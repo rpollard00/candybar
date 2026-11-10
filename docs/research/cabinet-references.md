@@ -70,7 +70,7 @@ All values are ESTIMATED from pixel positions in `photo-b.png`. The scale is 3.2
 - **Screen face.** A black bezel sits back between two raised white side cheeks. The front edges of the cheeks are rounded. The bezel is a rounded rectangle.
 - **Cheek to deck transition.** The reclined front edge of each cheek does not meet the deck at a corner. It sweeps forward in a concave curve into the side rail of the deck.
 - **Body taper.** In front view the body is narrower at the hood than at the deck.
-- **Control deck.** A thick slab with rounded plan corners. The lower part of its front and side faces is cut back in a facet. The control plate is a separate inset panel with a clear cover and four corner screws, with a border of white deck around it. It carries a ball-top lever, six buttons in two arcs, and a start button at the right.
+- **Control deck.** A thick slab. Its front edge, from the top down, is a radius, a shallow bevel band over about the upper 40 percent of the front, and then a front face that is close to vertical. Flat faces cut the front corners, seen from above. (An earlier reading, that the lower part was cut back, was wrong: the owner corrected it from `photo-e-three-quarter.png`.) The control plate is a separate inset panel with a clear cover and four corner screws, with a border of white deck around it. It carries a ball-top lever, six buttons in two arcs, and a start button at the right.
 - **Sides.** Flat side panels with a vertical rear edge. A colored stripe follows the front edge. Three short horizontal slots sit near the top of the side panel.
 - **Finish.** Gloss white body, one accent color for the lever, buttons, stripe and light strip. Small black feet.
 

@@ -61,6 +61,7 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 - The screen face: a bezel in the proportion of the 16:10 screen with an even frame of about 45 mm, on a body-colored band of about 60 mm, with a recline of about 30 degrees. The owner accepts a steeper sight line for this (about 36 degrees with the estimated eye position).
 - The bezel is about flush with the rails, and the screen is inset in the bezel. The rails read as broad members with a wide facet.
 - The front surface is continuous: the deck top, one concave bend, the screen face, and then the hood. The facet on the outside runs without a break from the front of the deck to the top of the hood.
+- The front edge of the deck, from the top down: the flat border, a radius, a shallow bevel band, and then the front face. This bevel band and the facet of the rail are one continuous band.
 
 ## Settled by the owner
 
