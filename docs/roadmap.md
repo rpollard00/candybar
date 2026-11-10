@@ -17,7 +17,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Variant D of the outer form exists as solids in `cad/candybar/shell` (five rounds). Its sheets are in `cad/out/shell-d`. Next: the owner chooses a screen face, then more rounds on the hood, the cheeks and the deck.
+1. Variant D of the outer form exists as solids in `cad/candybar/shell`, after eleven rounds on the body and deck and seven on the hood. Its sheets are in `cad/out/shell-d`. It is 495 x 540 x 582 mm. Next: the owner looks at the hood and the deck. Open on the hood: its depth front to back is about 0.19 of the width, against about 0.30 on the real cabinet.
 2. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
 3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
 4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
@@ -58,7 +58,7 @@ The owner asked for two more things on 2026-11-10: a complete rework of the hood
 - A cheek curve that is more subtle than on the MakerWorld model, and that runs smoothly all the way into the deck.
 - No holes in the front face of the deck.
 - A deck with the additional faces of the reference cabinet. Seen from above, the front is three faces: a center face that is square to the player and about half the width, and a face on each side of it that turns slightly outward. The turn is very subtle. (An earlier reading, flat faces that cut the corners at 45 degrees, was wrong.)
-- Measured from the photos (see `docs/research/photo-measurements.md`): the center face is 0.56 of the deck width; each flank turns back about 8 degrees; the corner radius is about 0.09 of the deck width; the crease on the front is one third of the way down, with the leaning band about one fifth of the front. The model does not have these values yet.
+- Measured from the photos (see `docs/research/photo-measurements.md`): the center face is 0.56 of the deck width; each flank turns back about 8 degrees; the corner radius is about 0.09 of the deck width; the crease on the front is one third of the way down, with the leaning band about one fifth of the front. The model has these values since round 11.
 - A visible cut between the top of the bezel and the hood.
 - A shorter deck. The control panel becomes about 396 x 175 mm (it was 396 x 240). The start, coin and menu buttons move from a row behind the main buttons to the right end of the panel, as on the reference cabinet. The deck is then about 195 to 215 mm from its front edge to the foot of the screen face.
 - The screen face: a bezel in the proportion of the 16:10 screen with an even frame of about 45 mm, on a body-colored band of about 60 mm, with a recline of about 30 degrees. The owner accepts a steeper sight line for this (about 36 degrees with the estimated eye position).
