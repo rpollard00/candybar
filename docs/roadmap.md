@@ -72,6 +72,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 
 - The look follows the reference cabinet. Practical choices belong to this project (decision record 0002).
 - Eight action buttons.
+- The cabinet must fit on a normal surface. Do not make the hood deeper unless the whole cabinet becomes deeper, and the owner does not want a deeper cabinet (2026-11-10).
 - The image is centered in the bezel. The owner first asked for a sight line of 15 to 25 degrees, and then chose a 16:10 bezel with more recline, which gives a steeper sight line.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
 - Control panels are swappable. A control panel for PC games is wanted beside the arcade one. It holds a keyboard, and a mouse area if there is room.
