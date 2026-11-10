@@ -34,7 +34,7 @@ def build_document(params_dir: Path = ROOT / "params", name: str = DOCUMENT) -> 
 
 def _populate(doc: App.Document, rows: list[params.Param]) -> None:
     params.write_sheet(doc, rows)
-    button_count = _button_count(doc)
+    button_count = _button_count_fixed_at_build(doc)
     builder = model.Model(doc, (row.name for row in rows))
     hardware.build(builder)
     panel.build(builder, button_count)
@@ -45,7 +45,7 @@ def _populate(doc: App.Document, rows: list[params.Param]) -> None:
     style.frame(doc)
 
 
-def _button_count(doc: App.Document) -> int:
+def _button_count_fixed_at_build(doc: App.Document) -> int:
     count = params.value(doc, "btn_count")
     if count not in panel.BUTTON_COUNTS:
         raise params.ParamError(f"btn_count must be one of {panel.BUTTON_COUNTS}, not {count:g}")

@@ -42,26 +42,51 @@ class SavedViewTest(unittest.TestCase):
         self.assertTrue(look()["gui_up"])
 
     def test_assemblies_solids_and_body_tips_are_shown(self) -> None:
-        for name in ("Monitor", "Monitor_Body", "Shell_Floor", "Deck_Lever", look()["tips"]["Deck_Lever"]):
+        shown = ("Monitor", "Monitor_Body", "Shell_Skin", "Hood_Marquee", "Deck_Lever", look()["tips"]["Deck_Lever"])
+        for name in shown:
             self.assertTrue(self.visible(name), name)
 
-    def test_every_tagged_solid_is_shown_unless_it_is_a_keepout(self) -> None:
+    def test_every_tagged_solid_is_shown_unless_it_is_a_keepout_or_an_alternate(self) -> None:
         tagged = {name: seen for name, seen in look()["objects"].items() if seen["role"]}
         self.assertGreater(len(tagged), 50)
-        wrong = [name for name, seen in tagged.items() if seen["visible"] != (seen["role"] != "keepout")]
+        wrong = [
+            name
+            for name, seen in tagged.items()
+            if seen["visible"] != (seen["role"] != "keepout" and not seen["alternate"])
+        ]
         self.assertEqual(wrong, [])
 
+    def test_one_bezel_plate_is_shown_and_its_alternates_are_hidden(self) -> None:
+        self.assertTrue(self.visible("Bezel_16x9"))
+        for name in ("Bezel_16x10", "Bezel_4x3", "Bezel_Tate"):
+            self.assertFalse(self.visible(name), name)
+
     def test_keepouts_sketches_earlier_features_origins_and_tools_are_hidden(self) -> None:
-        hidden = ("PSU_FanAir", "Shell_Profile", "Deck_Lever_Plate", "Deck_Lever_HoleSketch", "XY_Plane", "Shell_Bezel_Window")
-        for name in hidden:
+        hidden = ("PSU_FanAir", "Shell_SideProfile", "Shell_Envelope", "Deck_Lever_Plate", "Deck_Lever_HoleSketch", "XY_Plane")
+        for name in (*hidden, "Bezel_16x9_Window"):
             self.assertFalse(self.visible(name), name)
 
     def test_solids_carry_the_colour_of_their_role(self) -> None:
-        for name, role in (("Monitor_Body", "hardware"), ("Shell_Floor", "massing"), (look()["tips"]["Deck_Lever"], "printable")):
+        samples = (
+            ("Monitor_Body", "hardware"),
+            ("Shell_Skin", "massing"),
+            ("Bezel_16x9", "trim"),
+            ("Hood_SpeakerL", "trim"),
+            (look()["tips"]["Deck_Lever"], "printable"),
+        )
+        for name, role in samples:
             seen, style = look()["objects"][name], ROLE_STYLES[role]
             for channel, expected in zip(seen["colour"], style.shape_colour, strict=True):
                 self.assertAlmostEqual(channel, expected, places=3, msg=name)
             self.assertEqual(seen["transparency"], style.transparency, name)
+
+    def test_shell_is_opaque_until_asked_to_be_seen_through(self) -> None:
+        self.assertEqual(look()["objects"]["Shell_Skin"]["transparency"], 0)
+        through, again = look()["seen_through"], look()["opaque_again"]
+        for name in ("Shell_Skin", "Bezel_16x9", "Hood_Marquee"):
+            self.assertGreater(through[name], 50, name)
+            self.assertEqual(again[name], 0, name)
+        self.assertEqual(through["Monitor_Body"], 0)
 
     def test_document_opens_on_the_isometric_view(self) -> None:
         for component, expected in zip(look()["view_direction"], (-0.57735, 0.57735, -0.57735), strict=True):

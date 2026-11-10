@@ -27,7 +27,7 @@ def write(doc: App.Document, out_dir: Path) -> None:
                 Shape=part.own, LinearDeflection=STL_LINEAR_DEFLECTION, AngularDeflection=STL_ANGULAR_DEFLECTION, Relative=False
             )
             mesh.write(str(stl_dir / f"{part.name}.stl"))
-    _write_layout([solid for solid in solids if solid.role != "keepout"], out_dir / LAYOUT_STEP)
+    _write_layout([solid for solid in solids if solid.role != "keepout" and not solid.alternate], out_dir / LAYOUT_STEP)
 
 
 def _write_layout(solids: Sequence[model.Placed], path: Path) -> None:

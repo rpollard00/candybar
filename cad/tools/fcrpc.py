@@ -8,7 +8,7 @@ session and capture the 3D view.
     fcrpc.py exec path/to/script.py
     fcrpc.py exec -c "print(FreeCAD.ActiveDocument.Name)"
     fcrpc.py shot out.png --view Isometric --width 1600 --height 1000
-    fcrpc.py show [--keepouts]
+    fcrpc.py show [--inside] [--keepouts]
 """
 import argparse
 import base64
@@ -18,7 +18,8 @@ from pathlib import Path
 
 URL = "http://127.0.0.1:9875"
 VIEWS = ["Isometric", "Front", "Top", "Right", "Back", "Left", "Bottom", "Dimetric", "Trimetric"]
-SAVED = Path(__file__).resolve().parents[1] / "out" / "candybar.FCStd"
+CAD = Path(__file__).resolve().parents[1]
+SAVED = CAD / "out" / "candybar.FCStd"
 
 # An earlier copy of the document is closed first, unless it has unsaved
 # changes: those belong to the person at the screen.
@@ -38,6 +39,15 @@ if {keepouts!r}:
     for obj in doc.Objects:
         if getattr(obj, "CB_Role", "") == "keepout":
             obj.ViewObject.Visibility = True
+if {inside!r}:
+    import sys
+    if {cad!r} not in sys.path:
+        sys.path.insert(0, {cad!r})
+    for name in [n for n in sys.modules if n == "candybar" or n.startswith("candybar.")]:
+        del sys.modules[name]
+    from candybar import style
+    style.see_through(doc)
+if {keepouts!r} or {inside!r}:
     doc.recompute()
     FreeCADGui.getDocument(doc.Name).Modified = False
     FreeCADGui.ActiveDocument.ActiveView.fitAll()
@@ -69,7 +79,8 @@ def cmd_shot(server, args):
 
 
 def cmd_show(server, args):
-    result = server.execute_code(SHOW.format(path=str(SAVED), keepouts=args.keepouts), 120)
+    code = SHOW.format(path=str(SAVED), cad=str(CAD), keepouts=args.keepouts, inside=args.inside)
+    result = server.execute_code(code, 120)
     print(result.get("message") or result.get("error") or result)
     return 0 if result.get("success") else 1
 
@@ -97,6 +108,7 @@ def main():
 
     p_show = sub.add_parser("show", help="open cad/out/candybar.FCStd in the running FreeCAD")
     p_show.add_argument("--keepouts", action="store_true", help="also show the keep-out zones")
+    p_show.add_argument("--inside", action="store_true", help="make the shell translucent to show the hardware")
     p_show.set_defaults(run=cmd_show)
 
     args = parser.parse_args()

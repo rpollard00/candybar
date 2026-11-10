@@ -21,8 +21,11 @@ def decorate(path: Path) -> None:
     longer describe the saved file. If it does not, the file is left unsaved.
 
     This switches off backup files and thumbnails in FreeCAD's user settings,
-    so it belongs in the throwaway user directory that freecad-run.sh provides.
+    so it refuses to run outside the throwaway user directory that freecad-run.sh provides.
     """
+    throwaway = os.environ.get("CANDYBAR_THROWAWAY_HOME")
+    if not throwaway or Path(App.getUserAppDataDir()).resolve() != Path(throwaway).resolve():
+        raise RuntimeError("decorate changes FreeCAD's user settings: run it with freecad-run.sh, in a throwaway user directory")
     if not App.GuiUp:
         raise RuntimeError("view settings need FreeCAD's GUI binary: run this step with freecad-run.sh --gui")
     settings = App.ParamGet("User parameter:BaseApp/Preferences/Document")

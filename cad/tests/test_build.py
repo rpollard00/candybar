@@ -22,6 +22,11 @@ class BuildDocumentTest(unittest.TestCase):
         self.assertEqual(len(support.hole_centres(tile, params.value(doc, "btn_hole_d"))), 6)
         self.assertEqual(support.fail_rows(check.run(doc)), set())
 
+    def test_lever_tile_has_an_insert_hole_in_each_boss(self) -> None:
+        with support.saved_document() as doc:
+            tile = doc.getObject("Deck_Lever").Shape
+            self.assertEqual(len(support.hole_centres(tile, params.value(doc, "stick_insert_d"))), 4)
+
     def test_failed_build_closes_the_document_it_started(self) -> None:
         with self.assertRaisesRegex(params.ParamError, "btn_count must be one of"):
             build.build_document(support.params_copy({"btn_count": "7"}), name=NAME)

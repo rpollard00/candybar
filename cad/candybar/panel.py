@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import FreeCAD as App
 
-from .model import ZERO, Assembly, Model, Prim, ball, box, cyl
+from .model import ZERO, Assembly, Model, Prim, Side, ball, box, cyl
 
 OWNER = "ControlPanel"
 ACTION_NUT = "action_nut"
@@ -150,14 +150,14 @@ def _deck_lever(model: Model, part: App.DocumentObject) -> None:
     bosses = model.sketch(body, f"{name}_BossSketch", "XY_Plane")
     for label, x, y in BOSSES:
         bosses.circle(label, x, y, "stick_boss_d")
-    model.pad(body, f"{name}_Bosses", bosses, "stick_plate_drop", reversed_=True)
+    model.pad(body, f"{name}_Bosses", bosses, "stick_plate_drop", Side.AGAINST_NORMAL)
     shaft: Hole = ("shaft", LEVER_X, LEVER_Y, "stick_shaft_hole_d")
     _through_holes(model, body, name, (shaft, *_fix_holes("-panel_w / 2 + panel_fix_inset")))
     inserts = model.sketch(body, f"{name}_InsertSketch", "XY_Plane", offset=PLATE_Z)
     for label, x, y in BOSSES:
         inserts.circle(label, x, y, "stick_insert_d")
-    # The sketch lies on the boss faces; a reversed pocket cuts upward into the bosses.
-    model.pocket(body, f"{name}_Inserts", inserts, "stick_insert_depth", reversed_=True)
+    # The sketch lies on the boss faces and its normal points up, into the bosses.
+    model.pocket(body, f"{name}_Inserts", inserts, "stick_insert_depth", Side.ALONG_NORMAL)
 
 
 def _deck_buttons(model: Model, part: App.DocumentObject, button_holes: tuple[Hole, ...]) -> None:
@@ -170,7 +170,7 @@ def _plate(model: Model, part: App.DocumentObject, name: str, x0: str, x1: str) 
     body = model.body(part, name, OWNER)
     outline = model.sketch(body, f"{name}_OutlineSketch", "XY_Plane")
     outline.rectangle(x0, x1, ZERO, "panel_d")
-    model.pad(body, f"{name}_Plate", outline, "deck_t", reversed_=True)
+    model.pad(body, f"{name}_Plate", outline, "deck_t", Side.AGAINST_NORMAL)
     return body
 
 
@@ -178,4 +178,4 @@ def _through_holes(model: Model, body: App.DocumentObject, name: str, holes: tup
     sketch = model.sketch(body, f"{name}_HoleSketch", "XY_Plane")
     for label, x, y, diameter in holes:
         sketch.circle(label, x, y, diameter)
-    model.pocket(body, f"{name}_Holes", sketch, None, reversed_=False)
+    model.pocket(body, f"{name}_Holes", sketch, None, Side.AGAINST_NORMAL)

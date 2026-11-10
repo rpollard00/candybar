@@ -34,8 +34,11 @@ def baseline() -> tuple[Path, check.Report]:
     return out, build.run(PARAMS, out, renders=False)
 
 
-def shell_build(params_dir: Path, extra_env: dict[str, str] | None = None) -> tuple[subprocess.CompletedProcess[str], Path]:
-    out = temp_dir()
+def shell_build(
+    params_dir: Path, extra_env: dict[str, str] | None = None, out: Path | None = None
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Run build.sh without renders, into `out` or a fresh directory: (finished process, output directory)."""
+    out = out or temp_dir()
     env = os.environ | {"CANDYBAR_PARAMS": str(params_dir), "CANDYBAR_OUT": str(out)} | (extra_env or {})
     return subprocess.run([str(BUILD), "--no-render"], env=env, capture_output=True, text=True), out
 
@@ -95,6 +98,11 @@ def hole_centres(shape: Part.Shape, diameter: float) -> list[tuple[float, float]
 def underside_z(shape: Part.Shape) -> float:
     looking_down = [face for face in shape.Faces if isinstance(face.Surface, Part.Plane) and face.normalAt(0, 0).z < -0.99]
     return max(looking_down, key=lambda face: face.Area).CenterOfMass.z
+
+
+def width_at(shape: Part.Shape, z: float) -> float:
+    """The extent along x of a horizontal section through the shape."""
+    return Part.makeCompound(shape.slice(App.Vector(0, 0, 1), z)).BoundBox.XLength
 
 
 def fail_rows(report: check.Report, *rules: str) -> set[tuple[str, str]]:

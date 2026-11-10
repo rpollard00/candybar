@@ -31,7 +31,8 @@ home=$(mktemp -d "$state/home.XXXXXX") || exit 1
 trap 'rm -rf "$home"' EXIT
 status=$home/status
 
-CANDYBAR_ROOT=$root CANDYBAR_OUT=$out CANDYBAR_MODULE=$module CANDYBAR_STATUS=$status FREECAD_USER_HOME=$home \
+CANDYBAR_ROOT=$root CANDYBAR_OUT=$out CANDYBAR_MODULE=$module CANDYBAR_STATUS=$status \
+  FREECAD_USER_HOME=$home CANDYBAR_THROWAWAY_HOME=$home \
   "${runner[@]}" "$root/candybar/launch.FCMacro" 3>&1 4>&2 >"$log" 2>&1 </dev/null
 ended=$?
 

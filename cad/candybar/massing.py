@@ -1,55 +1,210 @@
+"""The cabinet shell: one styled massing solid, and the trim plates in its bezel and hood.
+
+The outer form is the common of three extruded silhouettes, seen from the
+side, the front and above. Every corner and radius of those silhouettes is a
+sketch dimension bound to the parameter sheet, so no fillet refers to an edge
+of a boolean result. It is massing, not a set of printable parts.
+"""
 from __future__ import annotations
 
-from .model import ZERO, Assembly, Model, box, tag
+import FreeCAD as App
+
+from .model import ORIGIN, X_AXIS, Y_AXIS, Z_AXIS, ZERO, Assembly, Corner, Model, Pose, box, leaning_back, tag
 
 OWNER = "Shell"
-PROFILE = "Shell_Profile"
-ROLE = "massing"
+ENVELOPE = "Shell_Envelope"
+SKIN = "Shell_Skin"
 
-# The side silhouette on the global YZ plane: sketch x is global Y, sketch y is global Z.
-PROFILE_CORNERS = (
-    ("front_foot", ZERO, "foot_h"),
-    ("panel_front", ZERO, "cp_top_z"),
-    ("bezel_foot", "bezel_foot_y", "cp_top_z"),
-    ("bezel_top", "bezel_top_y", "bezel_top_z"),
-    ("hood_lip", "hood_lip_y", "bezel_top_z"),
-    ("roof_front", "top_front_y", "cab_h"),
-    ("roof_rear", "cab_d", "cab_h"),
-    ("rear_foot", "cab_d", "foot_h"),
+DECK_LEFT = "-deck_w / 2"
+
+# Sketch x is global Y, sketch y is global Z.
+SIDE_PROFILE = (
+    Corner("deck_foot", "deck_facet_in", "foot_h"),
+    Corner("deck_facet", ZERO, "foot_h + deck_facet_h"),
+    Corner("deck_front", ZERO, "cp_top_z", "deck_edge_r"),
+    Corner("cheek_foot", "cheek_foot_y", "cp_top_z", "sweep_r"),
+    Corner("cheek_top", "cheek_top_y", "bezel_top_z"),
+    Corner("hood_lip", "hood_lip_y", "bezel_top_z"),
+    Corner("hood_top", "hood_top_y", "cab_h", "hood_r"),
+    Corner("roof_rear", "cab_d", "cab_h"),
+    Corner("rear_foot", "cab_d", "foot_h"),
 )
 
-SIDES = (("Shell_SideL", "-outer_w / 2"), ("Shell_SideR", "inner_w / 2"))
-
-INNER_LEFT = "-inner_w / 2"
-FLOOR_TOP = "foot_h + floor_t"
-
-BOXES = (
-    box("Shell_Floor", ROLE, ("outer_w", "cab_d", "floor_t"), ("-outer_w / 2", ZERO, "foot_h")),
-    box("Shell_Rear", ROLE, ("inner_w", "rear_t", "cab_h - foot_h - floor_t"), (INNER_LEFT, "rear_inner_y", FLOOR_TOP)),
-    box("Shell_Front", ROLE, ("inner_w", "front_t", "cp_inner_h"), (INNER_LEFT, ZERO, FLOOR_TOP)),
-    box("Shell_Shelf", ROLE, ("inner_w", "shelf_depth", "deck_t"), (INNER_LEFT, "cp_depth", "cp_top_z - deck_t")),
-    box("Shell_Roof", ROLE, ("inner_w", "cab_d - top_front_y", "rear_t"), (INNER_LEFT, "top_front_y", "cab_h - rear_t")),
+# Sketch x is global X, sketch y is global Z. The right half, going up; the left half mirrors it.
+FRONT_RIGHT = (
+    Corner("deck_foot", "deck_w / 2 - deck_facet_in", "foot_h"),
+    Corner("deck_facet", "deck_w / 2", "foot_h + deck_facet_h"),
+    Corner("deck_edge", "deck_w / 2", "cp_top_z", "deck_edge_r"),
+    Corner("flare", "outer_w / 2", "cp_top_z", "flare_r"),
+    Corner("hood_corner", "outer_w / 2 - body_taper", "cab_h", "hood_corner_r"),
+)
+FRONT_INNER_RIGHT = (
+    Corner("floor", "inner_w / 2", "foot_h"),
+    Corner("roof", "inner_w / 2 - body_taper", "cab_h", "hood_corner_r - skin_t"),
 )
 
-# Local frame of the bezel: x from the left inner wall, y back from the bezel
-# front plane, z up the slope from the shelf.
-BEZEL = Assembly("Bezel", base=(INNER_LEFT, "bezel_foot_y", "cp_top_z"), axis=(-1.0, 0.0, 0.0), angle="recline")
-BEZEL_PLATE = box("Shell_Bezel_Plate", "", ("inner_w", "mon_setback", "bezel_len"), (ZERO, ZERO, ZERO))
-BEZEL_WINDOW = box(
-    "Shell_Bezel_Window",
-    "",
-    ("mon_active_w", "mon_setback", "mon_active_h"),
-    ("(inner_w - mon_active_w) / 2", ZERO, "mon_chin + mon_bezel_bottom"),
+# Sketch x is global X, sketch y is global Y.
+PLAN_PROFILE = (
+    Corner("front_left", DECK_LEFT, ZERO, "deck_corner_r"),
+    Corner("front_right", "deck_w / 2", ZERO, "deck_corner_r"),
+    Corner("rear_right", "deck_w / 2", "cab_d"),
+    Corner("rear_left", DECK_LEFT, "cab_d"),
+)
+
+# The slab of space in front of the bezel plane, from the deck top to the hood. Sketch x is global Y.
+RECESS_REACH = "150 mm"
+RECESS_PROFILE = (
+    Corner("bezel_foot", "bezel_foot_y", "cp_top_z"),
+    Corner("bezel_top", "bezel_top_y", "bezel_top_z"),
+    Corner("top_front", f"bezel_top_y - {RECESS_REACH}", "bezel_top_z"),
+    Corner("foot_front", f"bezel_foot_y - {RECESS_REACH}", "cp_top_z"),
+)
+
+# The flat shelf between the control panel and the bezel foot. Without it the hollow, which follows
+# the sweep of the cheek, would break through the deck top in front of the bezel.
+SHELF = box("Shell_Shelf", "", ("deck_w", "shelf_depth", "skin_t"), (DECK_LEFT, "cp_depth", "cp_top_z - skin_t"))
+
+# Tools cut 1 mm past both faces of a wall, so that no cut ends on a face of the solid it cuts.
+OPENINGS = (
+    box(
+        "Shell_PanelOpening",
+        "",
+        ("panel_w + 2 * panel_gap", "panel_d + 2 * panel_gap", "skin_t + 2 mm"),
+        ("-panel_w / 2 - panel_gap", "panel_y0 - panel_gap", "cp_top_z - skin_t - 1 mm"),
+    ),
+    box("Shell_PsuCutout", "", ("psu_w", "rear_t + 2 mm", "psu_h"), ("psu_x0", "rear_inner_y - 1 mm", "psu_z0")),
+    box(
+        "Shell_FanIntake",
+        "",
+        ("fan_frame", "rear_t + 2 mm", "fan_frame"),
+        ("vent_fan_x - fan_frame / 2", "rear_inner_y - 1 mm", "vent_fan_z - fan_frame / 2"),
+    ),
+    box(
+        "Shell_ExhaustVent",
+        "",
+        ("side_t + 2 mm", "vent_out_d", "bc_fin_w"),
+        ("-outer_w / 2 - 1 mm", "vent_out_y0", "vent_out_z0"),
+    ),
+)
+
+# The hood face frame: x across from the centre line, y into the hood, z up the face from the hood lip.
+HOOD_BASE = (ZERO, "hood_lip_y", "bezel_top_z")
+HOOD_TILT = "hood_tilt"
+# name, left edge, width, lower edge, height: on the hood face, x across and z up it.
+HOOD_PLATES = (
+    ("Hood_Marquee", "-marquee_w / 2", "marquee_w", "hood_band_z0", "marquee_h"),
+    ("Hood_SpeakerL", "-marquee_w / 2 - spk_gap - spk_w", "spk_w", "hood_band_z0", "spk_h"),
+    ("Hood_SpeakerR", "marquee_w / 2 + spk_gap", "spk_w", "hood_band_z0", "spk_h"),
+    ("Hood_Strip", "-strip_w / 2", "strip_w", "strip_z0", "strip_h"),
+)
+HOOD_FACE = Assembly(
+    "HoodFace",
+    base=HOOD_BASE,
+    pose=leaning_back(HOOD_TILT),
+    prims=tuple(box(name, "trim", (width, "skin_t", height), (x0, ZERO, z0)) for name, x0, width, z0, height in HOOD_PLATES),
+)
+# The same face as a sketch plane: sketch x across, sketch y up the face.
+HOOD_FACE_AS_SKETCH = Pose(X_AXIS, f"90 deg - {HOOD_TILT}")
+# The cutting slab is centred on the face: half of this is in front of it, half goes through the wall.
+HOOD_CUT_THROUGH = "2 * skin_t + 4 mm"
+
+# The bezel frame: x from the plate's left edge, y back from the bezel front plane, z up the slope from the shelf.
+BEZEL = Assembly("Bezel", base=("-bezel_w / 2", "bezel_foot_y", "cp_top_z"), pose=leaning_back("recline"))
+# name, window width, window height, is an alternate to the first.
+BEZEL_PLATES = (
+    ("Bezel_16x9", "mon_active_w", "win169_h", False),
+    ("Bezel_16x10", "mon_active_w", "mon_active_h", True),
+    ("Bezel_4x3", "win43_w", "mon_active_h", True),
+    ("Bezel_Tate", "wintate_w", "mon_active_h", True),
 )
 
 
 def build(model: Model) -> None:
-    shell = model.assembly(Assembly(OWNER, base=(ZERO, ZERO, ZERO), prims=BOXES))
-    profile = model.sketch(shell, PROFILE, "YZ_Plane")
-    profile.polygon(PROFILE_CORNERS)
-    for name, x in SIDES:
-        tag(model.extrusion(shell, name, profile, "side_t", (x, ZERO, ZERO)), ROLE, OWNER)
+    shell = model.assembly(Assembly(OWNER, base=ORIGIN))
+    side = _outline(model, shell, "Shell_SideProfile", "YZ_Plane", SIDE_PROFILE)
+    plan = _outline(model, shell, "Shell_PlanProfile", "XY_Plane", PLAN_PROFILE)
+    recess = _outline(model, shell, "Shell_RecessProfile", "YZ_Plane", RECESS_PROFILE)
+    envelope = _envelope(model, shell, side, plan, recess)
+    cavity = _cavity(model, shell, side, plan, recess)
+    openings = [model.solid(shell, opening, OWNER) for opening in OPENINGS]
+    voids = model.fuse(shell, "Shell_Voids", [cavity, *openings, _hood_openings(model, shell)])
+    tag(model.cut(shell, SKIN, envelope, voids), "massing", OWNER)
+    model.assembly(HOOD_FACE, parent=shell, owner=OWNER)
+    _bezel_plates(model, shell)
+
+
+def _outline(model: Model, shell: App.DocumentObject, name: str, plane: str, corners: tuple[Corner, ...]) -> App.DocumentObject:
+    sketch = model.sketch(shell, name, plane)
+    sketch.polygon(corners)
+    return sketch.obj
+
+
+def _mirrored(right: tuple[Corner, ...]) -> tuple[Corner, ...]:
+    """A closed outline symmetric about x = 0: the right half as given, then its mirror image going back down."""
+    left = tuple(Corner(f"left_{corner.name}", f"-({corner.x})", corner.y, corner.radius) for corner in reversed(right))
+    return right + left
+
+
+def _across_deck(model: Model, shell: App.DocumentObject, name: str, outline: App.DocumentObject) -> App.DocumentObject:
+    return model.extrusion(shell, name, outline, X_AXIS, "deck_w", (DECK_LEFT, ZERO, ZERO))
+
+
+def _envelope(
+    model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject, recess: App.DocumentObject
+) -> App.DocumentObject:
+    """The outer form, less the recess between the cheeks. Hardware must stay inside it."""
+    front = _outline(model, shell, "Shell_FrontProfile", "XZ_Plane", _mirrored(FRONT_RIGHT))
+    silhouettes = (
+        _across_deck(model, shell, "Shell_SideSolid", side),
+        model.extrusion(shell, "Shell_FrontSolid", front, Y_AXIS, "cab_d"),
+        model.extrusion(shell, "Shell_PlanSolid", plan, Z_AXIS, "cab_h"),
+    )
+    outer = model.common(shell, "Shell_Outer", silhouettes)
+    between_cheeks = model.extrusion(shell, "Shell_Recess", recess, X_AXIS, "bezel_w", ("-bezel_w / 2", ZERO, ZERO))
+    return model.cut(shell, ENVELOPE, outer, between_cheeks)
+
+
+def _cavity(
+    model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject, recess: App.DocumentObject
+) -> App.DocumentObject:
+    """The hollow inside: the silhouettes moved inward by the wall thickness, less the cheeks and the shelf.
+
+    Nothing in front of the bezel plane and above the deck top is hollow, so the cheeks stay solid.
+    """
+    front = _outline(model, shell, "Shell_FrontInner", "XZ_Plane", _mirrored(FRONT_INNER_RIGHT))
+    side_inner = model.offset(shell, "Shell_SideInner", side, "-skin_t")
+    plan_inner = model.offset(shell, "Shell_PlanInner", plan, "-skin_t")
+    silhouettes = (
+        _across_deck(model, shell, "Shell_SideInnerSolid", side_inner),
+        model.extrusion(shell, "Shell_FrontInnerSolid", front, Y_AXIS, "cab_d"),
+        model.extrusion(shell, "Shell_PlanInnerSolid", plan_inner, Z_AXIS, "cab_h"),
+    )
+    block = model.common(shell, "Shell_CavityBlock", silhouettes)
+    in_front_of_bezel = _across_deck(model, shell, "Shell_RecessFull", recess)
+    kept = model.fuse(shell, "Shell_KeptSolid", (in_front_of_bezel, model.solid(shell, SHELF, OWNER)))
+    return model.cut(shell, "Shell_Cavity", block, kept)
+
+
+def _hood_openings(model: Model, shell: App.DocumentObject) -> App.DocumentObject:
+    """One tool through the hood face for all the plates set into it."""
+    sketch = model.posed_sketch(shell, "Shell_HoodOpeningSketch", HOOD_BASE, HOOD_FACE_AS_SKETCH)
+    for name, x0, width, z0, height in HOOD_PLATES:
+        sketch.rectangle(x0, f"{x0} + {width}", z0, f"{z0} + {height}", name=f"{name}_")
+    return model.slab(shell, "Shell_HoodOpenings", sketch.obj, HOOD_CUT_THROUGH)
+
+
+def _bezel_plates(model: Model, shell: App.DocumentObject) -> None:
     bezel = model.assembly(BEZEL, parent=shell)
-    plate = model.solid(bezel, BEZEL_PLATE, OWNER)
-    window = model.solid(bezel, BEZEL_WINDOW, OWNER)
-    tag(model.cut(bezel, "Shell_Bezel", plate, window), ROLE, OWNER)
+    for name, window_w, window_h, alternate in BEZEL_PLATES:
+        plate = model.solid(bezel, box(f"{name}_Plate", "", ("bezel_w", "mon_setback", "bezel_len"), ORIGIN), OWNER)
+        window = model.solid(
+            bezel,
+            box(
+                f"{name}_Window",
+                "",
+                (window_w, "mon_setback + 2 mm", window_h),
+                (f"(bezel_w - {window_w}) / 2", "-1 mm", f"win_cz - {window_h} / 2"),
+            ),
+            OWNER,
+        )
+        tag(model.cut(bezel, name, plate, window), "trim", OWNER, alternate=alternate)

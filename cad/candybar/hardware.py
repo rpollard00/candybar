@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from .model import ZERO, Assembly, Model, box
-
-ORIGIN = (ZERO, ZERO, ZERO)
+from .model import ORIGIN, X_AXIS, ZERO, Assembly, Model, Pose, box, leaning_back
 
 # Local frame: x across the screen from its left edge, y from the front glass
 # toward the back, z up the screen from its bottom edge.
 MONITOR = Assembly(
     "Monitor",
     base=("-mon_w / 2", "mon_bottom_y", "mon_bottom_z"),
-    axis=(-1.0, 0.0, 0.0),
-    angle="recline",
+    pose=leaning_back("recline"),
     prims=(
         box("Monitor_Body", "hardware", ("mon_w", "mon_t", "mon_h"), ORIGIN),
         box("Monitor_Cradle", "keepout", ("mon_w", "cradle_t", "mon_h"), (ZERO, "mon_t", ZERO)),
@@ -29,14 +26,17 @@ MONITOR = Assembly(
     ),
 )
 
+# The board stands on its stepped long edge with its straight long edge on top:
+# local y points down, and local z, the heatsink side, points at the rear door.
+ON_LONG_EDGE_HEATSINK_TO_REAR = Pose(X_AXIS, -90.0)
+
 # Local frame is the board datum: x from the I/O edge toward the power end, y
 # from the straight long edge toward the stepped edge, z up from the PCB top
 # face toward the heatsink.
 COMPUTE = Assembly(
     "Compute",
     base=("bc_x0", "bc_pcb_y", "bc_top_z"),
-    axis=(1.0, 0.0, 0.0),
-    angle=-90.0,
+    pose=ON_LONG_EDGE_HEATSINK_TO_REAR,
     prims=(
         box("Compute_PCB_IO", "hardware", ("bc_pcb_step_x", "bc_pcb_w_io", "bc_pcb_t"), (ZERO, ZERO, "-bc_pcb_t")),
         box(
