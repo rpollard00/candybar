@@ -24,6 +24,8 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 Modelling and iteration run on Opus subagents. The main session writes the brief and reviews the renders.
 
+The owner asked for two more things on 2026-11-10: a complete rework of the hood by a Fable agent, with a real New Astro City as a further reference, and tools that take measurements from the reference photos, because readings by eye were wrong several times. The photo tools go into `cad/tools/`, their picked points into `cad/reference/`, and their results into `docs/research/photo-measurements.md`.
+
 ## Waiting for the owner
 
 - [ ] Monitor: body width, height and thickness. Is it the flat model with no stand? Heights of the three ports on the left edge. Plug length with the bend, for the real cables.
