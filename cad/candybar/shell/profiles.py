@@ -102,16 +102,79 @@ def edge_section(d: Blueprint) -> Path:
     return [arc, Line(arc.at(arc.a1), (0.0, d.deck_lean_h))]
 
 
-def bend(d: Blueprint) -> Arc:
-    """The concave bend between the deck top and the screen face, in (y, z), from the deck up to the face."""
-    ya = d.foot_y - d.bend_t
-    return Arc((ya, d.deck_top + d.bend_r), d.bend_r, -math.pi / 2, -math.pi / 2 + math.radians(90.0 - d.recline))
+@dataclass(frozen=True)
+class Front:
+    """The front of the body in side view, in (y, z): the sweep up from the deck top, then the rail arc to the body top.
+
+    The rail arc is convex toward the player. Its chord runs from the end of the sweep to the front edge of the
+    body top; the recline of the cabinet is the angle of this chord, which is also the tangent of the arc at
+    mid chord and the recline of the flat screen behind it.
+    """
+    sweep: Arc
+    rail: Arc
+    chord: float
+    recline: float
+    sagitta: float
+    foot_lean: float
+    top_lean: float
+
+    def on_rail(self, d: Blueprint, s: float, below: float = 0.0) -> P2:
+        """The point of the rail arc in front of the point at s on the flat screen face, moved into the body by below."""
+        fy, fz = d.face(s)
+        mid = self.rail.at((self.rail.a0 + self.rail.a1) / 2)
+        rho = math.radians(self.recline)
+        t = (fy - mid[0]) * math.sin(rho) + (fz - mid[1]) * math.cos(rho)
+        a = (self.rail.a0 + self.rail.a1) / 2 - math.asin(max(-1.0, min(1.0, t / self.rail.r)))
+        a = min(max(a, self.rail.a1), self.rail.a0)
+        r = self.rail.r - below
+        return self.rail.c[0] + r * math.cos(a), self.rail.c[1] + r * math.sin(a)
+
+    def rise(self, d: Blueprint, s: float) -> float:
+        """How far the rail arc stands in front of the flat screen face at s, square to that face."""
+        y, z = self.on_rail(d, s)
+        fy, fz = d.face(s)
+        su, cu = d.u
+        return -(y - fy) * cu + (z - fz) * su
+
+    def chain(self, n_rail: int = 48, n_sweep: int = 14) -> list[tuple[float, float, P2]]:
+        """Points from the body top down the rail and round the sweep to the deck, each with the direction into the body."""
+        out = []
+        for i in range(n_rail + 1):
+            a = self.rail.a1 + (self.rail.a0 - self.rail.a1) * i / n_rail
+            out.append((*self.rail.at(a), (-math.cos(a), -math.sin(a))))
+        for i in range(1, n_sweep + 1):
+            a = self.sweep.a1 + (self.sweep.a0 - self.sweep.a1) * i / n_sweep
+            out.append((*self.sweep.at(a), (math.cos(a), math.sin(a))))
+        return out
 
 
-def front_profile(d: Blueprint) -> Path:
-    """Centre-line profile of the front in (y, z): deck top from its flat's front edge, bend, screen face to the body top."""
-    b = bend(d)
-    return [Line((d.edge_in, d.deck_top), b.at(b.a0)), b, Line(b.at(b.a1), d.face(d.top_s))]
+def front(d: Blueprint) -> Front:
+    """Solve the sweep and the rail arc: the sweep keeps its start and radius, and ends where the rail arc is tangent to it."""
+    centre = (d.foot_y - d.bend_t, d.deck_top + d.bend_r)
+    top = d.face(d.top_s)
+    turn = math.radians(d.rail_turn)
+    lean = math.radians(d.recline) - turn / 2
+    for _ in range(30):
+        foot = (centre[0] + d.bend_r * math.cos(lean), centre[1] - d.bend_r * math.sin(lean))
+        rho = math.atan2(top[0] - foot[0], top[1] - foot[1])
+        lean = rho - turn / 2
+    chord = math.dist(foot, top)
+    sweep = Arc(centre, d.bend_r, -math.pi / 2, -lean)
+    if turn < 1e-9:
+        r = 1e7
+        turn = 2 * math.asin(chord / (2 * r))
+    else:
+        r = chord / (2 * math.sin(turn / 2))
+    sagitta = r * (1 - math.cos(turn / 2))
+    mid = ((foot[0] + top[0]) / 2, (foot[1] + top[1]) / 2)
+    c = (mid[0] + (r - sagitta) * math.cos(rho), mid[1] - (r - sagitta) * math.sin(rho))
+    rail = Arc(c, r, math.pi - rho + turn / 2, math.pi - rho - turn / 2)
+    return Front(sweep, rail, chord, math.degrees(rho), sagitta, math.degrees(lean), math.degrees(rho + turn / 2))
+
+
+def body_half(d: Blueprint, z: float) -> float:
+    """Half the width of the body side at height z, with the bevel of the seam groove at its top."""
+    return d.side_x(z) - max(0.0, z - (d.body_top - d.seam_groove))
 
 
 def rear_profile(d: Blueprint) -> list[P2]:
@@ -200,14 +263,19 @@ class Hood:
 
 
 def hood_outline(d: Blueprint, height: float, half_base: float) -> Path:
-    """Right half of the cap seen from the front, in (x, z): a side that arcs inward, a long blend, half the top flat."""
-    a0 = math.radians(d.hood_side_lean)
-    rs = d.hood_side_r_ratio * d.width
-    c = (half_base - rs * math.cos(a0), -rs * math.sin(a0))
+    """Right half of the cap seen from the front, in (x, z): a side that carries on the arc of the body's tuck,
+    a long blend, half the top flat. The bevel of the seam groove at the foot is not in this outline."""
+    a0 = math.radians(d.tuck_lean)
     zb = d.hood_blend_from * height
-    ab = math.asin((zb - c[1]) / rs)
-    side = Arc(c, rs, a0, ab)
-    pb = side.at(ab)
+    if math.isinf(d.tuck_r):
+        side: Line | Arc = Line((half_base, 0.0), (half_base, zb))
+        pb, ab = (half_base, zb), 0.0
+    else:
+        rs = d.tuck_r
+        c = (half_base - rs * math.cos(a0), -rs * math.sin(a0))
+        ab = math.asin((zb - c[1]) / rs)
+        side = Arc(c, rs, a0, ab)
+        pb = side.at(ab)
     top = d.hood_top_flat_ratio * d.width / 2
     return [side, Conic(pb, (pb[0] - (height - zb) * math.tan(ab), height), (top, height), d.hood_blend_weight), Line((top, height), (0.0, height))]
 
@@ -225,7 +293,7 @@ def hood(d: Blueprint) -> Hood:
     height = d.hood_h - d.seam_gap
     origin = (0.0, d.seam_y + d.hood_shoulder_front, d.body_top + d.seam_gap)
     depth = d.depth - d.hood_shoulder_front - origin[1]
-    half_base = d.width / 2 - d.hood_shoulder
+    half_base = d.side_x(d.body_top) - d.hood_shoulder
     outline = sample(hood_outline(d, height, half_base), 3.0)
     z_open_top = height - d.hood_bar
     tm, tb = math.radians(d.marquee_tilt), math.radians(d.hood_band_tilt)
@@ -254,6 +322,8 @@ class Face:
     facing: str
     joins: str
     sets: str
+    curve: str
+    build: str
     polys: list[list[P3]] = field(default_factory=list)
     edges: list[list[P3]] = field(default_factory=list)
 
@@ -266,57 +336,75 @@ def mirror(polys: list[list[P3]]) -> list[list[P3]]:
     return [[(-x, y, z) for x, y, z in reversed(p)] for p in polys]
 
 
-FACES: dict[str, tuple[str, str, str, str, str]] = {
-    # id: (name, component, facing, joins, the dimension that sets it)
-    "DK1": ("deck top border", "deck", "faces up", "CP1, DK2, FB1, RL1", "deck_top 72; flat border 12 or more in front of the panel"),
-    "DK2": ("deck edge radius", "deck", "turns from up to 10 deg off vertical", "DK1, DK3", "deck_top_r 10.5, turning 80 deg"),
-    "DK3": ("deck edge band", "deck", "leans 10 deg from vertical, faces out", "DK2, DK4 to DK7 at the crease", "deck_lean 10, crease deck_lean_h 24 below the top"),
-    "DK4": ("deck front, centre face", "deck", "faces the player, vertical", "DK3, DK5", "deck_centre_frac 0.56 of the width"),
-    "DK5": ("deck front, flank", "deck", "vertical, turned back 8 deg", "DK4, DK6", "deck_flank 8"),
-    "DK6": ("deck front corner", "deck", "vertical, round in plan", "DK5, DK7", "deck_corner_frac 0.09 of the width (R 44.5)"),
-    "DK7": ("deck side", "deck", "faces sideways, vertical", "DK6, RL4 (same plane)", "at the full width; flush with RL4"),
-    "CP1": ("control panel", "control panel", "faces up", "DK1", "396 x 175, 2 below the deck top"),
-    "FB1": ("sweep", "front body", "concave, from up to the screen face", "DK1, FB2, RL1", "bend_r 50"),
-    "FB2": ("apron", "front body", "faces the player, reclined 30 deg", "FB1, BZ1, RL1", "band_len 60"),
-    "FB3": ("brow band", "front body", "faces the player, reclined 30 deg", "BZ1, FB4, RL1", "brow_ledge 12"),
-    "FB4": ("body top (shoulder)", "front body", "faces up", "FB3, RL1 to RL4, RB5, hood foot", "body_top 423.9; bare strip round the hood foot"),
-    "RL1": ("rail land", "rail", "faces the player, reclined 30 deg; follows the sweep", "BZ1, FB1 to FB3, RL2, DK1", "rail_land 16.0"),
-    "RL2": ("rail edge radius", "rail", "turns from the land to 10 deg off the side", "RL1, RL3, DK2", "same section as DK2"),
-    "RL3": ("rail edge band", "rail", "leans 10 deg from the side plane", "RL2, RL4 at the crease, DK3", "same section as DK3: 13.0 in, crease 24 behind the land"),
-    "RL4": ("side band", "rail", "faces sideways, vertical", "RL3, DK7 (same plane), RB2, FB4", "at the full width, 138 deep at the desk; carries the stripe"),
-    "BZ1": ("bezel face", "bezel", "faces the player, reclined 30 deg", "RL1, FB2, FB3, BZ2", "434.7 x 305.4, 2 behind the land"),
-    "BZ2": ("bezel step", "bezel", "faces the player, reclined 30 deg", "BZ1, SC1", "10 wide, 8 deeper"),
-    "BZ3": ("bezel step walls", "bezel", "face the centre of the screen", "BZ1, BZ2, SC1", "8 deep each"),
-    "SC1": ("screen", "bezel", "faces the player, reclined 30 deg", "BZ3", "344.7 x 215.4, 18 behind the land"),
-    "RB1": ("rear body side", "rear body", "faces sideways, vertical", "RB2, RB3 to RB5", "rear_w 470.7: in by the hood's shoulder, so the hood's side stands over it"),
-    "RB2": ("step", "rear body", "faces out and back, 45 deg in plan, leans 28 deg", "RL4, RB1", "foot 138 behind the deck (0.28 W); 12 deep"),
-    "RB3": ("lower rear wall", "rear body", "faces the rear, vertical", "RB1, RB2, RB4, RB6", "body_d 540"),
-    "RB4": ("rear slope", "rear body", "faces the rear and down, 45 deg", "RB3, RB5", "z 310 to 350"),
-    "RB5": ("upper rear wall", "rear body", "faces the rear, vertical", "RB4, FB4", "rear_proud 40 behind the lower wall"),
-    "RB6": ("rear door", "rear body", "faces the rear, vertical", "RB3", "368 x 188"),
-    "FL1": ("underside", "floor", "faces down", "DK4 to DK7, RL4, RB1 to RB3", "on the desk (feet not designed)"),
-    "HC1": ("hood leg, front face", "hood cap", "faces the player, upright", "HC4, HC11, HC3", "hood_bar 21 less the soft edge; leans in with the side"),
-    "HC2": ("hood top bar, front face", "hood cap", "faces the player, upright", "HC4, HC10", "hood_bar 21 less the soft edge"),
-    "HC3": ("hood sill, front face", "hood cap", "faces the player, upright", "HC1, HC12", "hood_sill_h 17"),
-    "HC4": ("hood soft edge", "hood cap", "turns from the front to the side and the roof", "HC1, HC2, HC5 to HC7", "quarter ellipse 16 in, 32 back"),
-    "HC5": ("hood side", "hood cap", "faces sideways, leans in 7 to 15 deg on one arc", "HC4, HC6, HC9, FB4", "arc R 1.3 W from the foot"),
-    "HC6": ("hood side blend", "hood cap", "turns from the side to the roof", "HC5, HC7", "conic from 0.45 of the height to the top flat"),
-    "HC7": ("hood roof", "hood cap", "faces up", "HC4, HC6, HC8", "top flat 0.64 W wide"),
-    "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high"),
-    "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, FB4", "4 in from the upper rear wall"),
-    "HC10": ("hood soffit", "hood cap", "faces down", "HC2, MQ1", "under the top bar, back to the marquee"),
-    "HC11": ("hood leg, inner wall", "hood cap", "faces the centre line", "HC1, HB1, MQ1", "from the front plane back to the band"),
-    "HC12": ("hood ledge", "hood cap", "faces up", "HC3, HB1", "hood_ledge 14"),
-    "HC13": ("marquee lip", "hood cap", "faces the player", "MQ1, HB1", "6 high, 5 proud"),
-    "MQ1": ("marquee cover", "marquee", "faces down 18 deg toward the player", "HC10, HC11, HC13, MQ2", "ends follow the blend of the opening"),
-    "MQ2": ("marquee window", "marquee", "faces down 18 deg toward the player", "MQ1", "straight, 34 high"),
-    "HB1": ("hood band", "hood band", "leans back 24 deg", "HC12, HC11, HC13, SP1, LG1", "foot on the ledge"),
-    "SP1": ("speaker form", "hood band", "parallel to the band", "HB1, SP2", "13 proud; outer end parallel to the leg"),
-    "SP2": ("speaker grille", "hood band", "parallel to the band", "SP1", "set 1.5 into the form"),
-    "SP3": ("speaker form walls", "hood band", "square to the band", "SP1, HB1", "13 high, top edge R 4"),
-    "LG1": ("logo form", "hood band", "parallel to the band", "HB1, LG2", "5 proud"),
-    "LG2": ("logo plate", "hood band", "parallel to the band", "LG1", "166 wide"),
-    "LG3": ("logo form walls", "hood band", "square to the band", "LG1, HB1", "5 high"),
+FLAT, SINGLE, DOUBLE = "flat", "single-curved", "double-curved"
+FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
+    # id: (name, component, facing, joins, the dimension that sets it, curvature, how to build it and what it means for the print)
+    "DK1": ("deck top border", "deck", "faces up", "CP1, DK2, FB1, RL1", "deck_top 72; flat border 12 or more in front of the panel", FLAT, "extrusion"),
+    "DK2": ("deck edge radius", "deck", "turns from up to 10 deg off vertical", "DK1, DK3", "deck_top_r 10.5, turning 80 deg",
+            "single-curved; double-curved round the corners", "sweep of the edge section along the deck outline"),
+    "DK3": ("deck edge band", "deck", "leans 10 deg from vertical, faces out", "DK2, DK4 to DK7 at the crease", "deck_lean 10, crease deck_lean_h 24 below the top",
+            "flat; single-curved round the corners", "the same sweep"),
+    "DK4": ("deck front, centre face", "deck", "faces the player, vertical", "DK3, DK5", "deck_centre_frac 0.56 of the width", FLAT, "extrusion of the deck outline"),
+    "DK5": ("deck front, flank", "deck", "vertical, turned back 8 deg", "DK4, DK6", "deck_flank 8", FLAT, "extrusion of the deck outline"),
+    "DK6": ("deck front corner", "deck", "vertical, round in plan", "DK5, DK7", "deck_corner_frac 0.09 of the width (R 44.5)", SINGLE, "extrusion of the deck outline"),
+    "DK7": ("deck side", "deck", "faces sideways, vertical", "DK6, RL4 (same plane)", "at the full width; flush with RL4", FLAT, "extrusion of the deck outline"),
+    "CP1": ("control panel", "control panel", "faces up", "DK1", "396 x 175, 2 below the deck top", FLAT, "cut plate"),
+    "FB1": ("sweep", "front body", "concave, from up to the foot of the rail arc", "DK1, FB2, RL1", "bend_r 50, turning 68 deg", SINGLE,
+            "extrusion of the side profile across the width"),
+    "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 60", SINGLE, "extrusion of the side profile across the width"),
+    "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB4, RL1", "brow_ledge 12", SINGLE, "extrusion of the side profile across the width"),
+    "FB4": ("body top", "front body", "faces up", "FB3, RL1 to RL4, RB5, hood foot", "body_top 423.9; under the hood, bare for 4 at the front and rear", FLAT, "plane cut"),
+    "RL1": ("rail land", "rail", "faces the player; one convex arc in side view, chord reclined 30 deg", "BZ1, FB1 to FB3, RL2, DK1",
+            "rail_sagitta_ratio 0.035 of the chord (13.0); 16.0 wide, 10.1 at the top of the bezel", SINGLE,
+            "extrusion of the side profile; on a print that stands upright the arc is in the layer plane and prints smooth"),
+    "RL2": ("rail edge radius", "rail", "turns from the land to 10 deg off the side", "RL1, RL3, DK2", "same section as DK2", DOUBLE,
+            "sweep of the edge section along the rail arc; above the start of the tuck the path leaves the side plane, so loft between sections there"),
+    "RL3": ("rail edge band", "rail", "leans 10 deg from the side", "RL2, RL4 at the crease, DK3", "same section as DK3: 13.0 in, crease 24 behind the land", DOUBLE,
+            "the same sweep and loft"),
+    "RL4": ("side band", "rail", "faces sideways; vertical up to 0.75 of the body height, then leans in on one arc", "RL3, DK7 (same plane), RB2, hood side HC5",
+            "body_tuck_ratio 0.015 (7.4 in at the seam, 9.6 deg there); carries the stripe", "flat; single-curved above the start of the tuck",
+            "extrusion of the front outline of the side along the depth; a stripe decal lies flat on it"),
+    "BZ1": ("bezel land", "bezel", "faces the player; follows the rail arc, 2 below the rail land", "RL1, FB2, FB3, BZ2", "434.7 x 305.4 outside, bezel_land 20 wide", SINGLE,
+            "extrusion; print the plate on its long edge, or the back down with layer steps on the land"),
+    "BZ2": ("bezel inner frame", "bezel", "slopes in toward the screen, 40 to 47 deg from the land", "BZ1, BZ3", "from the land down to a flat rim 2 above the screen",
+            "flat at the top and bottom; ruled and twisted at the sides", "loft between the inner edge of the land (an arc) and the rim (a line)"),
+    "BZ3": ("bezel rim wall", "bezel", "faces the centre of the screen", "BZ2, SC1", "bezel_rim 2 deep", FLAT, "extrusion"),
+    "SC1": ("screen", "bezel", "faces the player, flat, reclined 30 deg", "BZ3", "344.7 x 215.4; 18 behind the chord of the rail, 25 to 31 behind the rail land", FLAT, "the monitor"),
+    "RB1": ("rear body side", "rear body", "faces sideways; vertical, then leans in with the side band", "RB2, RB3 to RB5", "12 in from the side band", "flat; single-curved above the start of the tuck",
+            "extrusion of the front outline of the side"),
+    "RB2": ("step", "rear body", "faces out and back, 45 deg in plan, leans 28 deg", "RL4, RB1", "foot 138 behind the deck (0.28 W); 12 deep", "flat; twisted above the start of the tuck",
+            "loft between the two edges of the step"),
+    "RB3": ("lower rear wall", "rear body", "faces the rear, vertical", "RB1, RB2, RB4, RB6", "body_d 540", FLAT, "extrusion"),
+    "RB4": ("rear slope", "rear body", "faces the rear and down, 45 deg", "RB3, RB5", "z 310 to 350", FLAT, "extrusion"),
+    "RB5": ("upper rear wall", "rear body", "faces the rear, vertical", "RB4, FB4", "rear_proud 40 behind the lower wall", FLAT, "extrusion"),
+    "RB6": ("rear door", "rear body", "faces the rear, vertical", "RB3", "368 x 188", FLAT, "plate"),
+    "FL1": ("underside", "floor", "faces down", "DK4 to DK7, RL4, RB1 to RB3", "on the desk (feet not designed)", FLAT, "extrusion"),
+    "HC1": ("hood leg, front face", "hood cap", "faces the player, upright", "HC4, HC11, HC3", "hood_bar 21 less the soft edge; its outline follows the side", FLAT, "extrusion of the front outline"),
+    "HC2": ("hood top bar, front face", "hood cap", "faces the player, upright", "HC4, HC10", "hood_bar 21 less the soft edge", FLAT, "extrusion of the front outline"),
+    "HC3": ("hood sill, front face", "hood cap", "faces the player, upright", "HC1, HC12", "hood_sill_h 17", FLAT, "extrusion of the front outline"),
+    "HC4": ("hood soft edge", "hood cap", "turns from the front to the side and the roof", "HC1, HC2, HC5 to HC7", "quarter ellipse 16 in, 32 back",
+            "single-curved along the top flat; double-curved along the side and the blend", "sweep of the quarter ellipse along the front outline (extrusions and revolutions; the blend needs a true sweep)"),
+    "HC5": ("hood side", "hood cap", "faces sideways; leans in 9.6 deg at the seam and 17 deg at the blend, on the arc of the body's tuck", "HC4, HC6, HC9, RL4",
+            "radius 1.06 W, the same centre line as the tuck; no shoulder: a groove of 3 at the seam", SINGLE,
+            "extrusion of the front outline along the depth; print the cap on its rear face so that this outline is in the layer plane"),
+    "HC6": ("hood side blend", "hood cap", "turns from the side to the roof", "HC5, HC7", "conic from 0.45 of the height to the top flat", SINGLE, "the same extrusion"),
+    "HC7": ("hood roof", "hood cap", "faces up", "HC4, HC6, HC8", "top flat 0.66 W wide; hood_crown_ratio 0: no crown", FLAT, "the same extrusion"),
+    "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high", SINGLE,
+            "extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions)"),
+    "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, FB4", "4 in from the upper rear wall", FLAT, "extrusion"),
+    "HC10": ("hood soffit", "hood cap", "faces down", "HC2, MQ1", "under the top bar, back to the marquee", FLAT, "extrusion"),
+    "HC11": ("hood leg, inner wall", "hood cap", "faces the centre line", "HC1, HB1, MQ1", "from the front plane back to the band", SINGLE, "extrusion of the opening outline"),
+    "HC12": ("hood ledge", "hood cap", "faces up", "HC3, HB1", "hood_ledge 14", FLAT, "extrusion"),
+    "HC13": ("marquee lip", "hood cap", "faces the player", "MQ1, HB1", "6 high, 5 proud", SINGLE, "extrusion across the width"),
+    "MQ1": ("marquee cover", "marquee", "faces down 18 deg toward the player", "HC10, HC11, HC13, MQ2", "ends follow the blend of the opening", FLAT, "plate"),
+    "MQ2": ("marquee window", "marquee", "faces down 18 deg toward the player", "MQ1", "straight, 34 high", FLAT, "plate"),
+    "HB1": ("hood band", "hood band", "leans back 24 deg", "HC12, HC11, HC13, SP1, LG1", "foot on the ledge", FLAT, "plate"),
+    "SP1": ("speaker form", "hood band", "parallel to the band", "HB1, SP2", "13 proud; outer end parallel to the leg", FLAT, "extrusion square to the band"),
+    "SP2": ("speaker grille", "hood band", "parallel to the band", "SP1", "set 1.5 into the form", FLAT, "plate"),
+    "SP3": ("speaker form walls", "hood band", "square to the band", "SP1, HB1", "13 high, top edge R 4", FLAT, "extrusion with a fillet"),
+    "LG1": ("logo form", "hood band", "parallel to the band", "HB1, LG2", "5 proud", FLAT, "extrusion square to the band"),
+    "LG2": ("logo plate", "hood band", "parallel to the band", "LG1", "166 wide", FLAT, "plate"),
+    "LG3": ("logo form walls", "hood band", "square to the band", "LG1, HB1", "5 high", FLAT, "extrusion"),
 }
 
 
@@ -335,13 +423,15 @@ def faces(d: Blueprint) -> dict[str, Face]:
         for e in edges or []:
             out[key].edges += [e] + ([[(-x, y, z) for x, y, z in e]] if both else [])
 
-    # chain A: down the screen face and round the bend, in the side plane; frame: in = -x, down = into the solid
-    b = bend(d)
-    chain_a = [(*d.face(d.top_s - (d.top_s - d.bend_t) * i / 40), (cu, -su)) for i in range(41)]
-    chain_a += [(*b.at(a), (math.cos(a), math.sin(a))) for a in [b.a1 + (b.a0 - b.a1) * i / 12 for i in range(1, 13)]]
-    rows_a = [[(hw - i, d.seam_y + dn / cu, d.body_top) for i, dn in sec]]
-    rows_a += [[(hw - i, y + ny * dn, z + nz * dn) for i, dn in sec] for y, z, (ny, nz) in chain_a]
-    land_out = [(hw - inset, y, z) for y, z, _ in chain_a]
+    # chain A: from the body top down the rail arc and round the sweep; frame: in = toward the centre line, down = into the body
+    fr = front(d)
+    chain_a = fr.chain()
+    n_rail = 49
+    lean_top = math.radians(fr.top_lean)
+    seam_x = d.side_x(d.body_top)
+    rows_a = [[(seam_x - i, d.seam_y + dn / math.cos(lean_top), d.body_top) for i, dn in sec]]
+    rows_a += [[(d.side_x(z) - i, y + ny * dn, z + nz * dn) for i, dn in sec] for y, z, (ny, nz) in chain_a]
+    land_out = [(d.side_x(z) - inset, y, z) for y, z, _ in chain_a]
     land_in = [(xb, y, z) for y, z, _ in chain_a]
     add("RL1", strip(land_out, land_in), edges=[land_out, land_in])
     for j in range(len(sec) - 1):
@@ -349,36 +439,44 @@ def faces(d: Blueprint) -> dict[str, Face]:
     crease_a = [r[-1] for r in rows_a]
     add("RL3", [], edges=[crease_a, [r[n_radius - 1] for r in rows_a]])
     centre = [(y, z) for y, z, _ in chain_a]
-    cross = lambda pts: strip([(-xb, y, z) for y, z in pts], [(xb, y, z) for y, z in pts])
-    add("FB3", cross([d.face(d.top_s), d.face(d.bezel_s1)]), both=False)
-    add("FB2", cross([d.face(d.bezel_s0), d.face(d.bend_t)]), both=False)
-    add("FB1", cross(centre[40:]), both=False, edges=[[(-xb, *centre[-1]), (xb, *centre[-1])], [(-xb, *centre[40]), (xb, *centre[40])]])
 
-    # bezel and screen, in the plane of the screen face and behind it
+    def along(s0: float, s1: float, below: float = 0.0, n: int = 8) -> list[P2]:
+        """Points of the rail arc between two stations of the screen face, moved into the body by below."""
+        return [fr.on_rail(d, s0 + (s1 - s0) * k / n, below) for k in range(n + 1)]
+
+    def across(pts: list[P2], x0: float, x1: float) -> list[list[P3]]:
+        return strip([(x0, y, z) for y, z in pts], [(x1, y, z) for y, z in pts])
+
+    add("FB3", across(along(d.top_s, d.bezel_s1, n=3), -xb, xb), both=False)
+    add("FB2", across(along(d.bezel_s0, d.bezel_s0 - d.band_len, n=6) + centre[n_rail - 1:n_rail], -xb, xb), both=False)
+    add("FB1", across(centre[n_rail - 1:], -xb, xb), both=False,
+        edges=[[(-xb, *centre[-1]), (xb, *centre[-1])], [(-xb, *centre[n_rail - 1]), (xb, *centre[n_rail - 1])]])
+
+    # bezel: a land that follows the rail arc, an inner frame that slopes down to a flat rim, and the flat screen
     def on_face(x: float, s: float, behind: float) -> P3:
         y, z = d.face(s)
         return x, y + behind * cu, z - behind * su
 
-    def ring(outer: tuple[float, float, float, float], inner: tuple[float, float, float, float], behind: float) -> list[list[P3]]:
-        (ax, as0, bx, as1), (cx, cs0, dx, ds1) = outer, inner
-        o = [on_face(ax, as0, behind), on_face(bx, as0, behind), on_face(bx, as1, behind), on_face(ax, as1, behind)]
-        i = [on_face(cx, cs0, behind), on_face(dx, cs0, behind), on_face(dx, ds1, behind), on_face(cx, ds1, behind)]
-        return [[o[k], o[(k + 1) % 4], i[(k + 1) % 4], i[k]] for k in range(4)]
-
-    cs, sw = d.image_s, d.bezel_step_w
+    cs, bw, bl = d.image_s, d.bezel_w / 2, d.bezel_land
     win = (-MON_ACTIVE_W / 2, cs - MON_ACTIVE_H / 2, MON_ACTIVE_W / 2, cs + MON_ACTIVE_H / 2)
-    step = (win[0] - sw, win[1] - sw, win[2] + sw, win[3] + sw)
-    bez = (-d.bezel_w / 2, d.bezel_s0, d.bezel_w / 2, d.bezel_s1)
+    rim_depth = d.mon_setback - d.bezel_rim
+    s_in0, s_in1 = d.bezel_s0 + bl, d.bezel_s1 - bl
+    face = lambda s0, s1: along(s0, s1, 2.0, 14)
+    add("BZ1", across(face(d.bezel_s0, s_in0)[::7], -bw, bw) + across(face(s_in1, d.bezel_s1)[::7], -bw, bw), both=False)
+    add("BZ1", across(face(s_in0, s_in1), bw - bl, bw))
+    outer = [(bw, y, z) for y, z in face(d.bezel_s0, d.bezel_s1)]
+    inner = [(bw - bl, y, z) for y, z in face(s_in0, s_in1)]
+    add("BZ1", [], edges=[outer, inner])
+    add("BZ1", [], both=False, edges=[[(-bw, *p), (bw, *p)] for p in (outer[0][1:], outer[-1][1:])] + [[(-bw + bl, *p), (bw - bl, *p)] for p in (inner[0][1:], inner[-1][1:])])
+    rim_side = [on_face(win[2], win[1] + (win[3] - win[1]) * k / 14, rim_depth) for k in range(15)]
+    add("BZ2", strip(inner, rim_side), edges=[rim_side])
+    add("BZ2", [[(-bw + bl, *inner[0][1:]), (bw - bl, *inner[0][1:]), rim_side[0], (-rim_side[0][0], *rim_side[0][1:])],
+                [(-bw + bl, *inner[-1][1:]), (bw - bl, *inner[-1][1:]), rim_side[-1], (-rim_side[-1][0], *rim_side[-1][1:])]], both=False,
+        edges=[[(-p[0], *p[1:]), p] for p in (rim_side[0], rim_side[-1])])
     rect = lambda r, behind: [on_face(r[0], r[1], behind), on_face(r[2], r[1], behind), on_face(r[2], r[3], behind), on_face(r[0], r[3], behind)]
-    add("BZ1", ring(bez, step, 2.0), both=False, edges=[rect(bez, 2.0) + [on_face(bez[0], bez[1], 2.0)]])
-    add("BZ2", ring(step, win, 2.0 + d.bezel_step), both=False, edges=[rect(step, 2.0) + [on_face(step[0], step[1], 2.0)]])
-    add("SC1", [rect(win, d.mon_setback)], both=False, edges=[rect(win, d.mon_setback) + [on_face(win[0], win[1], d.mon_setback)]])
-
-    def walls(r: tuple[float, float, float, float], near: float, far: float) -> list[list[P3]]:
-        a, b = rect(r, near), rect(r, far)
-        return [[a[k], a[(k + 1) % 4], b[(k + 1) % 4], b[k]] for k in range(4)]
-
-    add("BZ3", walls(step, 2.0, 2.0 + d.bezel_step) + walls(win, 2.0 + d.bezel_step, d.mon_setback), both=False)
+    near, far = rect(win, rim_depth), rect(win, d.mon_setback)
+    add("BZ3", [[near[k], near[(k + 1) % 4], far[(k + 1) % 4], far[k]] for k in range(4)], both=False)
+    add("SC1", [far], both=False, edges=[far + far[:1]])
 
     # chain B: round the deck at the height of its top; frame: in = inward in plan, down = -z
     plan = deck_plan(d)
@@ -423,38 +521,48 @@ def faces(d: Blueprint) -> dict[str, Face]:
     panel = [(pw, py0 + d.panel_gap, d.panel_top), (pw, py1 - d.panel_gap, d.panel_top), (-pw, py1 - d.panel_gap, d.panel_top), (-pw, py0 + d.panel_gap, d.panel_top)]
     add("CP1", [panel], both=False, edges=[panel + panel[:1]])
 
-    # body top, side band, step, rear body
+    # body top, side band, step, rear body: every side face follows the tuck of the body toward the hood
     ys = d.seam_y
     t = math.tan(math.radians(d.step_lean))
-    rw = d.rear_w / 2
-    in_step = hw - rw
+    in_step = hw - d.rear_w / 2
+    crease = sorted({(round(z, 6), y) for _, y, z in crease_a})
+
+    def y_front(z: float) -> float:
+        """Front boundary of the side band at height z: the crease of the rail edge, or the seam to the deck below it."""
+        if z <= crease[0][0]:
+            return ya
+        for (z0, y0), (z1, y1) in zip(crease, crease[1:]):
+            if z0 <= z <= z1:
+                return y0 + (y1 - y0) * (z - z0) / (z1 - z0) if z1 > z0 else y0
+        return crease[-1][1]
 
     def y_rear(z: float) -> float:
         if z <= d.rear_step_z0:
             return d.body_d
         return min(d.depth, d.body_d + (z - d.rear_step_z0) * (d.depth - d.body_d) / (d.rear_step_z1 - d.rear_step_z0))
 
-    levels = sorted({0.0, d.rear_step_z0, d.rear_step_z1, d.body_top, *[d.body_top * i / 24 for i in range(25)]})
-    step_out = [(hw, min(d.step_y0 + z * t, y_rear(z)), z) for z in levels]
-    step_in = [(rw, min(d.step_y0 + in_step + z * t, y_rear(z)), z) for z in levels]
-    rear_in = [(rw, y_rear(z), z) for z in levels]
-    y_top = min(d.step_y0 + d.body_top * t, d.depth)
-    top_edge = [(hw - i, ys + dn / cu, d.body_top) for i, dn in sec]
-    right = [(0.0, ys, d.body_top), (hw - inset, ys, d.body_top)] + top_edge + [(hw, y_top, d.body_top), (rw, min(y_top + in_step, d.depth), d.body_top),
-                                                                               (rw, d.depth, d.body_top), (0.0, d.depth, d.body_top)]
-    add("FB4", [right], edges=[right[1:-1]])
-    band = [(hw, y, z) for _, y, z in crease_a] + [(hw, ya, 0.0)] + step_out
-    add("RL4", [band], edges=[band + band[:1]])
+    tuck_levels = [d.tuck_z0 + (d.body_top - d.tuck_z0) * k / 16 for k in range(17)]
+    levels = sorted({0.0, d.rear_step_z0, d.rear_step_z1, d.body_top - d.seam_groove, *tuck_levels, *[d.tuck_z0 * k / 20 for k in range(21)], *[z for z, _ in crease]})
+    band_front = [(body_half(d, z), y_front(z), z) for z in levels]
+    step_out = [(body_half(d, z), min(d.step_y0 + z * t, y_rear(z)), z) for z in levels]
+    step_in = [(body_half(d, z) - in_step, min(d.step_y0 + in_step + z * t, y_rear(z)), z) for z in levels]
+    rear_in = [(body_half(d, z) - in_step, y_rear(z), z) for z in levels]
+    add("RL4", strip(band_front, step_out), edges=[band_front, step_out, [band_front[0], step_out[0]]])
     add("RB2", strip(step_out, step_in), edges=[step_out, step_in])
     add("RB1", strip(step_in, rear_in), edges=[rear_in, [step_in[0], rear_in[0]]])
+    top_half = body_half(d, d.body_top)
+    y_top = min(d.step_y0 + d.body_top * t, d.depth)
+    top_edge = [(seam_x - i, ys + dn / math.cos(lean_top), d.body_top) for i, dn in sec]
+    right = [(0.0, ys, d.body_top), (seam_x - inset, ys, d.body_top)] + top_edge + [(top_half, y_top, d.body_top), (top_half - in_step, min(y_top + in_step, d.depth), d.body_top),
+                                                                                    (top_half - in_step, d.depth, d.body_top), (0.0, d.depth, d.body_top)]
+    add("FB4", [right], edges=[right[1:-1]])
+    rw = hw - in_step
     under = [(x, y, 0.0) for x, y, *_ in chain_b] + [(0.0, d.body_d, 0.0), (rw, d.body_d, 0.0), (rw, d.step_y0 + in_step, 0.0), (hw, d.step_y0, 0.0)]
     add("FL1", [under])
-    wall = [(-rw, d.body_d, 0.0), (rw, d.body_d, 0.0), (rw, d.body_d, d.rear_step_z0), (-rw, d.body_d, d.rear_step_z0)]
-    add("RB3", [wall], both=False, edges=[wall + wall[:1]])
-    slope = [(-rw, d.body_d, d.rear_step_z0), (rw, d.body_d, d.rear_step_z0), (rw, d.depth, d.rear_step_z1), (-rw, d.depth, d.rear_step_z1)]
-    add("RB4", [slope], both=False, edges=[slope + slope[:1]])
-    upper = [(-rw, d.depth, d.rear_step_z1), (rw, d.depth, d.rear_step_z1), (rw, d.depth, d.body_top), (-rw, d.depth, d.body_top)]
-    add("RB5", [upper], both=False, edges=[upper + upper[:1]])
+    for key, z0, z1 in (("RB3", 0.0, d.rear_step_z0), ("RB4", d.rear_step_z0, d.rear_step_z1), ("RB5", d.rear_step_z1, d.body_top)):
+        rows = [p for p in rear_in if z0 - 1e-9 <= p[2] <= z1 + 1e-9]
+        add(key, strip([(-x, y, z) for x, y, z in rows], rows), both=False, edges=[rows, [(-x, y, z) for x, y, z in rows], [(-rows[0][0], *rows[0][1:]), rows[0]],
+                                                                                [(-rows[-1][0], *rows[-1][1:]), rows[-1]]])
     dw = d.door_w / 2
     door = [(-dw, d.body_d + 0.5, d.door_z0), (dw, d.body_d + 0.5, d.door_z0), (dw, d.body_d + 0.5, d.door_z1), (-dw, d.body_d + 0.5, d.door_z1)]
     add("RB6", [door], both=False, edges=[door + door[:1]])
@@ -481,8 +589,11 @@ def faces(d: Blueprint) -> dict[str, Face]:
     right_sill = [at(x0, 0.0, 0.0)] + [at(x, 0.0, z) for x, z in corner]
     sill = right_sill + [(-x, y, z) for x, y, z in reversed(right_sill)]
     add("HC3", [sill], both=False, edges=[[at(x, 0.0, z) for x, z in corner] + [at(-x, 0.0, z) for x, z in reversed(corner)]])
-    side_front = [at(x, d.hood_edge_back, z) for x, z in h.outline]
-    side_rear = [at(x, h.y_rear(z), z) for x, z in h.outline]
+    g = d.seam_groove
+    side_line = ([(h.outline[0][0] - g, 0.0), (h.half_width(g), g)] if g > 0 else [h.outline[0]]) + [p for p in h.outline if p[1] > g + 1e-6]
+    nb = sum(1 for p in side_line if p[1] <= h.z_blend + 1e-6)
+    side_front = [at(x, d.hood_edge_back, z) for x, z in side_line]
+    side_rear = [at(x, h.y_rear(z), z) for x, z in side_line]
     add("HC5", strip(side_front[:nb], side_rear[:nb]), edges=[side_front[:nb], side_rear[:nb]])
     add("HC6", strip(side_front[nb - 1:-1], side_rear[nb - 1:-1]), edges=[[side_front[nb - 1], side_rear[nb - 1]], [side_front[-2], side_rear[-2]]])
     roof = [at(-h.half_top, d.hood_edge_back, h.height), at(h.half_top, d.hood_edge_back, h.height),
@@ -504,13 +615,13 @@ def faces(d: Blueprint) -> dict[str, Face]:
     rail = [at(-xr, yr, h.z_band_top), at(xr, yr, h.z_band_top), at(xr, yr, h.z_rail_top), at(-xr, yr, h.z_rail_top)]
     add("HC13", [rail], both=False, edges=[rail + rail[:1]])
 
-    def across(z0: float, z1: float, n: int = 10) -> list[list[P3]]:
+    def recess(z0: float, z1: float, n: int = 10) -> list[list[P3]]:
         zs = [z0 + (z1 - z0) * i / n for i in range(n + 1)]
         left = [at(-h.half_open(z, d), h.y_recess(z, d), z) for z in zs]
         return strip(left, [(-x, y, z) for x, y, z in left])
 
-    add("HB1", across(h.z_sill, h.z_band_top, 16), both=False)
-    add("MQ1", across(h.z_rail_top, h.z_open_top, 14), both=False)
+    add("HB1", recess(h.z_sill, h.z_band_top, 16), both=False)
+    add("MQ1", recess(h.z_rail_top, h.z_open_top, 14), both=False)
     tm, tb = math.radians(d.marquee_tilt), math.radians(d.hood_band_tilt)
 
     def on_plane(origin: P2, tilt: float, down: bool) -> Callable[[float, float, float], P3]:

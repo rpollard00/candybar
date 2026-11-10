@@ -4,6 +4,7 @@
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   -> cad/out/shell-d/reconstruction/k-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      -> cad/out/shell-d/reconstruction/m-*.png, r-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py compare     -> cad/out/shell-d/sheet-side-profile.png
+    cad/.venv-tools/bin/python cad/tools/draw_blueprint.py overlays    -> cad/out/shell-d/reconstruction/overlay-*.png
 
 target draws from cad/candybar/shell/profiles.py and dims.Blueprint only (plus the hardware outlines of the
 last build, cad/out/shell-d/3-short-band/overlay.json, when they exist). Every view is an orthographic
@@ -272,29 +273,42 @@ PROPORTIONS = [
     ("Height / W", "1.172", "about 1.25 (estimated)", "1.927 (floor cabinet)", "{height_r:.3f}", "a 16:10 screen is lower than 4:3 at the same width"),
     ("Deck top above the desk / W", "0.185", "about 0.2 (estimated)", "not comparable", "{deck_r:.3f}", "70 mm panel height for the hands; 58 inside is enough for the lever"),
     ("Deck front to screen foot / W", "0.380", "about 0.42 (estimated)", "0.49 (estimated)", "{foot_r:.3f}", "396 x 175 control panel with its border"),
-    ("Recline of the screen face, deg", "32.5", "about 30 (estimated)", "26 (estimated)", "{recline:.0f}", "owner's choice for the 16:10 bezel"),
+    ("Recline of the screen and of the rail's chord, deg", "32.5", "about 30 (estimated)", "26 (estimated)", "{recline:.0f}", "owner's choice for the 16:10 bezel"),
+    ("Rail arc in side view, sagitta / chord", "0.091 (one arc, R 1.154 W)", "0.000 +-0.002 (measured: straight)", "not measured (+-0.03)", "{rail_k:.3f}",
+     "a subtle arc between the maker's straight rail and the 3D model's strong one; sagitta {rail_s:.1f}, turn {rail_turn:.0f} deg"),
+    ("Body side below the tuck", "vertical, flat", "straight (measured); its lean is not measurable", "straight (measured); its lean is not measurable", "vertical, flat",
+     "same as the 3D model"),
+    ("Body side bow (widest at mid height) / W", "0.000", "0.000 +-0.004 (measured)", "0.000 +-0.003 (measured)", "{bow:.3f}", "same: no bow"),
+    ("Body tuck toward the hood, each side at the seam / W", "0.000 (the hood leans 13.5 deg from the seam)", "0.010 +-0.006 (measured)", "0.018 +-0.006 (measured, an upper limit)", "{tuck:.3f}",
+     "between the two; starts at {tuck_from:.2f} of the body height, {tuck_lean:.1f} deg at the seam"),
+    ("Hood crown across the width / W", "0.000", "0.000 +-0.005 (measured)", "0.000 +-0.001 (measured)", "{crown:.3f}", "same: the hood top is straight across"),
     ("Seam (body top) above the desk / W", "0.916", "0.88 (estimated)", "not comparable", "{seam_r:.3f}", "follows from the bezel: 215 image + 2 x 45 frame + 60 apron"),
     ("Hood height over the seam / W", "0.256", "0.33 (0.35 to bezel top)", "0.25 to 0.33 (0.36 to bezel top)", "{hood_r:.3f}", "0.341 to the bezel top, inside 0.33 to 0.35"),
     ("Hood depth at the seam / W", "0.335", "0.28 (estimated)", "0.30 (estimated)", "{hood_d_r:.3f}", "was 0.188 in the built model; needs the upper rear 40 proud"),
+    ("Screen inset below the rail land at mid height / W", "0.096 (cheek 25.9 proud)", "about 0.05 (estimated)", "deep (CRT)", "{inset_r:.3f}",
+     "flat screen 18 behind the chord; the arc adds 13 at mid height"),
     ("Bezel width / W", "0.885", "0.858 +-0.016 (measured)", "about 0.79", "{bezel_r:.3f}", "344.7 image + 2 x 45 frame"),
     ("Rail land / W", "0.016", "0.05 +-0.015 (estimated)", "not read", "{land_r:.3f}", "what the bezel leaves, less the edge section"),
     ("Rail edge, in x back / W", "0.039 x 0.039 (45 deg facet)", "0.03 x 0.12 (band 10 to 18 deg)", "not read", "{edge_in_r:.3f} x {edge_back_r:.3f}",
      "the deck's own edge section (10 deg band), so the edge follows through"),
     ("Side band depth at the desk / W", "0.277", "0.27 (estimated)", "not read", "{band_r:.3f}", "follows both references; the built model has 0.35"),
-    ("Rear body narrower, each side / W", "0.074", "0.01 to 0.03 (uncertain)", "not read", "{step_r:.3f}", "equal to the hood's shoulder: the hood's side stands over the rear body's side"),
-    ("Hood foot width / W", "0.990", "0.94 to 0.96 (measured)", "0.94 to 1.0 (estimated)", "{hood_foot_r:.3f}", "shoulder 12 each side"),
+    ("Rear body narrower, each side / W", "0.074", "0.01 to 0.03 (uncertain)", "not read", "{step_r:.3f}", "a shallow step behind the side band"),
+    ("Hood foot width / W", "0.990", "0.94 to 0.96 (measured)", "0.95 (measured)", "{hood_foot_r:.3f}", "the outline of the body top: no shoulder, a groove at the seam"),
     ("Hood top flat / W", "0.713", "0.66 (estimated)", "not read", "{top_flat_r:.2f}", "the widest blend that keeps a straight marquee window of 320"),
 ]
 
 
 def proportions(d: Blueprint) -> list[tuple[str, str, str, str, str, str]]:
     h = pr.hood(d)
+    fr = pr.front(d)
     w = d.width
     v = dict(width=w, depth_r=d.depth / w, height_r=(d.body_top + d.hood_h) / w, deck_r=d.deck_top / w, foot_r=d.foot_y / w, recline=d.recline,
              seam_r=d.body_top / w, hood_r=d.hood_h / w, hood_d_r=h.depth / w, bezel_r=d.bezel_w / w, land_r=d.rail_land / w,
              edge_in_r=d.edge_in / w, edge_back_r=d.deck_lean_h / w, step_r=(w - d.rear_w) / 2 / w, band_r=(d.step_y0 - d.foot_y + d.bend_t) / w,
-             hood_foot_r=2 * h.half_base / w, top_flat_r=d.hood_top_flat_ratio)
-    return [(q, k, m, r, t.format(**v), why) for q, k, m, r, t, why in PROPORTIONS]
+             hood_foot_r=2 * h.half_base / w, top_flat_r=d.hood_top_flat_ratio, rail_k=d.rail_sagitta_ratio, rail_s=fr.sagitta, rail_turn=d.rail_turn,
+             bow=d.body_bow_ratio, tuck=d.body_tuck_ratio, tuck_from=d.body_tuck_from, tuck_lean=d.tuck_lean, crown=d.hood_crown_ratio,
+             inset_r=(d.mon_setback + fr.rise(d, d.image_s)) / w)
+    return [(q, k, m, r, t.format(**v), why.format(**v)) for q, k, m, r, t, why in PROPORTIONS]
 
 
 def sheet_elevations(d: Blueprint, faces: dict[str, pr.Face]) -> None:
@@ -324,8 +338,8 @@ def sheet_elevations(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(a, (-28, d.deck_top), (-28, d.body_top), f"seam {d.body_top:.1f}", (-12, 0), turn=90)
     dim(a, (-28, d.body_top), (-28, top), f"{d.hood_h:.1f}", (-20, 0))
     dim(a, (d.depth + 30, 0), (d.depth + 30, top), f"height {top:.1f}", (12, 0), turn=90)
-    y, z = d.face((d.bezel_s0 + d.bezel_s1) / 2)
-    note(a, (y - 150, z + 40), f"screen face reclined {d.recline:.0f} deg", to=(y - 6, z))
+    y, z = pr.front(d).on_rail(d, (d.bezel_s0 + d.bezel_s1) / 2)
+    note(a, (y - 190, z + 40), f"rail: a convex arc, chord reclined {d.recline:.0f} deg", to=(y - 6, z))
     note(a, (385, 345), f"upper rear {d.rear_proud:.0f} proud", to=(d.depth - 1, d.rear_step_z1 + 12))
     a = axes[1, 0]
     dim(a, (-hw, -30), (hw, -30), f"{w:.1f}", (0, -12))
@@ -350,7 +364,8 @@ FACE_SPOTS: dict[str, dict[str, tuple[float, ...] | None]] = {
               "HC2": (-292, 575), "FB1": (-292, 85), "FB4": (-292, 395)},
     "side": {"RL2": (285, 470), "RL3": (320, 440), "DK2": (40, 115), "DK3": (95, 115), "DK5": (-45, 20), "DK6": (-45, 45), "HC4": (400, 545), "RB2": (640, 120)},
     "top": {"RL1": (292, 350), "RL2": (292, 320), "RL3": (292, 290), "DK2": (292, 130), "DK3": (292, 100), "HC7": (-292, 478), "HC4": (-292, 452), "HC6": (292, 500),
-            "HC5": (292, 530), "FB4": (292, 562), "FB3": (-292, 432), "BZ2": (-292, 395), "BZ1": (-292, 375), "FB1": (-292, 222), "DK1": (-292, 190)},
+            "HC5": (292, 530), "FB4": (292, 562), "FB3": (-292, 432), "BZ2": (-292, 395), "BZ1": (-292, 375), "FB1": (-292, 222), "DK1": (-292, 190),
+            "RL4": None, "RB2": None},
     "rear": {"RB2": (-292, 150), "RL4": (-292, 250), "RB3": (0, 50, 0, 75), "HC1": None, "HC4": None, "HC5": None, "HC6": None}}
 
 
@@ -415,8 +430,8 @@ def sheet_volumes(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     note(a, (330, 150), "FRONT BODY", colour_=INK, size=9)
     note(a, (450, 60), "REAR BODY", colour_=INK, size=9)
     note(a, (470, 500), "HOOD", colour_=INK, size=9)
-    y, z = d.face(d.image_s)
-    note(a, (130, 330), f"screen face reclined {d.recline:.0f} deg", to=(y - 8, z))
+    y, z = pr.front(d).on_rail(d, d.image_s)
+    note(a, (60, 330), f"rail: a convex arc, chord reclined {d.recline:.0f} deg", to=(y - 8, z))
     a = axes["top"]
     dim(a, (-d.rear_w / 2, d.depth + 22), (d.rear_w / 2, d.depth + 22), "rear body " + r(d.rear_w), (0, 12))
     dim(a, (hw + 22, 0), (hw + 22, d.foot_y - d.bend_t), "deck " + r(d.foot_y - d.bend_t), (12, 0), turn=90)
@@ -460,7 +475,7 @@ def sheet_side_section(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     top = d.body_top + d.hood_h
     h = pr.hood(d)
     frame(ax, "Side section at the centre line (the outer skin; each line in the colour of its face)", (-95, 700), (-70, 690), "y, from the deck front (mm)", "z, above the desk (mm)")
-    place = {"DK1": (20, 105), "CP1": (115, 100), "FB1": (190, 120), "FB2": (215, 175), "BZ1": (300, 330), "BZ2": (380, 270), "SC1": (330, 215), "FB3": (385, 440),
+    place = {"DK1": (20, 105), "CP1": (115, 100), "FB1": (190, 110), "FB2": (300, 120), "BZ1": (330, 150), "BZ2": (400, 185), "SC1": (430, 215), "BZ3": (360, 168), "FB3": (385, 440),
              "FB4": (520, 400), "RB5": (630, 395), "RB4": (625, 322), "RB3": (585, 150), "RB6": (585, 215), "DK3": (-45, 58), "DK2": (-45, 80), "DK4": (-45, 25),
              "HC3": (370, 450), "HC12": (370, 465), "HB1": (370, 480), "LG1": (370, 495), "LG2": (370, 510), "HC13": (370, 525), "MQ1": (370, 540), "MQ2": (370, 555),
              "HC10": (370, 570), "HC2": (370, 585), "HC4": (400, 600), "HC7": (505, 602), "HC8": (610, 585), "HC9": (630, 470)}
@@ -484,7 +499,17 @@ def sheet_side_section(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         (y0, z0), (y1, z1) = d.face(s0), d.face(s1)
         o = (-34 * d.u[1], 34 * d.u[0])
         dim(ax, (y0 + o[0], z0 + o[1]), (y1 + o[0], z1 + o[1]), text, (-14 * d.u[1], 14 * d.u[0]), turn=90 - d.recline)
-    note(ax, (60, 250), f"recline {d.recline:.0f} deg; sweep R {d.bend_r:.0f}", to=(d.foot_y + 14, d.deck_top + 30))
+    fr = pr.front(d)
+    rail = np.array([(y, z) for y, z, _ in fr.chain()])
+    ax.plot(rail[:, 0], rail[:, 1], color=INK, lw=0.9, zorder=40)
+    p0, p1 = fr.rail.at(fr.rail.a0), fr.rail.at(fr.rail.a1)
+    ax.plot([p0[0], p1[0]], [p0[1], p1[1]], color=INK, lw=0.6, ls="--", zorder=40)
+    pm = fr.rail.at((fr.rail.a0 + fr.rail.a1) / 2)
+    cm = ((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)
+    dim(ax, cm, pm, "", size=7)
+    note(ax, (40, 330), f"RL1, the rail land at the sides (black line): one arc,\nsagitta {fr.sagitta:.1f} = {d.rail_sagitta_ratio:.3f} of its chord {fr.chord:.1f} (dashed),\nR {fr.rail.r:.0f} = {fr.rail.r / d.width:.2f} W, turning {d.rail_turn:.0f} deg", to=pm)
+    note(ax, (40, 262), f"chord and flat screen reclined {fr.recline:.0f} deg; the rail leans\n{fr.foot_lean:.0f} deg at its foot and {fr.top_lean:.0f} deg at the seam; sweep R {d.bend_r:.0f}", to=(p0[0] - 4, p0[1] - 6))
+    note(ax, (455, 300), f"screen {d.mon_setback + fr.rise(d, d.image_s):.0f} below the rail land at mid height,\n{d.mon_setback + fr.rise(d, d.image_s + 107.7):.0f} at the top of the window", size=7)
     note(ax, (455, 250), "monitor, power supply and BC-250:\noutlines of the last build (dashed)", size=7)
     bx = fig.add_subplot(grid[0, 1])
     sec = pr.deck_front_section(d)
@@ -521,15 +546,15 @@ def sheet_plan_sections(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         ax.axvline(hw, color=RED, lw=0.5, ls=":")
         ax.text(hw + 2, ylim[1] - 4, f"side plane x = {hw:.1f}", color=RED, fontsize=6.5, rotation=90, va="top")
     a = axes[1]
-    yf = d.face(d.image_s)[0]
+    yf = pr.front(d).on_rail(d, d.image_s)[0]
     dim(a, (d.bezel_w / 2 + d.panel_gap, yf - 14), (hw - d.edge_in, yf - 14), f"land {d.rail_land:.1f}", (-4, -8))
     dim(a, (hw - d.edge_in, yf - 14), (hw, yf - 14), f"{d.edge_in:.1f}", (2, -8))
-    dim(a, (hw + 14, yf), (hw + 14, yf + d.deck_lean_h / d.u[1]), f"{d.deck_lean_h / d.u[1]:.1f}", (8, 0), turn=90)
-    note(a, (153, 560), "RL4 side band: in the side plane from the hood\nseam to the desk, flush with the deck's side DK7.\nIt carries the stripe. Behind it the step RB2\nturns in 12 to the rear body side RB1.", size=7.5)
-    note(a, (153, 420), "RL1 land, RL2 radius, RL3 band leaning 10 deg,\ncrease, RL4: the deck's edge section on its side.\nThe crease lies 24 behind the land, square to the\nscreen face (27.7 in this cut).", size=7.5)
+
+    note(a, (153, 560), "RL4 side band: in the side plane up to z 336, flush\nwith the deck's side DK7; above that it leans in\ntoward the hood. It carries the stripe. Behind it\nthe step RB2 turns in 12 to the rear body side RB1.", size=7.5)
+    note(a, (153, 420), "RL1 land, RL2 radius, RL3 band leaning 10 deg,\ncrease, RL4: the deck's edge section on its side.\nThe crease lies 24 behind the land, square to the\nrail arc. BZ1, BZ2: the bezel land and inner frame.", size=7.5)
     note(axes[2], (153, 400), "The same section, carried round the sweep:\nRL2 and RL3 run on into DK2 and DK3 of the deck.\nThe land RL1 turns into the deck top DK1.", size=7.5)
     note(axes[3], (113, 235), "DK7 (deck side) and RL4 (side band) are one plane.\nAbove the crease (z 48 to 63) the band DK3 leans in\n10 deg, up to 2.7; see sheet 03.", size=7.5)
-    note(axes[0], (153, 632), "The foot of the leg stands on the body top with a\nshoulder: 12 at the side, 4 at the front and rear.\nHC4 is the soft edge; HC11 the inner wall of the leg.", size=7.5)
+    note(axes[0], (153, 632), "The leg of the hood, 60 above the seam. Its side HC5\nis already in from the side plane: it carries on the\ntuck of the body. HC4 is the soft edge.", size=7.5)
     fig.suptitle("Blueprint 04: horizontal sections through the right side of the target, one scale (each line in the colour of its face)", fontsize=14, y=0.985)
     save(fig, "04-plan-sections")
 
@@ -549,9 +574,9 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     a.plot([-hw, hw], [d.body_top, d.body_top], color="#777", lw=1.0)
     w, mh = pr.marquee_window(d, h)
     top = oz + h.height
-    dim(a, (-h.half_base, oz - 16), (h.half_base, oz - 16), f"foot {2 * h.half_base:.1f}; body {d.width:.1f}: shoulder {d.hood_shoulder:.0f} each side", (0, -9))
+    dim(a, (-h.half_base, oz - 16), (h.half_base, oz - 16), f"foot {2 * h.half_base:.1f} = the body top (body {d.width:.1f} below the tuck): no shoulder, a groove of {d.seam_groove:.0f} at the seam", (0, -9))
     dim(a, (-h.half_top, top + 14), (h.half_top, top + 14), f"top flat {2 * h.half_top:.1f} = {d.hood_top_flat_ratio:.2f} W", (0, 9))
-    dim(a, (h.half_base + 40, oz), (h.half_base + 40, oz + h.z_blend), f"side: one arc, R {d.hood_side_r_ratio:.1f} W,\nleaning {d.hood_side_lean:.0f} deg at the foot", (48, 0), ha="center")
+    dim(a, (h.half_base + 40, oz), (h.half_base + 40, oz + h.z_blend), f"side: the arc of the body's tuck\ncarried on, R {d.tuck_r / d.width:.2f} W,\n{d.tuck_lean:.1f} deg at the seam", (48, 0), ha="center")
     dim(a, (h.half_base + 40, oz + h.z_blend), (h.half_base + 40, top), f"blend into the top:\na conic, {h.height - h.z_blend:.0f} high", (40, 0), ha="center")
     xb = h.half_width(h.z_blend)
     dim(a, (h.half_top, top + 34), (xb, top + 34), f"blend {xb - h.half_top:.0f} wide", (0, 9))
@@ -631,12 +656,12 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     a = axes[0, 0]
     dim(a, (ys, bt - 14), (oy, bt - 14), f"{d.hood_shoulder_front:.0f}", (-9, -5))
     dim(a, (oy + h.depth, bt - 14), (d.depth, bt - 14), f"{d.hood_shoulder_front:.0f}", (-9, -5))
-    note(a, (oy - 46, bt + 84), "The body top FB4 is flat. The cap stands on it with a seam of 1.5\nand a shoulder all round. Its front is upright: at the seam the\nplane changes from 30 deg recline to upright, as on the references.", size=7.5)
+    note(a, (oy - 46, bt + 84), f"The cap stands on the flat body top with a seam of 1.5. Its front is upright;\nthe rail under it leans {pr.front(d).top_lean:.0f} deg at the seam, so the plane changes there.\nShoulder {d.hood_shoulder_front:.0f} at the front and rear, none at the sides.", size=7.5)
     a = axes[0, 1]
-    dim(a, (h.half_base, bt + 14), (hw, bt + 14), f"{d.hood_shoulder:.0f}", (0, 7))
-    note(a, (hw - 92, bt - 62), "The leg stands over the land RL1 and the edge RL2, RL3: its front\nface HC1 over the land, its soft edge HC4 over the edge.", size=7.5)
+    dim(a, (h.half_base, bt - 22), (hw, bt - 22), f"tuck {d.tuck:.1f}", (2, -7))
+    note(a, (hw - 92, bt - 62), f"The side of the hood HC5 carries on the arc of the body side RL4 over the seam:\nno shoulder, a groove of {d.seam_groove:.0f}. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
     note(axes[0, 2], (hw - 92, ys + 88), "From above, the foot of the leg lies inside the\noutline of the body top everywhere.", size=7.5)
-    note(axes[1, 0], (135, 150), "RL2 and RL3 come down the rail, turn through the bend\nand run on along the deck as DK2 and DK3: one section,\none width, no jump. RL4 and DK7 are one plane.", size=7.5)
+    note(axes[1, 0], (135, 150), "RL2 and RL3 come down the rail arc, turn through the sweep\nand run on along the deck as DK2 and DK3: one section,\none width, no jump. RL4 and DK7 are one plane.", size=7.5)
     a = axes[1, 1]
     dim(a, (hw - d.edge_in, 170), (hw, 170), f"{d.edge_in:.1f}", (-16, 0))
     note(a, (hw - 106, 45), "The deck's side DK7 and the side band RL4\nlie in one plane: flush.", size=7.5)
@@ -644,6 +669,149 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     fig.suptitle("Blueprint 06: the two junctions of the target, large (hood to body above, body to deck below)", fontsize=14, y=0.995)
     fig.tight_layout()
     save(fig, "06-junctions")
+
+
+GHOSTS = {
+    # the same curves on the references, as ratios, for the ghost lines of sheet 08: (value, where the tuck starts)
+    "tuck": {"maker's mini: 0.010 W from 0.75": (0.010, 0.75), "real New Astro City: 0.018 W from 0.78 (upper limit)": (0.018, 0.78)},
+    "rail": {"maker's mini: straight (0.000 +-0.002)": 0.0, "3D reference model: 0.091 of the chord": 0.091},
+}
+
+
+def sheet_curvature(d: Blueprint, faces: dict[str, pr.Face]) -> None:
+    """Every curved line against its straight chord, with the deviation drawn five times too large."""
+    fr, h = pr.front(d), pr.hood(d)
+    k = 5.0
+    fig = plt.figure(figsize=(21, 14.5))
+    grid = fig.add_gridspec(2, 3, hspace=0.24, wspace=0.2, top=0.92, bottom=0.05, left=0.045, right=0.985)
+
+    a = fig.add_subplot(grid[0, 0])
+    t = np.linspace(0.0, fr.chord, 80)
+    arc = lambda ratio: (np.sqrt((fr.chord / (2 * math.sin(2 * math.atan(2 * ratio)))) ** 2 - (t - fr.chord / 2) ** 2)
+                         - (fr.chord / (2 * math.sin(2 * math.atan(2 * ratio))) - ratio * fr.chord)) if ratio > 0 else np.zeros_like(t)
+    a.plot(t, np.zeros_like(t), color=INK, lw=0.8, ls="--", label="chord (the blueprint before: a straight rail)")
+    for (label, ratio), c in zip(GHOSTS["rail"].items(), ("#2ca02c", "#1f77b4")):
+        a.plot(t, k * arc(ratio), color=c, lw=1.2, ls=":" if ratio == 0 else "-", alpha=0.8, label=label)
+    a.plot(t, k * arc(d.rail_sagitta_ratio), color=RED, lw=2.4, label=f"this cabinet: {d.rail_sagitta_ratio:.3f} of the chord")
+    dim(a, (fr.chord / 2, 0.0), (fr.chord / 2, k * fr.sagitta), f"sagitta {fr.sagitta:.1f}", (38, 0))
+    for s_, name in ((d.bezel_s0, "bezel bottom"), (d.image_s, "screen centre"), (d.bezel_s1, "bezel top")):
+        x = (s_ - d.bend_t) / (d.top_s - d.bend_t) * fr.chord
+        a.plot([x, x], [0, k * fr.rise(d, s_)], color=RED, lw=0.6)
+        a.text(x, -9, f"{name}\n{fr.rise(d, s_):.1f}", fontsize=7, ha="center", va="top", color=RED)
+    frame(a, f"1. Rail land in side view (RL1): deviation from its chord, drawn x{k:.0f}\nchord {fr.chord:.0f} long, reclined {fr.recline:.0f} deg; foot at the left, seam at the right",
+          (-10, fr.chord + 10), (-32, k * 0.091 * fr.chord + 14), "along the chord (mm)", f"in front of the chord (mm x {k:.0f})")
+    a.set_aspect("auto")
+    a.set_yticks([k * v for v in (0, 10, 20, 30)], ["0", "10", "20", "30"])
+    a.legend(loc="upper left", fontsize=7.5, frameon=False)
+
+    b = fig.add_subplot(grid[0, 1])
+    top = d.body_top + d.hood_h
+    zs = np.linspace(d.deck_top, d.body_top, 120)
+    hw = d.width / 2
+
+    def tuck_line(ratio: float, start: float) -> np.ndarray:
+        z0 = d.deck_top + start * (d.body_top - d.deck_top)
+        lean = 2 * math.atan2(ratio * d.width, d.body_top - z0)
+        r = (d.body_top - z0) / math.sin(lean)
+        return np.where(zs > z0, r - np.sqrt(np.maximum(r ** 2 - (zs - z0) ** 2, 0.0)), 0.0)
+
+    b.plot([0, 0], [d.deck_top, d.body_top], color=INK, lw=0.8, ls="--", label="side plane (the blueprint before: a straight side)")
+    b.plot([k * 12, k * (12 + 45 * math.tan(math.radians(7)))], [d.body_top, d.body_top + 45], color=INK, lw=0.8, ls=":")
+    b.plot([0, k * 12], [d.body_top, d.body_top], color=INK, lw=0.8, ls=":", label="the blueprint before: a shoulder of 12 under the hood")
+    for (label, (ratio, start)), c in zip(GHOSTS["tuck"].items(), ("#2ca02c", "#ff7f0e")):
+        b.plot(k * tuck_line(ratio, start), zs, color=c, lw=1.3, alpha=0.85, label=label)
+    b.plot(k * np.array([hw - d.side_x(z) for z in zs]), zs, color=RED, lw=2.4, label=f"this cabinet: {d.body_tuck_ratio:.3f} W from {d.body_tuck_from:.2f}")
+    hz = np.array([z for x, z in h.outline if z <= 45.0])
+    hx = np.array([x for x, z in h.outline if z <= 45.0])
+    b.plot(k * (hw - hx), h.origin[2] + hz, color=RED, lw=2.4)
+    b.plot([-4, k * 16], [d.body_top + d.seam_gap / 2] * 2, color="#888", lw=0.6)
+    b.text(k * 13.2, d.body_top - 7, f"seam: a groove of {d.seam_groove:.0f}", fontsize=7, va="center", color="#555")
+    b.plot([-6, 6], [d.tuck_z0, d.tuck_z0], color=RED, lw=0.6)
+    b.text(8, d.tuck_z0 - 5, f"the tuck starts at z {d.tuck_z0:.0f}\n({d.body_tuck_from:.2f} of the body height)", fontsize=7, va="top", color=RED)
+    dim(b, (0, d.body_top + 12), (k * d.tuck, d.body_top + 12), f"{d.tuck:.1f} in at the seam, {d.tuck_lean:.1f} deg there", (0, 9))
+    frame(b, f"2. Body side and the foot of the hood in front view (RL4, HC5): distance in from the side plane, drawn x{k:.0f}\none arc of R {d.tuck_r:.0f} ({d.tuck_r / d.width:.2f} W) through the seam: no shoulder, no jump of curvature",
+          (-6, k * 17), (d.deck_top - 10, d.body_top + 62), f"in from the side plane (mm x {k:.0f})", "z, above the desk (mm)")
+    b.set_aspect("auto")
+    b.set_xticks([k * v for v in (0, 5, 10, 15)], ["0", "5", "10", "15"])
+    b.legend(loc="lower right", fontsize=7.5, frameon=False)
+
+    c = fig.add_subplot(grid[0, 2])
+    ss = np.linspace(d.bezel_s0, d.bezel_s1, 120)
+    land = np.array([fr.rise(d, v) for v in ss])
+    win0, win1 = d.image_s - 107.712, d.image_s + 107.712
+    c.plot(ss - d.bezel_s0, k * land, color=RED, lw=2.4, label="rail land RL1 (the bezel land BZ1 lies 2 below it)")
+    c.plot(ss - d.bezel_s0, np.zeros_like(ss), color=INK, lw=0.8, ls="--", label="chord of the rail (the flat front of the blueprint before)")
+    c.plot([win0 - d.bezel_s0, win1 - d.bezel_s0], [-k * d.mon_setback] * 2, color="#1f77d0", lw=2.4, label="screen SC1: flat, where it was")
+    inner0, inner1 = d.bezel_land, d.bezel_len - d.bezel_land
+    for s_in, s_win in ((inner0, win0 - d.bezel_s0), (inner1, win1 - d.bezel_s0)):
+        c.plot([s_in, s_win, s_win], [k * (fr.rise(d, d.bezel_s0 + s_in) - 2), -k * (d.mon_setback - d.bezel_rim), -k * d.mon_setback], color="#555", lw=1.4)
+    c.plot([], [], color="#555", lw=1.4, label="bezel inner frame BZ2 and rim BZ3")
+    for s_, text in ((win0, "bottom of the window"), (d.image_s, "screen centre"), (win1, "top of the window")):
+        x = s_ - d.bezel_s0
+        dim(c, (x, -k * d.mon_setback), (x, k * fr.rise(d, s_)), f"{d.mon_setback + fr.rise(d, s_):.1f}", (11, 0), size=7.5)
+    frame(c, f"3. Flat screen in the convex body: depth of the screen below the rail land, drawn x{k:.0f}\nalong the bezel from its bottom edge (left) to its top edge (right)",
+          (-8, d.bezel_len + 8), (-k * 24, k * 22), "along the bezel (mm)", f"in front of the chord (mm x {k:.0f})")
+    c.set_aspect("auto")
+    c.set_yticks([k * v for v in (-20, -10, 0, 10, 20)], ["-20", "-10", "0", "10", "20"])
+    c.legend(loc="upper center", fontsize=7.5, frameon=False, ncol=2)
+
+    e = fig.add_subplot(grid[1, 0])
+    out = np.array(h.outline)
+    e.plot(out[:, 0], out[:, 1], color=RED, lw=2.2, label="this cabinet")
+    e.plot(-out[:, 0], out[:, 1], color=RED, lw=2.2)
+    body = np.array([(d.side_x(z), z - h.origin[2]) for z in np.linspace(d.body_top - 130, d.body_top, 40)])
+    for sgn in (1, -1):
+        e.plot(sgn * body[:, 0], body[:, 1], color=RED, lw=1.2)
+        e.plot([sgn * hw, sgn * hw], [-130, -d.seam_gap], color=INK, lw=0.7, ls="--")
+        e.plot([sgn * hw, sgn * (hw - 12), sgn * (hw - 12 - 60 * math.tan(math.radians(7)))], [-d.seam_gap, -d.seam_gap, 60], color=INK, lw=0.7, ls=":")
+    e.plot([], [], color=INK, lw=0.7, ls=":", label="the blueprint before: straight side, shoulder 12, hood side 7 deg")
+    xb_ = h.half_width(h.z_blend)
+    e.plot([xb_, h.half_top], [h.z_blend, h.height], color=INK, lw=0.7, ls="--")
+    dim(e, (h.half_top, h.height + 10), (xb_, h.height + 10), f"blend {xb_ - h.half_top:.0f} wide, {h.height - h.z_blend:.0f} high", (0, 9))
+    dim(e, (-h.half_top, h.height + 10), (h.half_top, h.height + 10), f"top flat {2 * h.half_top:.0f}: straight across (crown {d.hood_crown_ratio:.0f})", (0, 9))
+    note(e, (-240, -100), f"lean of the side: 0 below z {d.tuck_z0:.0f}, {d.tuck_lean:.1f} deg at the seam,\n{math.degrees(math.asin(math.sin(math.radians(d.tuck_lean)) + h.z_blend / d.tuck_r)):.1f} deg where the blend starts", size=7.5)
+    frame(e, "4. Upper body and hood in front view, true scale: one line from the side band over the seam into the top",
+          (-270, 270), (-135, h.height + 32), "x (mm)", "z, above the seam (mm)")
+    e.legend(loc="lower center", fontsize=7.5, frameon=False)
+
+    f = fig.add_subplot(grid[1, 1])
+    side = np.array(h.side)
+    f.plot(side[:, 0], side[:, 1], color=RED, lw=2.2)
+    y0, y1 = h.depth - d.hood_rear_arc_d, h.depth
+    f.plot([y0, y1], [h.height, h.height - d.hood_rear_arc_h], color=INK, lw=0.7, ls="--")
+    f.plot([0, d.hood_edge_back], [h.height - d.hood_edge_in, h.height], color=INK, lw=0.7, ls="--")
+    mid = pr.Conic((y0, h.height), (y1, h.height), (y1, h.height - d.hood_rear_arc_h)).at(0.5)
+    cm = ((y0 + y1) / 2, h.height - d.hood_rear_arc_h / 2)
+    dim(f, cm, mid, f"{math.dist(cm, mid):.1f}", (-12, -8))
+    note(f, (4, 40), f"rear arc HC8: a quarter ellipse {d.hood_rear_arc_d:.0f} deep and {d.hood_rear_arc_h:.0f} high;\nsoft edge HC4: a quarter ellipse {d.hood_edge_back:.0f} back and {d.hood_edge_in:.0f} down;\nroof between them {y0 - d.hood_edge_back:.0f} long, flat; front and rear walls upright", size=7.5)
+    frame(f, "5. Hood in side view, true scale: the long arc from the roof down the rear", (-20, h.depth + 20), (-10, h.height + 20), "y, behind the front of the cap (mm)", "z, above the seam (mm)")
+
+    g = fig.add_subplot(grid[1, 2])
+    g.axis("off")
+    rows = [("Hood top across the width (crown)", "straight", "0.000 +-0.001 W (owner-ref-1), 0.000 +-0.005 W (photo-b), 0 (3D model)", f"{d.hood_crown_ratio:.3f} W: straight"),
+            ("Body side below the tuck (bow)", "straight", "0.000 +-0.003 W (owner-ref-1), 0.000 +-0.004 W (photo-g), 0 (3D model)", f"{d.body_bow_ratio:.3f} W: straight"),
+            ("Front edge of the side band (crease RL3 / RL4)", "straight, parallel to the rail", "straight within 0.002 of its length on the maker's mini (photo-e)",
+             "follows the rail arc, 24 behind it"),
+            ("Sides in plan (side band, deck side)", "straight", "straight on the 3D model; deck sides parallel within 4 deg on the mini", "straight"),
+            ("Deck front in plan", "three faces", "three faces, 0.56 of the width and 8 deg (measured)", "three faces, no change"),
+            ("Step behind the side band", "straight, leans 28 deg", "straight on the 3D model and on the mini", "straight"),
+            ("Rear walls, body top", "flat", "flat on the 3D model; hidden or not readable in the photos", "flat"),
+            ("Hood front, hood band, marquee", "flat planes", "flat on all three", "flat planes")]
+    import textwrap
+    cols, widths = (0.0, 0.25, 0.42, 0.80), (24, 16, 38, 20)
+    y = 0.97
+    for row in [("Line", "Blueprint before", "What the references show", "Drawn now")] + rows:
+        cells = [textwrap.fill(text, w) for text, w in zip(row, widths)]
+        for x, cell in zip(cols, cells):
+            g.text(x, y, cell, fontsize=7.5, va="top", weight="bold" if row[0] == "Line" else "normal", transform=g.transAxes)
+        y -= 0.034 * max(cell.count("\n") + 1 for cell in cells) + 0.022
+        g.plot([0, 1], [y + 0.011, y + 0.011], color="#bbb", lw=0.4, transform=g.transAxes)
+    g.set_xlim(0, 1)
+    g.set_ylim(0, 1)
+    g.set_title("6. Lines that stay straight, because the references show them straight", fontsize=9.5)
+    fig.suptitle(f"Blueprint 08: curvature. Panels 1 to 3 draw the deviation from the straight line {k:.0f} times too large; the ghost lines are the same curve on the references",
+                 fontsize=13.5, y=0.975)
+    save(fig, "08-curvature")
 
 
 def write_tables(d: Blueprint) -> None:
@@ -654,8 +822,8 @@ def write_tables(d: Blueprint) -> None:
     text = open(path).read()
     rows = ["| Ratio to the body width W | 3D reference model (exact) | Maker's mini (photos) | Real New Astro City | This cabinet | Why it differs |", "| --- | --- | --- | --- | --- | --- |"]
     rows += ["| " + " | ".join(r) + " |" for r in proportions(d)]
-    faces = ["| ID | Name | Component | Which way it faces | What sets it | Joins |", "| --- | --- | --- | --- | --- | --- |"]
-    faces += [f"| {k} | {v[0]} | {v[1]} | {v[2]} | {v[4]} | {v[3]} |" for k, v in pr.FACES.items()]
+    faces = ["| ID | Name | Component | Which way it faces | Curvature | What sets it | Joins | How to build it, and the print |", "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    faces += [f"| {k} | {v[0]} | {v[1]} | {v[2]} | {v[5]} | {v[4]} | {v[3]} | {v[6]} |" for k, v in pr.FACES.items()]
     for key, body in (("proportions", rows), ("faces", faces)):
         begin, end = f"<!-- {key}:begin -->", f"<!-- {key}:end -->"
         if begin in text and end in text:
@@ -669,7 +837,7 @@ def target(only: str = "") -> None:
     faces = pr.faces(d)
     write_tables(d)
     sheets = {"01": sheet_volumes, "02": sheet_elevations, "03": sheet_side_section, "04": sheet_plan_sections, "05": sheet_hood, "06": sheet_junctions,
-              "07": sheet_face_map}
+              "07": sheet_face_map, "08": sheet_curvature}
     for key, fn in sheets.items():
         if not only or key in only.split(","):
             fn(d, faces)
@@ -1248,8 +1416,78 @@ def compare() -> None:
     save(fig, "sheet-side-profile", os.path.join(CAD, "out", "shell-d"), svg=False)
 
 
+# ---------- the blueprint's silhouette on the reference photos ----------
+
+OVERLAYS = {"owner-ref-1": (60, 180, 560, 800), "photo-g-video-arc-toward-hood": (40, 560, 900, 1500), "owner-ref-3-real-three-quarter-left": (60, 60, 470, 520)}
+INNER_LINES = ("BZ1", "HC1", "HC2", "HC3", "RL3", "SC1", "MQ2")
+
+
+def overlays() -> None:
+    """Fit a camera to each annotated photo (cad/reference) on the top edge and the width of the bezel, and draw the blueprint over it.
+
+    The photographed cabinets have other proportions (4:3 screens, a floor cabinet), so only the upper body and the
+    hood compare. The four bezel corners picked in the photo are tied to a rectangle in the plane of our bezel
+    that has our bezel's top edge and width and the photo bezel's aspect. The focal length is the assumption
+    named in the annotation; the principal point is the centre of the picture.
+    """
+    import cv2
+    d = Blueprint()
+    faces = pr.faces(d)
+    fr = pr.front(d)
+    ty, tz = fr.on_rail(d, d.bezel_s1, 2.0)
+    rho = math.radians(fr.recline)
+    half = d.bezel_w / 2
+    for stem, box in OVERLAYS.items():
+        ann = json.load(open(os.path.join(CAD, "reference", stem + ".json")))
+        img = cv2.imread(os.path.join(REPO, ann["photo"]))
+        hgt, wid = img.shape[:2]
+        drop = d.bezel_w / ann["bezel_aspect"]
+        by, bz = ty - drop * math.sin(rho), tz - drop * math.cos(rho)
+        obj = np.array([[-half, ty, tz], [half, ty, tz], [half, by, bz], [-half, by, bz]], float)
+        pix = np.array([ann["points"][k][:2] for k in ("bz_tl", "bz_tr", "bz_br", "bz_bl")], float)
+        f = ann["camera"]["f_px"]
+        cam = np.array([[f, 0, wid / 2], [0, f, hgt / 2], [0, 0, 1]], float)
+        ok, rvec, tvec = cv2.solvePnP(obj, pix, cam, None, flags=cv2.SOLVEPNP_IPPE)
+        rot, _ = cv2.Rodrigues(rvec)
+        err = np.linalg.norm(cv2.projectPoints(obj, rvec, tvec, cam, None)[0].reshape(-1, 2) - pix, axis=1)
+
+        def to_px(points: list) -> np.ndarray:
+            pts = np.array(points, float) @ rot.T + tvec.ravel()
+            pts[:, 2] = np.maximum(pts[:, 2], 1.0)
+            return (pts[:, :2] / pts[:, 2:]) * f + np.array([wid / 2, hgt / 2])
+
+        mask = np.zeros((hgt, wid), np.uint8)
+        for face in faces.values():
+            for poly in face.polys:
+                cv2.fillPoly(mask, [np.round(to_px(poly)).astype(np.int32)], 255)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        over = img.copy()
+        for key in INNER_LINES:
+            for e in faces[key].edges:
+                cv2.polylines(over, [np.round(to_px(e)).astype(np.int32)], False, (255, 200, 0), 1, cv2.LINE_AA)
+        cv2.drawContours(over, contours, -1, (255, 255, 0), 2, cv2.LINE_AA)
+        for x, y in pix:
+            cv2.circle(over, (int(x), int(y)), 5, (0, 0, 255), 1, cv2.LINE_AA)
+        x0, y0, x1, y1 = box
+        fig, axes = plt.subplots(1, 2, figsize=(15, 15 * (y1 - y0) / (x1 - x0) / 2 + 1.1))
+        for ax, im, title in ((axes[0], img, "photo"), (axes[1], over, "blueprint silhouette (cyan), bezel, hood front and screen (blue), picked bezel corners (red)")):
+            ax.imshow(cv2.cvtColor(im[y0:y1, x0:x1], cv2.COLOR_BGR2RGB))
+            ax.set_title(title, fontsize=9)
+            ax.axis("off")
+        loc = (-rot.T @ tvec.ravel())
+        fig.suptitle(f"{stem}: blueprint laid on the photo. Bezel top edges and bezel widths made equal; assumed focal length {f:.0f} px;\n"
+                     f"camera at x {loc[0]:.0f}, y {loc[1]:.0f}, z {loc[2]:.0f} mm in our frame; corner error {err.mean():.1f} px. Only the upper body and the hood compare.", fontsize=10)
+        fig.tight_layout()
+        path = os.path.join(RECON, f"overlay-{stem}.png")
+        fig.savefig(path, dpi=110)
+        plt.close(fig)
+        print("draw_blueprint:", os.path.relpath(path, REPO), f"corner error {err.round(1).tolist()} px")
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "target":
+    if sys.argv[1] == "overlays":
+        overlays()
+    elif sys.argv[1] == "target":
         target(sys.argv[2] if len(sys.argv) > 2 else "")
     elif sys.argv[1] == "reference":
         reference()

@@ -1,6 +1,6 @@
 # Blueprint of the cabinet
 
-Date: 2026-11-10. Status: a proposal for the owner's review. It is not built yet.
+Date: 2026-11-10. Status: a proposal for the owner's review. It is not built yet. Revision 2 adds the curves of the form: the owner found the first revision too simple, with straight lines where the references have subtle curves.
 
 This directory holds the target form of the cabinet as drawings: the big volumes first, then elevations, sections, the hood, the two junctions, and a map of every face. The drawings come from data. `cad/candybar/shell/dims.py` (class `Blueprint`) holds the named dimensions. `cad/candybar/shell/profiles.py` turns them into profiles and labelled faces. `cad/tools/draw_blueprint.py` draws the sheets from the profiles. The solids are to be built from the same profiles after the review, so the drawing and the model cannot drift apart. `parts.py`, `hood.py` and `build.py` still build the earlier form.
 
@@ -19,6 +19,7 @@ Each sheet is an SVG file and a PNG file with the same name.
 | `05-hood` | The hood: front elevation and two side sections |
 | `06-junctions` | Hood to body and body to deck, large, from the side, the front and above |
 | `07-face-map` | Every face in a flat false color with its ID |
+| `08-curvature` | Each curved line against its straight chord, with the deviation drawn five times too large, and the same curve on the references as ghost lines |
 
 Drawings of the references are third-party material. They are in `cad/out/shell-d/reconstruction/` (ignored by git):
 
@@ -30,7 +31,9 @@ Drawings of the references are third-party material. They are in `cad/out/shell-
 | `k-05-hood.png` | The 3D reference model: the hood |
 | `m-faces-hood.png`, `m-faces-body.png` | The maker's mini: the face IDs on the photo, each reading marked estimated or uncertain |
 | `r-faces.png` | The real New Astro City: the face IDs on the photo |
-| `../sheet-side-profile.png` | Side profiles and hood outlines of the references and of the target, over each other |
+| `../sheet-side-profile.png` | Side profiles and hood outlines of the references and of the target, over each other (the target on the exact slices of the 3D reference model) |
+| `overlay-owner-ref-1.png`, `overlay-photo-g-video-arc-toward-hood.png`, `overlay-owner-ref-3-real-three-quarter-left.png` | The silhouette of the blueprint on three photos, after a camera fit on the top edge and the width of the bezel |
+| `curves/` | Traces of the silhouettes and stripes in the photos, and the scripts that made them |
 
 ## Proportions of the big volumes
 
@@ -45,18 +48,116 @@ Drawings of the references are third-party material. They are in `cad/out/shell-
 | Height / W | 1.172 | about 1.25 (estimated) | 1.927 (floor cabinet) | 1.177 | a 16:10 screen is lower than 4:3 at the same width |
 | Deck top above the desk / W | 0.185 | about 0.2 (estimated) | not comparable | 0.146 | 70 mm panel height for the hands; 58 inside is enough for the lever |
 | Deck front to screen foot / W | 0.380 | about 0.42 (estimated) | 0.49 (estimated) | 0.477 | 396 x 175 control panel with its border |
-| Recline of the screen face, deg | 32.5 | about 30 (estimated) | 26 (estimated) | 30 | owner's choice for the 16:10 bezel |
+| Recline of the screen and of the rail's chord, deg | 32.5 | about 30 (estimated) | 26 (estimated) | 30 | owner's choice for the 16:10 bezel |
+| Rail arc in side view, sagitta / chord | 0.091 (one arc, R 1.154 W) | 0.000 +-0.002 (measured: straight) | not measured (+-0.03) | 0.035 | a subtle arc between the maker's straight rail and the 3D model's strong one; sagitta 13.0, turn 16 deg |
+| Body side below the tuck | vertical, flat | straight (measured); its lean is not measurable | straight (measured); its lean is not measurable | vertical, flat | same as the 3D model |
+| Body side bow (widest at mid height) / W | 0.000 | 0.000 +-0.004 (measured) | 0.000 +-0.003 (measured) | 0.000 | same: no bow |
+| Body tuck toward the hood, each side at the seam / W | 0.000 (the hood leans 13.5 deg from the seam) | 0.010 +-0.006 (measured) | 0.018 +-0.006 (measured, an upper limit) | 0.015 | between the two; starts at 0.75 of the body height, 9.6 deg at the seam |
+| Hood crown across the width / W | 0.000 | 0.000 +-0.005 (measured) | 0.000 +-0.001 (measured) | 0.000 | same: the hood top is straight across |
 | Seam (body top) above the desk / W | 0.916 | 0.88 (estimated) | not comparable | 0.857 | follows from the bezel: 215 image + 2 x 45 frame + 60 apron |
 | Hood height over the seam / W | 0.256 | 0.33 (0.35 to bezel top) | 0.25 to 0.33 (0.36 to bezel top) | 0.320 | 0.341 to the bezel top, inside 0.33 to 0.35 |
 | Hood depth at the seam / W | 0.335 | 0.28 (estimated) | 0.30 (estimated) | 0.269 | was 0.188 in the built model; needs the upper rear 40 proud |
+| Screen inset below the rail land at mid height / W | 0.096 (cheek 25.9 proud) | about 0.05 (estimated) | deep (CRT) | 0.063 | flat screen 18 behind the chord; the arc adds 13 at mid height |
 | Bezel width / W | 0.885 | 0.858 +-0.016 (measured) | about 0.79 | 0.879 | 344.7 image + 2 x 45 frame |
 | Rail land / W | 0.016 | 0.05 +-0.015 (estimated) | not read | 0.032 | what the bezel leaves, less the edge section |
 | Rail edge, in x back / W | 0.039 x 0.039 (45 deg facet) | 0.03 x 0.12 (band 10 to 18 deg) | not read | 0.026 x 0.049 | the deck's own edge section (10 deg band), so the edge follows through |
 | Side band depth at the desk / W | 0.277 | 0.27 (estimated) | not read | 0.279 | follows both references; the built model has 0.35 |
-| Rear body narrower, each side / W | 0.074 | 0.01 to 0.03 (uncertain) | not read | 0.024 | equal to the hood's shoulder: the hood's side stands over the rear body's side |
-| Hood foot width / W | 0.990 | 0.94 to 0.96 (measured) | 0.94 to 1.0 (estimated) | 0.951 | shoulder 12 each side |
-| Hood top flat / W | 0.713 | 0.66 (estimated) | not read | 0.64 | the widest blend that keeps a straight marquee window of 320 |
+| Rear body narrower, each side / W | 0.074 | 0.01 to 0.03 (uncertain) | not read | 0.024 | a shallow step behind the side band |
+| Hood foot width / W | 0.990 | 0.94 to 0.96 (measured) | 0.95 (measured) | 0.970 | the outline of the body top: no shoulder, a groove at the seam |
+| Hood top flat / W | 0.713 | 0.66 (estimated) | not read | 0.66 | the widest blend that keeps a straight marquee window of 320 |
 <!-- proportions:end -->
+
+## Curves
+
+The owner's words on revision 1: "the geometry we have is too simple, straight lines where the real thing as well as bar tops we've looked at have subtle curves", "the top of the front body curves inward smoothly toward the hood", "the hood and body meet in one smooth curve with a bevel cut between them", and in profile "a convex arc which follows the contour of the CRT".
+
+### How the curves were measured
+
+- **3D reference model.** Exact slices of the meshes.
+- **Photos.** A row-by-row trace of a brightness or color edge, then a fit. The picks and the readings are in `cad/reference/owner-ref-1.json`, `photo-g-video-arc-toward-hood.json` and `owner-ref-3-real-three-quarter-left.json`. The traces are in `cad/out/shell-d/reconstruction/curves/`.
+- **Correction for the camera.** A camera turns a straight edge into a straight line in the photo, whatever its position and tilt. So each curve is measured as the distance of the traced edge from a straight line: the line through the lower, straight part of the body side for the tuck, and the chord for an arc. A tilt of the camera cannot make this distance. It does not need a focal length. Widths are not compared between heights.
+- **The limit of this correction.** The distance shows that the edge is curved in space. It does not show in which direction. An edge that curves away from the camera gives the same trace as an edge that curves sideways. Two views are necessary to separate them, and no reference has two good views.
+
+### Survey
+
+Ratios are to the body width `W` unless a chord is named.
+
+| Line | Revision 1 | 3D reference model (exact) | Maker's mini | Real New Astro City | Revision 2 |
+| --- | --- | --- | --- | --- | --- |
+| Rail (cheek front line) in side view | Straight, 30 degrees, one radius at the foot | One arc: sagitta 0.091 of its chord, R 1.154 W, lean 12 degrees at the foot and 52 at the top | Straight: 0.000 ± 0.002 of the chord (photo-e: the front edge of the stripe departs 0.5 px from a line over 671 px, at about 42 degrees to the side) | Not measured. The stripe and the highlight of the cheek are straight above the sweep within ± 0.008 of their length in two views that are only 15 to 20 degrees off the front. That allows 0 to 0.03 of the chord. | One arc: sagitta 0.035 of the chord (13.0 mm), R 2.69 W, lean 22 degrees at the foot and 38 at the seam |
+| Body side below the tuck, front view | Vertical, straight | Vertical, straight | Straight within 0.004 W (photo-g) | Straight within 0.003 W (owner-ref-1) | Vertical, straight |
+| Body side, the top quarter (the tuck), front view | None. A shoulder of 12 under a narrower hood. | None. The hood is 1.4 narrower and leans 13.5 degrees from the seam: a kink. | 0.010 ± 0.006 W at the seam. Photo-b: 0.014 W, from about 0.70 of the body height. Photo-g: 0.003 W, then a corner radius of 0.015 W at the top. | 0.018 ± 0.006 W at the seam, from 0.78 of the body height (owner-ref-1). An upper limit: see below. | 0.015 W (7.4 mm) at the seam, from 0.75 of the body height, on one arc of R 1.06 W |
+| Side of the hood over the seam, front view | An arc of R 1.3 W that starts at 7 degrees, on a shoulder | An arc of R 1.29 W, 13.5 to 22 degrees | About 6 degrees, a small lip at the foot, then one long blend | The slope is continuous over the seam: 8.5 ± 3 degrees below it, 11 to 15 above it. The hood foot is 0.95 W. | The arc of the tuck carries on: 9.6 degrees at the seam, 17.6 where the blend starts. No shoulder. A groove of 3 at the seam. |
+| Top of the hood across the width (crown) | Straight | Straight | Straight within 0.005 W (photo-b) | Straight within 0.001 W (owner-ref-1) | Straight |
+| Hood in side view | Soft edge, short roof, one arc down the rear | A 42 degree facet, a flat top, a rear that leans 16 degrees | One arc down the rear (estimated trace) | Not read | No change |
+| Bezel | A flat frame with one step | A flat plate, 6 to 26 behind the cheeks | A flat land, then an inner frame that slopes in to the screen (photo-g, estimated) | A deep surround for the tube | A land that follows the rail arc, then an inner frame that slopes in to the flat screen |
+| Sides in plan, step, rear walls, body top, deck front in plan | Straight or flat | Straight or flat | Straight where a photo shows them | Not readable | No change |
+
+What I could not measure:
+
+- The rail arc of the real cabinet. No photo shows the cabinet from the side.
+- The real cabinet's tuck without the effect of its rail. In the front photo the top of the rail is farther from the camera than its middle. If the real rail curves back at its top, a part of the 0.018 W is that curve and not a narrower body. So 0.018 W is an upper limit.
+- The focal length of each photo. The overlays assume one (it is in each annotation file). The survey numbers do not use it.
+
+Where the photos disagree with each other, or with what was said:
+
+- "The real thing and recreations have a convex arc" in profile. The 3D reference model (a recreation) has a strong one. The maker's mini has none that I can measure: its rail is straight. For the real cabinet the photos neither confirm nor exclude an arc. In `owner-ref-3` two things read as an arc of the main body: the outer line of the side at the right, which bulges 0.033 of its length (that is the rear of the body, deeper at the height of the tube), and the stripe, which bends where the sweep starts.
+- The two front photos of the maker's mini disagree on the tuck: 0.014 W in photo-b, 0.003 W and a corner radius in photo-g. Photo-b is small (the body is 318 px wide). Photo-g is sharper, and its right side is white on white.
+- The coordinator read 318, 302 and 260 px for the widths in `owner-ref-1`. The trace gives 353 px above the deck, 337 below the seam and 277 at 0.8 of the hood height, in the full-size file. The ratio at the seam agrees: 0.95.
+
+### The amount of each curve, as named values
+
+Each curve is one value in `dims.Blueprint`. Sheet 08 shows our value beside the values of the references.
+
+| Value | Now | Maker's mini | Real cabinet | 3D model | Why this value |
+| --- | --- | --- | --- | --- | --- |
+| `body_tuck_ratio` | 0.015 | 0.010 ± 0.006 | 0.018 ± 0.006, an upper limit | 0 | The top of the maker's range and the middle of the real one. It keeps ten marquee modules and a land of 10 mm at the top of the bezel. |
+| `body_tuck_from` | 0.75 | 0.70 to 0.95 | 0.78 | not applicable | Between the two |
+| `rail_sagitta_ratio` | 0.035 | 0.000 | not measured | 0.091 | The owner asks for the arc. The maker's cabinet has none and the 3D model has a strong one. 0.035 is a visible arc that keeps the screen less than 32 mm below the rail. A 29 inch tube of that time has a sagitta of about 0.03 to 0.05 of its height (ESTIMATED from a face radius of 1.0 to 1.5 m). |
+| `hood_crown_ratio` | 0 | 0 | 0 | 0 | All three are straight |
+| `body_bow_ratio` | 0 | 0 | 0 | 0 | All three are straight below the tuck |
+
+### A flat monitor in a convex body
+
+- The convex form is in the shell. The rails arc in side view. The body sides tuck in toward the hood in front view.
+- The screen does not move. It stays flat, reclined 30 degrees, 18 mm behind the chord of the rail arc. So the sight line does not change (30.8 degrees with the eye at 530, 22.4 with the eye at 450), and the monitor, the cradle, the power supply and the BC-250 module are where the last build checked them.
+- **Recline** now has this definition: the angle of the chord of the rail arc. It is also the tangent of the arc at mid chord and the angle of the flat screen.
+- The rim of the bezel plate follows the rails. The bezel land (20 wide) is a part of the same cylinder, 2 mm below the rail land. Inside it an inner frame (25 wide) slopes down to a flat rim 2 mm above the screen. The slope is 40 to 47 degrees from the land.
+- The screen is 31.0 mm below the rail land at the screen center, 28.5 at the bottom of the window and 24.8 at its top. Revision 1 had 18 everywhere. The inset is largest near mid height, as on a tube surround.
+- The bezel plate stays removable: it comes out square to the screen, and no part of it is behind a rail. Its back is flat.
+- Print: a plate that lies with its flat back on the bed has layer steps on the curved land (8 mm of rise over 305). A plate that stands on its long edge has the arc in the layer plane and prints smooth. The plate is larger than the bed in both cases, so it is two halves, as before.
+
+Numbers at `W` = 494.7:
+
+| Check | Value |
+| --- | --- |
+| Sagitta of the rail over its chord (370.5) | 13.0 mm. Over the height of the bezel the rail stands 6.8 mm in front of the chord at the lower edge, 13.0 at the screen center, 1.6 at the upper edge. |
+| Monitor at its top corners | The top of the monitor is at z 372. The tuck is 1.9 mm there. The body is 490.9 wide outside. The monitor with its side clearance is 398 wide. No conflict. ESTIMATED from the drawing: the build check does not know the tuck yet. |
+| Rail land at the top corner of the bezel | 10.1 mm (16.0 below the tuck) |
+| Marquee window | 326 x 34, ten modules of 32 |
+| Sweep | Turns 68 degrees (it was 60). Its end is 6 mm higher. The deck does not change. |
+
+### Conflicts and options
+
+The tuck costs width in two places. I did not weaken the curve to hide this. These are the options.
+
+| Tuck at the seam | Rail land at the top of the bezel | Straight marquee window | What it needs |
+| --- | --- | --- | --- |
+| 0.010 W (maker's mini) | 12.0 | 336, ten modules | Nothing |
+| 0.015 W (drawn) | 10.1 | 326, ten modules | Top flat 0.66 W (it was 0.64) |
+| 0.018 W (real, upper limit) | 8.9 | 318 with a top flat of 0.66 W, 322 with 0.68 W | A top flat of 0.68 W, which makes the top corners of the hood tighter. Or nine modules. |
+| 0.023 W | 7.0 | 300 to 306 | Nine modules. Or a body 24 mm wider (519). Or a hood side that does not carry on the arc of the tuck: then the curvature jumps at the seam. |
+| 0.027 W | 5.4 | 284 | The land is less than 6 mm: a wider body or rounder top corners of the bezel |
+
+The rail arc has no conflict with the monitor, because the screen does not move. Its cost is depth in front of the screen:
+
+| Sagitta / chord | Sagitta | Rail lean, foot and seam | Screen below the rail land at the center |
+| --- | --- | --- | --- |
+| 0 (maker's mini) | 0 | 30, 30 | 18.0 |
+| 0.020 | 7.5 | 25, 35 | 25.4 |
+| 0.035 (drawn) | 13.0 | 22, 38 | 31.0 |
+| 0.050 | 18.4 | 19, 42 | 36.6 |
+| 0.091 (3D model) | 32.8 | 10, 51 | 51.9: a deep well round the screen |
 
 ## What the reconstruction found
 
@@ -78,7 +179,7 @@ Where this contradicts the current model and earlier briefs:
 4. `docs/research/photo-measurements.md` section C says that the facet runs to the table in its own plane and that the deck sits in front of it. The first part holds when "facet" is read as the side band. The second part does not hold: the deck is flush.
 5. Not resolved: on the maker's mini the rail shows a radius only, and the deck shows a radius and a leaning band. The photos do not show how the two meet at the sweep. See question 1.
 
-The target: the rail is a land (16.0), then the deck's own edge section turned on its side (a radius of 10.5 that turns 80 degrees, a band that leans 10 degrees, a crease 24 behind the land), then the side band. The same section runs down the screen face, round the sweep and along the deck, so the edges line up by construction. The side band and the deck's side are one plane. The step is 138 behind the deck at the desk (0.28 W) and 12 deep.
+The target: the rail is a land (16.0), then the deck's own edge section turned on its side (a radius of 10.5 that turns 80 degrees, a band that leans 10 degrees, a crease 24 behind the land), then the side band. The same section runs down the rail arc, round the sweep and along the deck, so the edges line up by construction. The side band and the deck's side are one plane up to 0.75 of the body height. Above that the side band leans in with the tuck. The step is 138 behind the deck at the desk (0.28 W) and 12 deep.
 
 ### Hood to body
 
@@ -88,14 +189,14 @@ The target: the rail is a land (16.0), then the deck's own edge section turned o
 
 Where this contradicts the current model: the current hood is 0.19 W deep on a body top 101 mm deep. Its rear is an upright wall with a 20 mm radius. Both references that show the side have a deeper hood whose top runs down the rear in one arc.
 
-The target: the upper rear of the body stands 40 mm proud of the lower rear wall, so the body top is 141 deep (0.285 W) and the hood 133 (0.269 W). The cabinet is 580 deep (it was 540). The front of the cap is upright, 4 mm behind the front edge of the body top. Each leg stands over the land and the edge of the rail, with a shoulder of 12 mm at the side. The rear body is narrower than the side band by the same 12 mm, so the side of the hood stands over the side of the rear body.
+The target: the upper rear of the body stands 40 mm proud of the lower rear wall, so the body top is 141 deep (0.285 W) and the hood 133 (0.269 W). The cabinet is 580 deep (it was 540). The front of the cap is upright, 4 mm behind the front edge of the body top. Each leg stands over the land and the edge of the rail. At the sides there is no shoulder: the foot of the hood has the outline of the body top (479.8 wide, 0.970 W), and the side of the hood carries on the arc of the body's tuck. The seam is a gap of 1.5 with a bevel of 3 on both parts: a groove across one surface. Revision 1 had a shoulder of 12 here, from the maker's 0.03 W. The owner's front photo of the real cabinet shows none.
 
 ### The hood
 
-- **Outline from the front.** The 3D reference model has sides on one arc that lean 13.5 to 22 degrees, a corner radius of 0.074 W and a top flat of 0.713 W. The maker's mini has sides that lean about 6 degrees at the foot, and then one long blend over the upper half into a top flat of about 0.66 W (estimated from the picks in `cad/reference/photo-b.json`). A single radius does not describe it: the owner is right. The target follows the maker's mini: an arc of radius 1.3 W that leans 7 degrees at the foot, a conic blend from 0.45 of the height, and a top flat of 0.64 W. This is the widest blend that keeps a straight marquee window of 320 mm.
-- **Bottom front corners.** On the maker's mini the legs come down near upright to a foot 0.94 to 0.96 W wide, and the bottom corners of the opening are near square. The target has a foot of 0.951 W and corners of radius 6. The current model has legs that lean 10 degrees and corners of radius 8.
+- **Outline from the front.** The 3D reference model has sides on one arc that lean 13.5 to 22 degrees, a corner radius of 0.074 W and a top flat of 0.713 W. The maker's mini has sides that lean about 6 degrees at the foot, and then one long blend over the upper half into a top flat of about 0.66 W (estimated from the picks in `cad/reference/photo-b.json`). A single radius does not describe it: the owner is right. The target: the arc of the body's tuck (R 1.06 W) carries on up the side of the hood, from 9.6 degrees at the seam to 17.6 degrees. A conic blend starts at 0.45 of the height and ends at a top flat of 0.66 W. This is the widest blend that keeps a straight marquee window of 320 mm. The real cabinet differs: its hood sides lean more (11 to 19 degrees, measured ± 3) and its top corners are tighter (about 0.06 W, estimated). The maker's mini has the long blend, and the target follows it.
+- **Bottom front corners.** On the maker's mini the legs come down near upright to a foot 0.94 to 0.96 W wide, and the bottom corners of the opening are near square. The target has a foot of 0.970 W, legs that lean 9.6 degrees at the seam, and corners of radius 6. The current model has legs that lean 10 degrees on a body with no tuck, and corners of radius 8.
 - **Side profile.** Upright front, a soft top front edge (a quarter ellipse, 16 down and 32 back), a roof 6 mm long, then one arc 95 deep and 110 high down to an upright rear wall.
-- **Inside the arch**, as before: the marquee under the top bar (window 322 x 34, 10 modules of 32 mm), a lip, the hood band with two speaker forms and the logo form, and the ledge on the sill. The deeper hood lets the band lean back 24 degrees (it was 16) with 67 mm clear behind it.
+- **Inside the arch**, as before: the marquee under the top bar (window 326 x 34, 10 modules of 32 mm), a lip, the hood band with two speaker forms and the logo form, and the ledge on the sill. The deeper hood lets the band lean back 24 degrees (it was 16) with 67 mm clear behind it.
 
 ## Words
 
@@ -110,7 +211,13 @@ New words in this blueprint. They are not in `CONTEXT.md` yet.
 | Edge section | The section of a top or front edge: a radius, then a band that leans, then a crease |
 | Side band | The face of the rail in the side plane, between the edge and the step. It carries the stripe. |
 | Step | The face that turns in from the side band to the rear body |
-| Body top | The flat top of the body under the hood. The shoulder is the bare strip of it round the foot of the hood. |
+| Body top | The flat top of the body under the hood. The shoulder is the bare strip of it in front of and behind the foot of the hood. |
+| Rail arc | The convex arc of the rail land in side view, from the end of the sweep to the body top |
+| Chord | The straight line between the two ends of the rail arc. Its angle is the recline. |
+| Tuck | The inward lean of the body sides over the top quarter of the body, toward the hood |
+| Seam groove | The beveled gap between the body and the hood, where one surface passes from one part to the other |
+| Bezel land | The outer band of the bezel plate, which follows the rail arc |
+| Bezel inner frame | The band of the bezel plate that slopes from the land down to the flat rim at the screen |
 | Brow band | The strip of screen face above the bezel |
 | Cap | The outer piece of the hood |
 | Top bar, leg, sill | The members of the cap round its opening |
@@ -131,57 +238,57 @@ One change of meaning against `CONTEXT.md`: the marquee is the lit strip under t
 The IDs are stable. A face of a reference that corresponds has the same ID.
 
 <!-- faces:begin -->
-| ID | Name | Component | Which way it faces | What sets it | Joins |
-| --- | --- | --- | --- | --- | --- |
-| DK1 | deck top border | deck | faces up | deck_top 72; flat border 12 or more in front of the panel | CP1, DK2, FB1, RL1 |
-| DK2 | deck edge radius | deck | turns from up to 10 deg off vertical | deck_top_r 10.5, turning 80 deg | DK1, DK3 |
-| DK3 | deck edge band | deck | leans 10 deg from vertical, faces out | deck_lean 10, crease deck_lean_h 24 below the top | DK2, DK4 to DK7 at the crease |
-| DK4 | deck front, centre face | deck | faces the player, vertical | deck_centre_frac 0.56 of the width | DK3, DK5 |
-| DK5 | deck front, flank | deck | vertical, turned back 8 deg | deck_flank 8 | DK4, DK6 |
-| DK6 | deck front corner | deck | vertical, round in plan | deck_corner_frac 0.09 of the width (R 44.5) | DK5, DK7 |
-| DK7 | deck side | deck | faces sideways, vertical | at the full width; flush with RL4 | DK6, RL4 (same plane) |
-| CP1 | control panel | control panel | faces up | 396 x 175, 2 below the deck top | DK1 |
-| FB1 | sweep | front body | concave, from up to the screen face | bend_r 50 | DK1, FB2, RL1 |
-| FB2 | apron | front body | faces the player, reclined 30 deg | band_len 60 | FB1, BZ1, RL1 |
-| FB3 | brow band | front body | faces the player, reclined 30 deg | brow_ledge 12 | BZ1, FB4, RL1 |
-| FB4 | body top (shoulder) | front body | faces up | body_top 423.9; bare strip round the hood foot | FB3, RL1 to RL4, RB5, hood foot |
-| RL1 | rail land | rail | faces the player, reclined 30 deg; follows the sweep | rail_land 16.0 | BZ1, FB1 to FB3, RL2, DK1 |
-| RL2 | rail edge radius | rail | turns from the land to 10 deg off the side | same section as DK2 | RL1, RL3, DK2 |
-| RL3 | rail edge band | rail | leans 10 deg from the side plane | same section as DK3: 13.0 in, crease 24 behind the land | RL2, RL4 at the crease, DK3 |
-| RL4 | side band | rail | faces sideways, vertical | at the full width, 138 deep at the desk; carries the stripe | RL3, DK7 (same plane), RB2, FB4 |
-| BZ1 | bezel face | bezel | faces the player, reclined 30 deg | 434.7 x 305.4, 2 behind the land | RL1, FB2, FB3, BZ2 |
-| BZ2 | bezel step | bezel | faces the player, reclined 30 deg | 10 wide, 8 deeper | BZ1, SC1 |
-| BZ3 | bezel step walls | bezel | face the centre of the screen | 8 deep each | BZ1, BZ2, SC1 |
-| SC1 | screen | bezel | faces the player, reclined 30 deg | 344.7 x 215.4, 18 behind the land | BZ3 |
-| RB1 | rear body side | rear body | faces sideways, vertical | rear_w 470.7: in by the hood's shoulder, so the hood's side stands over it | RB2, RB3 to RB5 |
-| RB2 | step | rear body | faces out and back, 45 deg in plan, leans 28 deg | foot 138 behind the deck (0.28 W); 12 deep | RL4, RB1 |
-| RB3 | lower rear wall | rear body | faces the rear, vertical | body_d 540 | RB1, RB2, RB4, RB6 |
-| RB4 | rear slope | rear body | faces the rear and down, 45 deg | z 310 to 350 | RB3, RB5 |
-| RB5 | upper rear wall | rear body | faces the rear, vertical | rear_proud 40 behind the lower wall | RB4, FB4 |
-| RB6 | rear door | rear body | faces the rear, vertical | 368 x 188 | RB3 |
-| FL1 | underside | floor | faces down | on the desk (feet not designed) | DK4 to DK7, RL4, RB1 to RB3 |
-| HC1 | hood leg, front face | hood cap | faces the player, upright | hood_bar 21 less the soft edge; leans in with the side | HC4, HC11, HC3 |
-| HC2 | hood top bar, front face | hood cap | faces the player, upright | hood_bar 21 less the soft edge | HC4, HC10 |
-| HC3 | hood sill, front face | hood cap | faces the player, upright | hood_sill_h 17 | HC1, HC12 |
-| HC4 | hood soft edge | hood cap | turns from the front to the side and the roof | quarter ellipse 16 in, 32 back | HC1, HC2, HC5 to HC7 |
-| HC5 | hood side | hood cap | faces sideways, leans in 7 to 15 deg on one arc | arc R 1.3 W from the foot | HC4, HC6, HC9, FB4 |
-| HC6 | hood side blend | hood cap | turns from the side to the roof | conic from 0.45 of the height to the top flat | HC5, HC7 |
-| HC7 | hood roof | hood cap | faces up | top flat 0.64 W wide | HC4, HC6, HC8 |
-| HC8 | hood rear arc | hood cap | turns from the roof to the rear | conic 95 deep, 110 high | HC7, HC9 |
-| HC9 | hood rear wall | hood cap | faces the rear, upright | 4 in from the upper rear wall | HC8, HC5, FB4 |
-| HC10 | hood soffit | hood cap | faces down | under the top bar, back to the marquee | HC2, MQ1 |
-| HC11 | hood leg, inner wall | hood cap | faces the centre line | from the front plane back to the band | HC1, HB1, MQ1 |
-| HC12 | hood ledge | hood cap | faces up | hood_ledge 14 | HC3, HB1 |
-| HC13 | marquee lip | hood cap | faces the player | 6 high, 5 proud | MQ1, HB1 |
-| MQ1 | marquee cover | marquee | faces down 18 deg toward the player | ends follow the blend of the opening | HC10, HC11, HC13, MQ2 |
-| MQ2 | marquee window | marquee | faces down 18 deg toward the player | straight, 34 high | MQ1 |
-| HB1 | hood band | hood band | leans back 24 deg | foot on the ledge | HC12, HC11, HC13, SP1, LG1 |
-| SP1 | speaker form | hood band | parallel to the band | 13 proud; outer end parallel to the leg | HB1, SP2 |
-| SP2 | speaker grille | hood band | parallel to the band | set 1.5 into the form | SP1 |
-| SP3 | speaker form walls | hood band | square to the band | 13 high, top edge R 4 | SP1, HB1 |
-| LG1 | logo form | hood band | parallel to the band | 5 proud | HB1, LG2 |
-| LG2 | logo plate | hood band | parallel to the band | 166 wide | LG1 |
-| LG3 | logo form walls | hood band | square to the band | 5 high | LG1, HB1 |
+| ID | Name | Component | Which way it faces | Curvature | What sets it | Joins | How to build it, and the print |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| DK1 | deck top border | deck | faces up | flat | deck_top 72; flat border 12 or more in front of the panel | CP1, DK2, FB1, RL1 | extrusion |
+| DK2 | deck edge radius | deck | turns from up to 10 deg off vertical | single-curved; double-curved round the corners | deck_top_r 10.5, turning 80 deg | DK1, DK3 | sweep of the edge section along the deck outline |
+| DK3 | deck edge band | deck | leans 10 deg from vertical, faces out | flat; single-curved round the corners | deck_lean 10, crease deck_lean_h 24 below the top | DK2, DK4 to DK7 at the crease | the same sweep |
+| DK4 | deck front, centre face | deck | faces the player, vertical | flat | deck_centre_frac 0.56 of the width | DK3, DK5 | extrusion of the deck outline |
+| DK5 | deck front, flank | deck | vertical, turned back 8 deg | flat | deck_flank 8 | DK4, DK6 | extrusion of the deck outline |
+| DK6 | deck front corner | deck | vertical, round in plan | single-curved | deck_corner_frac 0.09 of the width (R 44.5) | DK5, DK7 | extrusion of the deck outline |
+| DK7 | deck side | deck | faces sideways, vertical | flat | at the full width; flush with RL4 | DK6, RL4 (same plane) | extrusion of the deck outline |
+| CP1 | control panel | control panel | faces up | flat | 396 x 175, 2 below the deck top | DK1 | cut plate |
+| FB1 | sweep | front body | concave, from up to the foot of the rail arc | single-curved | bend_r 50, turning 68 deg | DK1, FB2, RL1 | extrusion of the side profile across the width |
+| FB2 | apron | front body | faces the player; follows the rail arc | single-curved | band_len 60 | FB1, BZ1, RL1 | extrusion of the side profile across the width |
+| FB3 | brow band | front body | faces the player; follows the rail arc | single-curved | brow_ledge 12 | BZ1, FB4, RL1 | extrusion of the side profile across the width |
+| FB4 | body top | front body | faces up | flat | body_top 423.9; under the hood, bare for 4 at the front and rear | FB3, RL1 to RL4, RB5, hood foot | plane cut |
+| RL1 | rail land | rail | faces the player; one convex arc in side view, chord reclined 30 deg | single-curved | rail_sagitta_ratio 0.035 of the chord (13.0); 16.0 wide, 10.1 at the top of the bezel | BZ1, FB1 to FB3, RL2, DK1 | extrusion of the side profile; on a print that stands upright the arc is in the layer plane and prints smooth |
+| RL2 | rail edge radius | rail | turns from the land to 10 deg off the side | double-curved | same section as DK2 | RL1, RL3, DK2 | sweep of the edge section along the rail arc; above the start of the tuck the path leaves the side plane, so loft between sections there |
+| RL3 | rail edge band | rail | leans 10 deg from the side | double-curved | same section as DK3: 13.0 in, crease 24 behind the land | RL2, RL4 at the crease, DK3 | the same sweep and loft |
+| RL4 | side band | rail | faces sideways; vertical up to 0.75 of the body height, then leans in on one arc | flat; single-curved above the start of the tuck | body_tuck_ratio 0.015 (7.4 in at the seam, 9.6 deg there); carries the stripe | RL3, DK7 (same plane), RB2, hood side HC5 | extrusion of the front outline of the side along the depth; a stripe decal lies flat on it |
+| BZ1 | bezel land | bezel | faces the player; follows the rail arc, 2 below the rail land | single-curved | 434.7 x 305.4 outside, bezel_land 20 wide | RL1, FB2, FB3, BZ2 | extrusion; print the plate on its long edge, or the back down with layer steps on the land |
+| BZ2 | bezel inner frame | bezel | slopes in toward the screen, 40 to 47 deg from the land | flat at the top and bottom; ruled and twisted at the sides | from the land down to a flat rim 2 above the screen | BZ1, BZ3 | loft between the inner edge of the land (an arc) and the rim (a line) |
+| BZ3 | bezel rim wall | bezel | faces the centre of the screen | flat | bezel_rim 2 deep | BZ2, SC1 | extrusion |
+| SC1 | screen | bezel | faces the player, flat, reclined 30 deg | flat | 344.7 x 215.4; 18 behind the chord of the rail, 25 to 31 behind the rail land | BZ3 | the monitor |
+| RB1 | rear body side | rear body | faces sideways; vertical, then leans in with the side band | flat; single-curved above the start of the tuck | 12 in from the side band | RB2, RB3 to RB5 | extrusion of the front outline of the side |
+| RB2 | step | rear body | faces out and back, 45 deg in plan, leans 28 deg | flat; twisted above the start of the tuck | foot 138 behind the deck (0.28 W); 12 deep | RL4, RB1 | loft between the two edges of the step |
+| RB3 | lower rear wall | rear body | faces the rear, vertical | flat | body_d 540 | RB1, RB2, RB4, RB6 | extrusion |
+| RB4 | rear slope | rear body | faces the rear and down, 45 deg | flat | z 310 to 350 | RB3, RB5 | extrusion |
+| RB5 | upper rear wall | rear body | faces the rear, vertical | flat | rear_proud 40 behind the lower wall | RB4, FB4 | extrusion |
+| RB6 | rear door | rear body | faces the rear, vertical | flat | 368 x 188 | RB3 | plate |
+| FL1 | underside | floor | faces down | flat | on the desk (feet not designed) | DK4 to DK7, RL4, RB1 to RB3 | extrusion |
+| HC1 | hood leg, front face | hood cap | faces the player, upright | flat | hood_bar 21 less the soft edge; its outline follows the side | HC4, HC11, HC3 | extrusion of the front outline |
+| HC2 | hood top bar, front face | hood cap | faces the player, upright | flat | hood_bar 21 less the soft edge | HC4, HC10 | extrusion of the front outline |
+| HC3 | hood sill, front face | hood cap | faces the player, upright | flat | hood_sill_h 17 | HC1, HC12 | extrusion of the front outline |
+| HC4 | hood soft edge | hood cap | turns from the front to the side and the roof | single-curved along the top flat; double-curved along the side and the blend | quarter ellipse 16 in, 32 back | HC1, HC2, HC5 to HC7 | sweep of the quarter ellipse along the front outline (extrusions and revolutions; the blend needs a true sweep) |
+| HC5 | hood side | hood cap | faces sideways; leans in 9.6 deg at the seam and 17 deg at the blend, on the arc of the body's tuck | single-curved | radius 1.06 W, the same centre line as the tuck; no shoulder: a groove of 3 at the seam | HC4, HC6, HC9, RL4 | extrusion of the front outline along the depth; print the cap on its rear face so that this outline is in the layer plane |
+| HC6 | hood side blend | hood cap | turns from the side to the roof | single-curved | conic from 0.45 of the height to the top flat | HC5, HC7 | the same extrusion |
+| HC7 | hood roof | hood cap | faces up | flat | top flat 0.66 W wide; hood_crown_ratio 0: no crown | HC4, HC6, HC8 | the same extrusion |
+| HC8 | hood rear arc | hood cap | turns from the roof to the rear | single-curved | conic 95 deep, 110 high | HC7, HC9 | extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions) |
+| HC9 | hood rear wall | hood cap | faces the rear, upright | flat | 4 in from the upper rear wall | HC8, HC5, FB4 | extrusion |
+| HC10 | hood soffit | hood cap | faces down | flat | under the top bar, back to the marquee | HC2, MQ1 | extrusion |
+| HC11 | hood leg, inner wall | hood cap | faces the centre line | single-curved | from the front plane back to the band | HC1, HB1, MQ1 | extrusion of the opening outline |
+| HC12 | hood ledge | hood cap | faces up | flat | hood_ledge 14 | HC3, HB1 | extrusion |
+| HC13 | marquee lip | hood cap | faces the player | single-curved | 6 high, 5 proud | MQ1, HB1 | extrusion across the width |
+| MQ1 | marquee cover | marquee | faces down 18 deg toward the player | flat | ends follow the blend of the opening | HC10, HC11, HC13, MQ2 | plate |
+| MQ2 | marquee window | marquee | faces down 18 deg toward the player | flat | straight, 34 high | MQ1 | plate |
+| HB1 | hood band | hood band | leans back 24 deg | flat | foot on the ledge | HC12, HC11, HC13, SP1, LG1 | plate |
+| SP1 | speaker form | hood band | parallel to the band | flat | 13 proud; outer end parallel to the leg | HB1, SP2 | extrusion square to the band |
+| SP2 | speaker grille | hood band | parallel to the band | flat | set 1.5 into the form | SP1 | plate |
+| SP3 | speaker form walls | hood band | square to the band | flat | 13 high, top edge R 4 | SP1, HB1 | extrusion with a fillet |
+| LG1 | logo form | hood band | parallel to the band | flat | 5 proud | HB1, LG2 | extrusion square to the band |
+| LG2 | logo plate | hood band | parallel to the band | flat | 166 wide | LG1 | plate |
+| LG3 | logo form walls | hood band | square to the band | flat | 5 high | LG1, HB1 | extrusion |
 <!-- faces:end -->
 
 ### The same faces on the references
@@ -193,7 +300,8 @@ Only the faces that differ are listed. "Followed" names the reference that the t
 | DK2, DK3 | No radius. One 45 degree facet, 10.6 x 10.6 (0.039 W). | Radius over 0.11 to 0.13 of the front height, band over 0.20, crease at 0.33 (measured) | Soft edge (estimated) | Maker's mini |
 | DK4, DK5, DK6 | Center flat 0.397 W, flanks swept 3.3 degrees, corner radius 0.111 W | Center 0.56 of the width, flanks 8 degrees, corner 0.09 (measured) | Not read | Maker's mini |
 | DK7, RL4 | One plane, exact | One plane within 3 mm (estimated) | One plane (estimated) | All |
-| RL1 | 4.4 wide (0.016 W) | About 0.05 W (estimated) | Broad (estimated) | Own value: 16.0 (0.032 W), from the bezel |
+| RL1 | 4.4 wide (0.016 W). One arc, sagitta 0.091 of the chord. | About 0.05 W (estimated). Straight (measured). | Broad (estimated). Arc not measured. | Own: 16.0 wide (0.032 W), on an arc of 0.035 of the chord. See question 8. |
+| RL4 | Vertical to the seam | Leans in 0.010 ± 0.006 W over the top quarter (measured) | Leans in up to 0.018 ± 0.006 W over the top 0.22 (measured) | Own: 0.015 W, between the two. See question 9. |
 | RL2, RL3 | No radius. A 45 degree facet 10.6 wide (0.039 W). | A soft radius, about 0.015 W. A band is not visible (uncertain). | A large soft edge (estimated) | Own: the deck's edge section. See question 1. |
 | RL5 (inner wall of the cheek) | 20 to 31 deep | None: the bezel is about flush | Deep (CRT) | Maker's mini: no such face |
 | FB1 | Fillet R 3.9 | A sweep (estimated) | A large sweep | Own value: R 50 |
@@ -201,11 +309,12 @@ Only the faces that differ are listed. "Followed" names the reference that the t
 | RB2 | 20 deep (0.074 W), 28.2 degrees | Depth 0.01 to 0.03 W (uncertain), 27.8 degrees | Not visible (uncertain) | Angle and position: both. Depth: own, 12. See question 3. |
 | RB4, RB5 | The upper rear leans forward 11.6 degrees and is as wide as the cheeks | The upper rear stands proud of the lower rear (estimated) | Not read | Maker's mini in kind |
 | RB8 (rear lower facet) | 43 degrees, 30.6 deep, 28.8 high | Present (estimated) | Not comparable | Left out: the power supply stands there |
-| FB4 | Shoulder 1.4 (0.005 W) | Shoulder 0.030 ± 0.012 W (measured) | 0 to 0.03 W (estimated) | Maker's mini: 12 (0.024 W) |
+| FB4 | Shoulder 1.4 (0.005 W) | Shoulder 0.030 ± 0.012 W (photo-b, measured); a small lip in photo-g | None at the sides: one line over the seam (owner-ref-1, measured) | Real cabinet, by the owner's direction: no shoulder at the sides, a groove |
+| BZ1, BZ2 | A flat plate, 6 to 26 behind the cheeks | A flat land and a sloped inner frame (estimated) | A deep surround | Maker's mini in kind, on the rail arc |
 | HC1 | Leans 37 to 43 degrees, continues the cheek | Near upright, 0.03 W wide (measured) | Near upright (estimated) | Maker's mini |
 | HC2, HC4 | Top bar 15 thick (0.056 W). The top front edge is a 42 degree facet. | Top bar 0.037 W (measured), one soft edge | The lit strip fills the brow | Maker's mini in kind; 21 thick (0.042 W) |
 | HC3, HC12 | None: the band starts at the seam | Ledge zone 0.088 W (measured) | Ledge zone 0.06 W (measured) | Maker's mini |
-| HC5, HC6 | Arc R 1.29 W, 13.5 to 22 degrees; corner R 0.074 W | About 6 degrees, then one long blend (estimated) | A long blend (estimated) | Maker's mini |
+| HC5, HC6 | Arc R 1.29 W, 13.5 to 22 degrees; corner R 0.074 W | About 6 degrees, then one long blend (estimated) | 11 to 19 degrees (measured ± 3 in owner-ref-1), then a tight corner of about 0.06 W (estimated) | The foot from the real cabinet (it carries on the tuck). The blend from the maker's mini. |
 | HC7, HC8, HC9 | Top flat 30 deep; rear leans forward 16 degrees | Almost no flat; one arc down the rear (estimated) | Not read | Maker's mini |
 | HC13 | None | A white zone 0.043 W under the strip (uncertain: lip or top of the band) | A dip of 0.02 W | Own: a lip 6 high |
 | MQ1, MQ2 | An upright strip 12.4 high (0.046 W), 15.9 behind the nose of the top bar | 0.049 W high, under the top bar, tilted down (estimated) | 0.16 W with the brow | Own: 34 high for the display, faces down 18 degrees |
@@ -217,13 +326,23 @@ Uncertain readings, all on the maker's mini: the edge of the rail (RL2, RL3), th
 
 ## Open questions for the owner
 
-1. **Edge of the rail.** The blueprint runs the deck's whole edge section (radius, 10 degree band, crease 24 mm behind the land) up the rail to the hood. The maker's mini shows only a soft radius on the rail (about 8 mm at this size). Whole section, or radius only?
-2. **Land of the rail.** It is 16 mm (0.03 W). The maker's mini has about 0.05 W (25 mm at this size). Keep 16, or widen the cabinet by about 18 mm?
-3. **The crease behind the stripe.** The blueprint makes it a step 12 mm deep, equal to the shoulder of the hood. The 3D reference model has 20 mm. The maker's mini reads shallower. 12, deeper, or only a shallow line?
-4. **Depth.** The hood is 133 mm deep (0.27 W) and the cabinet 580. The maker's mini has 0.28 W, the real cabinet 0.30 W, the 3D reference model 0.335 W. Enough, or deeper (0.30 W gives a cabinet of 595)?
-5. **Legs and top bar of the hood.** They are 21 mm (0.042 W). Thicker legs cost marquee width: 30 mm legs give a window of 304 mm, 9 modules. Keep 21?
-6. **Marquee.** It sits 38 mm under the top bar and faces down 18 degrees. A seated player sees all of it. A standing person does not see its top. Accept?
-7. **Rear.** The rear lower facet and the rear corner facets of the references are left out. Accept for now?
+Questions 1 to 7 are from revision 1. The note says what revision 2 does to each.
+
+1. **Edge of the rail.** The blueprint runs the deck's whole edge section (radius, 10 degree band, crease 24 mm behind the land) up the rail to the hood. The maker's mini shows only a soft radius on the rail (about 8 mm at this size). Whole section, or radius only? *Still open.*
+2. **Land of the rail.** It is 16 mm (0.03 W). The maker's mini has about 0.05 W (25 mm at this size). Keep 16, or widen the cabinet by about 18 mm? *Still open, and it matters more now: the tuck makes the land 10 mm at the top of the bezel. A wider body would also allow a larger tuck.*
+3. **The crease behind the stripe.** A step 12 mm deep, deeper (3D model 20), or only a shallow line? *Still open. Its reason changed: revision 1 made it equal to the shoulder of the hood, and that shoulder is gone.*
+4. **Depth.** The hood is 133 mm deep (0.27 W) and the cabinet 580. Enough, or deeper (0.30 W gives a cabinet of 595)? *Still open.*
+5. **Legs and top bar of the hood.** They are 21 mm (0.042 W). Keep 21? *Still open.*
+6. **Marquee.** It sits 38 mm under the top bar and faces down 18 degrees. A standing person does not see its top. Accept? *Still open.*
+7. **Rear.** The rear lower facet and the rear corner facets of the references are left out. Accept for now? *Still open.*
+
+New in revision 2:
+
+8. **Rail arc.** Drawn at 0.035 of the chord (13 mm). The maker's rail is straight. The 3D model has 0.091 (33 mm at this size). Sheet 08, panel 1, shows the three. Which amount?
+9. **Tuck.** Drawn at 0.015 W (7.4 mm on each side at the seam). The maker's mini has about 0.010, the real cabinet at most 0.018. Sheet 08, panel 2, shows the three. Which amount? Above 0.018 the marquee loses a module or the body must be wider.
+10. **Side shoulder.** Revision 2 has none: the hood meets the body in one line with a groove, as in your photo of the real cabinet. The maker's mini has a small lip there. Is none correct?
+11. **Hood side.** It carries on the arc of the tuck (17.6 degrees where the blend starts) and then blends into the top as on the maker's mini. The real hood leans more and has tighter top corners. Keep the long blend?
+12. **Bezel.** A land of 20 mm that follows the rails, then an inner frame of 25 mm that slopes to the screen. The screen is 25 to 31 mm below the rails. Accept this depth?
 
 ## How to draw the sheets again
 
@@ -232,6 +351,7 @@ cad/.venv-tools/bin/python cad/tools/draw_blueprint.py target      # docs/bluepr
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   # the 3D reference model, to cad/out
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      # the face IDs on the photos, to cad/out
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py compare     # side profiles over each other, to cad/out
+cad/.venv-tools/bin/python cad/tools/draw_blueprint.py overlays    # the blueprint's silhouette on the annotated photos, to cad/out
 ```
 
 `reference` needs the slices of the model: run `candybar.shell.reconstruct_slices` with `cad/candybar/freecad-run.sh` (the example is at the top of that file). `photos` reads the picks in `cad/out/shell-d/reconstruction/face-picks.json`.

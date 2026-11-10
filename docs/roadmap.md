@@ -18,7 +18,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 ## Next steps
 
 1. The blueprint is in `docs/blueprint/` (seven sheets and `index.md`), made on 2026-11-10. The drawings of the references are in `cad/out/shell-d/reconstruction/`.
-2. The owner reviews the blueprint and answers its open questions.
+2. The owner reviewed the first blueprint on 2026-11-10 and found it too simple: it has straight lines where the real cabinet has curves. The body must lean and bow inward into the hood as one curve, with a bevel cut at the seam. The side profile must be a convex arc that follows the contour of a CRT. A curvature pass on the blueprint is in work. No solids are built before the owner accepts it.
 3. Build the solids from the same profiles and dimensions that draw the blueprint. A model that follows a dimensioned blueprint can be built on Opus.
 4. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
 5. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
@@ -34,7 +34,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] A review of the blueprint in `docs/blueprint/`: are the big volumes on sheet 1 right, are the faces on sheet 7 read correctly, and answers to the seven questions in `index.md`.
+- [ ] A review of the revised blueprint in `docs/blueprint/` after the curvature pass: are the big volumes and their curves right, are the faces on the face map read correctly, and answers to the open questions in `index.md`.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.

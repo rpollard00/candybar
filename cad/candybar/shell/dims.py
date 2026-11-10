@@ -229,24 +229,32 @@ def hood_stations(d: Dims) -> HoodStations:
 class Blueprint(Dims):
     """The target of the blueprint (docs/blueprint): the dimensions that differ from the built model, and new ones.
 
-    The deck, the bend, the screen face and the bezel keep the values of Dims. The blueprint changes the rail
-    (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands proud) and
-    the hood (deeper, sides that arc into the top). profiles.py turns these into profiles and faces.
+    The deck, the screen and the bezel window keep the values of Dims. The blueprint changes the rail (one edge
+    section from the hood seam to the front of the deck), the rear (the upper rear stands proud) and the hood
+    (deeper, sides that arc into the top). It also holds the curves of the form as named values: the arc of the
+    rail in side view, the tuck of the body sides toward the hood in front view, and the lines that the
+    references draw straight (crown, bow), which are zero. profiles.py turns these into profiles and faces.
     """
-    # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk; the rear body is
-    # narrower by the hood's shoulder on each side (width - 2 * hood_shoulder), so the hood's side stands over it
+    # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk
     step_y0: float = 345.0
     rear_w: float = 470.7
     # rear: the lower rear wall stays at body_d; the upper rear and the hood stand proud of it
     rear_proud: float = 40.0
     rear_step_z0: float = 310.0
     rear_step_z1: float = 350.0
-    # hood cap
-    hood_shoulder: float = 12.0
-    hood_side_lean: float = 7.0
-    hood_side_r_ratio: float = 1.3
+    # curves of the body
+    rail_sagitta_ratio: float = 0.035
+    body_tuck_ratio: float = 0.015
+    body_tuck_from: float = 0.75
+    body_bow_ratio: float = 0.0
+    bezel_land: float = 20.0
+    bezel_rim: float = 2.0
+    # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides
+    hood_shoulder: float = 0.0
+    seam_groove: float = 3.0
+    hood_crown_ratio: float = 0.0
     hood_blend_from: float = 0.45
-    hood_top_flat_ratio: float = 0.64
+    hood_top_flat_ratio: float = 0.66
     hood_blend_weight: float = 0.7
     hood_rear_arc_d: float = 95.0
     hood_rear_arc_h: float = 110.0
@@ -262,12 +270,49 @@ class Blueprint(Dims):
 
     @property
     def rail_land(self) -> float:
-        """Width of the land beside the bezel: what the edge section leaves of the rail."""
+        """Width of the land beside the bezel below the tuck: what the edge section leaves of the rail."""
         return self.rail_t - self.edge_in
 
     @property
     def depth(self) -> float:
         return self.body_d + self.rear_proud
+
+    @property
+    def tuck(self) -> float:
+        """How far each body side stands in from the side plane at the seam."""
+        return self.body_tuck_ratio * self.width
+
+    @property
+    def tuck_z0(self) -> float:
+        """Height at which the body side leaves the side plane."""
+        return self.deck_top + self.body_tuck_from * (self.body_top - self.deck_top)
+
+    @property
+    def tuck_lean(self) -> float:
+        """Lean of the body side at the seam, degrees from vertical: the tuck is one arc that starts vertical."""
+        return math.degrees(2 * math.atan2(self.tuck, self.body_top - self.tuck_z0))
+
+    @property
+    def tuck_r(self) -> float:
+        """Radius of the tuck arc. The hood side continues on the same radius, so the curvature has no jump at the seam."""
+        lean = math.radians(self.tuck_lean)
+        return (self.body_top - self.tuck_z0) / math.sin(lean) if lean > 1e-9 else math.inf
+
+    def side_x(self, z: float) -> float:
+        """Half the width of the body at height z: the side plane, a bow below the tuck when one is set, and the tuck."""
+        half = self.width / 2
+        if self.body_bow_ratio:
+            t = min(max((z - self.deck_top) / (self.tuck_z0 - self.deck_top), 0.0), 1.0)
+            half += self.body_bow_ratio * self.width * 4 * t * (1 - t)
+        if z <= self.tuck_z0 or self.tuck <= 0:
+            return half
+        dz = min(z, self.body_top) - self.tuck_z0
+        return half - (self.tuck_r - math.sqrt(self.tuck_r ** 2 - dz ** 2))
+
+    @property
+    def rail_turn(self) -> float:
+        """Angle through which the rail arc turns, degrees, from its sagitta."""
+        return math.degrees(4 * math.atan(2 * self.rail_sagitta_ratio))
 
 
 OPTIONS: dict[str, dict[str, float]] = {

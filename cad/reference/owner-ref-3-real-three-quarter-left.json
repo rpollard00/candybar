@@ -1,0 +1,49 @@
+{
+ "photo": "cad/vendor/sega-new-astro-city/owner-ref-3-real-three-quarter-left.png",
+ "sha256": "15debc5dc9fccdc6ec886dbadf6ca7fb49fb3fe66828cbefdf9144721e9a6e3a",
+ "note": "Real New Astro City, three-quarter view from above; the visible side is at the right of the picture. Small picture (474 x 632): the bezel corners are +-6 px. The stripe is traced by its green centre line (cad/out/shell-d/reconstruction/curves/stripes3.py). The focal length is an assumption (500 px).",
+ "sigma_px": 3.0,
+ "points": {
+  "bz_tl": [
+   150.0,
+   172.0,
+   6.0
+  ],
+  "bz_tr": [
+   360.0,
+   187.0,
+   6.0
+  ],
+  "bz_br": [
+   301.0,
+   431.0,
+   6.0
+  ],
+  "bz_bl": [
+   122.0,
+   375.0,
+   6.0
+  ],
+  "stripe_top": [
+   397.0,
+   190.0
+  ],
+  "stripe_mid": [
+   374.0,
+   300.0
+  ],
+  "stripe_foot": [
+   347.0,
+   410.0
+  ]
+ },
+ "camera": {
+  "f_px": 500.0
+ },
+ "bezel_aspect": 1.03,
+ "readings": {
+  "stripe_sagitta_over_chord_above_the_sweep": 0.005,
+  "stripe_sagitta_sigma": 0.005,
+  "azimuth_deg_estimated": 20.0
+ }
+}

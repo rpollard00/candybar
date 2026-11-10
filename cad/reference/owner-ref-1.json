@@ -1,0 +1,99 @@
+{
+ "photo": "cad/vendor/sega-new-astro-city/owner-ref-1.png",
+ "sha256": "9a5f701f60be0d0dee34a2d0120caeea0d50cdd7948c2258f6ef21a00220f1cd",
+ "note": "Real New Astro City, front, camera above screen height and tilted down (the lamp pole and the speaker stands converge downward). Picks by brightness step on each row (cad/out/shell-d/reconstruction/curves/ref1.py), +-1.5 px. The bezel corners are the corners of the black surround, +-3 px. The focal length is not known: 1000 px is an assumption (the photo is a crop).",
+ "sigma_px": 1.5,
+ "points": {
+  "bz_tl": [
+   156.0,
+   343.0,
+   3.0
+  ],
+  "bz_tr": [
+   457.0,
+   343.0,
+   3.0
+  ],
+  "bz_br": [
+   461.0,
+   638.0,
+   3.0
+  ],
+  "bz_bl": [
+   150.0,
+   638.0,
+   3.0
+  ],
+  "sil_l_deck": [
+   128.5,
+   625.0
+  ],
+  "sil_r_deck": [
+   483.5,
+   625.0
+  ],
+  "sil_l_mid": [
+   130.5,
+   485.0
+  ],
+  "sil_r_mid": [
+   481.5,
+   485.0
+  ],
+  "sil_l_tuck_start": [
+   131.5,
+   405.0
+  ],
+  "sil_r_tuck_start": [
+   482.5,
+   405.0
+  ],
+  "sil_l_seam": [
+   137.5,
+   336.0
+  ],
+  "sil_r_seam": [
+   474.5,
+   336.0
+  ],
+  "hood_l_300": [
+   146.5,
+   300.0
+  ],
+  "hood_r_300": [
+   465.5,
+   300.0
+  ],
+  "hood_l_252": [
+   167.5,
+   252.0
+  ],
+  "hood_r_252": [
+   444.5,
+   252.0
+  ],
+  "hood_top_l": [
+   185.0,
+   232.5
+  ],
+  "hood_top_r": [
+   425.0,
+   232.5
+  ]
+ },
+ "camera": {
+  "f_px": 1000.0
+ },
+ "bezel_aspect": 1.03,
+ "readings": {
+  "body_width_px": 351.0,
+  "tuck_start_fraction_of_body_height": 0.78,
+  "inset_at_seam_from_extended_lower_line_px": [
+   5.8,
+   6.6
+  ],
+  "tuck_ratio_W": 0.018,
+  "tuck_ratio_sigma": 0.006,
+  "hood_top_sagitta_px_over_244": -0.28
+ }
+}
