@@ -58,6 +58,7 @@ The owner asked for two more things on 2026-11-10: a complete rework of the hood
 - A cheek curve that is more subtle than on the MakerWorld model, and that runs smoothly all the way into the deck.
 - No holes in the front face of the deck.
 - A deck with the additional faces of the reference cabinet. Seen from above, the front is three faces: a center face that is square to the player and about half the width, and a face on each side of it that turns slightly outward. The turn is very subtle. (An earlier reading, flat faces that cut the corners at 45 degrees, was wrong.)
+- Measured from the photos (see `docs/research/photo-measurements.md`): the center face is 0.56 of the deck width; each flank turns back about 8 degrees; the corner radius is about 0.09 of the deck width; the crease on the front is one third of the way down, with the leaning band about one fifth of the front. The model does not have these values yet.
 - A visible cut between the top of the bezel and the hood.
 - A shorter deck. The control panel becomes about 396 x 175 mm (it was 396 x 240). The start, coin and menu buttons move from a row behind the main buttons to the right end of the panel, as on the reference cabinet. The deck is then about 195 to 215 mm from its front edge to the foot of the screen face.
 - The screen face: a bezel in the proportion of the 16:10 screen with an even frame of about 45 mm, on a body-colored band of about 60 mm, with a recline of about 30 degrees. The owner accepts a steeper sight line for this (about 36 degrees with the estimated eye position).
@@ -88,7 +89,8 @@ The owner asked for two more things on 2026-11-10: a complete rework of the hood
 | `docs/Arcade_Project_Current_Design_2026-11-09.md` | The project brief |
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
-| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
+| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
+| `cad/reference/` | The picked points and known sizes for each reference photo, which the photo tools use |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
 | `cad/out/report.md` | Check results and the list of dimensions to measure (a build output) |
