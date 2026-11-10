@@ -225,6 +225,51 @@ def hood_stations(d: Dims) -> HoodStations:
                         y_band_top, y_marquee_bottom, y_marquee_top, depth - d.hood_wall, (xc, zc))
 
 
+@dataclass(frozen=True)
+class Blueprint(Dims):
+    """The target of the blueprint (docs/blueprint): the dimensions that differ from the built model, and new ones.
+
+    The deck, the bend, the screen face and the bezel keep the values of Dims. The blueprint changes the rail
+    (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands proud) and
+    the hood (deeper, sides that arc into the top). profiles.py turns these into profiles and faces.
+    """
+    # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk; the rear body is
+    # narrower by the hood's shoulder on each side (width - 2 * hood_shoulder), so the hood's side stands over it
+    step_y0: float = 345.0
+    rear_w: float = 470.7
+    # rear: the lower rear wall stays at body_d; the upper rear and the hood stand proud of it
+    rear_proud: float = 40.0
+    rear_step_z0: float = 310.0
+    rear_step_z1: float = 350.0
+    # hood cap
+    hood_shoulder: float = 12.0
+    hood_side_lean: float = 7.0
+    hood_side_r_ratio: float = 1.3
+    hood_blend_from: float = 0.45
+    hood_top_flat_ratio: float = 0.64
+    hood_blend_weight: float = 0.7
+    hood_rear_arc_d: float = 95.0
+    hood_rear_arc_h: float = 110.0
+    hood_sill_corner_r: float = 6.0
+    hood_ledge: float = 14.0
+    hood_band_tilt: float = 24.0
+
+    @property
+    def edge_in(self) -> float:
+        """How far the edge section runs in from the side plane: the radius, then the leaning band."""
+        t = math.radians(90.0 - self.deck_lean)
+        return self.deck_top_r * math.sin(t) + (self.deck_lean_h - self.deck_top_r * (1 - math.cos(t))) * math.tan(math.radians(self.deck_lean))
+
+    @property
+    def rail_land(self) -> float:
+        """Width of the land beside the bezel: what the edge section leaves of the rail."""
+        return self.rail_t - self.edge_in
+
+    @property
+    def depth(self) -> float:
+        return self.body_d + self.rear_proud
+
+
 OPTIONS: dict[str, dict[str, float]] = {
     "1-tall-bezel": {"recline": 24.0, "band_len": 0.0, "frame_side": 42.0, "frame_v": -1.0},
     "2-tall-band": {"recline": 26.0, "band_len": 100.0, "frame_side": 45.0, "frame_v": 45.0},
