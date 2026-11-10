@@ -21,6 +21,7 @@ LEGEND_WIDTH = 300
 CURVE_DEFLECTION = 0.02
 EDGE_KINDS = ("Sharp", "OutLine")
 NOTE = "Each solid is drawn with its own hidden lines removed; solids do not hide each other."
+PAINT_ORDER = ("massing", "trim", "keepout", "printable", "hardware", "protrusion")
 BASE_CSS = (
     "path { fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; } "
     "text { font-family: sans-serif; fill: #222; }"
@@ -50,8 +51,8 @@ VIEWS = (
 def write(doc: App.Document, out_dir: Path) -> None:
     views_dir = out_dir / FOLDER
     views_dir.mkdir()
-    solids = model.placed(doc)
-    width, depth, height = (params.value(doc, name) for name in ("outer_w", "cab_d", "cab_h"))
+    solids = [solid for solid in model.placed(doc) if not solid.alternate]
+    width, depth, height = (params.value(doc, name) for name in ("deck_w", "cab_d", "cab_h"))
     size = f"W x D x H = {width:.0f} x {depth:.0f} x {height:.0f} mm"
     for view in VIEWS:
         svg = views_dir / f"{view.name}.svg"
@@ -87,7 +88,7 @@ def _svg(view: View, solids: Sequence[model.Placed], size: str) -> str:
 
     paths = [
         f'<path id="{solid.name}" class="{role}" d="{path(lines)}"/>'
-        for role in ROLE_STYLES
+        for role in PAINT_ORDER
         for solid, lines in drawn
         if solid.role == role and lines
     ]
@@ -105,9 +106,9 @@ def _svg(view: View, solids: Sequence[model.Placed], size: str) -> str:
 
 def _css() -> str:
     rules = [BASE_CSS]
-    for role, style in ROLE_STYLES.items():
-        dash = " stroke-dasharray: 7 5;" if style.dashed else ""
-        rules.append(f".{role} {{ stroke: {style.hex};{dash} }}")
+    for role in PAINT_ORDER:
+        dash = " stroke-dasharray: 7 5;" if ROLE_STYLES[role].dashed else ""
+        rules.append(f".{role} {{ stroke: {ROLE_STYLES[role].hex};{dash} }}")
     return " ".join(rules)
 
 
@@ -118,8 +119,8 @@ def _header(view: View, size: str, width: int) -> list[str]:
         f'<text x="{MARGIN}" y="76" font-size="20">{escape(size)}</text>',
         f'<text x="{MARGIN}" y="102" font-size="14">{escape(NOTE)}</text>',
     ]
-    for row, (role, style) in enumerate(ROLE_STYLES.items()):
-        y = 26 + row * 21
+    for row, role in enumerate(PAINT_ORDER):
+        y = 20 + row * 19
         lines.append(f'<path class="{role}" d="M{legend_x},{y} L{legend_x + 44},{y}" style="stroke-width: 3"/>')
-        lines.append(f'<text x="{legend_x + 54}" y="{y + 5}" font-size="15">{escape(style.label)}</text>')
+        lines.append(f'<text x="{legend_x + 54}" y="{y + 5}" font-size="15">{escape(ROLE_STYLES[role].label)}</text>')
     return lines

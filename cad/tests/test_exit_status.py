@@ -25,6 +25,7 @@ class ExitStatusTest(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
         forced = [row for row in read_report(out)["rows"] if row["rule"] == "R5" and row["level"] == "FAIL"]
         self.assertTrue(forced, done.stdout)
+        self.assertIn("GuiDocument.xml", zipfile.ZipFile(out / build.SAVED).namelist())
 
     def test_view_step_that_cannot_start_returns_non_zero_and_says_so(self) -> None:
         stand_in = support.temp_dir() / "freecad"
@@ -40,4 +41,13 @@ class ExitStatusTest(unittest.TestCase):
         done, out = support.shell_build(support.params_copy({"deck_t": "five"}))
         self.assertNotEqual(done.returncode, 0)
         self.assertRegex(done.stderr, r"cabinet\.csv row \d+ \('deck_t'\): value 'five'")
+        self.assertNotIn("View step failed", done.stderr)
         self.assertFalse((out / "report.json").exists())
+
+    def test_broken_build_removes_the_outputs_of_an_earlier_good_one(self) -> None:
+        _, out = support.shell_build(support.PARAMS)
+        produced = sorted(path.name for path in out.iterdir() if not path.name.startswith("."))
+        self.assertEqual(produced, ["candybar.FCStd", "candybar.step", "report.json", "report.md", "step", "stl"])
+        done, _ = support.shell_build(support.params_copy({"deck_t": "five"}), out=out)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertEqual([path.name for path in out.iterdir() if not path.name.startswith(".")], [])

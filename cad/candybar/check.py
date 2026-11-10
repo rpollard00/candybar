@@ -9,20 +9,19 @@ from pathlib import Path
 from typing import Callable
 
 import FreeCAD as App
-import Part
 
 from . import massing, model, panel, params
 
 PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 LEVELS = (FAIL, WARN, PASS)
-SOLID_ROLES = ("hardware", "protrusion", "printable", "massing")
+SOLID_ROLES = ("hardware", "protrusion", "printable", "massing", "trim")
 VOLUME_TOLERANCE = 1.0
 LENGTH_TOLERANCE = 1e-6
 NUT_OVERLAP_WARN = 1.0
 REPORT_MD = "report.md"
 REPORT_JSON = "report.json"
 OUTPUTS = (REPORT_MD, REPORT_JSON)
-OVERALL = ("outer_w", "cab_d", "cab_h", "cp_top_z", "mon_center_y", "mon_center_z", "sight_angle", "eye_dist")
+OVERALL = ("deck_w", "outer_w", "cab_d", "cab_h", "cp_top_z", "mon_center_y", "mon_center_z", "sight_angle", "eye_dist")
 
 Finding = tuple[str, str, str]
 
@@ -129,23 +128,15 @@ def _keepout(scene: Scene) -> list[Finding]:
     return _clashes(pairs)
 
 
-def _interior(scene: Scene) -> Part.Shape:
-    profile = model.world_shape(scene.doc.getObject(massing.PROFILE))
-    width = scene.value("inner_w")
-    face = Part.Face(profile.Wires[0])
-    face.translate(App.Vector(-width / 2, 0, 0))
-    return face.extrude(App.Vector(width, 0, 0))
-
-
 def _containment(scene: Scene) -> list[Finding]:
-    interior = _interior(scene)
+    envelope = model.world_shape(scene.doc.getObject(massing.ENVELOPE))
     hardware = scene.with_role("hardware")
     found = [
-        (FAIL, solid.name, f"{volume:.0f} mm3 lies outside the interior")
+        (FAIL, solid.name, f"{volume:.0f} mm3 lies outside the shell envelope")
         for solid in hardware
-        if (volume := solid.world.cut(interior).Volume) > VOLUME_TOLERANCE
+        if (volume := solid.world.cut(envelope).Volume) > VOLUME_TOLERANCE
     ]
-    return found or [(PASS, f"{len(hardware)} hardware objects", "all inside the interior")]
+    return found or [(PASS, f"{len(hardware)} hardware objects", "all inside the shell envelope")]
 
 
 def _print_size(part: model.Placed) -> tuple[float, float, float]:

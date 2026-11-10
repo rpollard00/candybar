@@ -1,21 +1,30 @@
 name,value,unit,status,measure,source,note
 foot_h,6,mm,provisional,,design choice,Rubber feet: desk top to the floor underside
-floor_t,5,mm,provisional,,design choice,Floor plate thickness
+skin_t,5,mm,provisional,,design choice,"Shell wall thickness: floor, rear, roof and front faces"
+floor_t,=skin_t,mm,derived,,,Floor thickness
 side_t,12,mm,provisional,,design choice,Side wall build-up: skin plus ribs
-rear_t,6,mm,provisional,,design choice,Rear wall and rear door thickness
-front_t,4,mm,provisional,,design choice,Control box front wall thickness
+rear_t,=skin_t,mm,derived,,,Rear wall and rear door thickness
 inner_w,=mon_w + 2 * mon_side_clear,mm,derived,,,Clear width between the side walls
 outer_w,=inner_w + 2 * side_t,mm,derived,,,Overall cabinet width
-cab_d,525,mm,provisional,,"set by the PSU chain: bezel foot, cable trunk, 180 PSU bay, rear wall",Overall depth: front face to rear face
+deck_flare,24,mm,provisional,,reference photos (deck 1.15 to 1.25 of the body width),Control deck width beyond the body on each side
+deck_w,=outer_w + 2 * deck_flare,mm,derived,,,Control deck width
+body_taper,0,mm,provisional,,reference photos (slight taper),Body width lost on each side between the deck and the roof
+cab_d,535,mm,provisional,,"set by the PSU chain: bezel foot, cable trunk, 180 PSU bay, rear wall",Overall depth: front face to rear face
 rear_inner_y,=cab_d - rear_t,mm,derived,,,Inside face of the rear wall
 cp_inner_h,56,mm,provisional,,controls-ergonomics.md 5.5 (55 to 60),Panel top face down to the floor top face
 cp_top_z,=foot_h + floor_t + cp_inner_h,mm,derived,,,Panel top face above the desk
-cp_depth,246,mm,provisional,,controls-ergonomics.md 3.6 (233 to 248 panel),Control box depth: front face to the shelf
+cp_depth,256,mm,provisional,,controls-ergonomics.md 3.6 (233 to 248 panel) plus the deck border,Control deck depth: front face to the shelf
+deck_nose,14,mm,provisional,,reference photos (white border around the control plate),Deck border in front of the removable panel
+deck_edge_r,8,mm,provisional,,reference photos,Radius of the deck top edges
+deck_facet_h,30,mm,provisional,,reference photos,Height of the facet on the lower deck faces
+deck_facet_in,14,mm,provisional,,reference photos,Inset of the facet at the bottom of the deck
+deck_corner_r,22,mm,provisional,,reference photos,Radius of the front deck corners seen from above
+flare_r,14,mm,provisional,,reference photos,Radius where the body side meets the deck top seen from the front
 deck_t,5,mm,provisional,,Sanwa OBSN-30 panel limit of 5,Control deck thickness
 panel_gap,1,mm,provisional,Print a panel-fit coupon,design choice,Clearance around the removable panel
 panel_w,=inner_w - 2 * panel_gap,mm,derived,,,Removable panel width
-panel_d,=cp_depth - front_t - 2 * panel_gap,mm,derived,,,Removable panel depth
-panel_y0,=front_t + panel_gap,mm,derived,,,Panel front edge behind the cabinet front face
+panel_d,=cp_depth - deck_nose - 2 * panel_gap,mm,derived,,,Removable panel depth
+panel_y0,=deck_nose + panel_gap,mm,derived,,,Panel front edge behind the cabinet front face
 panel_fix_inset,9,mm,provisional,,design choice,Corner fastener hole inset from the panel edges
 panel_fix_d,4.4,mm,provisional,,M4 clearance,Corner fastener hole diameter
 stick_x,-75,mm,provisional,Try a paper layout at the real desk,design choice,Lever centre from the panel centre line. Negative is left
@@ -30,13 +39,28 @@ enc_x,-150,mm,provisional,,design choice,Encoder centre from the panel centre li
 enc_y,55,mm,provisional,,design choice,Encoder centre behind the panel front edge
 shelf_depth,30,mm,provisional,,design choice,Flat shelf between the panel and the bezel foot
 recline,22,deg,provisional,Bench test: the screen angle that feels right,controls-ergonomics.md 5.5 (15 to 25),Screen recline from vertical
-mon_chin,120,mm,provisional,Bench test: the screen height that feels right,design choice,"Bezel face from the shelf up to the monitor's bottom edge, along the slope"
+mon_chin,100,mm,provisional,Bench test: the screen height that feels right,design choice,"Bezel face from the shelf up to the monitor's bottom edge, along the slope"
 mon_setback,4,mm,provisional,,design choice,Monitor front face behind the bezel front plane
-bezel_top,25,mm,provisional,,design choice,"Bezel above the monitor's top edge, along the slope"
+bezel_top,45,mm,provisional,,reference photos (thick black margin above the image),"Bezel above the monitor's top edge, along the slope"
 cradle_t,20,mm,provisional,,design choice,Depth reserved behind the monitor for its cradle
-hood_overhang,45,mm,provisional,,design choice,Hood lip forward of the bezel top
-marquee_h,70,mm,provisional,,design choice,Marquee face height
-marquee_tilt,10,deg,provisional,,design choice,Marquee face tilt back from vertical
+cheek_proud,10,mm,provisional,,reference photos,Side cheek front edge forward of the bezel front plane
+bezel_side_margin,8,mm,provisional,,design choice,Bezel plate width beyond each monitor edge
+bezel_w,=mon_w + 2 * bezel_side_margin,mm,derived,,,Bezel plate width
+sweep_r,26,mm,provisional,,reference photos; limited so the control panel lifts out,Radius of the sweep from the cheek into the deck
+hood_h,135,mm,provisional,,reference photos (hood 0.35 of the body width),Hood height above the top of the bezel
+hood_tilt,10,deg,provisional,,design choice: speakers follow the contour,Hood front face tilt back from vertical
+hood_overhang,30,mm,provisional,,reference photos,Hood lip forward of the cheek top
+hood_r,35,mm,provisional,,reference photos,Radius of the hood top front edge seen from the side
+hood_corner_r,40,mm,provisional,,reference photos,Radius of the hood top corners seen from the front
+hood_band_z0,22,mm,provisional,,design choice,Bottom of the speaker and marquee band above the hood lip along the hood face
+marquee_w,210,mm,provisional,Size of the marquee display when it is chosen,design choice,Marquee window width
+marquee_h,64,mm,provisional,Size of the marquee display when it is chosen,design choice,Marquee window height
+spk_w,72,mm,provisional,Size of the speakers when they are chosen,design choice,Speaker grille width
+spk_h,64,mm,provisional,,design choice,Speaker grille height
+spk_gap,14,mm,provisional,,design choice,Gap between the marquee window and each speaker grille
+strip_h,10,mm,provisional,,reference photos (lit strip),Light strip height
+strip_z0,=hood_band_z0 + marquee_h + 8 mm,mm,derived,,,Light strip bottom above the hood lip along the hood face
+strip_w,=marquee_w + 2 * spk_gap + 2 * spk_w,mm,derived,,,Light strip width
 bezel_foot_y,=cp_depth + shelf_depth,mm,derived,,,Bezel front plane where it meets the shelf
 bezel_len,=mon_chin + mon_h + bezel_top,mm,derived,,,Bezel length along the slope
 mon_bottom_y,=bezel_foot_y + mon_chin * sin(recline) + mon_setback * cos(recline),mm,derived,,,"Monitor front bottom edge, depth"
@@ -45,9 +69,15 @@ mon_center_y,=mon_bottom_y + mon_h / 2 * sin(recline),mm,derived,,,"Screen centr
 mon_center_z,=mon_bottom_z + mon_h / 2 * cos(recline),mm,derived,,,"Screen centre, height above the desk"
 bezel_top_y,=bezel_foot_y + bezel_len * sin(recline),mm,derived,,,"Bezel top edge, depth"
 bezel_top_z,=cp_top_z + bezel_len * cos(recline),mm,derived,,,"Bezel top edge, height above the desk"
-hood_lip_y,=bezel_top_y - hood_overhang,mm,derived,,,"Hood front lower edge, depth"
-top_front_y,=hood_lip_y + marquee_h * sin(marquee_tilt),mm,derived,,,"Roof front edge, depth"
-cab_h,=bezel_top_z + marquee_h * cos(marquee_tilt),mm,derived,,,Overall height above the desk
+cheek_foot_y,=bezel_foot_y - cheek_proud / cos(recline),mm,derived,,,Cheek front line at the deck top
+cheek_top_y,=bezel_top_y - cheek_proud / cos(recline),mm,derived,,,Cheek front line at the hood base
+hood_lip_y,=cheek_top_y - hood_overhang,mm,derived,,,"Hood front lower edge, depth"
+hood_top_y,=hood_lip_y + hood_h * tan(hood_tilt),mm,derived,,,"Hood front face at roof height, before the radius"
+win_cz,=mon_chin + mon_bezel_bottom + mon_active_h / 2,mm,derived,,,Centre of the lit image up the bezel face
+win169_h,=mon_active_w * 9 / 16,mm,derived,,,Window height of the 16:9 bezel
+win43_w,=mon_active_h * 4 / 3,mm,derived,,,Window width of the 4:3 bezel
+wintate_w,=mon_active_h * 3 / 4,mm,derived,,,Window width of the vertical bezel
+cab_h,=bezel_top_z + hood_h,mm,derived,,,Overall height above the desk
 eye_y,-60,mm,provisional,"Sit as you would play. Eye position in front of the cabinet front face, as a negative number",median adult estimate,Eye position relative to the cabinet front face
 eye_z,530,mm,provisional,Sit as you would play. Eye height above the desk top,median adult estimate,Eye height above the desk
 sight_angle,=atan((eye_z - mon_center_z) / (mon_center_y - eye_y)),deg,derived,,,Sight line to the screen centre below horizontal
@@ -63,6 +93,11 @@ bc_x0,=-inner_w / 2 + bc_dp_clear + bc_io_overhang + 3 mm,mm,derived,,,BC-250 I/
 bc_bottom_z,=psu_z0 + psu_h + psu_fan_clear + 2 mm,mm,derived,,,BC-250 lower long edge above the desk
 bc_top_z,=bc_bottom_z + bc_pcb_w_pwr,mm,derived,,,BC-250 upper long edge above the desk
 bc_pcb_y,=rear_inner_y - bc_gap_door - bc_shroud_h,mm,derived,,,BC-250 PCB top face depth
+vent_fan_x,=bc_x0 + bc_shroud_x0 + bc_shroud_l / 2,mm,derived,,,Fan intake centre across the cabinet
+vent_fan_z,=bc_top_z - bc_shroud_y0 - bc_shroud_w / 2,mm,derived,,,Fan intake centre above the desk
+vent_out_y0,=bc_pcb_y - 15 mm,mm,derived,,,Exhaust vent front edge
+vent_out_d,60,mm,provisional,Wall power under the hardest game sets the vent area,hardware-envelopes.md 2 (100 cm2 exhaust),Exhaust vent size front to back
+vent_out_z0,=bc_top_z - bc_fin_y0 - bc_fin_w,mm,derived,,,Exhaust vent bottom above the desk
 tgt_panel_top_min,60,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk
 tgt_panel_top_max,75,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk
 tgt_palm_min,100,mm,provisional,,controls-ergonomics.md 5.5,Target range: lowest button centre to the panel front edge

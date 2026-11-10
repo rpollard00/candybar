@@ -10,7 +10,9 @@ The model is a layout study, not a set of finished parts.
 | --- | --- |
 | Monitor, BC-250, power supply, cable bundle, lever, buttons, encoder | Envelope solids and keep-out zones. The dimensions come from data sheets and community CAD, not from the real parts. |
 | Control deck | Two printable tiles: a lever tile and a button tile. The splice between the tiles and the panel latch are not designed. |
-| Cabinet shell | Provisional massing: side silhouette, floor, rear wall, bezel, shelf, roof. No shell part is designed. |
+| Cabinet shell | Styled massing: one solid that follows the reference cabinet in `docs/research/cabinet-references.md` section 1. It has the hood, the cheeks, the deck, the panel opening, the rear cut-outs and the side vent. It is not divided into printable parts. |
+| Bezel | Four plates for one opening: 16:9, 16:10, 4:3 and vertical. The document shows the 16:9 plate. The other three plates are hidden alternates. |
+| Hood face | Flush plates for the marquee, two speaker grilles and a light strip. No hardware is chosen for them. |
 | Monitor cradle, compute tray, ducts, power supply mount | Not designed. The keep-out zones hold their space. |
 
 ## Build
@@ -83,7 +85,7 @@ You can change a cell in the `Params` sheet of `candybar.FCStd`. The model follo
 | R0 object state | An object does not recompute, or a sketch is not fully constrained |
 | R1 interference | Two solids of different assemblies share more than 1 mm3. A printable part is also compared with the hardware of its own assembly. |
 | R2 keep-out | A solid of one assembly is in a keep-out zone of a different assembly |
-| R3 containment | A hardware solid is outside the cabinet interior |
+| R3 containment | A hardware solid is outside the shell envelope |
 | R4 print fit | A printable part is larger than the 256 mm bed. More than 240 mm gives a warning. |
 | R5 button spacing | Two button nuts overlap by more than 1 mm. A smaller overlap gives a warning. |
 
@@ -91,7 +93,7 @@ R6 compares the ergonomic values with their target ranges. R7 counts the paramet
 
 ## View the model
 
-Open `cad/out/candybar.FCStd` in FreeCAD. The keep-out zones are hidden. To show one, select it in the tree and press the space bar.
+Open `cad/out/candybar.FCStd` in FreeCAD. The shell is opaque, so the hardware inside is not visible. The keep-out zones and the alternate bezel plates are hidden. To show or hide an object, select it in the tree and press the space bar.
 
 ### Live session for Claude
 
@@ -100,6 +102,7 @@ The FreeCAD MCP addon (`neka-nat/freecad-mcp` 0.1.30) is installed in `~/.local/
 ```sh
 cad/tools/freecad-gui.sh             # start FreeCAD with the RPC server
 cad/tools/fcrpc.py show              # open the built model in the running FreeCAD
+cad/tools/fcrpc.py show --inside     # the same, with a translucent shell
 cad/tools/fcrpc.py show --keepouts   # the same, with the keep-out zones
 cad/tools/fcrpc.py shot view.png --view Right
 ```
@@ -119,7 +122,8 @@ Each solid has a `CB_Role` property. The checks use this property.
 | `hardware` | A purchased part |
 | `protrusion` | Hardware that goes through the shell: the lever shaft, the ball, the button caps |
 | `keepout` | Space for a plug, a cable, airflow, or a part that is not designed |
-| `massing` | Provisional shell geometry |
+| `massing` | The shell solid |
+| `trim` | A visible plate in the shell: a bezel plate, a speaker grille, the marquee window, the light strip |
 | `printable` | A designed part for the printer |
 
 ## Code

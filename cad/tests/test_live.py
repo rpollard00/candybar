@@ -82,14 +82,3 @@ class LiveParametricsTest(unittest.TestCase):
         self.assertAlmostEqual(new_x, old_x + 2, places=4)
         self.assertAlmostEqual(new_y, old_y, places=4)
         self.assertAlmostEqual(new_x, self.value("stick_x") + self.value("btn1_dx"), places=4)
-
-    def test_monitor_width_widens_the_cabinet_and_the_side_massing(self) -> None:
-        def span() -> float:
-            return self.shape("Shell_SideR").BoundBox.XMax - self.shape("Shell_SideL").BoundBox.XMin
-
-        outer_before, span_before = self.value("outer_w"), span()
-        self.assertAlmostEqual(span_before, outer_before, places=4)
-        self.edit(mon_w=self.value("mon_w") + 6)
-        self.assertAlmostEqual(self.value("outer_w"), outer_before + 6, places=4)
-        self.assertAlmostEqual(span(), span_before + 6, places=4)
-        self.assertAlmostEqual(self.shape("Shell_SideL").BoundBox.XLength, self.value("side_t"), places=4)

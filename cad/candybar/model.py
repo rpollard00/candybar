@@ -7,8 +7,10 @@ document follows later edits of the sheet.
 """
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterable, Sequence
 
 import FreeCAD as App
@@ -17,10 +19,15 @@ import Sketcher
 
 from . import params
 
-ROLES = ("hardware", "protrusion", "keepout", "massing", "printable")
+ROLES = ("hardware", "protrusion", "keepout", "massing", "trim", "printable")
 ZERO = "0"
 
 Triple = tuple[str, str, str]
+Axis = tuple[float, float, float]
+ORIGIN: Triple = (ZERO, ZERO, ZERO)
+X_AXIS: Axis = (1.0, 0.0, 0.0)
+Y_AXIS: Axis = (0.0, 1.0, 0.0)
+Z_AXIS: Axis = (0.0, 0.0, 1.0)
 
 _UNITS = frozenset({"mm", "deg"})
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -62,14 +69,43 @@ _KINDS: dict[str, tuple[str, tuple[str, ...]]] = {
 
 
 @dataclass(frozen=True)
+class Pose:
+    """A rotation about an axis of the parent frame. A text `angle` is bound; a number is fixed degrees."""
+
+    axis: Axis = Z_AXIS
+    angle: str | float = 0.0
+
+
+def leaning_back(angle: str) -> Pose:
+    """Upright, then tipped by `angle` so that the top moves toward the rear."""
+    return Pose((-1.0, 0.0, 0.0), angle)
+
+
+@dataclass(frozen=True)
 class Assembly:
-    """An `App::Part` with a bound placement. A text `angle` is bound; a number is fixed degrees."""
+    """An `App::Part` with a bound placement."""
 
     name: str
     base: Triple
-    axis: tuple[float, float, float] = (0.0, 0.0, 1.0)
-    angle: str | float = 0.0
+    pose: Pose = Pose()
     prims: tuple[Prim, ...] = ()
+
+
+@dataclass(frozen=True)
+class Corner:
+    """One corner of a sketched outline. A `radius` rounds it, and must then stay above zero."""
+
+    name: str
+    x: str
+    y: str
+    radius: str = ZERO
+
+
+class Side(Enum):
+    """Which way a pad or a pocket goes from its sketch plane."""
+
+    ALONG_NORMAL = "along the sketch normal"
+    AGAINST_NORMAL = "against the sketch normal"
 
 
 @dataclass(frozen=True)
@@ -78,6 +114,7 @@ class Placed:
     role: str
     owner: str
     tag: str
+    alternate: bool
     print_axis: str
     world: Part.Shape
     assembly: Part.Shape
@@ -116,16 +153,20 @@ class Model:
         for axis, text in zip("xyz", at, strict=True):
             self.bind(obj, f"Placement.Base.{axis}", text)
 
-    def assembly(self, spec: Assembly, parent: App.DocumentObject | None = None) -> App.DocumentObject:
-        part = _new(parent or self.doc, "App::Part", spec.name)
-        bound = isinstance(spec.angle, str)
-        degrees = self.number(spec.angle) if bound else spec.angle
-        part.Placement = App.Placement(App.Vector(), App.Rotation(App.Vector(*spec.axis), degrees))
+    def pose(self, obj: App.DocumentObject, base: Triple, pose: Pose) -> None:
+        bound = isinstance(pose.angle, str)
+        degrees = self.number(pose.angle) if bound else pose.angle
+        obj.Placement = App.Placement(App.Vector(), App.Rotation(App.Vector(*pose.axis), degrees))
         if bound:
-            self.bind(part, "Placement.Rotation.Angle", spec.angle)
-        self.place(part, spec.base)
+            self.bind(obj, "Placement.Rotation.Angle", pose.angle)
+        self.place(obj, base)
+
+    def assembly(self, spec: Assembly, parent: App.DocumentObject | None = None, owner: str = "") -> App.DocumentObject:
+        """An `App::Part` with its solids. The solids of a sub-assembly belong to `owner`."""
+        part = _new(parent or self.doc, "App::Part", spec.name)
+        self.pose(part, spec.base, spec.pose)
         for prim in spec.prims:
-            self.solid(part, prim, spec.name)
+            self.solid(part, prim, owner or spec.name)
         return part
 
     def solid(self, parent: App.DocumentObject, prim: Prim, owner: str) -> App.DocumentObject:
@@ -152,6 +193,16 @@ class Model:
         obj.Tool = tool
         return obj
 
+    def common(self, parent: App.DocumentObject, name: str, shapes: Sequence[App.DocumentObject]) -> App.DocumentObject:
+        obj = _new(parent, "Part::MultiCommon", name)
+        obj.Shapes = list(shapes)
+        return obj
+
+    def fuse(self, parent: App.DocumentObject, name: str, shapes: Sequence[App.DocumentObject]) -> App.DocumentObject:
+        obj = _new(parent, "Part::MultiFuse", name)
+        obj.Shapes = list(shapes)
+        return obj
+
     def sketch(self, parent: App.DocumentObject, name: str, plane: str, offset: str = ZERO) -> Sketch:
         """A sketch on an origin plane of a Body or Part, `offset` along the plane normal."""
         obj = _new(parent, "Sketcher::SketchObject", name)
@@ -161,34 +212,61 @@ class Model:
         self.bind(obj, "AttachmentOffset.Base.z", offset)
         return Sketch(self, obj)
 
-    def extrusion(
-        self, parent: App.DocumentObject, name: str, profile: Sketch, length: str, at: Triple
+    def posed_sketch(self, parent: App.DocumentObject, name: str, base: Triple, pose: Pose) -> Sketch:
+        """A sketch on a plane of its own: the parent's XY plane turned by `pose`, then moved to `base`."""
+        obj = _new(parent, "Sketcher::SketchObject", name)
+        self.pose(obj, base, pose)
+        return Sketch(self, obj)
+
+    def offset(
+        self, parent: App.DocumentObject, name: str, outline: App.DocumentObject, distance: str
     ) -> App.DocumentObject:
-        """The sketch extruded along its normal, then moved by `at`."""
+        """A flat closed outline moved sideways by `distance`: outward when positive, inward when negative."""
+        obj = _new(parent, "Part::Offset2D", name)
+        obj.Source = outline
+        obj.Join = "Intersection"
+        self.bind(obj, "Value", distance)
+        return obj
+
+    def extrusion(
+        self, parent: App.DocumentObject, name: str, outline: App.DocumentObject, axis: Axis, length: str, at: Triple = ORIGIN
+    ) -> App.DocumentObject:
+        """A flat outline made solid: `length` along `axis` of the parent frame, then moved by `at`."""
         obj = _new(parent, "Part::Extrusion", name)
-        obj.Base = profile.obj
-        obj.DirMode = "Normal"
+        obj.Base = outline
+        obj.DirMode = "Custom"
+        obj.Dir = App.Vector(*axis)
         obj.Solid = True
         self.bind(obj, "LengthFwd", length)
         self.place(obj, at)
         return obj
 
-    def pad(
-        self, body: App.DocumentObject, name: str, profile: Sketch, length: str, reversed_: bool
-    ) -> App.DocumentObject:
+    def slab(self, parent: App.DocumentObject, name: str, outline: App.DocumentObject, thickness: str) -> App.DocumentObject:
+        """A flat outline made solid: `thickness` in total, half on each side of its plane."""
+        obj = _new(parent, "Part::Extrusion", name)
+        obj.Base = outline
+        obj.DirMode = "Normal"
+        obj.Symmetric = True
+        obj.Solid = True
+        self.bind(obj, "LengthFwd", thickness)
+        return obj
+
+    def pad(self, body: App.DocumentObject, name: str, profile: Sketch, length: str, side: Side) -> App.DocumentObject:
         obj = _new(body, "PartDesign::Pad", name)
         obj.Profile = profile.obj
-        obj.Reversed = reversed_
+        # FreeCAD pads along the sketch normal unless reversed.
+        obj.Reversed = side is Side.AGAINST_NORMAL
         self.bind(obj, "Length", length)
         return obj
 
     def pocket(
-        self, body: App.DocumentObject, name: str, profile: Sketch, depth: str | None, reversed_: bool
+        self, body: App.DocumentObject, name: str, profile: Sketch, depth: str | None, side: Side
     ) -> App.DocumentObject:
         """A pocket `depth` deep, or through everything when `depth` is None."""
         obj = _new(body, "PartDesign::Pocket", name)
         obj.Profile = profile.obj
-        obj.Reversed = reversed_
+        # FreeCAD pockets against the sketch normal unless reversed: the opposite of a pad.
+        obj.Reversed = side is Side.ALONG_NORMAL
         if depth is None:
             obj.Type = "ThroughAll"
         else:
@@ -197,11 +275,17 @@ class Model:
 
 
 class Sketch:
-    """A sketch whose dimensions are named constraints bound to the parameter sheet."""
+    """A sketch whose dimensions are named constraints bound to the parameter sheet.
+
+    Geometry is seeded at the evaluated values, so the solver starts from a
+    solved state and a later parameter edit only has to move it.
+    """
 
     _H_AXIS = -1
     _V_AXIS = -2
     _ORIGIN = (-1, 1)
+    _START = 1
+    _END = 2
     _CENTRE = 3
 
     def __init__(self, model: Model, obj: App.DocumentObject) -> None:
@@ -215,31 +299,65 @@ class Sketch:
         self._dimension(f"{name}_d", Sketcher.Constraint("Diameter", geo, number(diameter)), diameter)
         self._pin(name, geo, self._CENTRE, x, y)
 
-    def rectangle(self, x0: str, x1: str, y0: str, y1: str) -> None:
+    def rectangle(self, x0: str, x1: str, y0: str, y1: str, name: str = "") -> None:
+        """An upright rectangle. `name` tells the constraints of several rectangles in one sketch apart."""
         number = self._model.number
         left, right, low, high = number(x0), number(x1), number(y0), number(y1)
-        first = self._closed_polyline([(left, low), (right, low), (right, high), (left, high)])
-        for offset, kind in enumerate(("Horizontal", "Vertical", "Horizontal", "Vertical")):
-            self.obj.addConstraint(Sketcher.Constraint(kind, first + offset))
-        self._pin("min", first, 1, x0, y0)
-        self._pin("max", first + 2, 1, x1, y1)
-
-    def polygon(self, corners: Sequence[tuple[str, str, str]]) -> None:
-        """A closed outline through named corners `(name, x, y)`, every corner pinned."""
-        number = self._model.number
-        first = self._closed_polyline([(number(x), number(y)) for _, x, y in corners])
-        for offset, (name, x, y) in enumerate(corners):
-            self._pin(name, first + offset, 1, x, y)
-
-    def _closed_polyline(self, points: Sequence[tuple[float, float]]) -> int:
+        corners = [App.Vector(x, y, 0) for x, y in ((left, low), (right, low), (right, high), (left, high))]
         first = self.obj.GeometryCount
-        count = len(points)
-        vectors = [App.Vector(x, y, 0) for x, y in points]
-        for start, end in zip(vectors, vectors[1:] + vectors[:1]):
-            self.obj.addGeometry(Part.LineSegment(start, end), False)
-        for offset in range(count):
-            self.obj.addConstraint(Sketcher.Constraint("Coincident", first + offset, 2, first + (offset + 1) % count, 1))
-        return first
+        for index in range(4):
+            self.obj.addGeometry(Part.LineSegment(corners[index], corners[(index + 1) % 4]), False)
+        for index, kind in enumerate(("Horizontal", "Vertical", "Horizontal", "Vertical")):
+            edge, following = first + index, first + (index + 1) % 4
+            self.obj.addConstraint(Sketcher.Constraint("Coincident", edge, self._END, following, self._START))
+            self.obj.addConstraint(Sketcher.Constraint(kind, edge))
+        self._pin(f"{name}min", first, self._START, x0, y0)
+        self._pin(f"{name}max", first + 2, self._START, x1, y1)
+
+    def polygon(self, corners: Sequence[Corner]) -> None:
+        """A closed outline through the corners in order, every corner pinned, rounded where it has a radius.
+
+        A rounded corner keeps its sharp position as a construction point, so
+        the same two parameters place it whatever its radius is. The arcs at
+        the two ends of an edge must fit on it: when they do not, the sketch
+        cannot be solved and `errors` reports it.
+        """
+        number = self._model.number
+        points = [App.Vector(number(corner.x), number(corner.y), 0) for corner in corners]
+        count = len(corners)
+        trims = [
+            _trim(points[index - 1], points[index], points[(index + 1) % count], number(corner.radius))
+            for index, corner in enumerate(corners)
+        ]
+        first = self.obj.GeometryCount
+        for index in range(count):
+            self.obj.addGeometry(Part.LineSegment(trims[index].leave, trims[(index + 1) % count].enter), False)
+        for index, (corner, trim) in enumerate(zip(corners, trims, strict=True)):
+            before, after = first + (index - 1) % count, first + index
+            if trim.centre is None:
+                self.obj.addConstraint(Sketcher.Constraint("Coincident", before, self._END, after, self._START))
+                self._pin(corner.name, after, self._START, corner.x, corner.y)
+            else:
+                self._round(corner, trim, before, after)
+
+    def _round(self, corner: Corner, trim: _Trim, before: int, after: int) -> None:
+        """The arc of a rounded corner, tangent to the edges `before` and `after` it."""
+        enter_angle, leave_angle = (_angle(trim.centre, point) for point in (trim.enter, trim.leave))
+        circle = Part.Circle(trim.centre, App.Vector(0, 0, 1), trim.radius)
+        # A sketch arc always runs counter-clockwise from its start to its end.
+        if trim.turns_left:
+            arc = self.obj.addGeometry(Part.ArcOfCircle(circle, enter_angle, leave_angle), False)
+            at_enter, at_leave = self._START, self._END
+        else:
+            arc = self.obj.addGeometry(Part.ArcOfCircle(circle, leave_angle, enter_angle), False)
+            at_enter, at_leave = self._END, self._START
+        self.obj.addConstraint(Sketcher.Constraint("Tangent", before, self._END, arc, at_enter))
+        self.obj.addConstraint(Sketcher.Constraint("Tangent", arc, at_leave, after, self._START))
+        self._dimension(f"{corner.name}_r", Sketcher.Constraint("Radius", arc, trim.radius), corner.radius)
+        sharp = self.obj.addGeometry(Part.Point(trim.sharp), True)
+        self._pin(corner.name, sharp, self._START, corner.x, corner.y)
+        for edge in (before, after):
+            self.obj.addConstraint(Sketcher.Constraint("PointOnObject", sharp, self._START, edge))
 
     def _pin(self, name: str, geo: int, point: int, x: str, y: str) -> None:
         for suffix, kind, text, axis in (("x", "DistanceX", x, self._V_AXIS), ("y", "DistanceY", y, self._H_AXIS)):
@@ -255,6 +373,34 @@ class Sketch:
         self.obj.setExpression(f"Constraints.{name}", self._model.expr(text))
 
 
+@dataclass(frozen=True)
+class _Trim:
+    """Where an outline enters and leaves one corner. A sharp corner has no centre."""
+
+    sharp: App.Vector
+    enter: App.Vector
+    leave: App.Vector
+    centre: App.Vector | None = None
+    radius: float = 0.0
+    turns_left: bool = False
+
+
+def _trim(before: App.Vector, at: App.Vector, after: App.Vector, radius: float) -> _Trim:
+    """The arc of `radius` tangent to both edges that meet at the corner `at`, or the sharp corner itself."""
+    if radius == 0:
+        return _Trim(at, at, at)
+    back = (before - at).normalize()
+    ahead = (after - at).normalize()
+    half_angle = back.getAngle(ahead) / 2
+    setback = radius / math.tan(half_angle)
+    centre = at + (back + ahead).normalize() * (radius / math.sin(half_angle))
+    return _Trim(at, at + back * setback, at + ahead * setback, centre, radius, turns_left=back.cross(ahead).z < 0)
+
+
+def _angle(centre: App.Vector, point: App.Vector) -> float:
+    return math.atan2(point.y - centre.y, point.x - centre.x)
+
+
 def _new(parent: App.Document | App.DocumentObject, type_id: str, name: str) -> App.DocumentObject:
     obj = parent.addObject(type_id, name) if isinstance(parent, App.Document) else parent.newObject(type_id, name)
     if obj.Name != name:
@@ -262,13 +408,17 @@ def _new(parent: App.Document | App.DocumentObject, type_id: str, name: str) -> 
     return obj
 
 
-def tag(obj: App.DocumentObject, role: str, owner: str, kind: str = "") -> None:
+def tag(obj: App.DocumentObject, role: str, owner: str, kind: str = "", alternate: bool = False) -> None:
+    """Mark a solid with its role and owner. An `alternate` stands in for another solid and is hidden by default."""
     if role not in ROLES:
         raise ValueError(f"{obj.Name}: unknown role {role!r}")
     for prop, text in (("CB_Role", role), ("CB_Owner", owner), ("CB_Tag", kind)):
         if text:
             obj.addProperty("App::PropertyString", prop, _GROUP)
             setattr(obj, prop, text)
+    if alternate:
+        obj.addProperty("App::PropertyBool", "CB_Alternate", _GROUP)
+        obj.CB_Alternate = True
 
 
 def placed(doc: App.Document) -> list[Placed]:
@@ -285,6 +435,7 @@ def placed(doc: App.Document) -> list[Placed]:
                 role=obj.CB_Role,
                 owner=obj.CB_Owner,
                 tag=getattr(obj, "CB_Tag", ""),
+                alternate=getattr(obj, "CB_Alternate", False),
                 print_axis=getattr(obj, "CB_PrintAxis", "z"),
                 world=world_shape(obj),
                 assembly=obj.Shape,
@@ -312,18 +463,17 @@ def world_shape(obj: App.DocumentObject) -> Part.Shape:
 
 
 def errors(doc: App.Document) -> list[tuple[str, str]]:
-    """Objects that failed to recompute, tagged solids without a valid shape, loose sketches."""
+    """Objects that failed to recompute, tagged objects that are not one valid solid, loose sketches."""
     found: list[tuple[str, str]] = []
     for obj in doc.Objects:
         if not obj.isValid():
             found.append((obj.Name, obj.getStatusString()))
-        elif "CB_Role" in obj.PropertiesList and not _is_solid(obj.Shape):
-            found.append((obj.Name, "no valid solid shape"))
+        elif "CB_Role" in obj.PropertiesList and not _is_one_solid(obj.Shape):
+            found.append((obj.Name, "not one valid solid"))
         elif obj.isDerivedFrom("Sketcher::SketchObject") and (freedom := obj.solve()) != 0:
             found.append((obj.Name, f"not fully constrained (solver result {freedom})"))
     return found
 
 
-def _is_solid(shape: Part.Shape) -> bool:
-    return not shape.isNull() and shape.isValid() and shape.Volume > 0
-
+def _is_one_solid(shape: Part.Shape) -> bool:
+    return not shape.isNull() and shape.isValid() and len(shape.Solids) == 1 and shape.Volume > 0
