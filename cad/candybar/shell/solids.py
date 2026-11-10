@@ -603,7 +603,8 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24),
             "closeup-seam-corner-left": cam((-(d.side_x(d.body_top) - 8), d.seam_y + 6, d.body_top), 35, -42, 6),
             "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12),
-            "closeup-seam-rear-corner": cam((d.side_x(d.body_top) - 8, d.depth - 8, d.body_top), 45, 140, 14)}
+            "closeup-seam-rear-corner": cam((d.side_x(d.body_top) - 8, d.depth - 8, d.body_top), 45, 140, 14),
+            "closeup-hood-band": cam((d.logo_w / 2 + d.logo_gap + 40, h.origin[1] + 20, h.origin[2] + (h.z_sill + h.z_rail_top) / 2), 100, 40, 10)}
 
 
 def export(out: str, parts: dict[str, Part.Shape], d: Blueprint) -> dict:

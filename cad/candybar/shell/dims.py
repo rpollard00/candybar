@@ -283,8 +283,12 @@ class Blueprint(Dims):
     hood_rear_arc_d: float = 95.0
     hood_rear_arc_h: float = 110.0
     hood_sill_corner_r: float = 6.0
-    hood_ledge: float = 14.0
-    hood_band_tilt: float = 24.0
+    # hood band: upright, so that the speakers fire straight forward; its face stands hood_band_recess behind the
+    # hood front at the top of the band, and the ledge on the sill is what is left between them
+    hood_band_tilt: float = 0.0
+    hood_band_recess: float = 5.0
+    # the top edge of the marquee stands hood_soffit_d behind the hood front at the top of the opening
+    hood_soffit_d: float = 23.3
 
     @property
     def edge_in(self) -> float:

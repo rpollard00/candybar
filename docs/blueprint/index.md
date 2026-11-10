@@ -140,7 +140,7 @@ Numbers at `W` = 494.7:
 | Monitor at its top corners | The top front corner of the monitor is at z 375.2, the top rear corner of the cradle at z 360.2. The tuck is 3.9 mm at z 375. The outer skin is 63.7 mm outside the monitor's top front corner and 68.0 mm outside the cradle's top rear corner (41.7 and 46.0 outside the 22 mm side clearance). No conflict: W does not change. The wall thickness is not designed yet. The build check does not know the tuck yet. |
 | Rail land | 16.0 at the bottom of the bezel and at mid height, 6.4 at the top of the bezel |
 | Hood | Foot 471.9 (0.954 W), top flat 348.8 (0.705 W), top corner R 34.6 (0.07 W) |
-| Marquee window | 358 x 34, eleven modules of 32 |
+| Marquee window | 362 x 34, eleven modules of 32 |
 | Sweep | Turns 68 degrees (it was 60). Its end is 6 mm higher. The deck does not change. |
 
 ### Conflicts and options
@@ -213,7 +213,7 @@ The target: the upper rear of the body stands 40 mm proud of the lower rear wall
 - **Outline from the front.** The 3D reference model has sides on one arc that lean 13.5 to 22 degrees, a corner radius of 0.074 W and a top flat of 0.713 W. The maker's mini has sides that lean about 6 degrees at the foot, and then one long blend over the upper half into a top flat of about 0.66 W (estimated from the picks in `cad/reference/photo-b.json`). A single radius does not describe it. The real cabinet has steeper sides (11 to 19 degrees, measured ± 3) and tight top corners (0.06 to 0.07 W, measured), with a top flat of about 0.68 W. The owner chose the real cabinet's form (2026-11-10): the long blend reads as a dome. The target: the side of the hood leaves the seam on the tangent of the body's tuck (11.1 degrees). It is near straight: one arc of R 7.7 W that turns 2 degrees (`hood_side_turn`), up to 130 mm above the seam. Then one radius of 0.07 W (34.6 mm, `hood_corner_ratio`) turns it into the top flat. The top flat follows: 348.8 mm (0.705 W). The straight marquee window is 358 mm, eleven modules.
 - **Bottom front corners.** On the maker's mini the legs come down near upright to a foot 0.94 to 0.96 W wide, and the bottom corners of the opening are near square. The target has a foot of 0.954 W, legs that lean 11.1 degrees at the seam, and corners of radius 6. The current model has legs that lean 10 degrees on a body with no tuck, and corners of radius 8.
 - **Side profile.** The owner's sketch of 2026-11-10 (the markup on the side render). The front leans back 16 degrees over its lower 0.29, then 2 degrees, with a radius of 40 between. A soft top front edge of one radius (14). A flat top 148 above the foot of the cap. The rear is the arc of revision 3 (95 deep, 110 high from the old top), cut by the lower flat top, with a radius of 10 in the crease, then an upright rear wall.
-- **Inside the arch**, as before: the marquee under the top bar (window 358 x 34, 11 modules of 32 mm), a lip, the hood band with two speaker forms and the logo form, and the ledge on the sill. The deeper hood lets the band lean back 24 degrees (it was 16) with 67 mm clear behind it.
+- **Inside the arch**: the marquee under the top bar (window 362 x 34, 11 modules of 32 mm), a lip, the hood band with two speaker forms and the logo form, and the ledge on the sill. The hood band is upright, so that the speakers fire straight forward (the owner, 2026-11-10: "The speaker face should be a 90 so speakers fire straight forward"). Before, the band leaned back 24 degrees, and the bend of the hood front ran across the speakers. The band face is 5 behind the hood front at the top of the band (`hood_band_recess`). The ledge is what is left of the sill in front of it: 13.9. The speaker forms stand 13 proud of the band. Their fronts are 0.2 ahead of the hood front at their foot and 7.8 ahead at their top, and 5.8 behind the foot of the hood front. The lip moves forward with the band: its front is on the line of the hood front. The marquee and the soffit do not move (`hood_soffit_d` 23.3). Thus the top of the lip is one flat shelf, 36.5 deep, back to the foot of the marquee.
 
 ## Words
 
@@ -296,21 +296,21 @@ The IDs are stable. A face of a reference that corresponds has the same ID.
 | HC7 | hood roof | hood cap | faces up | flat | hood_flat_h 148 above the foot; 0.713 W wide: follows from the side and the corner; hood_crown_ratio 0: no crown | HC4, HC6, HC8 | the same extrusion |
 | HC8 | hood rear arc | hood cap | turns from the roof to the rear | single-curved | conic 95 deep, 110 high from the top of revision 3, cut by the flat top; hood_top_rear_r 10 in the crease | HC7, HC9 | extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions) |
 | HC9 | hood rear wall | hood cap | faces the rear, upright | flat | flush with the upper rear wall: hood_shoulder_rear 0 | HC8, HC5, HC14, HC15 | extrusion |
-| HC10 | hood soffit | hood cap | faces down | flat | under the straight part of the top bar, back to the marquee | HC2, HC11, MQ1 | extrusion |
+| HC10 | hood soffit | hood cap | faces down | flat | under the straight part of the top bar, hood_soffit_d 23.3 back to the marquee | HC2, HC11, MQ1 | extrusion |
 | HC11 | hood leg, inner wall | hood cap | faces the centre line | single-curved | from the front plane back to the band | HC1, HB1, MQ1 | extrusion of the opening outline |
-| HC12 | hood ledge | hood cap | faces up | flat | hood_ledge 14 | HC3, HB1 | extrusion |
-| HC13 | marquee lip | hood cap | faces the player; its top and bottom face up and down | flat | hood_rail_h 6 high, hood_rail_proud 5 proud; ends on the legs | MQ1, HB1, HC11 | extrusion across the width, cut by the opening |
+| HC12 | hood ledge | hood cap | faces up | flat | 13.9 deep: what the band leaves of the sill | HC3, HB1 | extrusion |
+| HC13 | marquee lip | hood cap | faces the player; its top and bottom face up and down | flat | hood_rail_h 6 high, hood_rail_proud 5 proud: its front is flush with the hood front; its top runs back 36.5 to the marquee as one flat shelf; ends on the legs | MQ1, HB1, HC11 | extrusion across the width, cut by the opening |
 | HC16 | hood rear corner | hood cap | faces out and back, 45 deg in plan, upright | flat | the corner of the step in the body top, carried up: the foot of the cap has the outline of the body top | HC5, HC8, HC9, HC15 | plane cut; it runs out where the side of the cap leans in past it |
 | HC14 | hood foot | hood cap | faces down | flat | seam_gap 1.5 above the body top FB4 | HC1, HC3, HC4, HC9, HC15 | plane cut |
 | HC15 | seam bevel, hood | hood cap | faces out and down | flat on the straight runs; single-curved round the corners | seam_groove: from the side 3 above the foot, 3 in to the foot; one height all round the foot of the cap | HC1, HC3, HC4, HC5, HC9, HC14 | a ruled cut from the section of the cap 3 above its foot |
 | MQ1 | marquee cover | marquee | faces down 18 deg toward the player | flat | ends follow the corner of the opening | HC10, HC11, HC13, MQ2 | plate |
-| MQ2 | marquee window | marquee | faces down 18 deg toward the player | flat | straight, 358 x 34, eleven modules of 32 | MQ1 | plate |
-| HB1 | hood band | hood band | leans back 24 deg | flat | foot on the ledge | HC12, HC11, HC13, SP1, LG1 | plate |
-| SP1 | speaker form | hood band | parallel to the band | flat | 13 proud; outer end parallel to the leg | HB1, SP2 | extrusion square to the band |
-| SP2 | speaker grille | hood band | parallel to the band | flat | set 1.5 into the form | SP1 | plate |
+| MQ2 | marquee window | marquee | faces down 18 deg toward the player | flat | straight, 362 x 34, eleven modules of 32 | MQ1 | plate |
+| HB1 | hood band | hood band | faces the player, upright | flat | hood_band_recess 5 behind the hood front at its top; foot on the ledge | HC12, HC11, HC13, SP1, LG1 | plate |
+| SP1 | speaker form | hood band | faces the player, upright: the speaker fires straight forward | flat | 13 proud; outer end parallel to the leg | HB1, SP2 | extrusion square to the band |
+| SP2 | speaker grille | hood band | faces the player, upright | flat | set 1.5 into the form | SP1 | plate |
 | SP3 | speaker form walls | hood band | square to the band | flat | 13 high, top edge R 4 | SP1, HB1 | extrusion with a fillet |
-| LG1 | logo form | hood band | parallel to the band | flat | 5 proud | HB1, LG2 | extrusion square to the band |
-| LG2 | logo plate | hood band | parallel to the band | flat | 166 wide | LG1 | plate |
+| LG1 | logo form | hood band | faces the player, upright | flat | 5 proud | HB1, LG2 | extrusion square to the band |
+| LG2 | logo plate | hood band | faces the player, upright | flat | 166 wide | LG1 | plate |
 | LG3 | logo form walls | hood band | square to the band | flat | 5 high | LG1, HB1 | extrusion |
 <!-- faces:end -->
 
@@ -341,8 +341,8 @@ Only the faces that differ are listed. "Followed" names the reference that the t
 | HC7, HC8, HC9 | Top flat 30 deep; rear leans forward 16 degrees | Almost no flat; one arc down the rear (estimated) | Not read | Maker's mini |
 | HC13 | None | A white zone 0.043 W under the strip (uncertain: lip or top of the band) | A dip of 0.02 W | Own: a lip 6 high |
 | MQ1, MQ2 | An upright strip 12.4 high (0.046 W), 15.9 behind the nose of the top bar | 0.049 W high, under the top bar, tilted down (estimated) | 0.16 W with the brow | Own: 34 high for the display, faces down 18 degrees |
-| HB1 | Leans 44 degrees | Leans less (estimated) | Not read | Own: 24 degrees, which keeps 50 mm behind it |
-| SP1 to SP3 | Pods 0.204 x 0.147 W, fronts upright | Pods 0.176 x 0.163 W, fronts upright, 0.12 W deep | Pods 0.19 x 0.145 W at the ends | Owner's rule: forms 13 proud, faces parallel to the band |
+| HB1 | Leans 44 degrees | Leans less (estimated) | Not read | Owner's rule: upright, 5 behind the hood front at its top |
+| SP1 to SP3 | Pods 0.204 x 0.147 W, fronts upright | Pods 0.176 x 0.163 W, fronts upright, 0.12 W deep | Pods 0.19 x 0.145 W at the ends | Owner's rule: forms 13 proud, fronts upright (the speakers fire straight forward) |
 | LG2 | Recess 0.260 x 0.187 W | 0.369 x 0.133 W (measured) | About 0.30 x 0.125 W | Maker's mini: 0.34 x 0.10 W |
 
 Uncertain readings, all on the maker's mini: the edge of the rail (RL2, RL3), the depth of the step (RB2), the seam on the front of the hood (HC3, FB3), the white zone under the lit strip (HC13 or HB1), the surface beside the right pod (SP3 or HB1), and the rear wall in the side trace.
@@ -354,7 +354,7 @@ Questions 1 to 7 are from revision 1. They are still open. The note says what re
 1. **Edge of the rail.** The blueprint runs the deck's whole edge section (radius, 10 degree band, crease 24 mm behind the land) up the rail to the hood. The maker's mini shows only a soft radius on the rail (about 8 mm at this size). Whole section, or radius only? *Still open.*
 2. **Land of the rail.** It is 16 mm (0.03 W). The maker's mini has about 0.05 W (25 mm at this size). Keep 16, or widen the cabinet by about 18 mm? *Still open, and it matters more now: the tuck makes the land 6.4 mm at the top of the bezel.*
 3. **The crease behind the stripe.** A step 12 mm deep, deeper (3D model 20), or only a shallow line? *Still open. Its reason changed: revision 1 made it equal to the shoulder of the hood, and that shoulder is gone.*
-4. **Depth.** The hood is 133 mm deep (0.27 W) and the cabinet 580. Enough, or deeper (0.30 W gives a cabinet of 595)? *Still open.*
+4. **Depth.** The hood is 140 mm deep at the seam (0.28 W) and the cabinet 580. Enough, or deeper (0.30 W gives a cabinet of 595)? *Still open.*
 5. **Legs and top bar of the hood.** They are 21 mm (0.042 W). Keep 21? *Still open.*
 6. **Marquee.** It sits 38 mm under the top bar and faces down 18 degrees. A standing person does not see its top. Accept? *Still open.*
 7. **Rear.** The rear lower facet and the rear corner facets of the references are left out. Accept for now? *Still open.*
@@ -367,10 +367,16 @@ New in revision 2, answered in revision 3:
 11. **Hood side.** It carries on the arc of the tuck and then blends into the top as on the maker's mini. The real hood leans more and has tighter top corners. Keep the long blend? *Answered 2026-11-10: no. The owner's words: "lean towards the real cabinet, out of all the options drawn, 2 on the bottom row is the least domelike, somewhere between 2 and 4 for the front on view of the hood", and "4 has better proportions at the top of the hood". Revision 3 has a near-straight side (11.1 to 13.1 degrees), a top corner of 0.07 W and a top flat of 0.705 W.*
 12. **Bezel.** A land of 20 mm that follows the rails, then an inner frame of 25 mm that slopes to the screen. The screen is 25 to 31 mm below the rails. Accept this depth? *Answered 2026-11-10: move the screen forward. The owner's words: "Sounds good on the bezel depth though the inset is probably a little different because I chose 2." The screen is now 14.0 mm below the rail land at the top of the window, 20.2 at the center and 17.7 at the bottom.*
 
+New in revision 4:
+
+13. **Depth of the upright hood band.** Three places, drawn in `cad/out/shell-bp/compare/hood-band-options.png` (side section through a speaker). (a) Recessed, as built: the band face is 5 behind the hood front at the top of the band, the ledge is 13.9, and the speaker fronts are 0.2 to 7.8 ahead of the hood front. (b) Flush at the top of the band: the ledge is 8.9, and the speaker fronts are 5.2 to 12.8 ahead of the hood front. (c) Proud, from the front edge of the sill: there is no ledge, the band face is 8.9 ahead of the hood front at its top, and the speaker fronts are 14.1 to 21.7 ahead of it, as a small version of the box on the real cabinet. Which one? *Open.*
+14. **Shelf under the marquee.** The lip moves forward with the band, but the marquee does not move. Thus the top of the lip is a flat shelf 36.5 deep (in a). To make it shorter, move the marquee forward (a smaller soffit) or make it face down less. Accept the shelf? *Open.*
+
 ## How to draw the sheets again
 
 ```sh
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py target      # docs/blueprint, and the two tables in this file
+cad/.venv-tools/bin/python cad/tools/draw_blueprint.py band-options  # three depths of the hood band, to cad/out/shell-bp/compare
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   # the 3D reference model, to cad/out
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      # the face IDs on the photos, to cad/out
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py compare     # side profiles over each other, to cad/out

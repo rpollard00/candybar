@@ -475,11 +475,11 @@ def hood(d: Blueprint) -> Hood:
     z_rail_top = z_open_top - (d.marquee_margin + d.marquee_h + d.marquee_head) * math.cos(tm)
     z_band_top = z_rail_top - d.hood_rail_h
     side_front = hood_front(d, height)
-    y_band_foot = front_y(side_front, d.hood_sill_h) + d.hood_ledge
-    y_band_top = y_band_foot + (z_band_top - d.hood_sill_h) * math.tan(tb)
-    y_mb = y_band_top + d.hood_band_t / math.cos(tb) - d.marquee_cover_t / math.cos(tm)
+    y_band_top = front_y(side_front, z_band_top) + d.hood_band_recess
+    y_band_foot = y_band_top - (z_band_top - d.hood_sill_h) * math.tan(tb)
+    y_mt = front_y(side_front, z_open_top) + d.hood_soffit_d
     return Hood(origin, height, depth, half_base, path[-1].p[0], path[1].at(path[1].a0)[1], path[0], path[1], d.hood_sill_h,
-                z_band_top, z_rail_top, z_open_top, y_band_foot, y_band_top, y_mb, y_mb - (z_open_top - z_rail_top) * math.tan(tm),
+                z_band_top, z_rail_top, z_open_top, y_band_foot, y_band_top, y_mt + (z_open_top - z_rail_top) * math.tan(tm), y_mt,
                 outline, on_foot(offset(outline, d.hood_bar)), on_foot(offset(outline, d.hood_edge_in)),
                 sample(hood_side_profile(d, height, depth, arc_top), 3.0), side_front)
 
@@ -589,10 +589,10 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high from the top of revision 3, cut by the flat top; hood_top_rear_r 10 in the crease", SINGLE,
             "extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions)"),
     "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, HC14, HC15", "flush with the upper rear wall: hood_shoulder_rear 0", FLAT, "extrusion"),
-    "HC10": ("hood soffit", "hood cap", "faces down", "HC2, HC11, MQ1", "under the straight part of the top bar, back to the marquee", FLAT, "extrusion"),
+    "HC10": ("hood soffit", "hood cap", "faces down", "HC2, HC11, MQ1", "under the straight part of the top bar, hood_soffit_d 23.3 back to the marquee", FLAT, "extrusion"),
     "HC11": ("hood leg, inner wall", "hood cap", "faces the centre line", "HC1, HB1, MQ1", "from the front plane back to the band", SINGLE, "extrusion of the opening outline"),
-    "HC12": ("hood ledge", "hood cap", "faces up", "HC3, HB1", "hood_ledge 14", FLAT, "extrusion"),
-    "HC13": ("marquee lip", "hood cap", "faces the player; its top and bottom face up and down", "MQ1, HB1, HC11", "hood_rail_h 6 high, hood_rail_proud 5 proud; ends on the legs",
+    "HC12": ("hood ledge", "hood cap", "faces up", "HC3, HB1", "13.9 deep: what the band leaves of the sill", FLAT, "extrusion"),
+    "HC13": ("marquee lip", "hood cap", "faces the player; its top and bottom face up and down", "MQ1, HB1, HC11", "hood_rail_h 6 high, hood_rail_proud 5 proud: its front is flush with the hood front; its top runs back 36.5 to the marquee as one flat shelf; ends on the legs",
              FLAT, "extrusion across the width, cut by the opening"),
     "HC16": ("hood rear corner", "hood cap", "faces out and back, 45 deg in plan, upright", "HC5, HC8, HC9, HC15",
              "the corner of the step in the body top, carried up: the foot of the cap has the outline of the body top", FLAT,
@@ -602,12 +602,12 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
              "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the cap 3 above its foot"),
     "MQ1": ("marquee cover", "marquee", "faces down 18 deg toward the player", "HC10, HC11, HC13, MQ2", "ends follow the corner of the opening", FLAT, "plate"),
     "MQ2": ("marquee window", "marquee", "faces down 18 deg toward the player", "MQ1", "straight, 358 x 34, eleven modules of 32", FLAT, "plate"),
-    "HB1": ("hood band", "hood band", "leans back 24 deg", "HC12, HC11, HC13, SP1, LG1", "foot on the ledge", FLAT, "plate"),
-    "SP1": ("speaker form", "hood band", "parallel to the band", "HB1, SP2", "13 proud; outer end parallel to the leg", FLAT, "extrusion square to the band"),
-    "SP2": ("speaker grille", "hood band", "parallel to the band", "SP1", "set 1.5 into the form", FLAT, "plate"),
+    "HB1": ("hood band", "hood band", "faces the player, upright", "HC12, HC11, HC13, SP1, LG1", "hood_band_recess 5 behind the hood front at its top; foot on the ledge", FLAT, "plate"),
+    "SP1": ("speaker form", "hood band", "faces the player, upright: the speaker fires straight forward", "HB1, SP2", "13 proud; outer end parallel to the leg", FLAT, "extrusion square to the band"),
+    "SP2": ("speaker grille", "hood band", "faces the player, upright", "SP1", "set 1.5 into the form", FLAT, "plate"),
     "SP3": ("speaker form walls", "hood band", "square to the band", "SP1, HB1", "13 high, top edge R 4", FLAT, "extrusion with a fillet"),
-    "LG1": ("logo form", "hood band", "parallel to the band", "HB1, LG2", "5 proud", FLAT, "extrusion square to the band"),
-    "LG2": ("logo plate", "hood band", "parallel to the band", "LG1", "166 wide", FLAT, "plate"),
+    "LG1": ("logo form", "hood band", "faces the player, upright", "HB1, LG2", "5 proud", FLAT, "extrusion square to the band"),
+    "LG2": ("logo plate", "hood band", "faces the player, upright", "LG1", "166 wide", FLAT, "plate"),
     "LG3": ("logo form walls", "hood band", "square to the band", "LG1, HB1", "5 high", FLAT, "extrusion"),
 }
 

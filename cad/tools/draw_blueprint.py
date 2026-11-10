@@ -1,6 +1,7 @@
 """Draw the blueprint of the cabinet: the target's sheets from its profiles, and the reference sheets.
 
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py target      -> docs/blueprint/*.svg, *.png, faces.md
+    cad/.venv-tools/bin/python cad/tools/draw_blueprint.py band-options -> cad/out/shell-bp/compare/hood-band-options.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   -> cad/out/shell-d/reconstruction/k-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      -> cad/out/shell-d/reconstruction/m-*.png, r-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py compare     -> cad/out/shell-d/sheet-side-profile.png
@@ -22,7 +23,7 @@ import math
 import os
 import struct
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import matplotlib
 
@@ -612,7 +613,7 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
                     ("MQ2", (-w / 2 + 30, oz + h.z_rail_top + 10)), ("MQ1", (w / 2 + 10, oz + h.z_rail_top + 8)), ("HC13", (0, oz + (h.z_band_top + h.z_rail_top) / 2)),
                     ("HB1", (d.logo_w / 2 + 9, oz + 60)), ("SP1", (150, oz + h.z_band_top - 9)), ("SP2", (150, oz + 55)), ("LG1", (-d.logo_w / 2 + 12, oz + h.z_band_top - 14)), ("LG2", (0, oz + 55))):
         tag(a, at, fid)
-    for i, (x, title) in enumerate(((0.01, "Side section of the hood at the centre line"), (d.logo_w / 2 + d.logo_gap + 40.0, "Side section of the hood through a speaker"))):
+    for i, (x, title) in enumerate(((0.01, "Side section of the hood at the centre line"), (speaker_x(d), "Side section of the hood through a speaker"))):
         b = fig.add_subplot(grid[1, i])
         segs = {k: v for k, v in cut(faces, 0, x).items() if k in HOOD_IDS | {"FB3", "FB4", "RB5", "RB4", "BZ1"}}
         draw_cut(b, segs, lw=1.8)
@@ -633,11 +634,16 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
             rear = h.y_band_top + d.hood_band_t / math.cos(tb)
             dim(b, (oy + rear, oz + h.z_band_top - 4), (oy + h.y_rear(h.z_band_top) - d.hood_wall, oz + h.z_band_top - 4),
                 f"{h.y_rear(h.z_band_top) - d.hood_wall - rear:.0f} clear behind the band", (0, -7))
-            dim(b, (oy, oz + h.z_band_top - 10), (oy + h.y_band_top, oz + h.z_band_top - 10), f"band top {h.y_band_top:.0f} back", (-4, -7))
+            dim(b, (oy, oz + h.z_band_top - 10), (oy + h.y_band_top, oz + h.z_band_top - 10), f"band {h.y_band_top:.1f} back", (-4, -7))
+            yr = h.y_band_top - d.hood_rail_proud
+            dim(b, (oy + yr, oz + h.z_rail_top + 4), (oy + h.y_marquee_bottom, oz + h.z_rail_top + 4), f"shelf {h.y_marquee_bottom - yr:.1f}", (0, 5))
             dim(b, (oy, oz + h.z_open_top - 6), (oy + h.y_marquee_top, oz + h.z_open_top - 6), f"marquee {h.y_marquee_top:.0f} under the bar", (6, -7))
-            note(b, (oy + h.depth + 8, oz + 60), f"band leans back {d.hood_band_tilt:.0f} deg;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nrear flush with the upper rear", size=7)
+            note(b, (oy + h.depth + 8, oz + 60), f"band upright, {d.hood_band_recess:.0f} behind the hood front\nat its top; the top of the lip is one flat\nshelf back to the marquee;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nrear flush with the upper rear", size=7)
         else:
-            note(b, (oy + h.depth + 8, oz + 60), f"speaker form {d.speaker_proud:.0f} proud;\nits face is parallel to\nthe band, not upright", size=7)
+            ys = h.y_band_top - d.speaker_proud
+            zb, zt = h.z_sill + d.speaker_foot_gap, h.z_band_top - d.speaker_head_gap
+            note(b, (oy + h.depth + 8, oz + 60), f"speaker form {d.speaker_proud:.0f} proud, its front\nupright: it fires straight forward;\n"
+                 f"its front is {h.front_y(zt) - ys:.1f} ahead of the hood\nfront at its top, {h.front_y(zb) - ys:.1f} at its foot", size=7)
     fig.suptitle("Blueprint 05: the hood of the target", fontsize=14, y=0.985)
     save(fig, "05-hood")
 
@@ -867,6 +873,47 @@ def target(only: str = "") -> None:
     for key, fn in sheets.items():
         if not only or key in only.split(","):
             fn(d, faces)
+
+
+def speaker_x(d: Blueprint) -> float:
+    """Where a side section cuts through the right speaker form."""
+    return d.logo_w / 2 + d.logo_gap + 40.0
+
+
+def band_options() -> None:
+    """Three places in depth for the upright hood band, side by side to one scale: recessed (the build),
+    flush with the hood front at the top of the band, and proud from the front edge of the sill."""
+    d0 = Blueprint()
+    h0 = pr.hood(d0)
+    proud = h0.front_y(h0.z_sill) - h0.front_y(h0.z_band_top)
+    options = (("a. recessed (built)", d0.hood_band_recess), ("b. flush at the top of the band", 0.0), ("c. proud, from the front edge of the sill", proud))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 8.5))
+    x = speaker_x(d0)
+    for ax, (title, recess) in zip(axes, options):
+        d = replace(d0, hood_band_recess=recess)
+        h = pr.hood(d)
+        oy, oz = h.origin[1], h.origin[2]
+        segs = {k: v for k, v in cut(pr.faces(d), 0, x).items() if k in HOOD_IDS | {"SP3", "FB3", "FB4"}}
+        draw_cut(ax, segs, lw=1.8)
+        front = np.array(pr.sample(h.front, 1.0))
+        ax.plot(oy + front[:, 0], oz + front[:, 1], color=INK, lw=0.8, ls="--", zorder=40, label="outer front of the hood (the legs)")
+        frame(ax, f"{title}\nhood_band_recess {recess:.1f}", (oy - 40, oy + 80), (oz - 12, oz + h.height + 8), "y, from the deck front (mm)", "z, above the desk (mm)")
+        tag_cut(ax, segs, (oy - 40, oy + 80, oz - 12, oz + h.height + 8), off=9.0, skip={"HC1", "HC5", "HC6", "HC11"},
+                place={"HC13": (oy - 20, oz + h.z_rail_top + 4), "SP3": (oy + 20, oz + h.z_sill - 6)})
+        zb, zt = h.z_sill + d.speaker_foot_gap, h.z_band_top - d.speaker_head_gap
+        ys = h.y_band_top - d.speaker_proud
+        ahead = lambda y: f"{abs(y - ys):.1f} {'ahead of' if ys < y else 'behind'}"
+        dim(ax, (oy + h.front_y(h.z_band_top), oz + h.z_band_top - 2), (oy + h.y_band_top, oz + h.z_band_top - 2),
+            f"band face {abs(recess):.1f} {'behind' if recess >= 0 else 'ahead of'} the front", (36, -7), size=7)
+        dim(ax, (oy + h.front_y(h.z_sill), oz + h.z_sill + 2), (oy + h.y_band_foot, oz + h.z_sill + 2), f"ledge {abs(h.y_band_foot - h.front_y(h.z_sill)):.1f}", (26, 0), size=7)
+        dim(ax, (oy + h.y_band_top - d.hood_rail_proud, oz + h.z_rail_top + 2), (oy + h.y_marquee_bottom, oz + h.z_rail_top + 2),
+            f"shelf {h.y_marquee_bottom - h.y_band_top + d.hood_rail_proud:.1f} to the marquee", (0, 6), size=7)
+        note(ax, (oy + 22, oz + 45), f"speaker form {d.speaker_proud:.0f} proud, front upright:\nat its top (z {zt:.0f}) {ahead(h.front_y(zt))} the front,\n"
+             f"at its foot (z {zb:.0f}) {ahead(h.front_y(zb))} the front;\n{ahead(h.front_y(0.0))} the foot of the front", size=7)
+        ax.legend(loc="lower right", fontsize=6.5)
+    fig.suptitle("Hood band, upright: three places in depth (side section through a speaker, x = "
+                 f"{x:.0f}; the marquee {pr.marquee_window(d0, h0)[0]:.0f} x {d0.marquee_h:.0f} and the soffit {d0.hood_soffit_d:.1f} do not move)", fontsize=12)
+    save(fig, "hood-band-options", os.path.join(CAD, "out", "shell-bp", "compare"), svg=False)
 
 
 # ---------- the 3D reference model (a mesh; third-party material, drawn only below cad/out) ----------
@@ -1513,6 +1560,8 @@ def overlays() -> None:
 if __name__ == "__main__":
     if sys.argv[1] == "overlays":
         overlays()
+    elif sys.argv[1] == "band-options":
+        band_options()
     elif sys.argv[1] == "target":
         target(sys.argv[2] if len(sys.argv) > 2 else "")
     elif sys.argv[1] == "reference":
