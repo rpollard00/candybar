@@ -24,11 +24,13 @@ class Dims:
     deck_tail: float = 5.0
     deck_top: float = 72.0
     deck_under_body: float = 50.0
-    deck_corner: float = 32.0
-    deck_corner_r: float = 10.0
-    deck_top_r: float = 12.0
+    deck_centre_frac: float = 0.56
+    deck_flank: float = 8.0
+    deck_corner_frac: float = 0.09
+    deck_crease_r: float = 6.0
+    deck_top_r: float = 10.5
     deck_lean: float = 10.0
-    deck_lean_h: float = 27.0
+    deck_lean_h: float = 24.0
     # screen face
     recline: float = 30.0
     band_len: float = 60.0

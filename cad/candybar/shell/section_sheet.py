@@ -1,9 +1,12 @@
 """Draw the deck's front edge in true side section, large and dimensioned, from deck-section.json of a build.
 
 The points are the slice of the deck solid at the centre line (written by build.py), so the drawing shows the
-built geometry, not the intended one. Needs matplotlib (cad/.venv-tools). Example:
+built geometry, not the intended one. With "plan" first it draws the deck from above instead, from a top render
+of the deck, beside a rectified reference photo. Needs matplotlib, numpy and Pillow (cad/.venv-tools). Examples:
     cad/.venv-tools/bin/python cad/candybar/shell/section_sheet.py cad/out/shell-d/3-short-band/deck-section.json \
         cad/out/shell-d/sheet-deck-section.png
+    cad/.venv-tools/bin/python cad/candybar/shell/section_sheet.py plan DECK_SECTION_JSON DECK_RENDER_DIR \
+        REFERENCE_PNG OUT_PNG
 """
 from __future__ import annotations
 
@@ -49,5 +52,59 @@ def main(src: str, out: str) -> None:
     fig.savefig(out)
 
 
+
+
+def plan_sheet(src: str, render_dir: str, reference: str, out: str) -> None:
+    """The deck from directly above (an orthographic render) with its faces and angles dimensioned, beside the
+    rectified reference photo."""
+    import numpy as np
+    from PIL import Image
+
+    data = json.load(open(src))
+    d, w = data["dims"], data["width"]
+    cam = json.load(open(f"{render_dir}/views.json"))["views"]["top"]
+    img = np.asarray(Image.open(f"{render_dir}/top.png"))
+    rx, ry = cam["res"]
+    k = cam["mm_per_px"]
+    cx, cy = cam["center_ru"]
+    extent = (cx - rx / 2 * k, cx + rx / 2 * k, cy - ry / 2 * k, cy + ry / 2 * k)
+    fig, (a, b) = plt.subplots(1, 2, figsize=(18, 8.5), dpi=130, gridspec_kw={"width_ratios": [1.15, 1]})
+    a.imshow(img, extent=extent)
+    a.set_xlim(-w / 2 - 40, w / 2 + 40)
+    a.set_ylim(d_top_y(data) + 10, -60)
+    a.set_aspect("equal")
+    red = "#b0302a"
+    xc = d["deck_centre_frac"] * w / 2
+    a.annotate("", xy=(-xc, -30), xytext=(xc, -30), arrowprops=dict(arrowstyle="<->", color=red))
+    a.text(0, -36, f"centre face {2 * xc:.0f} mm = {d['deck_centre_frac']:.2f} of the deck width {w:.0f}", color=red, ha="center")
+    yf = (w / 2 - xc) * math.tan(math.radians(d["deck_flank"]))
+    for sx in (1, -1):
+        a.plot([sx * xc, sx * w / 2], [-8, yf - 8], color=red, lw=1.2)
+        a.plot([sx * xc, sx * w / 2], [-8, -8], color=red, lw=0.6, ls=":")
+        a.text(sx * (xc + w / 2) / 2, -14, f"flank {d['deck_flank']:.0f} deg", color=red, ha="center")
+    r = d["deck_corner_frac"] * w
+    a.text(w / 2 - 10, yf + r + 20, f"corner R {r:.0f}\n({d['deck_corner_frac']:.2f} W)", color=red, ha="right")
+    bd = data["border"]
+    fig.text(0.02, 0.06, "Border from the panel pocket, front corner: "
+           f"{bd['front corner, to the outline']} mm to the outline, {bd['front corner, to the flat border edge']} mm flat; "
+           f"front middle {bd['front middle, to the outline']} / {bd['front middle, to the flat border edge']}; "
+           f"side {bd['side, to the outline']} / {bd['side, to the flat border edge']}", fontsize=11, color="#333")
+    a.set_title("Variant D deck from directly above (orthographic render, mm)")
+    a.set_xlabel("X (mm)")
+    a.set_ylabel("Y behind the deck front (mm)")
+    b.imshow(np.asarray(Image.open(reference)))
+    b.set_axis_off()
+    b.set_title("Reference: photo-d, rectified to the deck top plane")
+    fig.tight_layout()
+    fig.savefig(out)
+
+
+def d_top_y(data: dict) -> float:
+    return max(p[1] for p in data["plan"]) - 30.0
+
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    if sys.argv[1] == "plan":
+        plan_sheet(*sys.argv[2:6])
+    else:
+        main(sys.argv[1], sys.argv[2])

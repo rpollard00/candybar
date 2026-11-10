@@ -161,6 +161,25 @@ def band_width_survey(d: Dims) -> list[tuple[str, float]]:
     return out
 
 
+def panel_border(d: Dims, deck: Part.Shape) -> dict[str, float]:
+    """Plan distance from the edge of the panel pocket to the deck's outer outline (at Z 30, under the crease),
+    and to the start of the top radius (where the flat border ends), at the pocket's front corners, front middle
+    and sides."""
+    outline = Part.Face(Part.Wire(deck.slice(V(0, 0, 1), 30.0)[0].Edges))
+    flat = deck.common(parts.halfspace((0, 0, d.deck_top - 0.05), (0, 0, 1)))
+    hw = d.panel_w / 2 + d.panel_gap
+    y0 = d.deck_nose
+    probes = {"front corner": V(hw, y0, 30.0), "front middle": V(0, y0, 30.0), "side": V(hw, y0 + 80, 30.0)}
+    out = {}
+    for name, p in probes.items():
+        out[f"{name}, to the outline"] = round(Part.Vertex(p).distToShape(outline.OuterWire)[0], 1)
+        q = V(p.x, p.y, d.deck_top)
+        top_wire = max(flat.Faces, key=lambda f: f.Area).OuterWire if flat.Faces else None
+        if top_wire is not None:
+            out[f"{name}, to the flat border edge"] = round(Part.Vertex(q).distToShape(top_wire)[0], 1)
+    return out
+
+
 def deck_section(d: Dims, deck: Part.Shape) -> list[list[float]]:
     """The deck's front edge in true side section at the centre line, as (y, z) points."""
     pts = []
@@ -333,7 +352,9 @@ def main() -> int:
         json.dump(r, open(os.path.join(root, name, "report.json"), "w"), indent=1)
         print("  hood:", r["hood"])
         json.dump({"points": deck_section(d, shell["deck"]), "dims": {k: getattr(d, k) for k in
-                   ("deck_top", "deck_top_r", "deck_lean", "deck_lean_h", "bottom_r", "deck_corner", "deck_corner_r")}},
+                   ("deck_top", "deck_top_r", "deck_lean", "deck_lean_h", "bottom_r", "deck_centre_frac", "deck_flank", "deck_corner_frac")},
+                   "width": d.width, "plan": parts.deck_plan(d), "panel": [d.panel_w, d.panel_d, d.deck_nose + d.panel_gap],
+                   "border": panel_border(d, shell["deck"])},
                   open(os.path.join(root, name, "deck-section.json"), "w"))
         widths = [w for _, w in r["band_width"] if w > 0]
         print("  log:", "; ".join(log))

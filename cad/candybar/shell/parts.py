@@ -169,17 +169,30 @@ def rail_solid(d: Dims, log: list[str]) -> Part.Shape:
     return try_fillet(solid, d.band_r, land_edges(solid, land), log, "rail land radius")
 
 
+def deck_plan(d: Dims) -> list[tuple[float, float]]:
+    """Sharp plan outline of the deck: a centre face square to the player, two flanks turning back, parallel sides."""
+    w = d.width
+    xc = d.deck_centre_frac * w / 2
+    yf = (w / 2 - xc) * math.tan(math.radians(d.deck_flank))
+    yr = d.foot_y - d.bend_t + 30.0
+    return [(-w / 2, yr), (-w / 2, yf), (-xc, 0.0), (xc, 0.0), (w / 2, yf), (w / 2, yr)]
+
+
 def deck_solid(d: Dims, log: list[str]) -> Part.Shape:
-    """The deck: soft vertical corners, then a soft radius over a short, slightly leaning band, then a crease
-    and a vertical front face down to a small bottom radius. The same section runs round the corners and sides."""
-    w, top, c = d.width, d.deck_top, d.deck_corner
+    """The deck: in plan a centre face and two flanks with soft creases and rounded corners; in section a soft
+    radius over a short, slightly leaning band, a crease, and a vertical front face down to a small bottom
+    radius. The section follows the plan outline round the corners and along the sides."""
+    w, top = d.width, d.deck_top
     ya = d.foot_y - d.bend_t
-    yr = ya + 30.0
-    plan = [(-w / 2, yr), (-w / 2, c), (-w / 2 + c, 0), (w / 2 - c, 0), (w / 2, c), (w / 2, yr)]
+    plan = deck_plan(d)
     prism = face_from([(x, y, 0) for x, y in plan]).extrude(V(0, 0, top))
-    corners = [e for e in prism.Edges if abs(e.Vertexes[0].Point.z - e.Vertexes[1].Point.z) > 1 and
-               min(v.Point.y for v in e.Vertexes) < c + 1e-3]
-    prism = try_fillet(prism, d.deck_corner_r, corners, log, "deck corner rounds")
+    xc = d.deck_centre_frac * w / 2
+
+    def vertical_at(x: float) -> list[Part.Edge]:
+        return [e for e in prism.Edges if abs(e.Vertexes[0].Point.z - e.Vertexes[1].Point.z) > 1
+                and abs(abs(e.Vertexes[0].Point.x) - x) < 1e-3 and e.Vertexes[0].Point.y < 100]
+    prism = try_fillet(prism, d.deck_corner_frac * w, vertical_at(w / 2), log, "deck corner rounds")
+    prism = try_fillet(prism, d.deck_crease_r, vertical_at(xc), log, "deck front creases")
     base = min(prism.Faces, key=lambda f: f.CenterOfMass.z)
     zc = top - d.deck_lean_h
     inset = d.deck_lean_h * math.tan(math.radians(d.deck_lean))
