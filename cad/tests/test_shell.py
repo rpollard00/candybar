@@ -107,7 +107,7 @@ class ShellTest(unittest.TestCase):
 
     def test_upright_hood_face_keeps_its_trim_plates_flush(self) -> None:
         _, baseline = support.baseline()
-        self.edit(hood_tilt=0)
+        self.edit(hood_tilt=0, hood_r=28)
         skin = self.shape(massing.SKIN)
         for name in HOOD_PLATES:
             plate = self.shape(name)
@@ -115,6 +115,11 @@ class ShellTest(unittest.TestCase):
             self.assertTrue(lies_in_a_face_of(skin, front_face(plate)), name)
             self.assertLess(plate.common(skin).Volume, 1e-3, name)
         self.assertEqual(support.fail_rows(check.run(self.doc)) - support.fail_rows(baseline), set())
+
+    def test_light_strip_that_runs_onto_the_hood_radius_fails_containment(self) -> None:
+        _, baseline = support.baseline()
+        self.edit(hood_tilt=0)
+        self.assertIn(("R3", "Hood_Strip"), support.fail_rows(check.run(self.doc)) - support.fail_rows(baseline))
 
     def test_bezel_windows_have_their_aspect_ratios(self) -> None:
         wanted = {"Bezel_16x9": 16 / 9, "Bezel_16x10": 16 / 10, "Bezel_4x3": 4 / 3, "Bezel_Tate": 3 / 4}

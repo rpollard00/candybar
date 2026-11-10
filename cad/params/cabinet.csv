@@ -95,8 +95,8 @@ bc_top_z,=bc_bottom_z + bc_pcb_w_pwr,mm,derived,,,BC-250 upper long edge above t
 bc_pcb_y,=rear_inner_y - bc_gap_door - bc_shroud_h,mm,derived,,,BC-250 PCB top face depth
 vent_fan_x,=bc_x0 + bc_shroud_x0 + bc_shroud_l / 2,mm,derived,,,Fan intake centre across the cabinet
 vent_fan_z,=bc_top_z - bc_shroud_y0 - bc_shroud_w / 2,mm,derived,,,Fan intake centre above the desk
-vent_out_y0,=bc_pcb_y - 15 mm,mm,derived,,,Exhaust vent front edge
-vent_out_d,60,mm,provisional,Wall power under the hardest game sets the vent area,hardware-envelopes.md 2 (100 cm2 exhaust),Exhaust vent size front to back
+vent_out_y0,=bc_pcb_y - 30 mm,mm,derived,,,Exhaust vent front edge
+vent_out_d,84,mm,provisional,Wall power under the hardest game sets the vent area,hardware-envelopes.md 2 (100 cm2 exhaust),Exhaust vent size front to back
 vent_out_z0,=bc_top_z - bc_fin_y0 - bc_fin_w,mm,derived,,,Exhaust vent bottom above the desk
 tgt_panel_top_min,60,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk
 tgt_panel_top_max,75,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk

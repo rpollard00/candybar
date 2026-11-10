@@ -36,7 +36,10 @@ _GROUP = "Candybar"
 
 @dataclass(frozen=True)
 class Prim:
-    """One primitive solid in its assembly's frame. `role` is empty for a tool shape."""
+    """One primitive solid in its assembly's frame. `role` is empty for a tool shape.
+
+    `owner` names the part the solid belongs to, when that is not the whole assembly.
+    """
 
     name: str
     role: str
@@ -44,6 +47,7 @@ class Prim:
     size: tuple[str, ...]
     at: Triple
     tag: str = ""
+    owner: str = ""
 
 
 def box(name: str, role: str, size: Triple, at: Triple) -> Prim:
@@ -176,7 +180,7 @@ class Model:
             self.bind(obj, prop, f"({text}) / 2" if prop == "Radius" else text)
         self.place(obj, prim.at)
         if prim.role:
-            tag(obj, prim.role, owner, prim.tag)
+            tag(obj, prim.role, prim.owner or owner, prim.tag)
         return obj
 
     def body(self, parent: App.DocumentObject, name: str, owner: str) -> App.DocumentObject:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import atexit
 import contextlib
 import csv
 import functools
@@ -22,10 +21,19 @@ BUILD = CAD / "build.sh"
 FREECAD_RUN = CAD / "candybar" / "freecad-run.sh"
 
 
+_temp_dirs: list[Path] = []
+
+
 def temp_dir() -> Path:
     path = Path(tempfile.mkdtemp(prefix="candybar-test-"))
-    atexit.register(shutil.rmtree, path, ignore_errors=True)
+    _temp_dirs.append(path)
     return path
+
+
+def remove_temp_dirs() -> None:
+    """Called by the runner: the launcher ends the process with os._exit, which skips atexit hooks."""
+    while _temp_dirs:
+        shutil.rmtree(_temp_dirs.pop(), ignore_errors=True)
 
 
 @functools.cache
@@ -35,12 +43,13 @@ def baseline() -> tuple[Path, check.Report]:
 
 
 def shell_build(
-    params_dir: Path, extra_env: dict[str, str] | None = None, out: Path | None = None
+    params_dir: Path, extra_env: dict[str, str] | None = None, out: Path | None = None, renders: bool = False
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
-    """Run build.sh without renders, into `out` or a fresh directory: (finished process, output directory)."""
+    """Run build.sh into `out` or a fresh directory: (finished process, output directory)."""
     out = out or temp_dir()
     env = os.environ | {"CANDYBAR_PARAMS": str(params_dir), "CANDYBAR_OUT": str(out)} | (extra_env or {})
-    return subprocess.run([str(BUILD), "--no-render"], env=env, capture_output=True, text=True), out
+    command = [str(BUILD)] if renders else [str(BUILD), "--no-render"]
+    return subprocess.run(command, env=env, capture_output=True, text=True), out
 
 
 @functools.cache

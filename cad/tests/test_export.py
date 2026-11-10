@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+import Mesh
 import Part
 
 from candybar import model
@@ -19,6 +20,27 @@ class LayoutStepTest(unittest.TestCase):
             hidden = [solid for solid in model.placed(doc) if solid.role == "keepout" or solid.alternate]
         self.assertGreaterEqual(len(hidden), 4)
         self.assertEqual(len(Part.read(str(out / "candybar.step")).Solids), len(on_show))
+
+
+class BuildOutputsTest(unittest.TestCase):
+    def test_full_build_draws_four_views_and_writes_a_true_stl_for_each_printable(self) -> None:
+        done, out = support.shell_build(support.PARAMS, renders=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        for view in ("front", "right", "top", "iso"):
+            self.assertGreater((out / "views" / f"{view}.png").stat().st_size, 10_000, view)
+        with support.saved_document() as doc:
+            printables = [solid for solid in model.placed(doc) if solid.role == "printable"]
+        self.assertGreaterEqual(len(printables), 2)
+        for part in printables:
+            mesh = Mesh.Mesh(str(out / "stl" / f"{part.name}.stl"))
+            self.assertLessEqual(abs(mesh.Volume - part.own.Volume), 0.01 * part.own.Volume, part.name)
+
+    def test_layout_step_names_no_alternate_bezel(self) -> None:
+        out, _ = support.baseline()
+        text = (out / "candybar.step").read_text(encoding="utf-8", errors="replace")
+        self.assertIn("Bezel_16x9", text)
+        for alternate in ("Bezel_16x10", "Bezel_4x3", "Bezel_Tate"):
+            self.assertNotIn(alternate, text)
 
 
 class StepRoundTripTest(unittest.TestCase):

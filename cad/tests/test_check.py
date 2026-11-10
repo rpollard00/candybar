@@ -62,6 +62,31 @@ class CheckerTest(unittest.TestCase):
             rows = check.run(self.doc).rows
         self.assertEqual(rows, (check.Row("R9", "broken rule", check.FAIL, "rule could not run", "RuntimeError: no such shape"),))
 
+    def test_cable_bundle_in_the_trunk_zone_fails_the_keepout_rule(self) -> None:
+        self.assertIn(("R2", "PSU_Trunk / CableBundle_Body"), self.new_fails(bundle_x0=-100))
+
+    def test_button_over_the_tile_seam_fails_interference_with_the_printed_tile(self) -> None:
+        self.assertIn(("R1", "Btn1_Body / Deck_Lever"), self.new_fails(btn1_dx=45))
+
+    def test_encoder_under_the_buttons_fails_interference_between_two_purchased_parts(self) -> None:
+        self.assertIn(("R1", "Btn2_Body / Encoder_Board"), self.new_fails(enc_x=17, enc_y=125))
+
+    def test_encoder_in_the_harness_zone_fails_the_keepout_rule(self) -> None:
+        self.assertIn(("R2", "Lever_Harness / Encoder_Board"), self.new_fails(enc_x=-130, enc_y=125))
+
+    def test_bezel_plate_wider_than_its_opening_fails_interference_with_the_skin(self) -> None:
+        self.assertIn(("R1", "Shell_Skin / Bezel_16x9"), self.new_fails(bezel_side_margin=30))
+
+    def test_hood_plates_wider_than_the_hood_fail_containment(self) -> None:
+        rows = self.new_fails(marquee_w=300)
+        self.assertTrue({("R3", "Hood_SpeakerL"), ("R3", "Hood_SpeakerR")} <= rows, rows)
+
+    def test_solid_with_no_height_fails_the_state_rule(self) -> None:
+        self.assertIn(("R0", "Encoder_Board"), self.new_fails(enc_h=0))
+
+    def test_outline_that_cannot_be_solved_fails_the_state_rule(self) -> None:
+        self.assertIn(("R0", "Shell_SideProfile"), self.new_fails(hood_r=155))
+
     def test_wider_nut_fails_button_spacing(self) -> None:
         rules = {rule for rule, _ in self.new_fails(btn_nut_d=38)}
         self.assertIn("R5", rules)

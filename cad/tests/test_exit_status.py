@@ -27,6 +27,22 @@ class ExitStatusTest(unittest.TestCase):
         self.assertTrue(forced, done.stdout)
         self.assertIn("GuiDocument.xml", zipfile.ZipFile(out / build.SAVED).namelist())
 
+    def test_design_with_a_failed_object_still_gets_view_settings(self) -> None:
+        done, out = support.shell_build(support.params_copy({"enc_h": "0"}))
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("View step failed", done.stderr)
+        self.assertIn("GuiDocument.xml", zipfile.ZipFile(out / build.SAVED).namelist())
+
+    def test_freecad_that_cannot_start_leaves_no_output_of_an_earlier_build(self) -> None:
+        _, out = support.shell_build(support.PARAMS)
+        stand_in = support.temp_dir() / "freecadcmd"
+        stand_in.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        stand_in.chmod(0o755)
+        path = f"{stand_in.parent}{os.pathsep}{os.environ['PATH']}"
+        done, _ = support.shell_build(support.PARAMS, {"PATH": path}, out=out)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertEqual([path.name for path in out.iterdir() if not path.name.startswith(".")], [])
+
     def test_view_step_that_cannot_start_returns_non_zero_and_says_so(self) -> None:
         stand_in = support.temp_dir() / "freecad"
         stand_in.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")

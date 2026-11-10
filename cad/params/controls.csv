@@ -6,16 +6,18 @@ stick_mount_w,40,mm,sourced,Slot centre to slot centre across the plate,Sanwa JL
 stick_mount_l,85,mm,sourced,Slot centre to slot centre along the plate,Sanwa JLF-P-1 plate drawing,Lever mounting pattern front to back
 stick_body_w,62,mm,sourced,Lever body width below the plate,Sanwa JLF drawing; confirm on the JLX2,Lever body size across the panel
 stick_body_l,75,mm,sourced,Lever body length below the plate,Sanwa JLF drawing; confirm on the JLX2,Lever body size front to back
-stick_body_depth,26.4,mm,sourced,Plate top face down to the bottom of the body,Sanwa JLF drawing; confirm on the JLX2,Lever body depth below the plate top
-stick_tip_depth,34,mm,sourced,Plate top face down to the shaft tip,Sanwa JLF drawing; confirm on the JLX2,Shaft tip depth below the plate top
+stick_body_depth,28,mm,sourced,Plate top face down to the bottom of the body,Sanwa JLF drawing: 26.4 below the plate underside plus the 1.6 plate; confirm on the JLX2,Lever body depth below the plate top. Gate clips can add 3
+stick_tip_depth,35.6,mm,sourced,Plate top face down to the shaft tip,Sanwa JLF drawing: 34 below the plate underside plus the 1.6 plate; confirm on the JLX2,Shaft tip depth below the plate top
 stick_tip_d,12,mm,provisional,,estimate,Shaft tip clearance diameter
 stick_plate_drop,9.25,mm,provisional,Set by the lever height you prefer,Vewlix reference (23 to 24 ball seat above the panel),Plate top face below the panel top face
 stick_shaft_hole_d,24,mm,sourced,,controls-ergonomics.md 1.4,Panel hole for the shaft
 stick_shaft_d,10,mm,sourced,,Sanwa JLF drawing,Shaft diameter
 stick_ball_d,35,mm,sourced,,Sanwa LB-35,Ball top diameter
-stick_ball_cz,35,mm,provisional,Panel top face up to the centre of the ball,derived from the 32.4 ball seat height,Ball centre above the panel top face
+stick_ball_seat_h,32.4,mm,sourced,Plate top face up to the underside of the ball,Sanwa JLF drawing; confirm on the JLX2,Ball underside above the plate top
+stick_ball_cz,=stick_ball_seat_h - stick_plate_drop + stick_ball_d / 2,mm,derived,,,Ball centre above the panel top face
 stick_washer_d,41,mm,provisional,Dust washer diameter,sources disagree: 38 or 41,Dust washer diameter
-stick_conn_clear,60,mm,provisional,Room the 5-pin harness needs beside the body,controls-ergonomics.md 1.6,Harness space on the connector side of the lever body
+stick_conn_clear,60,mm,provisional,Shaft centre to the end of the 5-pin harness bend,controls-ergonomics.md 1.6,Harness space from the shaft centre on the connector side
+stick_conn_w,40,mm,provisional,,estimate,Harness space width along the lever body
 stick_boss_d,10,mm,provisional,,design choice,Lever mounting boss diameter
 stick_insert_d,5.6,mm,provisional,Print an insert coupon,typical M4 heat-set insert,Hole for an M4 heat-set insert
 stick_insert_depth,6.5,mm,provisional,,typical M4 heat-set insert,Insert hole depth
@@ -27,13 +29,13 @@ btn_rim_h,3.5,mm,provisional,,estimate,Rim height above the panel
 btn_nut_d,36,mm,sourced,Nut outside diameter,Sanwa OBSN-30 drawing,30 mm button nut diameter
 btn_nut_h,11,mm,sourced,,Sanwa OBSN-30 drawing,30 mm button nut height
 btn_depth,34.5,mm,sourced,Panel top face down to the terminal tips,Sanwa OBSN-30 drawing,30 mm button depth below the panel top
-btn_wire_clear,12,mm,provisional,,estimate for 2.8 mm quick-disconnects,Wiring space below the terminals
+btn_wire_clear,20.5,mm,provisional,Depth below the panel top with real 2.8 mm terminals fitted,controls-ergonomics.md 2.1 (55 below the panel top in total),Wiring space below the terminals
 svc_hole_d,24,mm,sourced,,Sanwa OBSN-24 drawing,Panel hole for a 24 mm button
 svc_body_d,23.5,mm,provisional,,estimate,24 mm button body diameter
 svc_rim_d,27.3,mm,sourced,,controls-ergonomics.md 3.6,24 mm button rim diameter
 svc_nut_d,29.5,mm,sourced,,Sanwa OBSN-24 drawing,24 mm button nut diameter
 svc_nut_h,9,mm,provisional,,estimate,24 mm button nut height
-svc_depth,32,mm,sourced,,Sanwa OBSN-24 drawing,24 mm button depth below the panel top
+svc_depth,31.6,mm,sourced,,Sanwa OBSN-24 drawing,24 mm button depth below the panel top
 btn1_dx,59,mm,sourced,,slagcoin Sega Astro City 1P,Button 1 right of the lever centre
 btn1_dy,-14,mm,sourced,,slagcoin Sega Astro City 1P,Button 1 behind the lever centre
 btn2_dx,92,mm,sourced,,slagcoin Sega Astro City 1P,
