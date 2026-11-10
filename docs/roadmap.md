@@ -9,7 +9,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | Phase | Result | State |
 | --- | --- | --- |
 | 1. Layout study | Hardware envelopes, keep-out zones, two control panel tiles, layout checks | Done. All dimensions are sourced or provisional. |
-| 2. Shell form | The massing has the proportions and the main forms of the reference | Third pass in work: centered screen on an apron, deck that ends behind the screen face, taper, the EVGA power supply |
+| 2. Shell form | The massing has the proportions and the main forms of the reference | Done for now: centered screen on an apron, deck that ends behind the screen face, taper. 470 x 520 x 624 mm. The sight line is 23.8 degrees. |
 | 3. Shell detail | Facets on the cheeks and the rear, blended hood corners, hood as an open arch, rear door, hand-holds | Not started. Needs a change of modelling method: solid operations at build time. |
 | 4. Printable modules | The shell divided into parts for the 256 mm bed, with joints, inserts and ribs. Monitor cradle, compute module mount, power supply mount, control panel latch, bezel plate mount. | Not started |
 | 5. Print checks | Each part sliced for the A1. Fit coupons for inserts, joints and button holes. | Not started |
@@ -17,10 +17,10 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Examine the third pass in FreeCAD and against the reference photos.
-2. Apply the result of the cooling research: the shroud, and where the hot air leaves.
-3. Change the shell to solid modelling. Add the cheek facets, the rear facets and the blended hood corners. Make Blender renders from the angles of the reference photos.
-4. Design the rear door with its vents, and the hand-holds.
+1. Apply the measurements of the Mini New Astro City files and the panel research when they come.
+2. Change the shell to solid modelling. Add the cheek facets, the rear facets and the blended hood corners. Make Blender renders from the angles of the reference photos.
+3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
+4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
 
 ## Waiting for the owner
 

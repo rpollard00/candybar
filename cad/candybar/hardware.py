@@ -26,19 +26,22 @@ MONITOR = Assembly(
     ),
 )
 
-# The board stands on its stepped long edge with its straight long edge on top:
-# local y points down, and local z, the heatsink side, points at the rear door.
+# The board stands on its straight long edge, with the stepped long edge and its
+# power connector on top. Local z, the heatsink side, points at the rear door.
 ON_LONG_EDGE_HEATSINK_TO_REAR = Pose(X_AXIS, -90.0)
 
-# Local frame is the board datum: x from the I/O edge toward the power end, y
-# from the straight long edge toward the stepped edge, z up from the PCB top
-# face toward the heatsink.
+# Local frame: x from the I/O edge toward the power end, y DOWN from the stepped
+# long edge, z from the PCB top face toward the heatsink. The board notes measure
+# across the board from the straight long edge, in the other direction, so a note
+# value yn is at local y = bc_pcb_w_pwr - yn.
+BELOW_NARROW_PART = "bc_pcb_w_pwr - bc_pcb_w_io"
+SHROUD_TOP = "bc_pcb_w_pwr - bc_shroud_y0 - bc_shroud_w"
 COMPUTE = Assembly(
     "Compute",
     base=("bc_x0", "bc_pcb_y", "bc_top_z"),
     pose=ON_LONG_EDGE_HEATSINK_TO_REAR,
     prims=(
-        box("Compute_PCB_IO", "hardware", ("bc_pcb_step_x", "bc_pcb_w_io", "bc_pcb_t"), (ZERO, ZERO, "-bc_pcb_t")),
+        box("Compute_PCB_IO", "hardware", ("bc_pcb_step_x", "bc_pcb_w_io", "bc_pcb_t"), (ZERO, BELOW_NARROW_PART, "-bc_pcb_t")),
         box(
             "Compute_PCB_Pwr",
             "hardware",
@@ -49,32 +52,37 @@ COMPUTE = Assembly(
             "Compute_Backplate",
             "hardware",
             ("bc_pcb_l", "bc_pcb_w_io", "bc_backplate_drop - bc_pcb_t"),
-            (ZERO, ZERO, "-bc_backplate_drop"),
+            (ZERO, BELOW_NARROW_PART, "-bc_backplate_drop"),
         ),
-        box("Compute_Heatsink", "hardware", ("bc_fin_l", "bc_fin_w", "bc_fin_h"), ("bc_fin_x0", "bc_fin_y0", ZERO)),
+        box(
+            "Compute_Heatsink",
+            "hardware",
+            ("bc_fin_l", "bc_fin_w", "bc_fin_h"),
+            ("bc_fin_x0", "bc_pcb_w_pwr - bc_fin_y0 - bc_fin_w", ZERO),
+        ),
         box(
             "Compute_IO",
             "hardware",
             ("bc_fin_x0 + bc_io_overhang", "bc_pcb_w_io", "bc_io_h"),
-            ("-bc_io_overhang", ZERO, ZERO),
+            ("-bc_io_overhang", BELOW_NARROW_PART, ZERO),
         ),
         box(
             "Compute_FanShroud",
             "hardware",
             ("bc_shroud_l", "bc_shroud_w", "bc_shroud_h - bc_fin_h"),
-            ("bc_shroud_x0", "bc_shroud_y0", "bc_fin_h"),
+            ("bc_shroud_x0", SHROUD_TOP, "bc_fin_h"),
         ),
         box(
-            "Compute_DPPlug",
+            "Compute_ExhaustDuct",
             "keepout",
-            ("bc_dp_clear", "bc_pcb_w_io", "bc_io_h"),
-            ("-bc_io_overhang - bc_dp_clear", ZERO, ZERO),
+            ("bc_dp_clear + bc_io_overhang + bc_hood_x1", "bc_shroud_w", "bc_shroud_h + bc_gap_door"),
+            ("-bc_io_overhang - bc_dp_clear", SHROUD_TOP, ZERO),
         ),
         box(
             "Compute_PowerPlug",
             "keepout",
             ("bc_pwr_x1 - bc_pwr_x0", "bc_pwr_clear", "bc_pwr_h"),
-            ("bc_pwr_x0", "bc_pcb_w_pwr", ZERO),
+            ("bc_pwr_x0", "-bc_pwr_clear", ZERO),
         ),
         box(
             "Compute_UndersideAir",

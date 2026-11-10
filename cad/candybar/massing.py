@@ -94,8 +94,8 @@ OPENINGS = (
     box(
         "Shell_ExhaustVent",
         "",
-        ("side_t + 2 mm", "vent_out_d", "bc_fin_w"),
-        ("-outer_w / 2 - 1 mm", "vent_out_y0", "vent_out_z0"),
+        ("vent_out_w", "rear_t + 2 mm", "vent_out_h"),
+        ("vent_out_x0", "rear_inner_y - 1 mm", "vent_out_z0"),
     ),
 )
 

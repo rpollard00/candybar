@@ -25,11 +25,14 @@ bc_fin_y0,1.8,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block offset from
 bc_fin_l,239.54,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block length
 bc_fin_w,119.5,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block width
 bc_fin_h,26.1,mm,sourced,PCB top face up to the fin tops,MandicReally BC250 STEP,Fin top above the PCB top face
-bc_shroud_x0,160,mm,provisional,"On the first console: I/O edge to the near side of the fan shroud",assumed from the MKUU+ layout,Fan shroud start along the board
-bc_shroud_y0,-3.45,mm,provisional,,centred on the fin block,Fan shroud offset from the straight long edge
-bc_shroud_l,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud length along the board
-bc_shroud_w,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud width across the board
-bc_shroud_h,55.9,mm,provisional,"On the first console: PCB top face up to the outer face of the fan","MKUU+ shroud 3MF: the height of the whole shroud part. The fan face is estimated at 53",Fan outer face above the PCB top face
+bc_shroud_x0,164,mm,provisional,Test print on the board,bc250-cooling-and-psu.md: shroud for this cabinet,Fan shroud start along the board
+bc_shroud_y0,-3,mm,provisional,,bc250-cooling-and-psu.md: shroud for this cabinet,Fan shroud offset from the straight long edge
+bc_shroud_l,125.4,mm,provisional,,bc250-cooling-and-psu.md: shroud for this cabinet,Fan shroud length along the board
+bc_shroud_w,129,mm,provisional,,bc250-cooling-and-psu.md: shroud for this cabinet,Fan shroud width across the board
+bc_shroud_h,65,mm,provisional,"On the first console: PCB top face up to the outer face of the fan","bc250-cooling-and-psu.md: 63.1 with 10 mm of air space over opened fins. An unchanged MKUU+ shroud gives 74.6",Fan outer face above the PCB top face
+bc_fan_cx,226.7,mm,provisional,Test print on the board,bc250-cooling-and-psu.md: shroud for this cabinet,Fan centre from the I/O edge
+bc_fan_cy,61.55,mm,provisional,,bc250-cooling-and-psu.md: centre of the fin block,Fan centre from the straight long edge
+bc_hood_x1,57.1,mm,provisional,,bc250-cooling-and-psu.md: exhaust hood,End of the exhaust duct from the I/O edge
 bc_dp_clear,45,mm,provisional,DisplayPort plug plus cable bend beyond the I/O edge,hardware-envelopes.md 8,Space in front of the I/O edge
 bc_pwr_x0,220,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone start from the I/O edge
 bc_pwr_x1,248,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone end from the I/O edge
@@ -47,8 +50,8 @@ psu_d,150,mm,sourced,"PSU case depth, rear face to the socket face",EVGA SuperNO
 psu_d_max,150,mm,sourced,,EVGA SuperNOVA 1000 P5 (220-P5-1000-X1),Depth the PSU bay is sized for
 psu_fan_clear,25,mm,provisional,Which face holds the fan,ATX12V design guide 2.2 (12.7 minimum),Clear space kept over the PSU fan face
 psu_plug_clear,45,mm,provisional,Plug body plus cable bend in front of the modular sockets,estimate for Mini-Fit plugs; the unit is fully modular,Space in front of the socket face
-psu_plug_z0,0,mm,provisional,Lowest modular socket above the PSU underside,the modular sockets cover most of the face,Bottom of the plug zone above the PSU underside
-psu_plug_h,86,mm,provisional,Highest modular socket above the PSU underside,the modular sockets cover most of the face,Height of the plug zone
+psu_plug_z0,10,mm,provisional,Lowest modular socket above the PSU underside with the fan up,bc250-cooling-and-psu.md: read from a photo,Bottom of the plug zone above the PSU underside
+psu_plug_h,40,mm,provisional,Highest modular socket above the PSU underside with the fan up,bc250-cooling-and-psu.md: read from a photo,Height of the plug zone
 psu_bundle_w,140,mm,provisional,Coil the 24-pin lead with its bridging plug and the slack of the PCIe lead; measure the box,estimate: only two modular leads are fitted,Stowed cable width
 psu_bundle_d,90,mm,provisional,,estimate,Stowed cable depth
 psu_bundle_h,60,mm,provisional,,estimate,Stowed cable height
