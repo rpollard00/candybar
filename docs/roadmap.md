@@ -27,7 +27,8 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 ## Waiting for the owner
 
 - [ ] Monitor: body width, height and thickness. Is it the flat model with no stand? Heights of the three ports on the left edge. Plug length with the bend, for the real cables.
-- [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge.
+- [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
+- [ ] A choice between the screen face options, when the sheet is ready: a tall bezel, or a bezel in the proportion of the 16:10 screen with more recline.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
 - [ ] A look at the first renders of variant D, when they are ready.
