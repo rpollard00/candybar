@@ -57,7 +57,7 @@ The owner asked for two more things on 2026-11-10: a complete rework of the hood
 - Deeper cheeks, with the wide facet on the front edge.
 - A cheek curve that is more subtle than on the MakerWorld model, and that runs smoothly all the way into the deck.
 - No holes in the front face of the deck.
-- A deck with the additional faces of the reference cabinet: flat faces that cut the front corners, seen from above, like a coarse bevel.
+- A deck with the additional faces of the reference cabinet. Seen from above, the front is three faces: a center face that is square to the player and about half the width, and a face on each side of it that turns slightly outward. The turn is very subtle. (An earlier reading, flat faces that cut the corners at 45 degrees, was wrong.)
 - A visible cut between the top of the bezel and the hood.
 - A shorter deck. The control panel becomes about 396 x 175 mm (it was 396 x 240). The start, coin and menu buttons move from a row behind the main buttons to the right end of the panel, as on the reference cabinet. The deck is then about 195 to 215 mm from its front edge to the foot of the screen face.
 - The screen face: a bezel in the proportion of the 16:10 screen with an even frame of about 45 mm, on a body-colored band of about 60 mm, with a recline of about 30 degrees. The owner accepts a steeper sight line for this (about 36 degrees with the estimated eye position).
