@@ -17,7 +17,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Model variant D of the outer form as solids, and iterate on renders against the photos of the reference cabinet. The owner set variant D on 2026-11-10 (see below).
+1. Variant D of the outer form exists as solids in `cad/candybar/shell` (five rounds). Its sheets are in `cad/out/shell-d`. Next: the owner chooses a screen face, then more rounds on the hood, the cheeks and the deck.
 2. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
 3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
 4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
