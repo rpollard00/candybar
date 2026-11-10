@@ -57,6 +57,7 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 - No holes in the front face of the deck.
 - A deck with the additional faces of the reference cabinet: flat faces that cut the front corners, seen from above, like a coarse bevel.
 - A visible cut between the top of the bezel and the hood.
+- A shorter deck. The control panel becomes about 396 x 175 mm (it was 396 x 240). The start, coin and menu buttons move from a row behind the main buttons to the right end of the panel, as on the reference cabinet. The deck is then about 195 to 215 mm from its front edge to the foot of the screen face.
 
 ## Settled by the owner
 
