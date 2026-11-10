@@ -1,0 +1,11 @@
+# Generated CAD outputs. Rebuild with cad/build.sh.
+cad/out/
+
+# Third-party reference CAD. Fetch with cad/tools/fetch_vendor.sh.
+cad/vendor/
+
+__pycache__/
+*.FCBak
+
+# Working decision log of an agent run.
+decisions.tsv

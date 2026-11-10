@@ -1,0 +1,56 @@
+name,value,unit,status,measure,source,note
+stick_plate_w,53,mm,sourced,Mounting plate width,Sanwa JLF-P-1 plate drawing,Lever mounting plate size across the panel
+stick_plate_l,95,mm,sourced,Mounting plate length,Sanwa JLF-P-1 plate drawing,Lever mounting plate size front to back
+stick_plate_t,1.6,mm,sourced,,Sanwa JLF-P-1 plate drawing,Lever mounting plate thickness
+stick_mount_w,40,mm,sourced,Slot centre to slot centre across the plate,Sanwa JLF-P-1 plate drawing,Lever mounting pattern across the panel
+stick_mount_l,85,mm,sourced,Slot centre to slot centre along the plate,Sanwa JLF-P-1 plate drawing,Lever mounting pattern front to back
+stick_body_w,62,mm,sourced,Lever body width below the plate,Sanwa JLF drawing; confirm on the JLX2,Lever body size across the panel
+stick_body_l,75,mm,sourced,Lever body length below the plate,Sanwa JLF drawing; confirm on the JLX2,Lever body size front to back
+stick_body_depth,26.4,mm,sourced,Plate top face down to the bottom of the body,Sanwa JLF drawing; confirm on the JLX2,Lever body depth below the plate top
+stick_tip_depth,34,mm,sourced,Plate top face down to the shaft tip,Sanwa JLF drawing; confirm on the JLX2,Shaft tip depth below the plate top
+stick_tip_d,12,mm,provisional,,estimate,Shaft tip clearance diameter
+stick_plate_drop,9.25,mm,provisional,Set by the lever height you prefer,Vewlix reference (23 to 24 ball seat above the panel),Plate top face below the panel top face
+stick_shaft_hole_d,24,mm,sourced,,controls-ergonomics.md 1.4,Panel hole for the shaft
+stick_shaft_d,10,mm,sourced,,Sanwa JLF drawing,Shaft diameter
+stick_ball_d,35,mm,sourced,,Sanwa LB-35,Ball top diameter
+stick_ball_cz,35,mm,provisional,Panel top face up to the centre of the ball,derived from the 32.4 ball seat height,Ball centre above the panel top face
+stick_washer_d,41,mm,provisional,Dust washer diameter,sources disagree: 38 or 41,Dust washer diameter
+stick_conn_clear,60,mm,provisional,Room the 5-pin harness needs beside the body,controls-ergonomics.md 1.6,Harness space on the connector side of the lever body
+stick_boss_d,10,mm,provisional,,design choice,Lever mounting boss diameter
+stick_insert_d,5.6,mm,provisional,Print an insert coupon,typical M4 heat-set insert,Hole for an M4 heat-set insert
+stick_insert_depth,6.5,mm,provisional,,typical M4 heat-set insert,Insert hole depth
+btn_count,8,,provisional,,project brief: six or eight is open,Action buttons: 6 or 8. A change needs a rebuild
+btn_hole_d,30,mm,sourced,Print a hole coupon,Sanwa OBSN-30 drawing,Panel hole for a 30 mm button
+btn_body_d,29.5,mm,provisional,Button body diameter below the rim,estimate,30 mm button body diameter
+btn_rim_d,33.2,mm,sourced,,Sanwa OBSN-30 drawing,30 mm button rim diameter
+btn_rim_h,3.5,mm,provisional,,estimate,Rim height above the panel
+btn_nut_d,36,mm,sourced,Nut outside diameter,Sanwa OBSN-30 drawing,30 mm button nut diameter
+btn_nut_h,11,mm,sourced,,Sanwa OBSN-30 drawing,30 mm button nut height
+btn_depth,34.5,mm,sourced,Panel top face down to the terminal tips,Sanwa OBSN-30 drawing,30 mm button depth below the panel top
+btn_wire_clear,12,mm,provisional,,estimate for 2.8 mm quick-disconnects,Wiring space below the terminals
+svc_hole_d,24,mm,sourced,,Sanwa OBSN-24 drawing,Panel hole for a 24 mm button
+svc_body_d,23.5,mm,provisional,,estimate,24 mm button body diameter
+svc_rim_d,27.3,mm,sourced,,controls-ergonomics.md 3.6,24 mm button rim diameter
+svc_nut_d,29.5,mm,sourced,,Sanwa OBSN-24 drawing,24 mm button nut diameter
+svc_nut_h,9,mm,provisional,,estimate,24 mm button nut height
+svc_depth,32,mm,sourced,,Sanwa OBSN-24 drawing,24 mm button depth below the panel top
+btn1_dx,59,mm,sourced,,slagcoin Sega Astro City 1P,Button 1 right of the lever centre
+btn1_dy,-14,mm,sourced,,slagcoin Sega Astro City 1P,Button 1 behind the lever centre
+btn2_dx,92,mm,sourced,,slagcoin Sega Astro City 1P,
+btn2_dy,0,mm,sourced,,slagcoin Sega Astro City 1P,
+btn3_dx,128,mm,sourced,,slagcoin Sega Astro City 1P,
+btn3_dy,-6,mm,sourced,,slagcoin Sega Astro City 1P,
+btn4_dx,66,mm,sourced,,slagcoin Sega Astro City 1P,
+btn4_dy,24.5,mm,sourced,,slagcoin Sega Astro City 1P,
+btn5_dx,99,mm,sourced,,slagcoin Sega Astro City 1P,
+btn5_dy,38.5,mm,sourced,,slagcoin Sega Astro City 1P,
+btn6_dx,134.5,mm,sourced,,slagcoin Sega Astro City 1P,
+btn6_dy,32.5,mm,sourced,,slagcoin Sega Astro City 1P,
+btn7_dx,162,mm,sourced,,slagcoin Sega Astro City 1P,Used only with 8 buttons
+btn7_dy,-21,mm,sourced,,slagcoin Sega Astro City 1P,Used only with 8 buttons
+btn8_dx,168.5,mm,sourced,,slagcoin Sega Astro City 1P,Used only with 8 buttons
+btn8_dy,17.5,mm,sourced,,slagcoin Sega Astro City 1P,Used only with 8 buttons
+enc_l,96.3,mm,sourced,,RP2040 Advanced Breakout Board Gerber files,Encoder board length
+enc_w,45.31,mm,sourced,,RP2040 Advanced Breakout Board Gerber files,Encoder board width
+enc_h,15,mm,provisional,Board plus tallest connector,estimate,Encoder height including connectors
+enc_standoff,4,mm,provisional,,design choice,Gap between the deck underside and the encoder

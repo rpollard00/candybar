@@ -1,0 +1,29 @@
+# FreeCAD writes its own messages to file descriptors 1 and 2, which the shell
+# sends to a log. Descriptors 3 and 4 are the caller's stdout and stderr and
+# carry the text meant for the user. The process is ended here, whatever
+# happens, because the GUI binary would otherwise stay open.
+import importlib
+import os
+import sys
+import traceback
+
+
+def launch() -> int:
+    sys.stdout = os.fdopen(3, "w", buffering=1)
+    sys.stderr = os.fdopen(4, "w", buffering=1)
+    sys.path.insert(0, os.environ["CANDYBAR_ROOT"])
+    try:
+        return int(importlib.import_module(os.environ["CANDYBAR_MODULE"]).main())
+    except BaseException:
+        traceback.print_exc()
+        return 1
+
+
+try:
+    code = launch()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    with open(os.environ["CANDYBAR_STATUS"], "w", encoding="utf-8") as status:
+        status.write(str(code))
+finally:
+    os._exit(0)
