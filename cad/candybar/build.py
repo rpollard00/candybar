@@ -22,6 +22,8 @@ def build_document(params_dir: Path = ROOT / "params", name: str = DOCUMENT) -> 
     """
     rows = params.load(Path(params_dir))
     if name in App.listDocuments():
+        if App.GuiUp and App.Gui.getDocument(name).Modified:
+            raise RuntimeError(f"{name} is open with unsaved changes. Save or close it in FreeCAD first.")
         App.closeDocument(name)
     doc = App.newDocument(name)
     try:

@@ -5,7 +5,7 @@ the rear, z up from the panel top face. The deck occupies z from -deck_t to 0.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import FreeCAD as App
 
@@ -110,8 +110,8 @@ LEVER = (
     box(
         "Lever_Harness",
         "keepout",
-        ("stick_conn_clear", "40 mm", "stick_body_depth"),
-        ("stick_x - stick_body_w / 2 - stick_conn_clear", "stick_y - 20 mm", BODY_BOTTOM_Z),
+        ("stick_conn_clear - stick_body_w / 2", "stick_conn_w", "stick_body_depth"),
+        ("stick_x - stick_conn_clear", "stick_y - stick_conn_w / 2", BODY_BOTTOM_Z),
     ),
 )
 
@@ -138,10 +138,19 @@ def _fix_holes(x: str) -> tuple[Hole, ...]:
 
 def build(model: Model, action_count: int) -> None:
     fitted = buttons(action_count)
-    prims = (*LEVER, *(prim for button in fitted for prim in button.prims()), ENCODER)
+    prims = (
+        *_owned_by("Lever", LEVER),
+        *(prim for button in fitted for prim in _owned_by(button.name, button.prims())),
+        *_owned_by("Encoder", (ENCODER,)),
+    )
     part = model.assembly(Assembly(OWNER, base=(ZERO, "panel_y0", "cp_top_z"), prims=prims))
     _deck_lever(model, part)
     _deck_buttons(model, part, tuple(button.hole() for button in fitted))
+
+
+def _owned_by(part_name: str, prims: tuple[Prim, ...]) -> tuple[Prim, ...]:
+    """Each purchased part owns its solids, so the checks compare one part with the next."""
+    return tuple(replace(prim, owner=part_name) for prim in prims)
 
 
 def _deck_lever(model: Model, part: App.DocumentObject) -> None:

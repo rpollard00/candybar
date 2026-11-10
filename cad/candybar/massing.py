@@ -129,7 +129,7 @@ def build(model: Model) -> None:
     openings = [model.solid(shell, opening, OWNER) for opening in OPENINGS]
     voids = model.fuse(shell, "Shell_Voids", [cavity, *openings, _hood_openings(model, shell)])
     tag(model.cut(shell, SKIN, envelope, voids), "massing", OWNER)
-    model.assembly(HOOD_FACE, parent=shell, owner=OWNER)
+    model.assembly(HOOD_FACE, parent=shell)
     _bezel_plates(model, shell)
 
 
@@ -207,4 +207,4 @@ def _bezel_plates(model: Model, shell: App.DocumentObject) -> None:
             ),
             OWNER,
         )
-        tag(model.cut(bezel, name, plate, window), "trim", OWNER, alternate=alternate)
+        tag(model.cut(bezel, name, plate, window), "trim", BEZEL.name, alternate=alternate)

@@ -18,6 +18,7 @@ SOLID_ROLES = ("hardware", "protrusion", "printable", "massing", "trim")
 VOLUME_TOLERANCE = 1.0
 LENGTH_TOLERANCE = 1e-6
 NUT_OVERLAP_WARN = 1.0
+NUT_TAGS = (panel.ACTION_NUT, panel.SERVICE_NUT)
 REPORT_MD = "report.md"
 REPORT_JSON = "report.json"
 OUTPUTS = (REPORT_MD, REPORT_JSON)
@@ -113,9 +114,14 @@ def _interference(scene: Scene) -> list[Finding]:
     pairs = [
         (a, b)
         for a, b in combinations(scene.with_role(*SOLID_ROLES), 2)
-        if a.owner != b.owner or "printable" in (a.role, b.role)
+        if (a.owner != b.owner or "printable" in (a.role, b.role)) and not _both_nuts(a, b)
     ]
     return _clashes(pairs)
+
+
+def _both_nuts(a: model.Placed, b: model.Placed) -> bool:
+    """Two button nuts are judged by the spacing rule, which grades a small overlap as a warning."""
+    return a.tag in NUT_TAGS and b.tag in NUT_TAGS
 
 
 def _keepout(scene: Scene) -> list[Finding]:
@@ -130,13 +136,13 @@ def _keepout(scene: Scene) -> list[Finding]:
 
 def _containment(scene: Scene) -> list[Finding]:
     envelope = model.world_shape(scene.doc.getObject(massing.ENVELOPE))
-    hardware = scene.with_role("hardware")
+    contained = scene.with_role("hardware", "trim")
     found = [
         (FAIL, solid.name, f"{volume:.0f} mm3 lies outside the shell envelope")
-        for solid in hardware
+        for solid in contained
         if (volume := solid.world.cut(envelope).Volume) > VOLUME_TOLERANCE
     ]
-    return found or [(PASS, f"{len(hardware)} hardware objects", "all inside the shell envelope")]
+    return found or [(PASS, f"{len(contained)} hardware and trim objects", "all inside the shell envelope")]
 
 
 def _print_size(part: model.Placed) -> tuple[float, float, float]:
@@ -167,7 +173,7 @@ def _print_fit(scene: Scene) -> list[Finding]:
 
 
 def _button_spacing(scene: Scene) -> list[Finding]:
-    nuts = scene.with_tag(panel.ACTION_NUT, panel.SERVICE_NUT)
+    nuts = scene.with_tag(*NUT_TAGS)
     found: list[Finding] = []
     for a, b in combinations(nuts, 2):
         box_a, box_b = a.world.BoundBox, b.world.BoundBox
@@ -182,12 +188,12 @@ def _button_spacing(scene: Scene) -> list[Finding]:
 
 
 def _palm_rest(scene: Scene) -> float:
-    return min(nut.assembly.BoundBox.Center.y for nut in scene.with_tag(panel.ACTION_NUT))
+    return min(nut.world.BoundBox.Center.y for nut in scene.with_tag(panel.ACTION_NUT))
 
 
 ERGONOMICS: tuple[tuple[str, Callable[[Scene], float], str, str], ...] = (
     ("panel top above the desk", lambda scene: scene.value("cp_top_z"), "tgt_panel_top", "mm"),
-    ("palm rest: panel front edge to the nearest button centre", _palm_rest, "tgt_palm", "mm"),
+    ("palm rest: cabinet front edge to the nearest button centre", _palm_rest, "tgt_palm", "mm"),
     ("sight line to the screen centre, below horizontal", lambda scene: scene.value("sight_angle"), "tgt_sight", "deg"),
     ("eye to screen centre", lambda scene: scene.value("eye_dist"), "tgt_eye_dist", "mm"),
 )

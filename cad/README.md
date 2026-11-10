@@ -83,9 +83,9 @@ You can change a cell in the `Params` sheet of `candybar.FCStd`. The model follo
 | Rule | The build fails when |
 | --- | --- |
 | R0 object state | An object does not recompute, or a sketch is not fully constrained |
-| R1 interference | Two solids of different assemblies share more than 1 mm3. A printable part is also compared with the hardware of its own assembly. |
-| R2 keep-out | A solid of one assembly is in a keep-out zone of a different assembly |
-| R3 containment | A hardware solid is outside the shell envelope |
+| R1 interference | Two solids of different owners share more than 1 mm3. An owner is one purchased part, the shell, the bezel, or the hood face. A printable part is also compared with all hardware. Two button nuts are compared by R5 only. |
+| R2 keep-out | A solid of one owner is in a keep-out zone of a different owner |
+| R3 containment | A hardware solid or a trim plate is outside the shell envelope |
 | R4 print fit | A printable part is larger than the 256 mm bed. More than 240 mm gives a warning. |
 | R5 button spacing | Two button nuts overlap by more than 1 mm. A smaller overlap gives a warning. |
 
@@ -143,6 +143,6 @@ Each solid has a `CB_Role` property. The checks use this property.
 
 ## Reference CAD
 
-`cad/tools/fetch_vendor.sh` fetches third-party reference CAD into `cad/vendor/`. Git ignores this directory. The licenses of these files do not permit redistribution, so do not copy their geometry into tracked files. The build does not use them.
+`cad/tools/fetch_vendor.sh` fetches three third-party repositories into `cad/vendor/`. It also examines three files from Printables, which you must download by hand. The script gives a non-zero exit status until these files are there. Git ignores `cad/vendor/`. The licenses of these files do not permit redistribution, so do not copy their geometry into tracked files. The build does not use them.
 
 The research notes are in `docs/research/`.

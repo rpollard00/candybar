@@ -34,15 +34,22 @@ def decorate(path: Path) -> None:
     settings.SetBool("SaveThumbnail", False)
     doc = App.openDocument(str(path))
     try:
+        doc.recompute()
+        already_touched = _touched(doc)
         before = model.fingerprint(doc)
         style.apply(doc)
         style.frame(doc)
-        touched = [obj.Name for obj in doc.Objects if "Touched" in obj.State]
+        touched = sorted(_touched(doc) - already_touched)
         if touched or model.fingerprint(doc) != before:
             raise RuntimeError(f"the view step changed the model (touched: {touched}); {path} keeps no view settings")
         doc.save()
     finally:
         App.closeDocument(doc.Name)
+
+
+def _touched(doc: App.Document) -> set[str]:
+    """A design that fails its checks can hold objects that stay touched after a recompute."""
+    return {obj.Name for obj in doc.Objects if "Touched" in obj.State}
 
 
 def main() -> int:

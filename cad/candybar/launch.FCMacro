@@ -19,11 +19,13 @@ def launch() -> int:
         return 1
 
 
-try:
-    code = launch()
-    sys.stdout.flush()
-    sys.stderr.flush()
-    with open(os.environ["CANDYBAR_STATUS"], "w", encoding="utf-8") as status:
-        status.write(str(code))
-finally:
-    os._exit(0)
+# Without the wrapper's environment this is a person's FreeCAD session: leave it alone.
+if "CANDYBAR_STATUS" in os.environ:
+    try:
+        code = launch()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        with open(os.environ["CANDYBAR_STATUS"], "w", encoding="utf-8") as status:
+            status.write(str(code))
+    finally:
+        os._exit(0)

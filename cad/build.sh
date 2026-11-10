@@ -21,6 +21,11 @@ done
 export CANDYBAR_OUT=${CANDYBAR_OUT:-$here/out}
 saved=$CANDYBAR_OUT/candybar.FCStd
 
+# The build clears its own outputs, but only once Python runs. If FreeCAD dies
+# before that, the outputs of an earlier build would stay and look current.
+rm -rf "$saved" "$CANDYBAR_OUT/report.md" "$CANDYBAR_OUT/report.json" "$CANDYBAR_OUT/candybar.step" \
+  "$CANDYBAR_OUT/step" "$CANDYBAR_OUT/stl" "$CANDYBAR_OUT/views"
+
 built=0
 "$here/candybar/freecad-run.sh" candybar.build || built=$?
 

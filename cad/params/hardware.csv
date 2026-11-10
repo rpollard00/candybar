@@ -29,7 +29,7 @@ bc_shroud_x0,160,mm,provisional,"On the first console: I/O edge to the near side
 bc_shroud_y0,-3.45,mm,provisional,,centred on the fin block,Fan shroud offset from the straight long edge
 bc_shroud_l,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud length along the board
 bc_shroud_w,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud width across the board
-bc_shroud_h,55.9,mm,sourced,"On the first console: PCB top face up to the outer face of the fan",MKUU+ shroud 3MF with a 25 mm fan,Fan outer face above the PCB top face
+bc_shroud_h,55.9,mm,provisional,"On the first console: PCB top face up to the outer face of the fan","MKUU+ shroud 3MF: the height of the whole shroud part. The fan face is estimated at 53",Fan outer face above the PCB top face
 bc_dp_clear,45,mm,provisional,DisplayPort plug plus cable bend beyond the I/O edge,hardware-envelopes.md 8,Space in front of the I/O edge
 bc_pwr_x0,220,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone start from the I/O edge
 bc_pwr_x1,248,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone end from the I/O edge
