@@ -7,9 +7,11 @@ meshes, or the box given with --frame, so that two models framed by the same box
 
 Each view writes <out>/<view>.png on a light-grey background. Each orthographic view also writes
 <view>-mask.png (the object mask) and every view writes its projection to <out>/views.json, so that
-silhouette_iou.py and compose_sheet.py can work in millimetres. A model directory with focus.json
-({view: [x, y, z, radius]}) adds the close-up views closeup-cheek-foot, closeup-hood-corner and
-closeup-deck-front to the standard set.
+silhouette_iou.py and compose_sheet.py can work in millimetres. A model directory with focus.json adds
+close-up views to the standard set. An entry {view: [x, y, z, radius]} is one of the three fixed close-ups
+(closeup-cheek-foot, closeup-hood-corner, closeup-deck-front). An entry {view: {"target": [x, y, z],
+"radius": r, "az": deg, "el": deg, "aspect": height / width}} is a camera of its own: radius is half the
+width of the view at the target, az turns from the front toward the player's right, el lifts the camera.
 
 The script runs itself inside Blender (blender -b, no window). Engines: eevee (default), workbench, cycles;
 auto tries them in that order.
@@ -154,23 +156,26 @@ def perspective_camera(view: str, lo: Vec, hi: Vec, size: int) -> Camera:
     return Camera(view, "perspective", f, r, u, loc, res, lens_mm=lens, sensor_mm=sensor)
 
 
-def closeup_camera(view: str, target: Vec, radius: float, size: int) -> Camera:
+def closeup_camera(view: str, target: Vec, radius: float, size: int, angles: tuple[float, float], aspect: float = 0.8) -> Camera:
     """A perspective close-up on a named point of the model (from focus.json next to the meshes)."""
-    az, el = (math.radians(v) for v in CLOSEUP[view])
+    az, el = (math.radians(v) for v in angles)
     to_cam = (math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el))
     f = norm((-to_cam[0], -to_cam[1], -to_cam[2]))
     r = norm(cross(f, (0.0, 0.0, 1.0)))
     u = cross(r, f)
     half = math.tan(math.radians(CLOSEUP_FOV) / 2)
     loc = add(target, to_cam, radius / half)
-    res = (size, round(size * 0.8))
-    return Camera(view, "perspective", f, r, u, loc, res, lens_mm=36.0 / (2 * half), sensor_mm=36.0)
+    res = (size, round(size * aspect)) if aspect <= 1.0 else (round(size / aspect), size)
+    return Camera(view, "perspective", f, r, u, loc, res, lens_mm=36.0 / (2 * half) * min(1.0, 1.0 / aspect), sensor_mm=36.0)
 
 
 def make_camera(view: str, lo: Vec, hi: Vec, size: int, focus: dict | None = None) -> Camera:
+    entry = (focus or {}).get(view)
+    if isinstance(entry, dict):
+        return closeup_camera(view, tuple(entry["target"]), entry["radius"], size, (entry["az"], entry["el"]), entry.get("aspect", 0.8))
     if view in CLOSEUP:
-        x, y, z, radius = focus[view]
-        return closeup_camera(view, (x, y, z), radius, size)
+        x, y, z, radius = entry
+        return closeup_camera(view, (x, y, z), radius, size, CLOSEUP[view])
     return ortho_camera(view, lo, hi, size) if view in ORTHO_AXES else perspective_camera(view, lo, hi, size)
 
 
@@ -246,8 +251,9 @@ def run_cli(argv: list[str]) -> None:
             with open(path) as fh:
                 focus.update(json.load(fh))
     default = a.views == ",".join(VIEWS)
-    views = [v for v in a.views.split(",") if v] + ([v for v in CLOSEUP if v in focus] if default else [])
-    bad = [v for v in views if v not in VIEWS and not (v in CLOSEUP and v in focus)]
+    closeups = [v for v, entry in focus.items() if v in CLOSEUP or isinstance(entry, dict)]
+    views = [v for v in a.views.split(",") if v] + (closeups if default else [])
+    bad = [v for v in views if v not in VIEWS and v not in closeups]
     if bad:
         raise SystemExit(f"unknown view {bad}: choose from {', '.join(VIEWS)}")
     if a.frame:

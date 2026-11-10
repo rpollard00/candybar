@@ -20,13 +20,13 @@ import FreeCAD
 import MeshPart
 import Part
 
-from . import parts
+from . import hood, parts
 from .dims import EYE, EYE_LOW, OPTIONS, Dims, option, sight
 
 V = FreeCAD.Vector
 FINISH = {"body": "white", "deck": "white", "control_panel": "black", "bezel": "black", "band": "white",
           "hood": "white", "hood_band": "white", "speaker_left": "black", "speaker_right": "black",
-          "marquee": "#2f4f3a", "light_strip": "#8fd16a", "rear_door": "white", "screen": "#3a4250"}
+          "logo_plate": "#2f4f3a", "marquee_cover": "#5e9c46", "marquee": "#9be070", "rear_door": "white", "screen": "#3a4250"}
 OUTLINE = {"Monitor_Body": "#1f77d0", "PSU_Body": "#d62728", "CableBundle_Body": "#9467bd", "Compute_": "#2ca02c"}
 LAYOUT = {"image_centre": (0.0, 408.7, 323.0), "recline": 22.0, "panel_y0": 15.0, "panel_top": 67.0, "psu_z0": 14.0,
           "rear_inner_y": 515.0, "floor": 12.0}
@@ -129,7 +129,7 @@ def build_shell(d: Dims, hw: Hardware | None = None, log: list[str] | None = Non
     body, door = parts.rear_features(d, body, fan, duct, psu_box)
     out["body"], out["deck"], out["control_panel"] = body, deck, panel
     out["bezel"] = parts.bezel(d)
-    out.update(parts.hood_parts(d, log))
+    out.update(hood.hood_parts(d, log))
     out["rear_door"] = door
     out["screen"] = parts.screen(d)
     return out
@@ -193,6 +193,13 @@ def overhang_check(shell: dict[str, Part.Shape], d: Dims) -> dict:
 def common_z(shape: Part.Shape, z0: float, z1: float | None = None) -> Part.Shape:
     s = shape.common(parts.halfspace((0, 0, z0), (0, 0, 1))) if z0 > -0.5 else shape
     return s.common(parts.halfspace((0, 0, z1), (0, 0, -1))) if z1 is not None else s
+
+
+def hood_overhang(d: Dims, shell: dict[str, Part.Shape]) -> float:
+    """Volume of the hood that lies outside the plan outline of the body top."""
+    faces = [Part.Face(w) for w in shell["body"].slice(V(0, 0, 1), d.body_top - 0.05)]
+    column = max(faces, key=lambda f: f.Area).extrude(V(0, 0, 400.0))
+    return sum(shell[k].cut(column).Volume for k in shell if k.startswith(("hood", "speaker", "logo", "marquee")))
 
 
 def fits(outer: Part.Shape, shape: Part.Shape) -> bool:
@@ -262,6 +269,13 @@ def check(d: Dims, shell: dict[str, Part.Shape], hw: Hardware) -> list[dict]:
         f"{min(d.panel_top - 60, 75 - d.panel_top):.0f} mm")
     inner = d.panel_top - spare
     add("56 mm inside under the panel top (12 mm floor)", inner >= 56, f"{inner:.0f}", f"{inner - 56:+.0f} mm")
+    hs = hood.survey(d, shell)
+    behind = hs["depth_behind_band_min"]
+    add("At least 50 mm clear behind the hood band, inside the rear wall of the hood", behind >= 50.0, f"{behind:.1f}", f"{behind - 50:+.1f} mm")
+    mw, mh = hs["marquee_window"]
+    add("Marquee window straight, 32 to 40 mm high", 32.0 <= mh <= 40.0, f"{mw:.0f} x {mh:.0f}, {hs['marquee_modules']} modules of {d.marquee_module:.0f}",
+        f"{min(mh - 32, 40 - mh):.0f} mm")
+    add("The hood stands inside the outline of the body top", hood_overhang(d, shell) < 1.0, f"{hood_overhang(d, shell):.1f} mm3 outside")
     for label, eye in (("530", EYE), ("450", EYE_LOW)):
         a, dist = sight(d, eye)
         ok = 15 <= a <= 25 and 450 <= dist <= 600
@@ -290,6 +304,7 @@ def export(out: str, shell: dict[str, Part.Shape], d: Dims, hw: Hardware, checks
     report = {"option": name, "dims": {k: getattr(d, k) for k in d.__dataclass_fields__},
               "outside": [round(bb.XLength, 1), round(bb.YLength, 1), round(bb.ZLength, 1)],
               "bezel": [round(d.bezel_w, 1), round(d.bezel_len, 1)], "body_top": round(d.body_top, 1), "foot_y": d.foot_y,
+              "bezel_top": list(d.face(d.bezel_s1)), "bezel_foot_line": list(d.face(d.bezel_s0)),
               "sight_530": [round(a530, 1), round(d530)], "sight_450": [round(a450, 1), round(d450)], "checks": checks}
     json.dump(report, open(os.path.join(out, "report.json"), "w"), indent=1)
     return report
@@ -312,7 +327,11 @@ def main() -> int:
         r["band_width"] = band_width_survey(d)
         r["overhang"] = overhang_check(shell, d)
         json.dump(r, open(os.path.join(root, name, "report.json"), "w"), indent=1)
-        json.dump(parts.focus_points(d), open(os.path.join(root, name, "focus.json"), "w"), indent=1)
+        json.dump({**parts.focus_points(d), **hood.focus_points(d)}, open(os.path.join(root, name, "focus.json"), "w"), indent=1)
+        r["hood"] = hood.survey(d, shell)
+        json.dump(hood.section_data(d, shell), open(os.path.join(root, name, "hood-section.json"), "w"))
+        json.dump(r, open(os.path.join(root, name, "report.json"), "w"), indent=1)
+        print("  hood:", r["hood"])
         json.dump({"points": deck_section(d, shell["deck"]), "dims": {k: getattr(d, k) for k in
                    ("deck_top", "deck_top_r", "deck_lean", "deck_lean_h", "bottom_r", "deck_corner", "deck_corner_r")}},
                   open(os.path.join(root, name, "deck-section.json"), "w"))

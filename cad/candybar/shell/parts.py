@@ -5,7 +5,7 @@ face) extruded across the width. One band runs round its outer edge without a br
 land, a bevel leaning 30 degrees from the side face, then the side face. Along the side chain the band is a
 ruled loft between the profile at the inner edge of the bevel and the profile offset inward at the side
 plane, so its width is the same everywhere by construction; across the deck front and the flat corner faces
-the band is a plane with the same section. The hood is built the same way, so its sides continue the rails.
+the band is a plane with the same section. The hood is in hood.py.
 """
 from __future__ import annotations
 
@@ -288,84 +288,6 @@ def screen(d: Dims) -> Part.Shape:
     cs = d.image_s
     return in_face(box((-MON_ACTIVE_W / 2, d.mon_setback, cs - MON_ACTIVE_H / 2),
                        (MON_ACTIVE_W / 2, d.mon_setback + 1, cs + MON_ACTIVE_H / 2)), d)
-
-
-# ---------- hood: its sides continue the rails ----------
-
-def hood_profiles(d: Dims, front_y: float) -> tuple[list[Seg], list[Seg], dict[str, float]]:
-    z0 = d.body_top + d.seam_gap
-    h = d.hood_h - d.seam_gap
-    top, D = z0 + h, d.body_d
-    lf, lr = math.radians(d.hood_lean_front), math.radians(d.hood_lean_rear)
-    rn = d.hood_nose_r
-
-    def prof(off: float) -> list[Seg]:
-        # front line y = front_y + off*cos(lf) + (z - z0) tan(lf), offset inward by off; roof lowered by off
-        roof = top - off
-        r = max(rn - off, 5.0)
-        cz = roof - r
-        cy = front_y + off / math.cos(lf) + (cz - z0) * math.tan(lf) + r / math.cos(lf)
-        tan_pt = (cy - r * math.cos(lf), cz + r * math.sin(lf))
-        start = (front_y + off / math.cos(lf), z0)
-        rear_top = (D - (roof - z0) * math.tan(lr), roof)
-        a0, a1 = math.pi - lf, math.pi / 2
-        arc = arc_seg((cy, cz), r, a0, a1)
-        return [("L", start, tan_pt), ("A", tan_pt, arc[2], (cy, roof)), ("L", (cy, roof), rear_top), ("L", rear_top, (D, z0)),
-                ("L", (D, z0), start)]
-
-    return prof(0.0), prof(d.band_drop), {"z0": z0, "top": top, "front_y": front_y}
-
-
-def hood_parts(d: Dims, log: list[str]) -> dict[str, Part.Shape]:
-    su, cu = d.u
-    front_y = d.face((d.body_top - d.deck_top) / cu)[0]
-    inner, outer, g = hood_profiles(d, front_y)
-    w = d.width
-    hood = band_solid(inner, outer, w / 2, d)
-    xi = w / 2 - d.band_in
-
-    def land(e: Part.Edge) -> bool:
-        mid = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
-        return all(abs(abs(v.Point.x) - xi) < 1e-3 for v in e.Vertexes) and abs(abs(mid.x) - xi) < 1e-3 \
-            and mid.z > g["z0"] + 1e-3 and mid.y < d.body_d - 30
-    hood = try_fillet(hood, d.band_r, land_edges(hood, land), log, "hood land radius")
-
-    def outer_edge(e: Part.Edge) -> bool:
-        mid = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
-        return all(abs(abs(v.Point.x) - w / 2) < 1e-3 for v in e.Vertexes) and abs(abs(mid.x) - w / 2) < 1e-3 \
-            and mid.z > g["z0"] + 1e-3 and mid.y < d.body_d - 30
-    hood = try_fillet(hood, d.hood_outer_r, land_edges(hood, outer_edge), log, "hood outer radius")
-    for sx in (1, -1):
-        hood = hood.cut(halfspace((sx * (w / 2 - d.rear_facet), d.body_d, 0), (sx, 1, 0)))
-    z0, top, yf = g["z0"], g["top"], front_y
-    bar = d.rail_t
-    r_in = max(d.hood_corner_r - bar, 8.0)
-    k0, k1 = (-(w / 2 - bar), top - d.hood_bar_top), (w / 2 - bar, top - d.hood_bar_top)
-    inset = [(-(w / 2 - bar), z0 - 5), (k0[0], k0[1] - r_in), *[(k0[0] + r_in - r_in * math.cos(a), k0[1] - r_in + r_in * math.sin(a))
-             for a in [i * math.pi / 20 for i in range(1, 10)]], (k0[0] + r_in, k0[1]), (k1[0] - r_in, k1[1]),
-             *[(k1[0] - r_in + r_in * math.cos(a), k1[1] - r_in + r_in * math.sin(a)) for a in [math.pi / 2 - i * math.pi / 20 for i in range(1, 10)]],
-             (k1[0], k1[1] - r_in), (w / 2 - bar, z0 - 5)]
-    bt = math.radians(d.band_tilt)
-    p0 = (0, yf + d.band_setback, z0)
-    n = (0, math.cos(bt), -math.sin(bt))
-    neg = tuple(-x for x in n)
-    opening = prism_y(inset, yf - 200, d.body_d)
-    hood = hood.cut(common(opening, halfspace(p0, neg))).removeSplitter()
-    back = (0, p0[1] + n[1] * d.band_t, p0[2] + n[2] * d.band_t)
-    parts = {"hood": hood, "hood_band": common(opening, halfspace(p0, n), halfspace(back, neg), halfspace((0, 0, z0), (0, 0, 1)))}
-    proud = (0, p0[1] - n[1] * 3, p0[2] - n[2] * 3)
-    face_slab = common(halfspace(p0, neg), halfspace(proud, n))
-    shrink = [(x * (1 - 9 / (w / 2)), z if z > z0 else z0 + 9) for x, z in inset]
-    shrink = [(x, min(z, top - d.hood_bar_top - 9)) for x, z in shrink]
-    inner_open = prism_y(shrink, yf - 200, d.body_d)
-    strip_top = top - d.hood_bar_top - 4
-    strip_bottom = strip_top - 12
-    for name, sx in (("speaker_left", -1), ("speaker_right", 1)):
-        x0, x1 = sorted((sx * 98, sx * w))
-        parts[name] = common(inner_open, face_slab, box((x0, -BIG, z0), (x1, BIG, strip_bottom - 5)))
-    parts["marquee"] = common(face_slab, box((-80, -BIG, z0 + 14), (80, BIG, strip_bottom - 7)))
-    parts["light_strip"] = common(inner_open, face_slab, box((-w, -BIG, strip_bottom), (w, BIG, strip_top)))
-    return parts
 
 
 def focus_points(d: Dims) -> dict[str, list[float]]:
