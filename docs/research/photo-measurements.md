@@ -11,7 +11,7 @@ Research date: 2026-11-09. Scope: form of the reference cabinet (the maker's New
 | MEASURED (tool, file) | Computed by the tool from the picks in the file. The ± is from moving each picked point by its sigma (1 to 4 px) and combining the changes as a root sum of squares. The text names any extra systematic error. |
 | ESTIMATED | A reading or a calculation that needs an assumption. The assumption is given. |
 
-Tools: `photo_detail.py` (brightness profiles), `photo_rectify.py` (planes and measures), `photo_overlay.py` (model against photo), `photo_annot.py` (picks, crops, snapping). A focal length that is not measured is a stated assumption. Where it matters, the number is given for a range of focal lengths.
+Tools: `photo_detail.py` (brightness profiles), `photo_rectify.py` (planes and measures), `photo_overlay.py` (model against photo), `photo_profile.py` (side views: level, scale, measure, overlay), `photo_annot.py` (picks, crops, snapping). A focal length that is not measured is a stated assumption. Where it matters, the number is given for a range of focal lengths.
 
 ## A. The deck front edge (reference cabinet)
 
@@ -100,6 +100,44 @@ Method: `photo_rectify.py` with the plane `top` in `photo-d-unpainted-shell.json
 
 The owner's description holds: a centre face square to the player, about half the width (0.54 to 0.56). Two flanks turn back about 8 degrees, then a rounded corner.
 
+## E. The real cabinet in profile (owner-ref-4)
+
+Photo: `cad/vendor/sega-new-astro-city/owner-ref-4-profile.png` (540 × 720), a true side view of a real New Astro City (a floor cabinet), front to the right. The picks and traces are in `cad/reference/owner-ref-4-profile.json`. Tool: `photo_profile.py` (`measure` gives the table, `overlay` gives the pictures in `cad/out/shell-d/reconstruction/`).
+
+Scale. The floor line sets the level (the floor tilts 0.3 degrees in the photo). The height (floor to hood top, 1445 mm) gives 2.374 mm per px. The depth (rear wall to deck front, 905 mm) gives 2.457 mm per px. The service manual gives both sizes [S33]. The two scales differ by 3.5 percent: this is the error from perspective. Each line is also computed with one scale on both axes; the "range" column gives the spread. The traces are snapped to edges (sigma 1 px). Short lengths carry about ± 1.5 px more: ± 0.006 W on the hood parts and ± 0.007 W on the overhang. A check: the deck top reads 626 mm above the floor. Owners measure 650 mm, so the photo reads about 4 percent low.
+
+`W` is the body width: 750 mm for the real cabinet, 494.7 mm for this cabinet. The real cabinet is a floor cabinet with a 29 inch tube. Compare the shape, not the sizes.
+
+| Line | Real cabinet (MEASURED) | Range | This cabinet | Difference |
+| --- | --- | --- | --- | --- |
+| Rail arc, sagitta / chord (chord from the top of the sweep to the seam) | 0.033 | 0.032 to 0.033 | 0.035 | +0.002 |
+| Recline of the rail chord, degrees from upright | 29.1 | 28.3 to 29.1 | 30.1 | +0.9 |
+| Rail arc radius / W (circle fit, rms 1.8 mm) | 2.97 | 2.97 to 3.10 | 2.69 | -0.28 |
+| Sweep radius / W | 0.143 | 0.141 to 0.146 | 0.101 | -0.042 |
+| Rail chord / W | 0.849 | 0.842 to 0.871 | 0.749 | -0.100 |
+| Seam (foot of the hood) above the deck top / W | 0.872 | 0.872 to 0.902 | 0.714 | -0.158 |
+| Hood height over the seam / W | 0.220 | 0.220 to 0.227 | 0.317 | +0.097 |
+| Hood depth at the seam / W | 0.325 | 0.314 to 0.325 | 0.269 | -0.056 |
+| Hood front beyond the rail top at the seam / W | 0.018 | 0.018 | -0.008 (4 behind) | -0.026 |
+| Front box of the hood (speakers and marquee): top above the seam / W | 0.103 | 0.103 to 0.107 | none | |
+| Front box: depth in front of the upper part / W | 0.097 | 0.093 to 0.097 | none | |
+| Step from the top of the front box up to the hood top / W | 0.116 | 0.116 to 0.120 | 0 | -0.116 |
+| Flat hood top, depth / W | 0.147 | 0.142 to 0.147 | 0.012 | -0.135 |
+| Hood rear: lean forward from upright, degrees (straight) | 17.6 | 17.1 to 17.6 | 0: an arc down to an upright wall | |
+| Body rear wall above the deck: lean forward from upright, degrees | 13.6 | 13.1 to 13.6 | 0: upright, the upper rear 40 proud | |
+| Side band: rail edge to the step, at mid rail / W | 0.326 | 0.315 to 0.326 | 0.336 | +0.010 |
+| Rail edge to the line behind it, at mid rail / W | 0.159 | 0.154 to 0.159 | 0.056 (the crease) | -0.104 |
+| The same at a quarter and at three quarters of the rail height / W | 0.165, 0.137 | ± 0.005 | 0.054, 0.058 | |
+
+What the profile shows:
+
+- **Rail.** A concave sweep at the deck, then one convex arc to the seam. The arc fits one circle with an rms error of 1.8 mm. Its sagitta is 0.033 of the chord (0.032 to 0.033 when the lower end moves 24 px). This is the value that the earlier photos could not give. It agrees with this cabinet (0.035) within the error. The real chord reclines 29 degrees (this cabinet: 30).
+- **Hood.** Two parts with a step. A front box (speakers and marquee) stands over the top of the rail. Its front is upright and 0.018 W in front of the rail top. Its top is 0.10 W above the seam. Behind it, a taller upper part rises to 0.22 W. Its front is near upright (6 degrees) and its top is flat for 0.15 W. Its rear is straight and leans forward 17.6 degrees, with small corners. There is no rear arc. The step between the two tops is a near-upright face, not a slope. The hood is 0.325 W deep at the seam and 0.22 W high: it is deeper and lower than this cabinet's (0.269 W, 0.32 W).
+- **Rear.** Above the deck, the rear wall of the body leans forward 13.6 degrees. It runs into the hood rear (17.6 degrees) in almost one line, so the profile narrows to the top. Below the deck the base is set in by about 0.09 W.
+- **Side band.** The step face shows as a dark band. Its inner edge is sharp, and it leans back 25 degrees (this cabinet: 28). From the rail edge to it is 0.33 W at mid rail, close to this cabinet. A thin line runs 0.14 to 0.17 W behind the rail edge. It is straight, but the rail edge curves, so the band between them is narrowest at the top. It is a crease or a joint of the side panel (not determined). This cabinet's edge crease is 24 mm (0.05 W) behind the land.
+
+Not measured: the width of anything (one view), the outer edge of the step band (a soft shade), how the front box meets the rail top (in shadow), the depth of the seam groove, and the shape of the hood front in plan.
+
 ## Model against photo
 
 `photo_overlay.py` on `photo-e-three-quarter.json`, with the 3D reference model (`photo-e-three-quarter/overlay-full/` and `overlay-plane/`). The full fit uses six anchors: the four bezel corners, the deck front centre and the hood top centre. Its rms error is 35 px, because the model has different proportions. The fit on the screen face alone matches the four bezel corners at 10 px rms. With that fit, the model's deck front lands about 83 px below the photo's and its hood top 71 px off. The model's steeper recline (32.5 degrees) and lower hood show directly.
@@ -108,7 +146,7 @@ The owner's description holds: a centre face square to the player, about half th
 
 - One view gives no absolute angles of surfaces without a known shape in them. The band lean (A) and the verticality of the lower deck face are not measured.
 - Photo-e and photo-d are screenshots, probably cropped, so the principal point is not known. The camera of photo-e rests on the bezel outline and the horizon. Its recline estimate (12 degrees from the bezel plane, 24 to 30 degrees from the bezel side edges) is not consistent, so photo-e gives no recline. Its heights carry ± 9 percent for the focal length.
-- The real cabinet has one photo. Its camera is an assumed phone lens.
+- The real cabinet has two photos. In the three-quarter view the camera is an assumed phone lens. The profile view (E) needs no camera model, but its two scales differ by 3.5 percent.
 - A point used in a plane must lie in that plane. Widths taken in photo-b's screen plane for parts in front of it (deck, hood front) read about 2 to 4 percent large.
 - **Least trusted:** the maker's top corner radius (0.23 W). The front silhouette in photo-b is one long blend from the top flat into the leaning side, so "a radius" fits it poorly. Next: the facet width in C, which depends on an assumed facet angle.
 - Monocular depth and normal estimators: not attempted. The time went to the three measuring tools and question D. The flat plateaus in A (± 0.5 levels on gloss white) give such a model little to read. A 10 degree lean would not show without specular cues.
