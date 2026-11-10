@@ -111,10 +111,11 @@ def place_hardware(d: Dims, hw: Hardware) -> dict[str, float]:
     return {"monitor_rotation": d.recline - LAYOUT["recline"], "psu_dz": dz, "compute_dz": dz}
 
 
-def build_shell(d: Dims, hw: Hardware | None = None) -> dict[str, Part.Shape]:
+def build_shell(d: Dims, hw: Hardware | None = None, log: list[str] | None = None) -> dict[str, Part.Shape]:
     """Every outer-form part of variant D (plus the lit screen, for renders)."""
+    log = [] if log is None else log
     out: dict[str, Part.Shape] = {}
-    body = parts.body(d)
+    body, deck, panel = parts.body_and_deck(d, log)
     fan = (0.0, 0.5 * (d.door_z0 + d.door_z1))
     duct = (-d.door_w / 2 + 60, fan[1])
     psu_box = ((-d.rear_w / 2 + d.wall_spare + d.psu_side, -d.rear_w / 2 + d.wall_spare + d.psu_side + 150), (15.0, 101.0))
@@ -126,17 +127,76 @@ def build_shell(d: Dims, hw: Hardware | None = None) -> dict[str, Part.Shape]:
         duct = (du.Center.x, du.Center.z)
         psu_box = ((ps.XMin, ps.XMax), (ps.ZMin, ps.ZMax))
     body, door = parts.rear_features(d, body, fan, duct, psu_box)
-    out["body"] = body
-    out["deck"], out["control_panel"] = parts.deck(d)
+    out["body"], out["deck"], out["control_panel"] = body, deck, panel
     out["bezel"] = parts.bezel(d)
-    b = parts.band(d)
-    if b is not None:
-        out["band"] = b
-    _, top_y = parts.cheek_points(d)
-    out.update(parts.hood_parts(d, top_y))
+    out.update(parts.hood_parts(d, log))
     out["rear_door"] = door
     out["screen"] = parts.screen(d)
     return out
+
+
+def band_width_survey(d: Dims) -> list[tuple[str, float]]:
+    """Width of the flat bevel band, measured in sections across the band at stations along its whole path."""
+    solid = parts.front_solid(d, [])
+    su, cu = d.u
+    w, top = d.width, d.deck_top
+    stations: list[tuple[str, V, V]] = []
+    for x in (-150.0, -60.0, 0.0, 60.0, 150.0):
+        stations.append((f"deck front x={x:.0f}", V(x, 0.0, top), V(1, 0, 0)))
+    c = d.deck_corner
+    stations.append(("deck corner right", V(w / 2 - c / 2, c / 2, top), V(1, 1, 0)))
+    stations.append(("deck corner left", V(-w / 2 + c / 2, c / 2, top), V(-1, 1, 0)))
+    ya = d.foot_y - d.bend_t
+    for y in (60.0, 120.0, ya - 15):
+        stations.append((f"deck side y={y:.0f}", V(w / 2, y, top), V(0, 1, 0)))
+    for k in (0.25, 0.5, 0.75):
+        a = math.radians(-90 + k * (90 - d.recline))
+        cy, cz = ya, top + d.bend_r
+        p = V(w / 2, cy + d.bend_r * math.cos(a), cz + d.bend_r * math.sin(a))
+        stations.append((f"bend {int(k * 100)} %", p, V(0, -math.sin(a), math.cos(a))))
+    s_top = (d.body_top - top) / cu
+    for k in (0.15, 0.4, 0.65, 0.9):
+        y, z = d.face(s_top * k)
+        stations.append((f"screen face {int(k * 100)} %", V(w / 2, y, z), V(0, su, cu)))
+    out = []
+    for name, p, n in stations:
+        n.normalize()
+        best = None
+        for wire in solid.slice(n, n.dot(p)):
+            for e in wire.Edges:
+                a, b = e.Vertexes[0].Point, e.Vertexes[-1].Point
+                if abs(e.Length - (b - a).Length) > 0.05:
+                    continue
+                if (a - p).Length < 45 and (b - p).Length < 45 and 15 < e.Length < 45:
+                    dirn = (b - a).normalize()
+                    if 0.25 < abs(dirn.z if abs(n.z) < 0.9 else dirn.x) < 0.97 or "corner" in name or "front" in name:
+                        if best is None or abs(e.Length - 28) < abs(best - 28):
+                            best = e.Length
+        out.append((name, round(best, 2) if best else -1.0))
+    return out
+
+
+def overhang_check(shell: dict[str, Part.Shape], d: Dims) -> dict:
+    """No rail overhangs the deck: in front of the step line, the plan outline above deck height lies inside the
+    outline under the band, and the front-view width is the same."""
+    solids = [s for k, s in shell.items() if k in ("body", "deck")]
+    fused = solids[0].fuse(solids[1:])
+    z_cut = d.deck_top - d.band_drop - 2
+    faces = [Part.Face(wr) for wr in fused.slice(V(0, 0, 1), z_cut)]
+    prism = faces[0].extrude(V(0, 0, 2000)) if faces else None
+    for f in faces[1:]:
+        prism = prism.fuse(f.extrude(V(0, 0, 2000)))
+    front = fused.common(parts.halfspace((0, d.step_y0 - 10, 0), (0, -1, 0)))
+    above = common_z(front, d.deck_top + 0.5)
+    outside = above.cut(prism).Volume if prism is not None else math.inf
+    bb_all, bb_low = fused.BoundBox, common_z(fused, -1, z_cut).BoundBox
+    return {"plan_volume_outside_mm3": round(outside, 2), "front_x_extent_all": [round(bb_all.XMin, 2), round(bb_all.XMax, 2)],
+            "front_x_extent_below_band": [round(bb_low.XMin, 2), round(bb_low.XMax, 2)]}
+
+
+def common_z(shape: Part.Shape, z0: float, z1: float | None = None) -> Part.Shape:
+    s = shape.common(parts.halfspace((0, 0, z0), (0, 0, 1))) if z0 > -0.5 else shape
+    return s.common(parts.halfspace((0, 0, z1), (0, 0, -1))) if z1 is not None else s
 
 
 def fits(outer: Part.Shape, shape: Part.Shape) -> bool:
@@ -161,8 +221,8 @@ def margin(outer: Part.Shape, hw: Hardware, name: str, axes: tuple[int, ...] = (
 
 
 def check(d: Dims, shell: dict[str, Part.Shape], hw: Hardware) -> list[dict]:
-    plate = parts.in_face(parts.box((-d.bezel_w / 2, 0, d.bezel_s0), (d.bezel_w / 2, d.bezel_t, d.bezel_s1)), d)
-    solids = [parts.body(d)] + [s for k, s in shell.items() if k not in ("screen", "body", "rear_door")] + [plate]
+    plate = parts.in_face(parts.box((-d.bezel_w / 2, 0, d.bezel_s0), (d.bezel_w / 2, d.bezel_t + 2.0, d.bezel_s1)), d)
+    solids = [parts.body_and_deck(d, [])[0]] + [s for k, s in shell.items() if k not in ("screen", "body", "rear_door")] + [plate]
     outer = solids[0].fuse(solids[1:]).removeSplitter()
     # the rear door, its vents and the power supply opening are openings in the wall the hardware stands against,
     # so the containment test uses the body before those cuts
@@ -242,15 +302,25 @@ def export(out: str, shell: dict[str, Part.Shape], d: Dims, hw: Hardware, checks
 def main() -> int:
     root = os.environ.get("CANDYBAR_OUT", "cad/out/shell-d")
     hw_dir = os.environ.get("CANDYBAR_SHELL_HW", os.path.join(root, "layout-hardware"))
-    names = [n for n in os.environ.get("CANDYBAR_SHELL_OPTIONS", ",".join(OPTIONS)).split(",") if n]
+    names = [n for n in os.environ.get("CANDYBAR_SHELL_OPTIONS", "3-short-band").split(",") if n]
     failed = 0
     for name in names:
         d = option(name)
         hw = Hardware(hw_dir)
         place_hardware(d, hw)
-        shell = build_shell(d, hw)
+        log: list[str] = []
+        shell = build_shell(d, hw, log)
         checks = check(d, shell, hw)
         r = export(os.path.join(root, name), shell, d, hw, checks, name)
+        r["modelling_log"] = log
+        r["band_width"] = band_width_survey(d)
+        r["overhang"] = overhang_check(shell, d)
+        json.dump(r, open(os.path.join(root, name, "report.json"), "w"), indent=1)
+        json.dump(parts.focus_points(d), open(os.path.join(root, name, "focus.json"), "w"), indent=1)
+        widths = [w for _, w in r["band_width"] if w > 0]
+        print("  log:", "; ".join(log))
+        print("  band width:", r["band_width"])
+        print(f"  band flat width {min(widths):.2f} to {max(widths):.2f} over {len(widths)} of {len(r['band_width'])} stations; overhang {r['overhang']}")
         fails = [c["requirement"] for c in checks if not c["pass"]]
         failed += bool(fails)
         print(f"{name}: {' x '.join(f'{v:.0f}' for v in r['outside'])}  recline {d.recline:.0f}  frame {d.frame_side:.0f}/{d.frame_v:.0f}"

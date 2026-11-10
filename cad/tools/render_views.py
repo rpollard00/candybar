@@ -7,7 +7,9 @@ meshes, or the box given with --frame, so that two models framed by the same box
 
 Each view writes <out>/<view>.png on a light-grey background. Each orthographic view also writes
 <view>-mask.png (the object mask) and every view writes its projection to <out>/views.json, so that
-silhouette_iou.py and compose_sheet.py can work in millimetres.
+silhouette_iou.py and compose_sheet.py can work in millimetres. A model directory with focus.json
+({view: [x, y, z, radius]}) adds the close-up views closeup-cheek-foot, closeup-hood-corner and
+closeup-deck-front to the standard set.
 
 The script runs itself inside Blender (blender -b, no window). Engines: eevee (default), workbench, cycles;
 auto tries them in that order.
@@ -41,6 +43,12 @@ PERSPECTIVE = {
     "three-quarter-front-left": (-42.0, 6.0),
     "three-quarter-rear-left": (-140.0, 18.0),
 }
+CLOSEUP = {
+    "closeup-cheek-foot": (42.0, 10.0),
+    "closeup-hood-corner": (35.0, 2.0),
+    "closeup-deck-front": (-40.0, 24.0),
+}
+CLOSEUP_FOV = 34.0
 DISTANCE_PER_DIAGONAL = 1.0
 MARGIN = 0.06
 BACKGROUND = (0.86, 0.865, 0.87)
@@ -146,7 +154,23 @@ def perspective_camera(view: str, lo: Vec, hi: Vec, size: int) -> Camera:
     return Camera(view, "perspective", f, r, u, loc, res, lens_mm=lens, sensor_mm=sensor)
 
 
-def make_camera(view: str, lo: Vec, hi: Vec, size: int) -> Camera:
+def closeup_camera(view: str, target: Vec, radius: float, size: int) -> Camera:
+    """A perspective close-up on a named point of the model (from focus.json next to the meshes)."""
+    az, el = (math.radians(v) for v in CLOSEUP[view])
+    to_cam = (math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el))
+    f = norm((-to_cam[0], -to_cam[1], -to_cam[2]))
+    r = norm(cross(f, (0.0, 0.0, 1.0)))
+    u = cross(r, f)
+    half = math.tan(math.radians(CLOSEUP_FOV) / 2)
+    loc = add(target, to_cam, radius / half)
+    res = (size, round(size * 0.8))
+    return Camera(view, "perspective", f, r, u, loc, res, lens_mm=36.0 / (2 * half), sensor_mm=36.0)
+
+
+def make_camera(view: str, lo: Vec, hi: Vec, size: int, focus: dict | None = None) -> Camera:
+    if view in CLOSEUP:
+        x, y, z, radius = focus[view]
+        return closeup_camera(view, (x, y, z), radius, size)
     return ortho_camera(view, lo, hi, size) if view in ORTHO_AXES else perspective_camera(view, lo, hi, size)
 
 
@@ -215,8 +239,15 @@ def run_cli(argv: list[str]) -> None:
     ap.add_argument("--blender", default=os.environ.get("BLENDER", "blender"))
     a = ap.parse_args(argv)
     meshes = [m for spec in a.meshes for m in expand(spec)]
-    views = [v for v in a.views.split(",") if v]
-    bad = [v for v in views if v not in VIEWS]
+    focus: dict = {}
+    for spec in a.meshes:
+        path = os.path.join(spec, "focus.json")
+        if os.path.isdir(spec) and os.path.exists(path):
+            with open(path) as fh:
+                focus.update(json.load(fh))
+    default = a.views == ",".join(VIEWS)
+    views = [v for v in a.views.split(",") if v] + ([v for v in CLOSEUP if v in focus] if default else [])
+    bad = [v for v in views if v not in VIEWS and not (v in CLOSEUP and v in focus)]
     if bad:
         raise SystemExit(f"unknown view {bad}: choose from {', '.join(VIEWS)}")
     if a.frame:
@@ -226,7 +257,7 @@ def run_cli(argv: list[str]) -> None:
         lo, hi = read_bounds([m[0] for m in meshes])
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
-    cams = [make_camera(v, lo, hi, a.size) for v in views]
+    cams = [make_camera(v, lo, hi, a.size, focus) for v in views]
     job = {"out": out, "meshes": meshes, "cameras": [asdict(c) for c in cams], "frame": [lo, hi],
            "samples": a.samples, "edges": not a.no_edges, "background": BACKGROUND, "finishes": FINISHES}
     order = list(ENGINES) if a.engine == "auto" else [a.engine]

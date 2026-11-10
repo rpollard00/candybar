@@ -24,47 +24,43 @@ class Dims:
     deck_tail: float = 10.0
     deck_top: float = 72.0
     deck_under_body: float = 50.0
-    deck_corner: float = 58.0
-    deck_facet_in: float = 13.0
-    deck_facet_drop: float = 11.0
-    deck_crease_z: float = 30.0
-    deck_crease_in: float = 15.0
+    deck_corner: float = 32.0
     # screen face
-    recline: float = 24.0
-    band_len: float = 0.0
-    frame_side: float = 42.0
-    frame_v: float = 195.0
-    bezel_t: float = 14.0
-    bezel_step: float = 5.0
-    bezel_step_w: float = 12.0
+    recline: float = 30.0
+    band_len: float = 60.0
+    frame_side: float = 45.0
+    frame_v: float = 45.0
+    bezel_t: float = 20.0
+    bezel_step: float = 8.0
+    bezel_step_w: float = 10.0
     bezel_corner_r: float = 10.0
     reveal: float = 3.0
-    brow_ledge: float = 16.0
-    mon_setback: float = 4.0
-    # cheeks and body
-    cheek_t: float = 40.0
-    cheek_proj: float = 34.0
-    cheek_bulge: float = 12.0
-    cheek_reach: float = 72.0
-    cheek_sweep_s: float = 70.0
-    cheek_facet: float = 22.0
+    brow_ledge: float = 12.0
+    mon_setback: float = 18.0
+    # the rail: one band (radius, bevel, land) round the deck and up the cabinet
+    land: float = 12.0
+    band_in: float = 17.0
+    band_drop: float = 29.5
+    band_r: float = 12.0
+    bottom_r: float = 4.0
+    bend_r: float = 50.0
     body_d: float = 540.0
     rear_w: float = 430.0
-    step_y0: float = 330.0
+    step_y0: float = 380.0
     step_lean: float = 28.0
     rear_facet: float = 14.0
     # hood
     hood_h_ratio: float = 0.28
-    hood_lean_front: float = 6.0
+    hood_lean_front: float = 10.0
     hood_lean_rear: float = 16.0
-    hood_side_in: float = 52.0
+    seam_gap: float = 1.5
     hood_corner_r: float = 46.0
     hood_nose_r: float = 40.0
+    hood_outer_r: float = 8.0
     hood_bar_side: float = 34.0
     hood_bar_top: float = 46.0
-    hood_overhang: float = 24.0
-    band_setback: float = 44.0
-    band_tilt: float = 26.0
+    band_setback: float = 32.0
+    band_tilt: float = 16.0
     band_t: float = 8.0
     # rear
     door_w: float = 368.0
@@ -89,11 +85,21 @@ class Dims:
 
     @property
     def width(self) -> float:
-        return self.bezel_w + 2 * (self.cheek_t + self.panel_gap)
+        return self.bezel_w + 2 * (self.rail_t + self.panel_gap)
+
+    @property
+    def rail_t(self) -> float:
+        """Horizontal thickness of the rail seen from the front: bevel plus land."""
+        return self.band_in + self.land
+
+    @property
+    def bend_t(self) -> float:
+        """Tangent length of the concave bend between the deck top and the screen face."""
+        return self.bend_r * math.tan(math.radians(90.0 - self.recline) / 2)
 
     @property
     def foot_y(self) -> float:
-        return self.deck_nose + self.panel_gap * 2 + self.panel_d + self.deck_tail
+        return self.deck_nose + self.panel_gap * 2 + self.panel_d + self.deck_tail + self.bend_t
 
     @property
     def deck_end(self) -> float:
@@ -111,7 +117,7 @@ class Dims:
 
     @property
     def bezel_s0(self) -> float:
-        return self.band_len + (self.reveal if self.band_len else 0.0)
+        return self.bend_t + self.band_len
 
     @property
     def bezel_s1(self) -> float:
@@ -123,11 +129,11 @@ class Dims:
 
     @property
     def top_s(self) -> float:
-        return self.bezel_s1 + self.reveal
+        return self.bezel_s1 + self.brow_ledge
 
     @property
     def body_top(self) -> float:
-        return self.face(self.top_s)[1] + self.brow_ledge
+        return self.face(self.top_s)[1]
 
     @property
     def hood_h(self) -> float:
