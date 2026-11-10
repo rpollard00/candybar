@@ -43,9 +43,9 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | Button nuts | Seimitsu nuts, snap-in buttons, or a layout spread by half a millimeter. Three pairs of Sanwa screw nuts overlap by 0.15 to 0.28 mm. | Owner |
 | Marquee and speakers | No hardware is chosen. The hood band has provisional openings. | Owner |
 | One encoder for each control panel | Research recommends it: one USB cable is then the only connection of a panel. | Owner |
-| Control panel tops as cut plates | A mail-order service cuts the top plate of each control panel from a drawing that the model makes: a switch plate for the keyboard, and possibly one plate for the lever and buttons in place of two printed tiles. Open: material and thickness, and whether the arcade panel also gets one. | Research, then owner |
-| The keyboard | 60%, built into the PC control panel by the owner. Open: the PCB (a standard hot-swap 60% board or hand wiring), the layout, and a pointing device beside it or none. | Owner |
-| Front USB hardware | Open: the hub, panel-mount sockets or a hub without its shell, and powered or not. | Research |
+| The arcade plate stack | Research gives: 2.0 mm aluminum under a 1.5 mm clear cover (3.5 mm in total, inside the 3.9 mm limit of Sanwa snap-in buttons), or 3.2 mm aluminum with no cover. The owner wants the cover with art. Open: confirm 2.0 + 1.5 and snap-in buttons. | Owner |
+| The keyboard | 60%, built into the PC control panel by the owner. Research gives: a 1.6 mm aluminum switch plate, 14 mm clear below it, key tops 13 to 16 mm above it. Open: a bought hot-swap PCB (GH60 form) or hand wiring, a small switch plate or a full-panel plate, and a touchpad beside it or none. | Owner |
+| Front USB hardware | Research gives: screw-flange sockets on short cables in a removable printed socket plate, and a hub with its own 5 V supply from a SATA lead, because the 5 V of the BC-250 is weak. The flange screws are visible. Open: the hub model, and USB 2 or USB 3 at the sockets. | Owner |
 
 ## Settled by the owner
 
@@ -70,7 +70,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | `docs/Arcade_Project_Current_Design_2026-11-09.md` | The project brief |
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
-| `docs/research/` | Research notes: reference cabinets, hardware envelopes, controls and ergonomics |
+| `docs/research/` | Research notes: reference cabinets, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
 | `cad/out/report.md` | Check results and the list of dimensions to measure (a build output) |
