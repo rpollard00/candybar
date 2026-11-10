@@ -17,8 +17,8 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Review the three target variants and choose one with the owner.
-2. Model the shell as solids against the chosen target. Iterate until the renders read as the reference.
+1. Model variant D of the outer form as solids, and iterate on renders against the photos of the reference cabinet. The owner set variant D on 2026-11-10 (see below).
+2. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
 3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
 4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
 
@@ -30,7 +30,7 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] A choice between the three target variants, when they are ready.
+- [ ] A look at the first renders of variant D, when they are ready.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.
@@ -47,6 +47,16 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 | The arcade plate stack | Research gives: 2.0 mm aluminum under a 1.5 mm clear cover (3.5 mm in total, inside the 3.9 mm limit of Sanwa snap-in buttons), or 3.2 mm aluminum with no cover. The owner wants the cover with art. Open: confirm 2.0 + 1.5 and snap-in buttons. | Owner |
 | The keyboard | 60%, built into the PC control panel by the owner. Research gives: a 1.6 mm aluminum switch plate, 14 mm clear below it, key tops 13 to 16 mm above it. Open: a bought hot-swap PCB (GH60 form) or hand wiring, a small switch plate or a full-panel plate, and a touchpad beside it or none. | Owner |
 | Front USB hardware | Research gives: screw-flange sockets on short cables in a removable printed socket plate, and a hub with its own 5 V supply from a SATA lead, because the 5 V of the BC-250 is weak. The flange screws are visible. Open: the hub model, and USB 2 or USB 3 at the sockets. | Owner |
+
+## Variant D of the shell, as the owner set it
+
+- The size of target variant B (about 466 x 571 x 555 mm), with the hood proportion of variants A and C.
+- The reference cabinet in the photos leads the look. The MakerWorld model gives measured curves where the photos give none.
+- Deeper cheeks, with the wide facet on the front edge.
+- A cheek curve that is more subtle than on the MakerWorld model, and that runs smoothly all the way into the deck.
+- No holes in the front face of the deck.
+- A deck with the additional faces of the reference cabinet: flat faces that cut the front corners, seen from above, like a coarse bevel.
+- A visible cut between the top of the bezel and the hood.
 
 ## Settled by the owner
 
