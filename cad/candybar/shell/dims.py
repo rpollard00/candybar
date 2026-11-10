@@ -252,6 +252,8 @@ class Blueprint(Dims):
     bezel_rim: float = 2.0
     # the flat screen stands 14 below the rail land at the top edge of the window
     mon_setback: float = 7.2
+    # the lit image as a thin plate on the screen face, for the renders of the solids
+    screen_t: float = 1.0
     # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides
     hood_shoulder: float = 0.0
     seam_groove: float = 3.0

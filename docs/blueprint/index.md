@@ -2,7 +2,7 @@
 
 Date: 2026-11-10. Status: a proposal for the owner's review. It is not built yet. Revision 2 adds the curves of the form: the owner found the first revision too simple, with straight lines where the references have subtle curves. Revision 3 applies the owner's answers to questions 8 to 12: a larger tuck over the top third of the body, a hood with near-straight sides and tight top corners, and a screen 10.8 mm nearer the bezel.
 
-This directory holds the target form of the cabinet as drawings: the big volumes first, then elevations, sections, the hood, the two junctions, and a map of every face. The drawings come from data. `cad/candybar/shell/dims.py` (class `Blueprint`) holds the named dimensions. `cad/candybar/shell/profiles.py` turns them into profiles and labelled faces. `cad/tools/draw_blueprint.py` draws the sheets from the profiles. The solids are to be built from the same profiles after the review, so the drawing and the model cannot drift apart. `parts.py`, `hood.py` and `build.py` still build the earlier form.
+This directory holds the target form of the cabinet as drawings: the big volumes first, then elevations, sections, the hood, the two junctions, and a map of every face. The drawings come from data. `cad/candybar/shell/dims.py` (class `Blueprint`) holds the named dimensions. `cad/candybar/shell/profiles.py` turns them into profiles and labelled faces. `cad/tools/draw_blueprint.py` draws the sheets from the profiles. `cad/candybar/shell/solids.py` builds the solids from the same profiles, so the drawing and the model cannot drift apart. `cad/tools/check_solids.py` measures the solids against the faces. `parts.py`, `hood.py` and `build.py` still build the earlier form.
 
 Words are those of `CONTEXT.md`. New words are in the section "Words". `W` is the body width: 494.7 mm.
 
@@ -372,3 +372,11 @@ cad/.venv-tools/bin/python cad/tools/draw_blueprint.py overlays    # the bluepri
 ```
 
 `reference` needs the slices of the model: run `candybar.shell.reconstruct_slices` with `cad/candybar/freecad-run.sh` (the example is at the top of that file). `photos` reads the picks in `cad/out/shell-d/reconstruction/face-picks.json`.
+
+## How to build and check the solids
+
+```sh
+CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.solids   # one STL and one BREP for each part, a STEP of all parts, the manifest, the report
+CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh tools.check_solids      # the solids against the faces; exit status 1 when a distance is more than 0.5 mm
+python3 cad/tools/render_views.py cad/out/shell-bp/renders cad/out/shell-bp        # the fixed views and the close-ups of the junctions
+```
