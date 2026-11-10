@@ -5,14 +5,16 @@ Every part is made from the profile paths of profiles.py and the values of dims.
                rounds stay exact round the corners), cut at the foot of the sweep; a pocket for the control panel.
   body         the side profile extruded across the width, in common with the front outline (with the tuck)
                extruded along the depth. The edge section is cut along the rail: revolutions round the arcs of
-               the sweep and of the rail below the tuck, a loft between sections above it, an extrusion along
-               the tangent over the top. Then the bevel of the seam groove, the step to the rear body, and the
-               recess of the bezel plate. The plane through the outer edge of the step splits front and rear body.
+               the sweep and of the rail below the tuck; above it, where the section is measured in from the side
+               at each height, a loft between sections, on along the tangent over the top. Then the bevel of the
+               seam groove (a plane along the whole depth), the step to the rear body, and the recess and reveal
+               of the bezel plate. The plane through the outer edge of the step splits front and rear body.
   hood         an evolved solid: the quarter ellipse of the soft edge carried round the front outline, in common
-               with the side profile extruded across the width; the bevel of the seam groove, the recess of the
-               opening; the marquee lip and the forms on the hood band as parts of their own.
-  bezel        the land on a cylinder 2 below the rail arc, a flat back on the screen, the window as a ruled loft
-               from the inner edge of the land to the rim and straight on to the screen.
+               with the side profile extruded across the width; the bevel of the seam groove (a plane along the
+               whole depth), the recess of the opening; the marquee lip and the forms on the hood band as parts
+               of their own.
+  bezel        the land on a cylinder bezel_drop below the rail arc, a flat back on the screen, the window as a
+               ruled loft from the inner edge of the land to the rim and straight on to the screen.
 
 The functions take the profiles as data, so that the same construction can run on offset profiles later.
 Run headless, it writes the parts to CANDYBAR_OUT (default cad/out/shell-bp); tools/check_solids.py compares
@@ -39,7 +41,9 @@ P2 = pr.P2
 Place = Callable[[P2], FreeCAD.Vector]
 BIG = 2000.0
 OVER = 10.0
-TUCK_STATIONS = 12
+TUCK_STATIONS = 24
+EDGE_POINTS = 16
+OFF_LAND = 0.01
 FINISH = {"deck": "white", "control_panel": "black", "front_body": "white", "rear_body": "white", "bezel": "black",
           "screen": "#3a4250", "hood": "white", "marquee_lip": "white", "speaker_left": "black", "speaker_right": "black",
           "logo_form": "#2f4f3a"}
@@ -204,16 +208,48 @@ def edge_profile(d: Blueprint, top: float) -> pr.Path:
 
 
 def edge_cutter_section(d: Blueprint) -> pr.Path:
-    """What the edge section takes off a square corner, in (inward, down), with room outside the corner."""
-    i, h = d.edge_in, d.deck_lean_h
-    sec = pr.edge_section(d)
-    return [pr.Line((-OVER, -OVER), (i, -OVER)), pr.Line((i, -OVER), (i, 0.0)), *sec, pr.Line((0.0, h), (-OVER, h)),
-            pr.Line((-OVER, h), (-OVER, -OVER))]
+    """What the edge section takes off a square corner, in (inward, down), with room outside the corner. The band
+    runs on past the crease, so that the crease is where the band crosses the side, not an edge laid on it. The
+    section stands OFF_LAND out from the land, so that it crosses the land at a small angle and does not lie on
+    its tangent."""
+    arc, band = pr.edge_section(d)
+    out = lambda p: (p[0], p[1] - OFF_LAND)
+    arc = pr.Arc(out(arc.c), arc.r, arc.a0, arc.a1)
+    (i0, d0), (i1, d1) = out(band.p), out(band.q)
+    past = (i1 - OVER / 5, d1 + (d1 - d0) / (i0 - i1) * OVER / 5)
+    return [pr.Line((-OVER, -OVER), (d.edge_in, -OVER)), pr.Line((d.edge_in, -OVER), out((d.edge_in, 0.0))), arc, pr.Line((i0, d0), past),
+            pr.Line(past, (-OVER, past[1])), pr.Line((-OVER, past[1]), (-OVER, -OVER))]
 
 
 def station(x_off: float, p: P2, n: P2) -> Place:
     """The section plane at a point of the side profile: inward is -x from x_off, down is n in (y, z)."""
     return lambda q: V(x_off - q[0], p[0] + n[0] * q[1], p[1] + n[1] * q[1])
+
+
+def tucked(d: Blueprint, p: P2, n: P2) -> Place:
+    """The section at a point of the side profile, with inward measured from the side at the height of each point."""
+    return lambda q: V(d.side_x(p[1] + n[1] * q[1]) - q[0], p[0] + n[0] * q[1], p[1] + n[1] * q[1])
+
+
+def warped_wire(path: pr.Path, place: Place, flat: Place) -> Part.Wire:
+    """A section through a place that bends it: where it does not bend a segment (the same points as flat), and
+    for lines at one depth, the edge stays exact; the rest are splines through points, with the true tangent at
+    both ends."""
+    edges = []
+    for seg in path:
+        probe = [seg.p, seg.q] if isinstance(seg, pr.Line) else [seg.at(seg.a0 + (seg.a1 - seg.a0) * k / 4) for k in range(5)]
+        if (isinstance(seg, pr.Line) and abs(seg.p[1] - seg.q[1]) < 1e-12) or all((place(q) - flat(q)).Length < 1e-12 for q in probe):
+            edges.append(edge(seg, place))
+            continue
+        if isinstance(seg, pr.Line):
+            at = lambda t: (seg.p[0] + (seg.q[0] - seg.p[0]) * t, seg.p[1] + (seg.q[1] - seg.p[1]) * t)
+        else:
+            at = lambda t: seg.at(seg.a0 + (seg.a1 - seg.a0) * t)
+        tangent = lambda t: (place(at(t + 1e-6)) - place(at(t - 1e-6))).normalize()
+        curve = Part.BSplineCurve()
+        curve.interpolate(Points=[place(at(k / EDGE_POINTS)) for k in range(EDGE_POINTS + 1)], InitialTangent=tangent(0.0), FinalTangent=tangent(1.0))
+        edges.append(curve.toShape())
+    return Part.Wire(edges)
 
 
 # ---------- deck ----------
@@ -254,8 +290,9 @@ def side_profile(d: Blueprint, fr: pr.Front) -> pr.Path:
 
 
 def rail_cutter(d: Blueprint, fr: pr.Front) -> Part.Shape:
-    """The edge section along the right rail: revolutions round the sweep and the rail arc below the tuck, a loft
-    between sections where the side tucks in, an extrusion along the tangent over the body top."""
+    """The edge section along the right rail: revolutions round the sweep and the rail arc below the tuck; where
+    the side tucks in, a loft between sections measured in from the side at each height, on along the tangent over
+    the body top."""
     sec = edge_cutter_section(d)
     hw = d.width / 2
     sw, rl = fr.sweep, fr.rail
@@ -265,42 +302,36 @@ def rail_cutter(d: Blueprint, fr: pr.Front) -> Part.Shape:
     start = sw.at(sw.a0)
     pieces = [face_at(hw, start, (0.0, -1.0)).extrude(V(0, -OVER, 0)),
               face_at(hw, start, (0.0, -1.0)).revolve(*axis(sw.c), math.degrees(sw.a1 - sw.a0))]
-    a_t = rl.a1
-    if d.tuck > 0 and rl.at(rl.a1)[1] > d.tuck_z0:
-        a_t = math.pi - math.asin((d.tuck_z0 - rl.c[1]) / rl.r)
-        sections = [rl.a1 + (a_t - rl.a1) * k / TUCK_STATIONS for k in range(TUCK_STATIONS, -1, -1)]
-        wires = [wire(sec, station(d.side_x(rl.at(a)[1]), rl.at(a), rail_n(a))) for a in sections]
-        pieces.append(Part.makeLoft(wires, True, False))
-    pieces.append(face_at(hw, rl.at(rl.a0), rail_n(rl.a0)).revolve(*axis(rl.c), math.degrees(a_t - rl.a0)))
-    up = V(0, math.sin(rl.a1), -math.cos(rl.a1))
-    pieces.append(face_at(d.side_x(d.body_top), rl.at(rl.a1), rail_n(rl.a1)).extrude(up * (d.deck_lean_h * 2)))
+    top, n_top = rl.at(rl.a1), rail_n(rl.a1)
+    up = (math.sin(rl.a1), -math.cos(rl.a1))
+    reach = 2 * d.deck_lean_h
+    z_s = d.tuck_z0 - d.deck_lean_h / 2
+    if d.tuck <= 0 or top[1] <= z_s:
+        pieces.append(face_at(hw, rl.at(rl.a0), rail_n(rl.a0)).revolve(*axis(rl.c), math.degrees(rl.a1 - rl.a0)))
+        pieces.append(face_at(hw, top, n_top).extrude(V(0, *up) * reach))
+        return pieces[0].multiFuse(pieces[1:])
+    a_s = math.pi - math.asin((z_s - rl.c[1]) / rl.r)
+    arc = [(rl.at(a), rail_n(a)) for a in (a_s + (rl.a1 - a_s) * k / TUCK_STATIONS for k in range(TUCK_STATIONS + 1))]
+    tangent = [((top[0] + up[0] * reach * k / 8, top[1] + up[1] * reach * k / 8), n_top) for k in range(1, 9)]
+    pieces.append(face_at(hw, rl.at(rl.a0), rail_n(rl.a0)).revolve(*axis(rl.c), math.degrees(a_s - rl.a0)))
+    pieces.append(Part.makeLoft([warped_wire(sec, tucked(d, p, n), station(hw, p, n)) for p, n in arc + tangent], True, False))
     return pieces[0].multiFuse(pieces[1:])
 
 
-def groove_bevel(d: Blueprint) -> tuple[P2, P2]:
-    """The bevel of the seam groove on the body side, in (x, z): from its foot to the body top."""
-    g = d.seam_groove
-    return (d.side_x(d.body_top - g), d.body_top - g), (pr.body_half(d, d.body_top), d.body_top)
-
-
-def bevel_cutter(d: Blueprint, fr: pr.Front) -> Part.Shape:
-    """The bevel of the seam groove along the right side band, behind the crease of the rail edge."""
-    a, b = extended(*groove_bevel(d))
+def bevel_cutter(d: Blueprint) -> Part.Shape:
+    """The bevel of the seam groove on the right side of the body: a plane along the whole depth."""
+    a, b = extended(*pr.body_bevel(d))
     far = d.width / 2 + OVER
-    wedge = along(poly([a, b, (far, b[1]), (far, a[1])]))
-    rl = fr.rail
-    n = V(0, -math.cos(rl.a1), -math.sin(rl.a1))
-    crease = V(0, *rl.at(rl.a1)) + n * d.deck_lean_h
-    return wedge.common(halfspace(crease, n))
+    return along(poly([a, b, (far, b[1]), (far, a[1])]))
 
 
 def step_cutter(d: Blueprint) -> Part.Shape:
     """What the step takes off the right side behind the side band: a 45 degree notch in plan, leaning back."""
-    (ax, az), bevel_top = groove_bevel(d)
-    b = extended((ax, az), bevel_top)[1]
+    top = d.body_top + OVER
     s = d.width / 2 - d.rear_w / 2
     far = d.width / 2 + s + OVER
-    outline = side_path(d, az) + [pr.Line((ax, az), b)] + poly([b, (far, b[1]), (far, -OVER), (d.width / 2, -OVER)])[:-1]
+    sides = side_path(d, top)
+    outline = sides + poly([ends(sides[-1])[1], (far, top), (far, -OVER), (d.width / 2, -OVER)])[:-1]
     m = FreeCAD.Matrix()
     m.A23 = math.tan(math.radians(d.step_lean))
     m.A24 = d.step_y0
@@ -332,9 +363,9 @@ def bezel_box(d: Blueprint, fr: pr.Front, x0: float, x1: float) -> Part.Shape:
     return slab(V(0, 0, 0), up, into, (x0, x1), (t[0], t[1]), (-BIG / 4, BIG / 4))
 
 
-def land_cylinder(fr: pr.Front) -> Part.Shape:
+def land_cylinder(d: Blueprint, fr: pr.Front) -> Part.Shape:
     """The solid cylinder of the bezel land: the rail arc, 2 below."""
-    return Part.makeCylinder(fr.rail.r - 2.0, BIG, V(-BIG / 2, *fr.rail.c), V(1, 0, 0))
+    return Part.makeCylinder(fr.rail.r - d.bezel_drop, BIG, V(-BIG / 2, *fr.rail.c), V(1, 0, 0))
 
 
 def behind_screen(d: Blueprint, depth: float) -> Part.Shape:
@@ -359,8 +390,8 @@ def body(d: Blueprint, fr: pr.Front) -> tuple[Part.Shape, Part.Shape]:
     xb = d.bezel_w / 2 + d.panel_gap
     bw = d.bezel_w / 2
     plate = bezel_box(d, fr, -bw, bw).cut(behind_screen(d, d.mon_setback))
-    reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(fr))
-    cutters = [both(rail_cutter(d, fr)), both(bevel_cutter(d, fr)), both(step_cutter(d)), plate, both(reveal), screen(d)]
+    reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(d, fr))
+    cutters = [both(rail_cutter(d, fr)), both(bevel_cutter(d)), both(step_cutter(d)), plate, both(reveal), screen(d)]
     solid = solid.cut(cutters).removeSplitter()
     t = math.tan(math.radians(d.step_lean))
     split = V(0, -1, t).normalize()
@@ -373,7 +404,7 @@ def body(d: Blueprint, fr: pr.Front) -> tuple[Part.Shape, Part.Shape]:
 
 def land_edge(d: Blueprint, fr: pr.Front, x: float, s0: float, s1: float) -> Part.Edge:
     """An arc of the bezel land at x, between two stations of the screen face."""
-    pts = [V(x, *fr.on_rail(d, s, 2.0)) for s in (s0, (s0 + s1) / 2, s1)]
+    pts = [V(x, *fr.on_rail(d, s, d.bezel_drop)) for s in (s0, (s0 + s1) / 2, s1)]
     return Part.Arc(*pts).toShape()
 
 
@@ -381,9 +412,9 @@ def bezel(d: Blueprint, fr: pr.Front) -> Part.Shape:
     """The bezel plate: the land on the cylinder 2 below the rail arc, a flat back on the screen, and the window:
     the inner frame as a ruled loft from the inner edge of the land to the rim, then the rim wall to the screen."""
     bw, bl = d.bezel_w / 2, d.bezel_land
-    plate = bezel_box(d, fr, -bw, bw).common(land_cylinder(fr)).cut(behind_screen(d, d.mon_setback))
+    plate = bezel_box(d, fr, -bw, bw).common(land_cylinder(d, fr)).cut(behind_screen(d, d.mon_setback))
     xi, s0, s1 = bw - bl, d.bezel_s0 + bl, d.bezel_s1 - bl
-    p = lambda x, s: V(x, *fr.on_rail(d, s, 2.0))
+    p = lambda x, s: V(x, *fr.on_rail(d, s, d.bezel_drop))
     land = Part.Wire([Part.makeLine(p(-xi, s0), p(xi, s0)), land_edge(d, fr, xi, s0, s1), Part.makeLine(p(xi, s1), p(-xi, s1)),
                       land_edge(d, fr, -xi, s1, s0)])
     w, cs, h = MON_ACTIVE_W / 2, d.image_s, MON_ACTIVE_H / 2
@@ -422,13 +453,11 @@ def recess_profile(d: Blueprint, h: pr.Hood) -> list[P2]:
 
 
 def hood_bevel(d: Blueprint, h: pr.Hood) -> Part.Shape:
-    """The bevel of the seam groove at the foot of the right side of the cap, behind the soft edge."""
-    g = d.seam_groove
-    side = pr.hood_outline(d, h.height, h.half_base)[0]
-    p1 = ends(from_height(side, g))[0]
-    a = extended((h.half_base - g, 0.0), p1)[0]
+    """The bevel of the seam groove at the foot of the right side of the cap: a plane along the whole depth."""
+    p0, p1 = pr.hood_bevel(d, h)
+    a = extended(p0, p1)[0]
     far = h.half_base + OVER
-    return along(poly([a, p1, (far, p1[1]), (far, a[1])]), d.hood_edge_back, h.depth + OVER)
+    return along(poly([a, p1, (far, p1[1]), (far, a[1])]), -OVER, h.depth + OVER)
 
 
 def hood(d: Blueprint) -> dict[str, Part.Shape]:
@@ -499,7 +528,7 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-rail-tuck": cam(crease, 40, 70, 10),
             "closeup-rail-top": cam((d.side_x(d.body_top) - 6, d.seam_y + 15, d.body_top - 10), 45, 55, 12),
             "closeup-hood-foot": cam((h.half_base - 5, h.origin[1] + 25, h.origin[2]), 40, 60, 8),
-            "closeup-step-top": cam((pr.body_half(d, d.body_top) - 6, d.depth - 8, d.body_top - 8), 40, 140, 20),
+            "closeup-step-top": cam((d.side_x(d.body_top) - d.seam_groove - 6, d.depth - 8, d.body_top - 8), 40, 140, 20),
             "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24)}
 
 
@@ -507,7 +536,7 @@ def export(out: str, parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     os.makedirs(out, exist_ok=True)
     manifest = {}
     for k, s in parts.items():
-        MeshPart.meshFromShape(Shape=s, LinearDeflection=0.1, AngularDeflection=0.1).write(os.path.join(out, f"{k}.stl"))
+        MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.02).write(os.path.join(out, f"{k}.stl"))
         s.exportBrep(os.path.join(out, f"{k}.brep"))
         manifest[k] = {"file": f"{k}.stl", "finish": FINISH[k], "brep": f"{k}.brep"}
     Part.makeCompound(list(parts.values())).exportStep(os.path.join(out, "shell-bp.step"))

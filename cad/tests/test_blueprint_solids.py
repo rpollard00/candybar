@@ -33,16 +33,17 @@ class BlueprintSolidsTest(unittest.TestCase):
     def test_no_two_parts_overlap(self) -> None:
         self.assertEqual(self.baseline["overlaps"], [])
 
-    def test_sections_clear_of_the_blueprint_defects_match_it(self) -> None:
-        for name in ("X side band", "Z deck", "Z mid body", "Z tuck", "Z hood"):
-            with self.subTest(plane=name):
-                self.assertFalse(over(self.baseline["sections"][name]))
+    def test_every_view_and_section_matches_the_blueprint(self) -> None:
+        self.assertEqual(failing(self.baseline), set())
+        self.assertTrue(self.baseline["ok"])
+
+    def test_no_point_of_a_section_is_skipped(self) -> None:
+        self.assertEqual(sum(row["bridged_points"] for row in self.baseline["sections"].values()), 0)
 
     def assert_check_notices(self, **change: float) -> None:
         changed = check_solids.run(solids.build(replace(self.d, **change)), self.d)
-        new = failing(changed) - failing(self.baseline)
         self.assertFalse(changed["ok"])
-        self.assertTrue(new, f"no view or section fails that passed before: {change}")
+        self.assertTrue(failing(changed), f"no view or section fails: {change}")
 
     def test_check_notices_a_stronger_rail_arc(self) -> None:
         self.assert_check_notices(rail_sagitta_ratio=self.d.rail_sagitta_ratio + 0.01)

@@ -10,11 +10,9 @@ The reference is profiles.faces(Blueprint()): the labelled faces as flat polygon
                direction. The parts of each of GROUPS are fused first, as the faces draw them as one skin; the
                forms on the hood band are cut on their own, as the faces draw the band under them.
 
-The faces leave out some walls: the short walls round a recess or a reveal, the underside of the hood over the
-seam gap. A point of a solid's cut does not count when it lies in a gap between two loose ends of the faces' cut:
-inside a disc over a gap of at most BRIDGE, or on the straight line over a gap of at most CHORD. Nor does it count
-on the underside of the hood. The report counts these points. The faces MARKS are drawn 0.5 proud as markings and
-are not compared.
+Where the faces leave out a short wall, a point of a solid's cut does not count when it lies in a gap between two
+loose ends of the faces' cut: inside a disc over a gap of at most BRIDGE, or on the straight line over a gap of at
+most CHORD. The report counts these points. The faces MARKS are drawn 0.5 proud as markings and are not compared.
 
 Run headless (exit status 1 when a tolerance is exceeded):
 
@@ -153,13 +151,6 @@ def bridged(points: np.ndarray, ends: np.ndarray) -> np.ndarray:
 
 # ---------- the solids ----------
 
-def hood_underside(face: Part.Face, d: Blueprint) -> bool:
-    if not isinstance(face.Surface, Part.Plane):
-        return False
-    n = face.normalAt(*face.Surface.parameter(face.CenterOfMass))
-    return n.z < -0.999 and abs(face.CenterOfMass.z - (d.body_top + d.seam_gap)) < 1e-3
-
-
 def skins(parts: dict[str, Part.Shape]) -> list[Part.Shape]:
     """The parts as the faces draw them: each of GROUPS fused, the others alone."""
     out = []
@@ -169,8 +160,8 @@ def skins(parts: dict[str, Part.Shape]) -> list[Part.Shape]:
     return out + [s for k, s in parts.items() if not any(k in g for g in GROUPS)]
 
 
-def solid_cut(shapes: list[Part.Shape], axis: int, at: float, d: Blueprint) -> tuple[np.ndarray, np.ndarray]:
-    """The cut of the skins with the plane: segments of the drawn faces, and those of the hood's underside."""
+def solid_cut(shapes: list[Part.Shape], axis: int, at: float) -> np.ndarray:
+    """The cut of the skins with the plane, as segments (n, 2, 2) in the two other coordinates."""
     keep = [i for i in range(3) if i != axis]
     lo = Part.makeCompound(shapes).BoundBox
     size = 4 * max(lo.XLength, lo.YLength, lo.ZLength)
@@ -178,30 +169,28 @@ def solid_cut(shapes: list[Part.Shape], axis: int, at: float, d: Blueprint) -> t
     origin[axis] = at
     u = [V(*[1.0 if i == k else 0.0 for i in range(3)]) for k in keep]
     plane = Part.Face(Part.makePolygon([V(*origin) + u[0] * a * size + u[1] * b * size for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))]))
-    drawn, hidden = [], []
+    segs = []
     for face in [f for s in shapes for f in s.Faces]:
-        cut = face.section(plane)
-        for e in cut.Edges:
+        for e in face.section(plane).Edges:
             pts = np.array([[p[i] for i in keep] for p in e.discretize(Distance=STEP)])
             if len(pts) > 1:
-                (hidden if hood_underside(face, d) else drawn).append(np.stack([pts[:-1], pts[1:]], axis=1))
-    stack = lambda segs: np.concatenate(segs) if segs else np.zeros((0, 2, 2))
-    return stack(drawn), stack(hidden)
+                segs.append(np.stack([pts[:-1], pts[1:]], axis=1))
+    return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
 
 
-def compare(solid: np.ndarray, hidden: np.ndarray, ref: np.ndarray) -> dict:
+def compare(solid: np.ndarray, ref: np.ndarray) -> dict:
     """Largest distance from the solid's cut to the faces' cut and back, with the points that fall in a bridge."""
     pts = sample(solid)
     dist = distance(pts, ref)
     covered = bridged(pts, loose_ends(ref))
     ref_pts = sample(ref)
-    back = distance(ref_pts, np.concatenate([solid, hidden]))
+    back = distance(ref_pts, solid)
     far = dist[~covered]
     at = lambda p, k: [round(float(v), 1) for v in p[int(np.argmax(k))]] if len(k) else []
     return {"solid_to_blueprint": round(float(far.max()) if len(far) else 0.0, 3),
             "blueprint_to_solid": round(float(back.max()) if len(back) else 0.0, 3),
             "solid_worst_at": at(pts[~covered], far), "blueprint_worst_at": at(ref_pts, back),
-            "bridged_points": int((covered & (dist > TOL)).sum()), "hidden_segments": len(hidden)}
+            "bridged_points": int((covered & (dist > TOL)).sum())}
 
 
 # ---------- silhouettes ----------
@@ -280,8 +269,7 @@ def run(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     shapes = skins(parts)
     sections = {}
     for name, (axis, at) in planes(d).items():
-        drawn, hidden = solid_cut(shapes, axis, at, d)
-        sections[name] = {"at": round(at, 2), **compare(drawn, hidden, face_cut(faces, axis, at))}
+        sections[name] = {"at": round(at, 2), **compare(solid_cut(shapes, axis, at), face_cut(faces, axis, at))}
     sil = silhouettes(parts, faces)
     over = lambda r: max(r["solid_to_blueprint"], r["blueprint_to_solid"]) > TOL
     ok = (all(s["valid"] and s["solids"] == 1 and s["closed"] and s["check"] and s["volume_mm3"] > 0 for s in state.values())

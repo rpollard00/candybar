@@ -250,6 +250,8 @@ class Blueprint(Dims):
     body_bow_ratio: float = 0.0
     bezel_land: float = 20.0
     bezel_rim: float = 2.0
+    # the bezel land lies this far below the rail land; the reveal round the plate (panel_gap wide) has the same depth
+    bezel_drop: float = 2.0
     # the flat screen stands 14 below the rail land at the top edge of the window
     mon_setback: float = 7.2
     # the lit image as a thin plate on the screen face, for the renders of the solids
@@ -304,14 +306,15 @@ class Blueprint(Dims):
         return (self.body_top - self.tuck_z0) / math.sin(lean) if lean > 1e-9 else math.inf
 
     def side_x(self, z: float) -> float:
-        """Half the width of the body at height z: the side plane, a bow below the tuck when one is set, and the tuck."""
+        """Half the width of the body at height z: the side plane, a bow below the tuck when one is set, and the tuck.
+        Above the body top the tuck arc runs on, for the solids that are cut there."""
         half = self.width / 2
         if self.body_bow_ratio:
             t = min(max((z - self.deck_top) / (self.tuck_z0 - self.deck_top), 0.0), 1.0)
             half += self.body_bow_ratio * self.width * 4 * t * (1 - t)
         if z <= self.tuck_z0 or self.tuck <= 0:
             return half
-        dz = min(z, self.body_top) - self.tuck_z0
+        dz = z - self.tuck_z0
         return half - (self.tuck_r - math.sqrt(self.tuck_r ** 2 - dz ** 2))
 
     @property

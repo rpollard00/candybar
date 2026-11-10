@@ -650,14 +650,17 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         ("side", (oy - 50, oy + h.depth + 45), (bt - 70, bt + 95), "Hood to body, from the right side",
          [("HC4", (oy + 16, bt + 60), None), ("HC5", (oy + 80, bt + 60), None), ("RL4", (oy + 80, bt - 40), None), ("RL3", (oy - 30, bt - 60), (ys + 7, bt - 20)),
           ("RL2", (oy - 44, bt - 42), (ys - 7, bt - 20)), ("FB4", (oy + 150, bt + 22), (oy + 120, bt)), ("RB5", (oy + 160, bt - 45), (d.depth, bt - 40)),
-          ("HC9", (oy + 160, bt + 50), (oy + h.depth, bt + 45))]),
+          ("HC9", (oy + 160, bt + 50), (oy + h.depth, bt + 45)), ("FB5", (oy + 110, bt - 20), (oy + 100, bt - 1.5)),
+          ("HC15", (oy + 110, bt + 25), (oy + 100, bt + d.seam_gap + 1.5))]),
         ("front", (hw - 95, hw + 22), (bt - 70, bt + 95), "Hood to body, from the front: the right foot",
          [("HC1", (hw - 62, bt + 78), (h.half_width(60.0, h.opening) + 2.5, bt + 60)), ("HC4", (hw + 10, bt + 85), (h.half_width(60.0) - 8, bt + 60)), ("HC3", (hw - 80, bt + 9), None),
           ("RL1", (hw - 21, bt - 45), None), ("RL2", (hw + 12, bt - 30), (hw - 8.5, bt - 30)), ("RL3", (hw + 12, bt - 55), (hw - 1.5, bt - 55)), ("FB3", (hw - 70, bt - 6), None),
-          ("BZ1", (hw - 70, bt - 40), None)]),
+          ("BZ1", (hw - 70, bt - 40), None), ("FB5", (hw + 14, bt + 5), (d.side_x(d.body_top) - 1.0, bt - 1.0)),
+          ("HC15", (hw + 14, bt + 22), (h.half_base - 1.0, bt + d.seam_gap + 1.0))]),
         ("top", (hw - 95, hw + 22), (ys - 25, ys + 95), "Hood to body, from above: the right foot on the body top",
          [("FB4", (hw - 6, ys + 62), None), ("HC4", (hw - 50, ys + 20), None), ("HC5", (hw + 12, ys + 84), (hw - 16, ys + 84)), ("RL1", (hw - 21, ys - 12), None),
-          ("RL2", (hw + 12, ys - 6), (hw - 8, ys + 3)), ("RL3", (hw + 12, ys + 24), (hw - 2, ys + 14)), ("FB3", (hw - 70, ys - 5), None)]),
+          ("RL2", (hw + 12, ys - 6), (hw - 8, ys + 3)), ("RL3", (hw + 12, ys + 24), (hw - 2, ys + 14)), ("FB3", (hw - 70, ys - 5), None),
+          ("FB5", (hw + 12, ys + 50), (d.side_x(d.body_top) - 1.5, ys + 50))]),
         ("side", (130, 330), (-12, 175), "Body to deck, from the right side",
          [("RL4", (300, 40), None), ("DK7", (165, 25), None), ("RL3", (318, 166), (288, 130)), ("RL2", (238, 166), (274, 130)), ("DK3", (165, 100), (165, 56)),
           ("DK2", (142, 100), (150, 68))]),
@@ -680,8 +683,10 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     note(a, (oy - 46, bt + 84), f"The cap stands on the flat body top with a seam of 1.5. Its front is upright;\nthe rail under it leans {pr.front(d).top_lean:.0f} deg at the seam, so the plane changes there.\nShoulder {d.hood_shoulder_front:.0f} at the front and rear, none at the sides.", size=7.5)
     a = axes[0, 1]
     dim(a, (h.half_base, bt - 22), (hw, bt - 22), f"tuck {d.tuck:.1f}", (2, -7))
-    note(a, (hw - 92, bt - 62), f"The side of the hood HC5 leaves the seam on the tangent of the body side RL4:\nno shoulder, a groove of {d.seam_groove:.0f}. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
-    note(axes[0, 2], (hw - 92, ys + 88), "From above, the foot of the leg lies inside the\noutline of the body top everywhere.", size=7.5)
+    note(a, (hw - 92, bt - 62), f"The side of the hood HC5 leaves the seam on the tangent of the body side RL4:\nno shoulder, a groove of {d.seam_groove:.0f}: FB5 below, HC15 above. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
+    note(axes[0, 2], (hw - 92, ys + 88), "From above, the foot of the leg lies inside the\noutline of the body top everywhere.\n"
+         f"The seam groove: a bevel of {d.seam_groove:.0f} on each part, planes along the depth.\nFB5 runs out across the rail edge, HC15 in the soft edge HC4.\n"
+         f"At the front the cap stands {d.hood_shoulder_front:.0f} back on the flat body top:\nno bevel there.", size=7.5)
     note(axes[1, 0], (135, 150), "RL2 and RL3 come down the rail arc, turn through the sweep\nand run on along the deck as DK2 and DK3: one section,\none width, no jump. RL4 and DK7 are one plane.", size=7.5)
     a = axes[1, 1]
     dim(a, (hw - d.edge_in, 170), (hw, 170), f"{d.edge_in:.1f}", (-16, 0))
