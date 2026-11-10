@@ -47,7 +47,7 @@ URL: https://www.reddit.com/r/cade/comments/1xl7lxk/my_latest_two_builds_i_desig
 
 The page stays INACCESSIBLE to automated tools: every fetch was blocked, and a real browser got a human-verification page. On 2026-11-09 the owner supplied three photos from the post. They are in `cad/vendor/reddit-mgs-mini-astro/` (`photo-a.png` three-quarter view from the right, `photo-b.png` front view, `photo-c.png` three-quarter view from the left, low resolution). Git ignores that directory. The photos belong to the builder.
 
-The post shows two builds by the MGS builder. The larger one is a two-player Neo Geo style bartop. **The smaller one, a one-player New Astro City mini with an 8 inch 4:3 screen, is the aesthetic goal of this project.** It is not the MVS-U4 bartop of section 3, and no CAD file of it was found.
+The post shows two builds by the MGS builder. The larger one is a two-player Neo Geo style bartop. **The smaller one, a one-player New Astro City mini with an 8 inch 4:3 screen, is the aesthetic goal of this project.** It is not the MVS-U4 bartop of section 3, and no CAD file of it was found. The owner reports that the builder sells finished units of it and does not publish or sell its files. His GitHub account (section 2) holds other designs only.
 
 ### What the photos show
 

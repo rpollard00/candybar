@@ -28,7 +28,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. Are the fin tops of the second board closed?
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] The Mini New Astro City files from MakerWorld (model 700005), put into `cad/vendor/`. They need a login.
+- [ ] The Mini New Astro City files from MakerWorld (model 700005). They need a login. The owner will get them. They are a different design from the reference cabinet, but they give real Astro City curves to measure.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 - [ ] A look at the apron in the third pass (decision record 0003 is a proposal).
 
