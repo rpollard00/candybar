@@ -1,0 +1,4 @@
+name,value,unit,status,measure,source,note
+a1_bed,256,mm,sourced,,BambuStudio A1 machine profile,Build volume edge length
+a1_part_max_xy,240,mm,provisional,Print a 240 x 240 single-layer test,hardware-envelopes.md 7,Recommended largest footprint side: bed less brim
+a1_part_max_z,245,mm,provisional,,hardware-envelopes.md 7,Recommended largest part height

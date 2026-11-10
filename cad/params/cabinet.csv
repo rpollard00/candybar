@@ -1,0 +1,73 @@
+name,value,unit,status,measure,source,note
+foot_h,6,mm,provisional,,design choice,Rubber feet: desk top to the floor underside
+floor_t,5,mm,provisional,,design choice,Floor plate thickness
+side_t,12,mm,provisional,,design choice,Side wall build-up: skin plus ribs
+rear_t,6,mm,provisional,,design choice,Rear wall and rear door thickness
+front_t,4,mm,provisional,,design choice,Control box front wall thickness
+inner_w,=mon_w + 2 * mon_side_clear,mm,derived,,,Clear width between the side walls
+outer_w,=inner_w + 2 * side_t,mm,derived,,,Overall cabinet width
+cab_d,525,mm,provisional,,"set by the PSU chain: bezel foot, cable trunk, 180 PSU bay, rear wall",Overall depth: front face to rear face
+rear_inner_y,=cab_d - rear_t,mm,derived,,,Inside face of the rear wall
+cp_inner_h,56,mm,provisional,,controls-ergonomics.md 5.5 (55 to 60),Panel top face down to the floor top face
+cp_top_z,=foot_h + floor_t + cp_inner_h,mm,derived,,,Panel top face above the desk
+cp_depth,246,mm,provisional,,controls-ergonomics.md 3.6 (233 to 248 panel),Control box depth: front face to the shelf
+deck_t,5,mm,provisional,,Sanwa OBSN-30 panel limit of 5,Control deck thickness
+panel_gap,1,mm,provisional,Print a panel-fit coupon,design choice,Clearance around the removable panel
+panel_w,=inner_w - 2 * panel_gap,mm,derived,,,Removable panel width
+panel_d,=cp_depth - front_t - 2 * panel_gap,mm,derived,,,Removable panel depth
+panel_y0,=front_t + panel_gap,mm,derived,,,Panel front edge behind the cabinet front face
+panel_fix_inset,9,mm,provisional,,design choice,Corner fastener hole inset from the panel edges
+panel_fix_d,4.4,mm,provisional,,M4 clearance,Corner fastener hole diameter
+stick_x,-75,mm,provisional,Try a paper layout at the real desk,design choice,Lever centre from the panel centre line. Negative is left
+stick_y,125,mm,provisional,Try a paper layout at the real desk,controls-ergonomics.md 3.6,Lever centre behind the panel front edge
+seam_x,=stick_x + 36 mm,mm,derived,,controls-ergonomics.md 3.6,Seam between the lever tile and the button tile
+seam_gap,0.3,mm,provisional,,design choice,Gap between the two deck tiles
+svc_y,=panel_d - 26 mm,mm,derived,,,Service button row behind the panel front edge
+svc1_x,60,mm,provisional,,design choice,Service button 1 from the panel centre line
+svc2_x,100,mm,provisional,,design choice,Service button 2 from the panel centre line
+svc3_x,140,mm,provisional,,design choice,Service button 3 from the panel centre line
+enc_x,-150,mm,provisional,,design choice,Encoder centre from the panel centre line
+enc_y,55,mm,provisional,,design choice,Encoder centre behind the panel front edge
+shelf_depth,30,mm,provisional,,design choice,Flat shelf between the panel and the bezel foot
+recline,22,deg,provisional,Bench test: the screen angle that feels right,controls-ergonomics.md 5.5 (15 to 25),Screen recline from vertical
+mon_chin,120,mm,provisional,Bench test: the screen height that feels right,design choice,"Bezel face from the shelf up to the monitor's bottom edge, along the slope"
+mon_setback,4,mm,provisional,,design choice,Monitor front face behind the bezel front plane
+bezel_top,25,mm,provisional,,design choice,"Bezel above the monitor's top edge, along the slope"
+cradle_t,20,mm,provisional,,design choice,Depth reserved behind the monitor for its cradle
+hood_overhang,45,mm,provisional,,design choice,Hood lip forward of the bezel top
+marquee_h,70,mm,provisional,,design choice,Marquee face height
+marquee_tilt,10,deg,provisional,,design choice,Marquee face tilt back from vertical
+bezel_foot_y,=cp_depth + shelf_depth,mm,derived,,,Bezel front plane where it meets the shelf
+bezel_len,=mon_chin + mon_h + bezel_top,mm,derived,,,Bezel length along the slope
+mon_bottom_y,=bezel_foot_y + mon_chin * sin(recline) + mon_setback * cos(recline),mm,derived,,,"Monitor front bottom edge, depth"
+mon_bottom_z,=cp_top_z + mon_chin * cos(recline) - mon_setback * sin(recline),mm,derived,,,"Monitor front bottom edge, height above the desk"
+mon_center_y,=mon_bottom_y + mon_h / 2 * sin(recline),mm,derived,,,"Screen centre, depth"
+mon_center_z,=mon_bottom_z + mon_h / 2 * cos(recline),mm,derived,,,"Screen centre, height above the desk"
+bezel_top_y,=bezel_foot_y + bezel_len * sin(recline),mm,derived,,,"Bezel top edge, depth"
+bezel_top_z,=cp_top_z + bezel_len * cos(recline),mm,derived,,,"Bezel top edge, height above the desk"
+hood_lip_y,=bezel_top_y - hood_overhang,mm,derived,,,"Hood front lower edge, depth"
+top_front_y,=hood_lip_y + marquee_h * sin(marquee_tilt),mm,derived,,,"Roof front edge, depth"
+cab_h,=bezel_top_z + marquee_h * cos(marquee_tilt),mm,derived,,,Overall height above the desk
+eye_y,-60,mm,provisional,"Sit as you would play. Eye position in front of the cabinet front face, as a negative number",median adult estimate,Eye position relative to the cabinet front face
+eye_z,530,mm,provisional,Sit as you would play. Eye height above the desk top,median adult estimate,Eye height above the desk
+sight_angle,=atan((eye_z - mon_center_z) / (mon_center_y - eye_y)),deg,derived,,,Sight line to the screen centre below horizontal
+eye_dist,=sqrt((eye_z - mon_center_z)^2 + (mon_center_y - eye_y)^2),mm,derived,,,Eye to screen centre
+psu_raise,3,mm,provisional,,design choice,PSU underside above the floor top face
+psu_x0,=-inner_w / 2 + 8 mm,mm,derived,,,PSU left face
+psu_z0,=foot_h + floor_t + psu_raise,mm,derived,,,PSU underside above the desk
+psu_y0,=rear_inner_y - psu_d_max,mm,derived,,,Front of the PSU bay
+bundle_x0,=psu_x0 + psu_w + 6 mm,mm,derived,,,Cable bundle bay left face
+bundle_y0,=bezel_foot_y + (psu_z0 + psu_bundle_h - cp_top_z) * tan(recline) + mon_setback / cos(recline) + 3 mm,mm,derived,,,Cable bundle bay front face: 3 behind the back of the bezel at the bundle's top edge
+bc_gap_door,5,mm,provisional,,design choice,Fan outer face to the inside of the rear door
+bc_x0,=-inner_w / 2 + bc_dp_clear + bc_io_overhang + 3 mm,mm,derived,,,BC-250 I/O edge position across the cabinet
+bc_bottom_z,=psu_z0 + psu_h + psu_fan_clear + 2 mm,mm,derived,,,BC-250 lower long edge above the desk
+bc_top_z,=bc_bottom_z + bc_pcb_w_pwr,mm,derived,,,BC-250 upper long edge above the desk
+bc_pcb_y,=rear_inner_y - bc_gap_door - bc_shroud_h,mm,derived,,,BC-250 PCB top face depth
+tgt_panel_top_min,60,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk
+tgt_panel_top_max,75,mm,provisional,,controls-ergonomics.md 5.5,Target range: panel top above the desk
+tgt_palm_min,100,mm,provisional,,controls-ergonomics.md 5.5,Target range: lowest button centre to the panel front edge
+tgt_palm_max,120,mm,provisional,,controls-ergonomics.md 5.5,Target range: lowest button centre to the panel front edge
+tgt_sight_min,15,deg,provisional,,controls-ergonomics.md 5.5,Target range: sight line below horizontal
+tgt_sight_max,25,deg,provisional,,controls-ergonomics.md 5.5,Target range: sight line below horizontal
+tgt_eye_dist_min,450,mm,provisional,,controls-ergonomics.md 5.5,Target range: eye to screen centre
+tgt_eye_dist_max,600,mm,provisional,,controls-ergonomics.md 5.5,Target range: eye to screen centre

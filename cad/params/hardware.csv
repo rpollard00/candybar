@@ -1,0 +1,54 @@
+name,value,unit,status,measure,source,note
+mon_w,354,mm,sourced,"Body width, including the power button that stands proud of the right edge",uperfect.com BE16CU product size,Monitor body width
+mon_h,230,mm,sourced,"Body height, including the rubber feet on the bottom edge",uperfect.com BE16CU product size,Monitor body height
+mon_t,10,mm,sourced,Body thickness at the thickest point,uperfect.com BE16CU product size,Monitor body thickness
+mon_active_w,344.678,mm,sourced,,uperfect.com viewable area,Lit image width
+mon_active_h,215.424,mm,sourced,,uperfect.com viewable area,Lit image height
+mon_bezel_bottom,9.6,mm,provisional,"Bottom body edge up to the first lit pixel row, with the screen on",estimate from a manufacturer render,Bottom bezel height
+mon_vesa,75,mm,sourced,Hole centre to hole centre,uperfect.com (75 x 75 M4),VESA pattern pitch
+mon_vesa_cz,116,mm,provisional,Bottom body edge up to the centre of the VESA pattern,estimate from a manufacturer render,VESA pattern centre above the bottom edge
+mon_vesa_thread_depth,4,mm,sourced,Usable thread depth of one VESA hole,uperfect.com (M4 x 4),Screw engagement limit
+mon_port_z_lo,40,mm,provisional,Bottom body edge up to the lowest port on the left edge,estimate from a manufacturer render,Bottom of the left-edge plug zone
+mon_port_z_hi,95,mm,provisional,Bottom body edge up to the highest port on the left edge,estimate from a manufacturer render,Top of the left-edge plug zone
+mon_ctrl_z_lo,22,mm,provisional,Bottom body edge up to the 3.5 mm jack on the right edge,estimate from a manufacturer render,Bottom of the right-edge control zone
+mon_ctrl_z_hi,75,mm,provisional,Bottom body edge up to the power button on the right edge,estimate from a manufacturer render,Top of the right-edge control zone
+mon_side_clear,22,mm,provisional,"Plug body plus cable bend beyond the left edge, with the cables you will use",hardware-envelopes.md 8,Space beside each monitor edge. 22 needs right-angle plugs; straight plugs need about 70
+bc_pcb_l,307.6,mm,sourced,Board length from the I/O edge to the far end,MandicReally BC250 STEP,BC-250 PCB length
+bc_pcb_w_io,122.21,mm,sourced,Board width at the I/O end,MandicReally BC250 STEP,BC-250 PCB width at the I/O end
+bc_pcb_w_pwr,144,mm,sourced,Board width at the power-connector end,MandicReally BC250 STEP,BC-250 PCB width at the power end
+bc_pcb_step_x,207.4,mm,sourced,I/O edge to the step in the board outline,MandicReally BC250 STEP,Where the board widens
+bc_pcb_t,1.55,mm,sourced,,MandicReally BC250 STEP,PCB thickness
+bc_backplate_drop,5.55,mm,sourced,PCB top face down to the outer face of the backplate,MandicReally BC250 STEP,Backplate outer face below the PCB top face
+bc_io_overhang,4.2,mm,sourced,,MandicReally BC250 STEP,Power button reach beyond the I/O edge
+bc_fin_x0,47.14,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block start from the I/O edge
+bc_fin_y0,1.8,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block offset from the straight long edge
+bc_fin_l,239.54,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block length
+bc_fin_w,119.5,mm,sourced,,MandicReally BC250 STEP,Heatsink fin block width
+bc_fin_h,26.1,mm,sourced,PCB top face up to the fin tops,MandicReally BC250 STEP,Fin top above the PCB top face
+bc_shroud_x0,160,mm,provisional,"On the first console: I/O edge to the near side of the fan shroud",assumed from the MKUU+ layout,Fan shroud start along the board
+bc_shroud_y0,-3.45,mm,provisional,,centred on the fin block,Fan shroud offset from the straight long edge
+bc_shroud_l,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud length along the board
+bc_shroud_w,130,mm,sourced,,MKUU+ shroud 3MF,Fan shroud width across the board
+bc_shroud_h,55.9,mm,sourced,"On the first console: PCB top face up to the outer face of the fan",MKUU+ shroud 3MF with a 25 mm fan,Fan outer face above the PCB top face
+bc_dp_clear,45,mm,provisional,DisplayPort plug plus cable bend beyond the I/O edge,hardware-envelopes.md 8,Space in front of the I/O edge
+bc_pwr_x0,220,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone start from the I/O edge
+bc_pwr_x1,248,mm,sourced,,MandicReally BC250 STEP,8-pin plug zone end from the I/O edge
+bc_pwr_clear,55,mm,provisional,PCIe plug plus cable bend beyond the board edge,hardware-envelopes.md 8,Space beyond the stepped long edge for the 8-pin plug
+bc_pwr_h,15,mm,provisional,,estimate,8-pin plug zone height above the PCB top face
+bc_io_h,23,mm,sourced,,MandicReally BC250 STEP,Tallest I/O part above the PCB top face
+bc_underside_gap,10,mm,provisional,,hardware-envelopes.md 2 (memory on the underside),Air gap kept below the backplate
+fan_frame,120,mm,sourced,,ARCTIC P12 Pro spec sheet,Fan frame size
+fan_t,25,mm,sourced,,ARCTIC P12 Pro spec sheet,Fan thickness
+fan_hole_pitch,105,mm,sourced,,ARCTIC P12 Pro spec sheet,Fan mounting hole pitch
+fan_hole_d,4.3,mm,sourced,,standard 120 mm fan,Fan mounting hole diameter
+psu_w,150,mm,sourced,,ATX12V design guide 2.2,PSU width
+psu_h,86,mm,sourced,,ATX12V design guide 2.2,PSU height
+psu_d,160,mm,provisional,"PSU case depth, rear face to cable-exit face. Also note the make and model",typical 850 to 1000 W unit,PSU depth
+psu_d_max,180,mm,provisional,,typical 850 to 1000 W unit,Depth the PSU bay is sized for
+psu_fan_clear,25,mm,provisional,Which face holds the fan,ATX12V design guide 2.2 (12.7 minimum),Clear space kept over the PSU fan face
+psu_trunk_clear,55,mm,provisional,Free length the cable trunk needs before its first bend,hardware-envelopes.md 6,Space in front of the cable-exit face
+psu_trunk_z0,13,mm,provisional,PSU underside up to the bottom of the cable trunk where it leaves the case,ATX12V design guide 2.2 reference exit position,Bottom of the cable trunk above the PSU underside
+psu_trunk_h,40,mm,provisional,Cable trunk diameter where it leaves the case,hardware-envelopes.md 6 (30 to 40 trunk),Height of the cable trunk zone
+psu_bundle_w,200,mm,provisional,Fold the unused leads and measure the box they fill,hardware-envelopes.md 6 (2.0 to 2.5 litres),Stowed cable bundle width
+psu_bundle_d,120,mm,provisional,,hardware-envelopes.md 6,Stowed cable bundle depth
+psu_bundle_h,100,mm,provisional,,hardware-envelopes.md 6,Stowed cable bundle height
