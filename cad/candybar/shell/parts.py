@@ -90,16 +90,18 @@ def land_edges(solid: Part.Shape, test) -> list[Part.Edge]:
 
 
 def try_fillet(solid: Part.Shape, r: float, edges: list[Part.Edge], log: list[str], what: str) -> Part.Shape:
+    """Fillet, retrying slightly smaller radii when OCC refuses the nominal one; log what held."""
     if not edges or r <= 0:
         return solid
-    try:
-        out = solid.makeFillet(r, edges)
+    for k in (1.0, 0.97, 0.92, 0.85):
+        try:
+            out = solid.makeFillet(r * k, edges)
+        except Part.OCCError:
+            continue
         if out.isValid() and out.Volume > 0.9 * solid.Volume:
-            log.append(f"{what}: fillet r {r} on {len(edges)} edges held")
+            log.append(f"{what}: fillet r {r * k:.1f} on {len(edges)} edges held")
             return out
-        log.append(f"{what}: fillet gave an invalid solid, skipped")
-    except Part.OCCError as exc:
-        log.append(f"{what}: fillet failed ({exc}), skipped")
+    log.append(f"{what}: fillet failed at r {r} to {r * 0.85:.1f}, skipped")
     return solid
 
 
@@ -134,39 +136,71 @@ def front_profiles(d: Dims) -> tuple[list[Seg], list[Seg]]:
     return inner, outer
 
 
-def front_solid(d: Dims, log: list[str]) -> Part.Shape:
+def rail_solid(d: Dims, log: list[str]) -> Part.Shape:
+    """The body: its land bends into the deck top, and its wide facet is one plane from the hood to the table."""
     w, top = d.width, d.deck_top
-    inner, outer = front_profiles(d)
-    solid = band_solid(inner, outer, w / 2, d)
-    c = d.deck_corner
-    for sx in (1, -1):
-        m = (sx, -1.0)
-        q = (sx * (w / 2 - c), 0.0)
-        solid = solid.cut(halfspace((q[0], q[1], 0), (m[0], m[1], 0)))
-        solid = band_plane_cut(solid, (sx * (w / 2 - c / 2), c / 2), m, top, d)
-    solid = solid.removeSplitter()
+    inner, _ = front_profiles(d)
+    ya = d.foot_y - d.bend_t
+    body_prof = [("L", (ya, 0.0), (ya, top))] + inner[3:7] + [("L", (d.body_d, 0.0), (ya, 0.0))]
+    solid = Part.Face(wire_at(body_prof, -w / 2)).extrude(V(w, 0, 0))
+    su, cu = d.u
     xi = w / 2 - d.band_in
-    s_seam_z = d.body_top
+    fy, fz = d.face(0.0)
+    u3 = V(0, su, cu)
+    for sx in (1, -1):
+        p0 = V(sx * xi, fy, fz)
+        w3 = V(sx * d.band_in, d.band_drop * cu, -d.band_drop * su)
+        n = u3.cross(w3)
+        if n.dot(V(sx * w / 2, fy, fz) - p0) < 0:
+            n = n * -1
+        cut = common(halfspace((p0.x, p0.y, p0.z), (n.x, n.y, n.z)), halfspace((sx * xi, 0, 0), (sx, 0, 0)))
+        solid = solid.cut(cut)
+    solid = solid.removeSplitter()
+    front_n = V(0, -cu, su)
 
     def land(e: Part.Edge) -> bool:
-        zs = [v.Point.z for v in e.Vertexes]
-        mid = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
-        if all(abs(z - top) < 1e-3 for z in zs) and mid.y < d.foot_y - d.bend_t - 1 and abs(mid.z - top) < 1e-3:
-            return mid.y > 1.0 and not (abs(abs(mid.x) - w / 2) < 1e-3)
-        on_side = abs(abs(mid.x) - xi) < 1e-3 and top - 1e-3 <= mid.z < s_seam_z - 1e-3
-        return on_side and all(abs(abs(v.Point.x) - xi) < 1e-3 for v in e.Vertexes)
+        faces = solid.ancestorsOfType(e, Part.Face)
+        if len(faces) != 2 or e.Length < 50:
+            return False
+        normals = [f.normalAt(*f.Surface.parameter(e.valueAt(e.FirstParameter + 0.5 * (e.LastParameter - e.FirstParameter)))) for f in faces]
+        has_front = any(abs(nv.dot(front_n)) > 0.999 for nv in normals)
+        has_facet = any(0.3 < abs(nv.x) < 0.95 for nv in normals)
+        return has_front and has_facet
+    return try_fillet(solid, d.band_r, land_edges(solid, land), log, "rail land radius")
 
-    solid = try_fillet(solid, d.band_r, land_edges(solid, land), log, "front land radius")
-    bottom = lambda e: all(v.Point.z < 1e-3 for v in e.Vertexes) and e.valueAt(e.FirstParameter).y < c + 1e-3 \
-        and e.valueAt(e.LastParameter).y < c + 1e-3
-    solid = try_fillet(solid, d.bottom_r, land_edges(solid, bottom), log, "deck bottom radius")
-    return solid
+
+def deck_solid(d: Dims, log: list[str]) -> Part.Shape:
+    """The deck: soft vertical corners, then a soft radius over a short, slightly leaning band, then a crease
+    and a vertical front face down to a small bottom radius. The same section runs round the corners and sides."""
+    w, top, c = d.width, d.deck_top, d.deck_corner
+    ya = d.foot_y - d.bend_t
+    yr = ya + 30.0
+    plan = [(-w / 2, yr), (-w / 2, c), (-w / 2 + c, 0), (w / 2 - c, 0), (w / 2, c), (w / 2, yr)]
+    prism = face_from([(x, y, 0) for x, y in plan]).extrude(V(0, 0, top))
+    corners = [e for e in prism.Edges if abs(e.Vertexes[0].Point.z - e.Vertexes[1].Point.z) > 1 and
+               min(v.Point.y for v in e.Vertexes) < c + 1e-3]
+    prism = try_fillet(prism, d.deck_corner_r, corners, log, "deck corner rounds")
+    base = min(prism.Faces, key=lambda f: f.CenterOfMass.z)
+    zc = top - d.deck_lean_h
+    inset = d.deck_lean_h * math.tan(math.radians(d.deck_lean))
+    w_low = base.OuterWire.copy()
+    w_low.translate(V(0, 0, zc))
+    w_top = base.OuterWire.makeOffset2D(-inset)
+    w_top.translate(V(0, 0, top))
+    lower = Part.Face(base.OuterWire).extrude(V(0, 0, zc))
+    upper = Part.makeLoft([w_low, w_top], True, True)
+    deck = lower.fuse(upper).removeSplitter()
+    top_edges = [e for e in deck.Edges if all(abs(v.Point.z - top) < 1e-3 for v in e.Vertexes)]
+    deck = try_fillet(deck, d.deck_top_r, top_edges, log, "deck top radius")
+    bottom_edges = [e for e in deck.Edges if all(abs(v.Point.z) < 1e-3 for v in e.Vertexes)]
+    deck = try_fillet(deck, d.bottom_r, bottom_edges, log, "deck bottom radius")
+    return deck.common(halfspace((0, ya, 0), (0, -1, 0))).removeSplitter()
 
 
 def body_and_deck(d: Dims, log: list[str]) -> tuple[Part.Shape, Part.Shape, Part.Shape]:
-    """(body, deck, control panel). The deck is split off at the start of the bend."""
+    """(body, deck, control panel)."""
     w = d.width
-    solid = front_solid(d, log)
+    solid = rail_solid(d, log)
     t = math.tan(math.radians(d.step_lean))
     for sx in (1, -1):
         step = common(halfspace((sx * d.rear_w / 2, 0, 0), (sx, 0, 0)), halfspace((sx * w / 2, d.step_y0, 0), (sx, 1, -t)))
@@ -175,18 +209,13 @@ def body_and_deck(d: Dims, log: list[str]) -> tuple[Part.Shape, Part.Shape, Part
         c = d.rear_facet
         solid = solid.cut(common(halfspace((sx * (d.rear_w / 2 - c), d.body_d, 0), (sx, 1, 0)), below))
         solid = solid.cut(halfspace((sx * (w / 2 - c), d.body_d, 0), (sx, 1, 0)))
-    # bezel recess between the lands, 2 mm behind the land surface plus the plate thickness
     half = d.bezel_w / 2 + d.panel_gap
-    solid = solid.cut(in_face(box((-half, -60.0, d.bezel_s0), (half, d.bezel_t + 2.0, d.bezel_s1)), d))
-    # control panel pocket
+    body = solid.cut(in_face(box((-half, -60.0, d.bezel_s0), (half, d.bezel_t + 2.0, d.bezel_s1)), d)).removeSplitter()
     py0 = d.deck_nose
     hw = d.panel_w / 2 + d.panel_gap
-    solid = solid.cut(box((-hw, py0, d.panel_top - d.panel_t), (hw, py0 + d.panel_d + 2 * d.panel_gap, d.deck_top + 30)))
-    split_y = d.foot_y - d.bend_t
-    deck = common(solid, halfspace((0, split_y, 0), (0, -1, 0))).removeSplitter()
-    body = common(solid, halfspace((0, split_y, 0), (0, 1, 0))).removeSplitter()
+    deck = deck_solid(d, log).cut(box((-hw, py0, d.panel_top - d.panel_t), (hw, py0 + d.panel_d + 2 * d.panel_gap, d.deck_top + 30)))
     panel = box((-d.panel_w / 2, py0 + d.panel_gap, d.panel_top - d.panel_t), (d.panel_w / 2, py0 + d.panel_gap + d.panel_d, d.panel_top))
-    return body, deck, panel
+    return body, deck.removeSplitter(), panel
 
 
 def rear_features(d: Dims, solid: Part.Shape, fan_xz: tuple[float, float], duct_xz: tuple[float, float],

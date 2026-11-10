@@ -136,28 +136,15 @@ def build_shell(d: Dims, hw: Hardware | None = None, log: list[str] | None = Non
 
 
 def band_width_survey(d: Dims) -> list[tuple[str, float]]:
-    """Width of the flat bevel band, measured in sections across the band at stations along its whole path."""
-    solid = parts.front_solid(d, [])
+    """Width of the rail's flat facet, in sections across it, from the table up to the hood seam."""
+    solid = parts.rail_solid(d, [])
     su, cu = d.u
-    w, top = d.width, d.deck_top
-    stations: list[tuple[str, V, V]] = []
-    for x in (-150.0, -60.0, 0.0, 60.0, 150.0):
-        stations.append((f"deck front x={x:.0f}", V(x, 0.0, top), V(1, 0, 0)))
-    c = d.deck_corner
-    stations.append(("deck corner right", V(w / 2 - c / 2, c / 2, top), V(1, 1, 0)))
-    stations.append(("deck corner left", V(-w / 2 + c / 2, c / 2, top), V(-1, 1, 0)))
-    ya = d.foot_y - d.bend_t
-    for y in (60.0, 120.0, ya - 15):
-        stations.append((f"deck side y={y:.0f}", V(w / 2, y, top), V(0, 1, 0)))
-    for k in (0.25, 0.5, 0.75):
-        a = math.radians(-90 + k * (90 - d.recline))
-        cy, cz = ya, top + d.bend_r
-        p = V(w / 2, cy + d.bend_r * math.cos(a), cz + d.bend_r * math.sin(a))
-        stations.append((f"bend {int(k * 100)} %", p, V(0, -math.sin(a), math.cos(a))))
-    s_top = (d.body_top - top) / cu
-    for k in (0.15, 0.4, 0.65, 0.9):
-        y, z = d.face(s_top * k)
-        stations.append((f"screen face {int(k * 100)} %", V(w / 2, y, z), V(0, su, cu)))
+    w = d.width
+    stations = []
+    s_top = (d.body_top - d.deck_top) / cu
+    for s_ in [(20 - d.deck_top) / cu, (50 - d.deck_top) / cu] + [s_top * k for k in (0.15, 0.4, 0.65, 0.9)]:
+        y, z = d.face(s_)
+        stations.append((f"facet at z={z:.0f}", V(w / 2, y, z), V(0, su, cu)))
     out = []
     for name, p, n in stations:
         n.normalize()
@@ -168,12 +155,21 @@ def band_width_survey(d: Dims) -> list[tuple[str, float]]:
                 if abs(e.Length - (b - a).Length) > 0.05:
                     continue
                 if (a - p).Length < 45 and (b - p).Length < 45 and 15 < e.Length < 45:
-                    dirn = (b - a).normalize()
-                    if 0.25 < abs(dirn.z if abs(n.z) < 0.9 else dirn.x) < 0.97 or "corner" in name or "front" in name:
-                        if best is None or abs(e.Length - 28) < abs(best - 28):
-                            best = e.Length
+                    if best is None or abs(e.Length - 28) < abs(best - 28):
+                        best = e.Length
         out.append((name, round(best, 2) if best else -1.0))
     return out
+
+
+def deck_section(d: Dims, deck: Part.Shape) -> list[list[float]]:
+    """The deck's front edge in true side section at the centre line, as (y, z) points."""
+    pts = []
+    for wire in deck.slice(V(1, 0, 0), 0.0):
+        for e in wire.Edges:
+            for p in e.discretize(Distance=0.5):
+                if p.y < 60:
+                    pts.append([round(p.y, 3), round(p.z, 3)])
+    return pts
 
 
 def overhang_check(shell: dict[str, Part.Shape], d: Dims) -> dict:
@@ -317,10 +313,13 @@ def main() -> int:
         r["overhang"] = overhang_check(shell, d)
         json.dump(r, open(os.path.join(root, name, "report.json"), "w"), indent=1)
         json.dump(parts.focus_points(d), open(os.path.join(root, name, "focus.json"), "w"), indent=1)
+        json.dump({"points": deck_section(d, shell["deck"]), "dims": {k: getattr(d, k) for k in
+                   ("deck_top", "deck_top_r", "deck_lean", "deck_lean_h", "bottom_r", "deck_corner", "deck_corner_r")}},
+                  open(os.path.join(root, name, "deck-section.json"), "w"))
         widths = [w for _, w in r["band_width"] if w > 0]
         print("  log:", "; ".join(log))
         print("  band width:", r["band_width"])
-        print(f"  band flat width {min(widths):.2f} to {max(widths):.2f} over {len(widths)} of {len(r['band_width'])} stations; overhang {r['overhang']}")
+        print(f"  facet flat width {min(widths):.2f} to {max(widths):.2f} over {len(widths)} of {len(r['band_width'])} stations; overhang {r['overhang']}")
         fails = [c["requirement"] for c in checks if not c["pass"]]
         failed += bool(fails)
         print(f"{name}: {' x '.join(f'{v:.0f}' for v in r['outside'])}  recline {d.recline:.0f}  frame {d.frame_side:.0f}/{d.frame_v:.0f}"

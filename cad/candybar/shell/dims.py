@@ -20,11 +20,15 @@ class Dims:
     panel_gap: float = 1.0
     panel_top: float = 70.0
     panel_t: float = 5.0
-    deck_nose: float = 20.0
-    deck_tail: float = 10.0
+    deck_nose: float = 25.0
+    deck_tail: float = 5.0
     deck_top: float = 72.0
     deck_under_body: float = 50.0
     deck_corner: float = 32.0
+    deck_corner_r: float = 10.0
+    deck_top_r: float = 12.0
+    deck_lean: float = 10.0
+    deck_lean_h: float = 27.0
     # screen face
     recline: float = 30.0
     band_len: float = 60.0
@@ -72,7 +76,7 @@ class Dims:
     pocket_z0: float = 0.0
     wall_spare: float = 12.0
     psu_side: float = 14.0
-    controls_forward: float = 10.0
+    controls_forward: float = 15.0
 
     # derived
     @property
