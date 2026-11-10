@@ -28,7 +28,6 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 
 - [ ] Monitor: body width, height and thickness. Is it the flat model with no stand? Heights of the three ports on the left edge. Plug length with the bend, for the real cables.
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
-- [ ] A choice between the screen face options, when the sheet is ready: a tall bezel, or a bezel in the proportion of the 16:10 screen with more recline.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
 - [ ] A look at the first renders of variant D, when they are ready.
@@ -59,12 +58,15 @@ Modelling and iteration run on Opus subagents. The main session writes the brief
 - A deck with the additional faces of the reference cabinet: flat faces that cut the front corners, seen from above, like a coarse bevel.
 - A visible cut between the top of the bezel and the hood.
 - A shorter deck. The control panel becomes about 396 x 175 mm (it was 396 x 240). The start, coin and menu buttons move from a row behind the main buttons to the right end of the panel, as on the reference cabinet. The deck is then about 195 to 215 mm from its front edge to the foot of the screen face.
+- The screen face: a bezel in the proportion of the 16:10 screen with an even frame of about 45 mm, on a body-colored band of about 60 mm, with a recline of about 30 degrees. The owner accepts a steeper sight line for this (about 36 degrees with the estimated eye position).
+- The bezel is about flush with the rails, and the screen is inset in the bezel. The rails read as broad members with a wide facet.
+- The front surface is continuous: the deck top, one concave bend, the screen face, and then the hood. The facet on the outside runs without a break from the front of the deck to the top of the hood.
 
 ## Settled by the owner
 
 - The look follows the reference cabinet. Practical choices belong to this project (decision record 0002).
 - Eight action buttons.
-- The image is centered in the bezel. The sight line is in the 15 to 25 degree range.
+- The image is centered in the bezel. The owner first asked for a sight line of 15 to 25 degrees, and then chose a 16:10 bezel with more recline, which gives a steeper sight line.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
 - Control panels are swappable. A control panel for PC games is wanted beside the arcade one. It holds a keyboard, and a mouse area if there is room.
 - Four USB ports that the player can reach, for controllers: two USB-C and two USB-A, in the right side face of the deck toward the front, out of view. They go through a hub inside the cabinet.
