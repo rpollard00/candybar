@@ -62,6 +62,13 @@ class Conic:
         k = b0 + b1 + b2
         return ((b0 * self.p[0] + b1 * self.corner[0] + b2 * self.q[0]) / k, (b0 * self.p[1] + b1 * self.corner[1] + b2 * self.q[1]) / k)
 
+    def after(self, t: float) -> "Conic":
+        """The part of the conic from t to its end, as a conic of its own."""
+        h0 = ((1 - t) ** 2 + 2 * t * (1 - t) * self.w + t ** 2)
+        h1 = (1 - t) * self.w + t
+        corner = (((1 - t) * self.w * self.corner[0] + t * self.q[0]) / h1, ((1 - t) * self.w * self.corner[1] + t * self.q[1]) / h1)
+        return Conic(self.at(t), corner, self.q, h1 / math.sqrt(h0))
+
 
 Path = list[Line | Arc | Conic]
 
@@ -172,73 +179,101 @@ def front(d: Blueprint) -> Front:
     return Front(sweep, rail, chord, math.degrees(rho), sagitta, math.degrees(lean), math.degrees(rho + turn / 2))
 
 
-def body_bevel(d: Blueprint) -> tuple[P2, P2]:
-    """The bevel of the seam groove on the right side of the body in (x, z), from the side band up to the body top.
-    It is a plane along the depth: it runs along the side band and runs out across the rail edge at the front."""
-    g = d.seam_groove
-    return (d.side_x(d.body_top - g), d.body_top - g), (d.side_x(d.body_top) - g, d.body_top)
-
-
-def x_at(seg: Line | Arc, z: float) -> float:
-    """The x of a rising line or arc at height z."""
-    if isinstance(seg, Arc):
-        return seg.c[0] + math.sqrt(seg.r ** 2 - (z - seg.c[1]) ** 2)
-    (x0, z0), (x1, z1) = seg.p, seg.q
-    return x0 + (x1 - x0) * (z - z0) / (z1 - z0)
-
-
-def hood_bevel(d: Blueprint, h: "Hood") -> tuple[P2, P2]:
-    """The bevel of the seam groove on the right side of the cap in its frame (x, z), from the foot up to the side.
-    It is a plane along the depth: it runs along the side and runs out in the soft edge at the front."""
-    g = d.seam_groove
-    return (h.half_base - g, 0.0), (x_at(h.side_arc, g), g)
-
-
-def plane_of(line: tuple[P2, P2], origin: P3 = (0.0, 0.0, 0.0)) -> tuple[P3, P3]:
-    """A line in (x, z) carried along the depth, as a point and the normal toward the side it cuts away (out, up)."""
-    (x0, z0), (x1, z1) = line
-    n = (z1 - z0, 0.0, -(x1 - x0))
-    if n[0] < 0:
-        n = (-n[0], 0.0, -n[2])
-    return (origin[0] + x0, origin[1], origin[2] + z0), n
-
-
-def clip(poly: list[P3], plane: tuple[P3, P3]) -> tuple[list[P3], list[P3]]:
-    """The part of a polygon behind a plane (away from its normal), and the cut along the plane: two points or none."""
-    (o, n) = plane
-    side = [sum((q[k] - o[k]) * n[k] for k in range(3)) for q in poly]
+def clip(poly: list[P3], side: Callable[[P3], float]) -> list[P3]:
+    """The part of a polygon where side() is not positive; the cut is placed by linear interpolation along each edge."""
+    v = [side(q) for q in poly]
     kept: list[P3] = []
-    cut: list[P3] = []
-    for i, (q, sq) in enumerate(zip(poly, side)):
-        r, sr = poly[(i + 1) % len(poly)], side[(i + 1) % len(poly)]
+    for i, (q, sq) in enumerate(zip(poly, v)):
+        r, sr = poly[(i + 1) % len(poly)], v[(i + 1) % len(poly)]
         if sq <= 0:
             kept.append(q)
         if (sq <= 0) != (sr <= 0):
             k = sq / (sq - sr)
-            x = (q[0] + k * (r[0] - q[0]), q[1] + k * (r[1] - q[1]), q[2] + k * (r[2] - q[2]))
-            kept.append(x)
-            cut.append(x)
-    return (kept if len(kept) >= 3 else []), (cut if len(cut) == 2 else [])
+            kept.append((q[0] + k * (r[0] - q[0]), q[1] + k * (r[1] - q[1]), q[2] + k * (r[2] - q[2])))
+    return kept if len(kept) >= 3 else []
 
 
-def clipped(polys: list[list[P3]], plane: tuple[P3, P3], cuts: list[list[P3]] | None = None) -> list[list[P3]]:
-    """Polygons clipped by a plane; the cuts go into the list given."""
-    out = []
+def section(polys: list[list[P3]], z: float) -> list[P2]:
+    """The closed outline in plan where a level plane cuts a closed skin of polygons, counter-clockwise."""
+    segs = []
     for p in polys:
-        kept, cut = clip(p, plane)
-        if kept:
-            out.append(kept)
-        if cut and cuts is not None:
-            cuts.append(cut)
+        hits = []
+        for i, a in enumerate(p):
+            b = p[(i + 1) % len(p)]
+            if (a[2] > z) != (b[2] > z):
+                k = (z - a[2]) / (b[2] - a[2])
+                hits.append((a[0] + k * (b[0] - a[0]), a[1] + k * (b[1] - a[1])))
+        if len(hits) == 2 and math.dist(*hits) > 1e-6:
+            segs.append(hits)
+    loop = segs.pop(0)
+    while segs:
+        end = loop[-1]
+        k = min(range(len(segs)), key=lambda i: min(math.dist(end, segs[i][0]), math.dist(end, segs[i][1])))
+        a, b = segs.pop(k)
+        nxt = b if math.dist(end, a) <= math.dist(end, b) else a
+        if math.dist(end, a if nxt is b else b) > 0.5:
+            break
+        if math.dist(nxt, loop[-1]) > 0.05:
+            loop.append(nxt)
+    if math.dist(loop[0], loop[-1]) < 0.05:
+        loop.pop()
+    area = sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(loop, loop[1:] + loop[:1]))
+    return loop if area > 0 else loop[::-1]
+
+
+def inset(loop: list[P2], by: float) -> list[P2]:
+    """A convex counter-clockwise outline moved in by a distance: each corner where its two moved edges meet."""
+    out = []
+    n = len(loop)
+    for i in range(n):
+        a, b, c = loop[i - 1], loop[i], loop[(i + 1) % n]
+        u = ((b[0] - a[0]) / math.dist(a, b), (b[1] - a[1]) / math.dist(a, b))
+        w = ((c[0] - b[0]) / math.dist(b, c), (c[1] - b[1]) / math.dist(b, c))
+        nu, nw = (-u[1], u[0]), (-w[1], w[0])
+        cross = u[0] * w[1] - u[1] * w[0]
+        if abs(cross) < 1e-6:
+            out.append((b[0] + by * nu[0], b[1] + by * nu[1]))
+            continue
+        p = (a[0] + by * nu[0], a[1] + by * nu[1])
+        q = (b[0] + by * nw[0], b[1] + by * nw[1])
+        t = ((q[0] - p[0]) * w[1] - (q[1] - p[1]) * w[0]) / cross
+        out.append((p[0] + t * u[0], p[1] + t * u[1]))
     return out
 
 
-def bevel_strips(cuts: list[list[P3]], plane: tuple[P3, P3], z_edge: float) -> list[list[P3]]:
-    """The face of a bevel plane between its cut through the other faces and its straight edge at height z_edge."""
-    (o, n) = plane
-    on_edge = lambda q: (o[0] - n[2] * (z_edge - o[2]) / n[0], q[1], z_edge)
-    pts = sorted({(round(q[0], 9), round(q[1], 9), round(q[2], 9)) for c in cuts for q in c}, key=lambda q: (q[1], -abs(q[2] - z_edge)))
-    return [[a, b, on_edge(b), on_edge(a)] for a, b in zip(pts, pts[1:]) if abs(b[1] - a[1]) > 1e-9 or abs(b[2] - a[2]) > 1e-9]
+def depth_inside(loop: list[P2]) -> Callable[[P3], float]:
+    """How far a point lies inside an outline in plan (negative outside)."""
+    edges = list(zip(loop, loop[1:] + loop[:1]))
+
+    def dist(q: P3) -> float:
+        best, inside = math.inf, False
+        for (x0, y0), (x1, y1) in edges:
+            dx, dy = x1 - x0, y1 - y0
+            t = max(0.0, min(1.0, ((q[0] - x0) * dx + (q[1] - y0) * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(q[0] - x0 - t * dx, q[1] - y0 - t * dy))
+            if (y0 > q[1]) != (y1 > q[1]) and q[0] < x0 + (q[1] - y0) * dx / dy:
+                inside = not inside
+        return best if inside else -best
+    return dist
+
+
+def groove(loop: list[P2], z_edge: float, z_face: float, by: float) -> tuple[list[list[P3]], list[P2], Callable[[P3], float]]:
+    """A bevel of one height round a part: from its outline at z_edge to the outline moved in by `by` at z_face.
+    Returns the bevel as strips, the inner outline, and the side function that clips the other faces to it."""
+    inner = inset(loop, by)
+    strips = [[(*loop[i - 1], z_edge), (*loop[i], z_edge), (*inner[i], z_face), (*inner[i - 1], z_face)] for i in range(len(loop))]
+    inside = depth_inside(loop)
+    return strips, inner, lambda q: by * (q[2] - z_edge) / (z_face - z_edge) - inside(q)
+
+
+def refine(poly: list[P3], step: float = 1.0) -> list[P3]:
+    """A polygon with points added along its edges, none longer than step."""
+    out: list[P3] = []
+    for i, a in enumerate(poly):
+        b = poly[(i + 1) % len(poly)]
+        n = max(1, math.ceil(math.dist(a, b) / step))
+        out += [(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, a[2] + (b[2] - a[2]) * k / n) for k in range(n)]
+    return out
 
 
 def rear_profile(d: Blueprint) -> list[P2]:
@@ -292,6 +327,10 @@ class Hood:
     opening: list[P2]
     edge_line: list[P2]
     side: list[P2]
+    front: Path
+
+    def front_y(self, z: float) -> float:
+        return front_y(self.front, z)
 
     def half_width(self, z: float, points: list[P2] | None = None) -> float:
         """Half the width of the outline (or of another curve of the same kind) at height z."""
@@ -299,7 +338,9 @@ class Hood:
         for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
             if z0 <= z <= z1 and z1 > z0:
                 return x0 + (x1 - x0) * (z - z0) / (z1 - z0)
-        return pts[-1][0] if z >= pts[-1][1] else pts[0][0]
+        if z >= pts[-1][1] - 1e-9:
+            return max(x for x, zz in pts if zz >= pts[-1][1] - 1e-9)
+        return pts[0][0]
 
     def y_rear(self, z: float) -> float:
         """Where the rear of the cap is at height z, from the side profile."""
@@ -347,19 +388,78 @@ def hood_outline(d: Blueprint, height: float, half_base: float) -> Path:
     return [side, corner, Line(top, (0.0, height))]
 
 
-def hood_side_profile(d: Blueprint, height: float, depth: float) -> Path:
-    """The cap seen from the side, in (y, z): upright front, soft edge, short roof, a long arc down to the rear wall."""
-    return [Line((0.0, 0.0), (0.0, height - d.hood_edge_in)),
-            Conic((0.0, height - d.hood_edge_in), (0.0, height), (d.hood_edge_back, height)),
-            Line((d.hood_edge_back, height), (depth - d.hood_rear_arc_d, height)),
-            Conic((depth - d.hood_rear_arc_d, height), (depth, height), (depth, height - d.hood_rear_arc_h)),
-            Line((depth, height - d.hood_rear_arc_h), (depth, 0.0))]
+def front_y(path: Path, z: float) -> float:
+    """How far the front of the cap stands back from its foot at height z (it leans back), from its side view."""
+    for seg in path:
+        (y0, z0), (y1, z1) = (seg.p, seg.q) if isinstance(seg, Line) else (seg.at(seg.a0), seg.at(seg.a1))
+        if z <= max(z0, z1) + 1e-9:
+            if isinstance(seg, Line):
+                return y0 + (y1 - y0) * (z - z0) / (z1 - z0)
+            return seg.c[0] + math.sqrt(max(seg.r ** 2 - (z - seg.c[1]) ** 2, 0.0))
+    (y0, z0), (y1, z1) = path[-1].p, path[-1].q
+    return y1 + (y1 - y0) * (z - z1) / (z1 - z0)
+
+
+def hood_front(d: Blueprint, height: float) -> Path:
+    """The front of the cap in side view, in (y, z) from its foot: a lower line that leans back hood_front_lean_low,
+    an upper line that leans back hood_front_lean_up, and an arc of hood_front_blend_r between them. The two lines
+    meet at hood_front_low_share of the height."""
+    a0, a1 = math.radians(d.hood_front_lean_low), math.radians(d.hood_front_lean_up)
+    zk = d.hood_front_low_share * height
+    yk = zk * math.tan(a0)
+    r = d.hood_front_blend_r
+    t = r * math.tan((a0 - a1) / 2)
+    p0 = (yk - t * math.sin(a0), zk - t * math.cos(a0))
+    p1 = (yk + t * math.sin(a1), zk + t * math.cos(a1))
+    blend = Arc((p0[0] - r * math.cos(a0), p0[1] + r * math.sin(a0)), r, -a0, -a1)
+    return [Line((0.0, 0.0), p0), blend, Line(p1, (yk + (height - zk) * math.tan(a1), height))]
+
+
+def top_rear(d: Blueprint, arc: Conic, height: float) -> tuple[Arc, Conic]:
+    """Where the flat top at height cuts the rear arc: the radius hood_top_rear_r in the crease, and the rest of the arc."""
+    r = d.hood_top_rear_r
+    centre = lambda t: (lambda p, n: (p[0] + r * n[0], p[1] + r * n[1]))(arc.at(t), inward(arc, t))
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if centre(mid)[1] > height - r else (lo, mid)
+    c = centre(lo)
+    q = arc.at(lo)
+    return Arc(c, r, math.pi / 2, math.atan2(q[1] - c[1], q[0] - c[0])), arc.after(lo)
+
+
+def inward(arc: Conic, t: float) -> P2:
+    """The unit normal of a rear arc at t, toward the inside of the cap (to the right of its way down)."""
+    a, b = arc.at(max(t - 1e-6, 0.0)), arc.at(min(t + 1e-6, 1.0))
+    n = (b[1] - a[1], -(b[0] - a[0]))
+    k = math.hypot(*n)
+    return n[0] / k, n[1] / k
+
+
+def hood_side_profile(d: Blueprint, height: float, depth: float, arc_top: float | None = None) -> Path:
+    """The cap seen from the side, in (y, z): the leaning front, the soft edge, the flat top, the rear arc down to the
+    rear wall. The rear arc is drawn to arc_top; a lower flat top cuts it, with a radius in the crease."""
+    arc_top = height if arc_top is None else arc_top
+    front = hood_front(d, height)
+    e = d.hood_edge_in
+    y_top = front[-1].q[0]
+    lean = math.tan(math.radians(d.hood_front_lean_up))
+    edge = Conic((y_top - e * lean, height - e), (y_top, height), (y_top + d.hood_edge_back, height))
+    arc = Conic((depth - d.hood_rear_arc_d, arc_top), (depth, arc_top), (depth, arc_top - d.hood_rear_arc_h))
+    upper = front[-1]
+    front = front[:-1] + [Line(upper.p, edge.p)]
+    if arc_top - height < 1e-9:
+        return front + [edge, Line(edge.q, arc.p), arc, Line(arc.q, (depth, 0.0))]
+    crease, rest = top_rear(d, arc, height)
+    return front + [edge, Line(edge.q, crease.at(crease.a0)), crease, rest, Line(rest.q, (depth, 0.0))]
 
 
 def hood(d: Blueprint) -> Hood:
-    height = d.hood_h - d.seam_gap
-    origin = (0.0, d.seam_y + d.hood_shoulder_front, d.body_top + d.seam_gap)
-    depth = d.depth - d.hood_shoulder_front - origin[1]
+    height = d.hood_flat_h
+    arc_top = d.hood_h - d.seam_gap
+    on_rail = d.seam_gap * math.tan(math.radians(front(d).top_lean))
+    origin = (0.0, d.seam_y + on_rail + d.hood_shoulder_front, d.body_top + d.seam_gap)
+    depth = d.depth - d.hood_shoulder_rear - origin[1]
     half_base = d.side_x(d.body_top) - d.hood_shoulder
     path = hood_outline(d, height, half_base)
     outline = sample(path, 3.0)
@@ -374,11 +474,14 @@ def hood(d: Blueprint) -> Hood:
     tm, tb = math.radians(d.marquee_tilt), math.radians(d.hood_band_tilt)
     z_rail_top = z_open_top - (d.marquee_margin + d.marquee_h + d.marquee_head) * math.cos(tm)
     z_band_top = z_rail_top - d.hood_rail_h
-    y_band_top = d.hood_ledge + (z_band_top - d.hood_sill_h) * math.tan(tb)
+    side_front = hood_front(d, height)
+    y_band_foot = front_y(side_front, d.hood_sill_h) + d.hood_ledge
+    y_band_top = y_band_foot + (z_band_top - d.hood_sill_h) * math.tan(tb)
     y_mb = y_band_top + d.hood_band_t / math.cos(tb) - d.marquee_cover_t / math.cos(tm)
     return Hood(origin, height, depth, half_base, path[-1].p[0], path[1].at(path[1].a0)[1], path[0], path[1], d.hood_sill_h,
-                z_band_top, z_rail_top, z_open_top, d.hood_ledge, y_band_top, y_mb, y_mb - (z_open_top - z_rail_top) * math.tan(tm),
-                outline, on_foot(offset(outline, d.hood_bar)), on_foot(offset(outline, d.hood_edge_in)), sample(hood_side_profile(d, height, depth), 3.0))
+                z_band_top, z_rail_top, z_open_top, y_band_foot, y_band_top, y_mb, y_mb - (z_open_top - z_rail_top) * math.tan(tm),
+                outline, on_foot(offset(outline, d.hood_bar)), on_foot(offset(outline, d.hood_edge_in)),
+                sample(hood_side_profile(d, height, depth, arc_top), 3.0), side_front)
 
 
 def marquee_window(d: Blueprint, h: Hood) -> tuple[float, float]:
@@ -428,11 +531,11 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "CP1": ("control panel", "control panel", "faces up", "DK1", "396 x 175, 2 below the deck top", FLAT, "cut plate"),
     "FB1": ("sweep", "front body", "concave, from up to the foot of the rail arc", "DK1, FB2, RL1", "bend_r 50, turning 68 deg", SINGLE,
             "extrusion of the side profile across the width"),
-    "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 60", SINGLE, "extrusion of the side profile across the width"),
-    "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB4, RL1", "brow_ledge 12", SINGLE, "extrusion of the side profile across the width"),
+    "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 52", SINGLE, "extrusion of the side profile across the width"),
+    "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB5, RL1", "brow_ledge 20: a plain strip above the bezel, then the seam bevel", SINGLE, "extrusion of the side profile across the width"),
     "FB4": ("body top", "front body", "faces up", "FB3, RL1 to RL3, FB5, RB2, RB5, HC14", "body_top 423.9; under the hood, bare for 4 at the front and rear", FLAT, "plane cut"),
-    "FB5": ("seam bevel, body", "front body", "faces out and up", "FB4, RL2 to RL4, RB2", "seam_groove 3 in and 3 down from the side at the body top; runs out across the rail edge at the front",
-            FLAT, "plane cut along the depth; it leaves through the step at the rear"),
+    "FB5": ("seam bevel, body", "front body", "faces out and up", "FB3, FB4, RL1 to RL4, RB2, RB5", "seam_groove: from the side 3 below the body top, 3 in to the top; one height all round the body top",
+            "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the body 3 below its top"),
     "RL1": ("rail land", "rail", "faces the player; one convex arc in side view, chord reclined 30 deg", "BZ1, FB1 to FB3, RL2, DK1",
             "rail_sagitta_ratio 0.035 of the chord (13.0); 16.0 wide, 6.4 at the top of the bezel", SINGLE,
             "extrusion of the side profile; on a print that stands upright the arc is in the layer plane and prints smooth"),
@@ -461,18 +564,21 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "RB5": ("upper rear wall", "rear body", "faces the rear, vertical", "RB4, FB4", "rear_proud 40 behind the lower wall", FLAT, "extrusion"),
     "RB6": ("rear door", "rear body", "faces the rear, vertical", "RB3", "368 x 188", FLAT, "plate"),
     "FL1": ("underside", "floor", "faces down", "DK4 to DK7, RL4, RB1 to RB3", "on the desk (feet not designed)", FLAT, "extrusion"),
-    "HC1": ("hood leg, front face", "hood cap", "faces the player, upright", "HC4, HC11, HC3", "hood_bar 21 less the soft edge; its outline follows the side", FLAT, "extrusion of the front outline"),
-    "HC2": ("hood top bar, front face", "hood cap", "faces the player, upright", "HC4, HC10", "hood_bar 21 less the soft edge", FLAT, "extrusion of the front outline"),
-    "HC3": ("hood sill, front face", "hood cap", "faces the player, upright", "HC1, HC12", "hood_sill_h 17", FLAT, "extrusion of the front outline"),
-    "HC4": ("hood soft edge", "hood cap", "turns from the front to the side and the roof", "HC1, HC2, HC5 to HC7", "quarter ellipse 16 in, 32 back",
+    "HC1": ("hood leg, front face", "hood cap", "faces the player; leans back 16 deg below the bend, 2 deg above it", "HC4, HC11, HC3, HC15",
+            "hood_bar 21 less the soft edge; its outline follows the side", SINGLE, "the front outline carried along the front of the side view"),
+    "HC2": ("hood top bar, front face", "hood cap", "faces the player; leans back 2 deg", "HC4, HC10", "hood_bar 21 less the soft edge", FLAT,
+            "the front outline carried along the front of the side view"),
+    "HC3": ("hood sill, front face", "hood cap", "faces the player; leans back 16 deg", "HC1, HC12, HC15", "hood_sill_h 17; on the lower part of the front", FLAT,
+            "the front outline carried along the front of the side view"),
+    "HC4": ("hood soft edge", "hood cap", "turns from the front to the side and the roof", "HC1, HC2, HC5 to HC7", "a quarter circle of 14 (hood_edge_in, hood_edge_back), measured back from the leaning front",
             "single-curved along the top flat; double-curved along the side and the corner", "sweep of the quarter ellipse along the front outline: an extrusion along the top flat, revolutions round the arcs of the side and the corner"),
     "HC5": ("hood side", "hood cap", "faces sideways; leans in 11.1 deg at the seam and 13.1 deg at the top corner", "HC4, HC6, HC9, RL4",
             "tangent to the tuck at the seam; hood_side_turn 2 deg on one arc of 7.7 W; no shoulder", SINGLE,
             "extrusion of the front outline along the depth; print the cap on its rear face so that this outline is in the layer plane"),
-    "HC6": ("hood side blend", "hood cap", "turns from the side to the roof", "HC5, HC7", "hood_corner_ratio 0.07: one radius of 34.6, from 130 above the seam to the top flat", SINGLE,
+    "HC6": ("hood side blend", "hood cap", "turns from the side to the roof", "HC5, HC7", "hood_corner_ratio 0.07: one radius of 34.6 up to the top flat", SINGLE,
             "the same extrusion"),
-    "HC7": ("hood roof", "hood cap", "faces up", "HC4, HC6, HC8", "top flat 0.705 W wide (348.8): follows from the side and the corner; hood_crown_ratio 0: no crown", FLAT, "the same extrusion"),
-    "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high", SINGLE,
+    "HC7": ("hood roof", "hood cap", "faces up", "HC4, HC6, HC8", "hood_flat_h 148 above the foot; 0.713 W wide: follows from the side and the corner; hood_crown_ratio 0: no crown", FLAT, "the same extrusion"),
+    "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high from the top of revision 3, cut by the flat top; hood_top_rear_r 10 in the crease", SINGLE,
             "extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions)"),
     "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, HC14, HC15", "4 in from the upper rear wall", FLAT, "extrusion"),
     "HC10": ("hood soffit", "hood cap", "faces down", "HC2, HC11, MQ1", "under the straight part of the top bar, back to the marquee", FLAT, "extrusion"),
@@ -481,8 +587,8 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "HC13": ("marquee lip", "hood cap", "faces the player; its top and bottom face up and down", "MQ1, HB1, HC11", "hood_rail_h 6 high, hood_rail_proud 5 proud; ends on the legs",
              FLAT, "extrusion across the width, cut by the opening"),
     "HC14": ("hood foot", "hood cap", "faces down", "HC1, HC3, HC4, HC9, HC15", "seam_gap 1.5 above the body top FB4", FLAT, "plane cut"),
-    "HC15": ("seam bevel, hood", "hood cap", "faces out and down", "HC4, HC5, HC9, HC14", "seam_groove 3 in and 3 up from the foot of the side; runs out in the soft edge at the front",
-             FLAT, "plane cut along the depth; it leaves through the rear wall"),
+    "HC15": ("seam bevel, hood", "hood cap", "faces out and down", "HC1, HC3, HC4, HC5, HC9, HC14", "seam_groove: from the side 3 above the foot, 3 in to the foot; one height all round the foot of the cap",
+             "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the cap 3 above its foot"),
     "MQ1": ("marquee cover", "marquee", "faces down 18 deg toward the player", "HC10, HC11, HC13, MQ2", "ends follow the corner of the opening", FLAT, "plate"),
     "MQ2": ("marquee window", "marquee", "faces down 18 deg toward the player", "MQ1", "straight, 358 x 34, eleven modules of 32", FLAT, "plate"),
     "HB1": ("hood band", "hood band", "leans back 24 deg", "HC12, HC11, HC13, SP1, LG1", "foot on the ledge", FLAT, "plate"),
@@ -521,13 +627,10 @@ def faces(d: Blueprint) -> dict[str, Face]:
     land_out = [(d.side_x(z) - inset, y, z) for y, z, _ in chain_a]
     land_in = [(xb, y, z) for y, z, _ in chain_a]
     add("RL1", strip(land_out, land_in), edges=[land_out, land_in])
-    bevel = plane_of(body_bevel(d))
-    body_cuts: list[list[P3]] = []
-    behind = lambda pts, plane: [q for q in pts if sum((q[k] - plane[0][k]) * plane[1][k] for k in range(3)) <= 1e-9]
     for j in range(len(sec) - 1):
-        add("RL2" if j < n_radius - 1 else "RL3", clipped(strip([r[j] for r in rows_a], [r[j + 1] for r in rows_a]), bevel, body_cuts))
+        add("RL2" if j < n_radius - 1 else "RL3", strip([r[j] for r in rows_a], [r[j + 1] for r in rows_a]))
     crease_a = [r[-1] for r in rows_a]
-    add("RL3", [], edges=[behind(crease_a, bevel), behind([r[n_radius - 1] for r in rows_a], bevel)])
+    add("RL3", [], edges=[crease_a, [r[n_radius - 1] for r in rows_a]])
     centre = [(y, z) for y, z, _ in chain_a]
 
     def along(s0: float, s1: float, below: float = 0.0, n: int = 8) -> list[P2]:
@@ -664,20 +767,9 @@ def faces(d: Blueprint) -> dict[str, Face]:
     step_out = [(d.side_x(z), min(d.step_y0 + z * t, y_rear(z)), z) for z in levels]
     step_in = [step_in_at(z) for z in levels]
     rear_in = [(x, y_rear(z), z) for x, _, z in step_in]
-    add("RL4", clipped(strip(band_front, step_out), bevel, body_cuts), edges=[behind(band_front, bevel), behind(step_out, bevel), [band_front[0], step_out[0]]])
-    add("RB2", clipped(strip(step_out, step_in), bevel, body_cuts), edges=[behind(step_out, bevel), behind(step_in, bevel)])
+    add("RL4", strip(band_front, step_out), edges=[band_front, step_out, [band_front[0], step_out[0]]])
+    add("RB2", strip(step_out, step_in), edges=[step_out, step_in])
     add("RB1", strip(step_in, rear_in), edges=[rear_in, [step_in[0], rear_in[0]]])
-    add("FB5", bevel_strips(body_cuts, bevel, d.body_top))
-    x_top = body_bevel(d)[1][0]
-    top_edge = [(seam_x - i, ys + dn / math.cos(lean_top), d.body_top) for i, dn in sec]
-    kept = [q for q in top_edge if q[0] <= x_top]
-    a, b = kept[-1], top_edge[len(kept)]
-    run_out = (x_top, a[1] + (b[1] - a[1]) * (x_top - a[0]) / (b[0] - a[0]), d.body_top)
-    y_step = d.step_y0 + d.body_top * t
-    corner_in = step_in_at(d.body_top)
-    right = ([(0.0, ys, d.body_top), (seam_x - inset, ys, d.body_top)] + kept + [run_out, (x_top, y_step + seam_x - x_top, d.body_top), corner_in]
-             + ([(corner_in[0], d.depth, d.body_top)] if corner_in[1] < d.depth - 1e-9 else []) + [(0.0, d.depth, d.body_top)])
-    add("FB4", [right], edges=[right[1:-1]])
     rw = hw - in_step
     under = [(x, y, 0.0) for x, y, *_ in chain_b] + [(0.0, d.body_d, 0.0), (rw, d.body_d, 0.0), (rw, d.step_y0 + in_step, 0.0), (hw, d.step_y0, 0.0)]
     add("FL1", [under])
@@ -697,50 +789,42 @@ def faces(d: Blueprint) -> dict[str, Face]:
     normals = offset(h.outline, 1.0)
     normals[0] = (h.outline[0][0] - 1.0 / math.cos(math.radians(d.tuck_lean)), 0.0)
     quarter = [(d.hood_edge_in * (1 - math.sin(p)), d.hood_edge_back * (1 - math.cos(p))) for p in [math.pi / 2 * i / 8 for i in range(9)]]
-    rows_h = [[at(x + (nx - x) * i, back, z + (nz - z) * i) for i, back in quarter] for (x, z), (nx, nz) in zip(h.outline, normals)]
-    groove = plane_of(hood_bevel(d, h), h.origin)
-    groove_left = ((-groove[0][0], *groove[0][1:]), (-groove[1][0], 0.0, groove[1][2]))
-    foot = ((0.0, 0.0, oz), (0.0, 0.0, -1.0))
-    hood_cuts: list[list[P3]] = []
+    fy = h.front_y
+    lean = lambda x, back, z: at(x, back + fy(z), z)
+    rows_h = [[lean(x + (nx - x) * i, back, z + (nz - z) * i) for i, back in quarter] for (x, z), (nx, nz) in zip(h.outline, normals)]
+    above_foot = lambda q: oz - q[2]
     for j in range(8):
-        add("HC4", clipped(clipped(strip([r[j] for r in rows_h], [r[j + 1] for r in rows_h]), foot), groove, hood_cuts))
+        add("HC4", [p for p in (clip(q, above_foot) for q in strip([r[j] for r in rows_h], [r[j + 1] for r in rows_h])) if p])
     add("HC4", [], edges=[[r[8] for r in rows_h], [r[0] for r in rows_h]])
-    front_out = [at(x, 0.0, z) for x, z in h.edge_line]
-    front_in = [at(x, 0.0, z) for x, z in h.opening]
+    front_out = [lean(x, 0.0, z) for x, z in h.edge_line]
+    front_in = [lean(x, 0.0, z) for x, z in h.opening]
     add("HC1", strip(front_out[:nb], front_in[:nb]), edges=[front_out[:nb], front_in[:nb]])
     add("HC2", strip(front_out[nb - 1:], front_in[nb - 1:]), edges=[front_out[nb - 1:], front_in[nb - 1:]])
     xs = h.half_open(h.z_sill, d)
     round_z = [h.z_sill + d.hood_sill_corner_r * (1 - math.cos(math.pi / 2 * i / 8)) for i in range(9)]
     corner = [(h.half_open(z, d), z) for z in reversed(round_z)]
     x0 = h.half_width(0.0, h.opening)
-    right_sill = [at(x0, 0.0, 0.0)] + [at(x, 0.0, z) for x, z in corner]
+    right_sill = [lean(x0, 0.0, 0.0)] + [lean(x, 0.0, z) for x, z in corner]
     sill = right_sill + [(-x, y, z) for x, y, z in reversed(right_sill)]
-    add("HC3", [sill], both=False, edges=[[at(x, 0.0, z) for x, z in corner] + [at(-x, 0.0, z) for x, z in reversed(corner)]])
-    side_front = [at(x, d.hood_edge_back, z) for x, z in h.outline]
+    add("HC3", [sill], both=False, edges=[[lean(x, 0.0, z) for x, z in corner] + [lean(-x, 0.0, z) for x, z in reversed(corner)]])
+    side_front = [lean(x, d.hood_edge_back, z) for x, z in h.outline]
     side_rear = [at(x, h.y_rear(z), z) for x, z in h.outline]
-    add("HC5", clipped(strip(side_front[:nb], side_rear[:nb]), groove, hood_cuts), edges=[behind(side_front[:nb], groove), behind(side_rear[:nb], groove)])
+    add("HC5", strip(side_front[:nb], side_rear[:nb]), edges=[side_front[:nb], side_rear[:nb]])
     add("HC6", strip(side_front[nb - 1:-1], side_rear[nb - 1:-1]), edges=[[side_front[nb - 1], side_rear[nb - 1]], [side_front[-2], side_rear[-2]]])
-    roof = [at(-h.half_top, d.hood_edge_back, h.height), at(h.half_top, d.hood_edge_back, h.height),
-            at(h.half_top, h.depth - d.hood_rear_arc_d, h.height), at(-h.half_top, h.depth - d.hood_rear_arc_d, h.height)]
+    roof_end = max(y for y, z in h.side if z >= h.height - 1e-6)
+    roof = [lean(-h.half_top, d.hood_edge_back, h.height), lean(h.half_top, d.hood_edge_back, h.height), at(h.half_top, roof_end, h.height), at(-h.half_top, roof_end, h.height)]
     add("HC7", [roof], both=False)
-    rear = [p for p in h.side if p[0] >= h.depth - d.hood_rear_arc_d - 1e-6]
+    rear = [p for p in h.side if p[0] >= roof_end - 1e-6]
     rear_l = [at(-h.half_width(z), y, z) for y, z in rear]
     rear_r = [at(h.half_width(z), y, z) for y, z in rear]
-    na = sum(1 for y, z in rear if z >= h.height - d.hood_rear_arc_h - 1e-6)
+    na = sum(1 for y, z in rear if z >= d.hood_h - d.seam_gap - d.hood_rear_arc_h - 1e-6)
     add("HC8", strip(rear_l[:na], rear_r[:na]), both=False, edges=[rear_r[:na], rear_l[:na]])
-    add("HC9", clipped(clipped(strip(rear_l[na - 1:], rear_r[na - 1:]), groove, hood_cuts), groove_left), both=False,
-        edges=[behind(rear_r[na - 1:], groove), behind(rear_l[na - 1:], groove_left), [rear_l[na - 1], rear_r[na - 1]]])
-    add("HC15", bevel_strips(hood_cuts, groove, oz))
-    x_bevel = groove[0][0]
-    sole = [q for q in rows_h[0] if q[0] <= x_bevel]
-    a, b = sole[-1], rows_h[0][len(sole)]
-    sole_right = [(0.0, oy, oz)] + sole + [(x_bevel, a[1] + (b[1] - a[1]) * (x_bevel - a[0]) / (b[0] - a[0]), oz), (x_bevel, oy + h.depth, oz), (0.0, oy + h.depth, oz)]
-    add("HC14", [sole_right + [(-x, y, z) for x, y, z in reversed(sole_right[1:-1])]], both=False)
+    add("HC9", strip(rear_l[na - 1:], rear_r[na - 1:]), both=False, edges=[rear_r[na - 1:], rear_l[na - 1:], [rear_l[na - 1], rear_r[na - 1]]])
     xo = h.half_top
-    add("HC10", [[at(-xo, 0.0, h.z_open_top), at(xo, 0.0, h.z_open_top), at(xo, h.y_marquee_top, h.z_open_top), at(-xo, h.y_marquee_top, h.z_open_top)]], both=False)
+    add("HC10", [[lean(-xo, 0.0, h.z_open_top), lean(xo, 0.0, h.z_open_top), at(xo, h.y_marquee_top, h.z_open_top), at(-xo, h.y_marquee_top, h.z_open_top)]], both=False)
     inner = [(h.half_open(z, d), z) for z in round_z + [z for x, z in h.opening if round_z[-1] < z <= h.z_open_top]]
-    add("HC11", strip([at(x, 0.0, z) for x, z in inner], [at(x, h.y_recess(z, d), z) for x, z in inner]))
-    add("HC12", [[at(-xs, 0.0, h.z_sill), at(xs, 0.0, h.z_sill), at(xs, h.y_band_foot, h.z_sill), at(-xs, h.y_band_foot, h.z_sill)]], both=False)
+    add("HC11", strip([lean(x, 0.0, z) for x, z in inner], [at(x, h.y_recess(z, d), z) for x, z in inner]))
+    add("HC12", [[lean(-xs, 0.0, h.z_sill), lean(xs, 0.0, h.z_sill), at(xs, h.y_band_foot, h.z_sill), at(-xs, h.y_band_foot, h.z_sill)]], both=False)
     xr, xt = h.half_open(h.z_band_top, d), h.half_open(h.z_rail_top, d)
     yr = h.y_band_top - d.hood_rail_proud
     rail = [at(-xr, yr, h.z_band_top), at(xr, yr, h.z_band_top), at(xt, yr, h.z_rail_top), at(-xt, yr, h.z_rail_top)]
@@ -795,4 +879,28 @@ def faces(d: Blueprint) -> dict[str, Face]:
     add("LG1", tilted(bd, logo, d.logo_proud), both=False, edges=[[bd(x, v, d.logo_proud) for x, v in logo + logo[:1]]])
     add("LG2", tilted(bd, plate, d.logo_proud + 0.5), both=False, edges=[[bd(x, v, d.logo_proud + 0.5) for x, v in plate + plate[:1]]])
     add("LG3", raised(bd, logo, d.logo_proud), both=False)
+
+    # the seam groove: a bevel of one height round the body top and round the foot of the cap
+    g = d.seam_groove
+
+    def cut_to(prefixes: tuple[str, ...], side: Callable[[P3], float], z_lo: float, z_hi: float) -> None:
+        near = lambda p: min(v[2] for v in p) <= z_hi + 1.0 and max(v[2] for v in p) >= z_lo - 1.0
+        for face in out.values():
+            if face.id.startswith(prefixes):
+                face.polys = [q for q in (clip(refine(p), side) if near(p) else p for p in face.polys) if q]
+                kept = ([v for v in e if not z_lo - 1e-9 <= v[2] <= z_hi + 1e-9 or side(v) <= 1e-9] for e in face.edges)
+                face.edges = [e for e in kept if len(e) >= 2]
+
+    body_loop = section([p for k in ("FB3", "RL1", "RL2", "RL3", "RL4", "RB1", "RB2", "RB5") for p in out[k].polys], d.body_top - g)
+    body_strips, body_inner, body_cut = groove(body_loop, d.body_top - g, d.body_top, g)
+    hood_loop = section([p for k in ("HC1", "HC3", "HC4", "HC5", "HC9") for p in out[k].polys], oz + g)
+    hood_strips, hood_inner, hood_cut = groove(hood_loop, oz + g, oz, g)
+    cut_to(("FB", "RL", "RB"), body_cut, d.body_top - g, d.body_top)
+    cut_to(("HC", "HB", "MQ", "SP", "LG"), hood_cut, oz, oz + g)
+    top = [(x, y, d.body_top) for x, y in body_inner]
+    out["FB4"].polys, out["FB4"].edges = [top], [top + top[:1]]
+    add("FB5", body_strips, both=False)
+    sole = [(x, y, oz) for x, y in hood_inner]
+    add("HC14", [sole], both=False, edges=[sole + sole[:1]])
+    add("HC15", hood_strips, both=False)
     return out

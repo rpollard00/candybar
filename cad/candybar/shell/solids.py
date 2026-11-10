@@ -44,6 +44,9 @@ OVER = 10.0
 TUCK_STATIONS = 24
 EDGE_POINTS = 16
 OFF_LAND = 0.01
+BLEND_SECTIONS = 6
+SHEAR_TOL = 1e-3
+BEVEL_STEP = 0.5
 FINISH = {"deck": "white", "control_panel": "black", "front_body": "white", "rear_body": "white", "bezel": "black",
           "screen": "#3a4250", "hood": "white", "marquee_lip": "white", "speaker_left": "black", "speaker_right": "black",
           "logo_form": "#2f4f3a"}
@@ -192,12 +195,6 @@ def evolved(spine: pr.Path, profile: pr.Path) -> Part.Shape:
                                                        AxeProf=True, Solid=True)
 
 
-def extended(p: P2, q: P2, by: float = OVER) -> tuple[P2, P2]:
-    """The ends of a line moved apart along it by a distance each."""
-    k = by / math.dist(p, q)
-    return (p[0] - (q[0] - p[0]) * k, p[1] - (q[1] - p[1]) * k), (q[0] + (q[0] - p[0]) * k, q[1] + (q[1] - p[1]) * k)
-
-
 # ---------- the edge section ----------
 
 def edge_profile(d: Blueprint, top: float) -> pr.Path:
@@ -318,11 +315,68 @@ def rail_cutter(d: Blueprint, fr: pr.Front) -> Part.Shape:
     return pieces[0].multiFuse(pieces[1:])
 
 
-def bevel_cutter(d: Blueprint) -> Part.Shape:
-    """The bevel of the seam groove on the right side of the body: a plane along the whole depth."""
-    a, b = extended(*pr.body_bevel(d))
-    far = d.width / 2 + OVER
-    return along(poly([a, b, (far, b[1]), (far, a[1])]))
+def outline_at(shape: Part.Shape, z: float) -> Part.Wire:
+    """The outer outline where a level plane at height z cuts a solid."""
+    return max(shape.slice(V(0, 0, 1), z), key=lambda w: w.BoundBox.DiagonalLength)
+
+
+def edge_points(loop: Part.Wire) -> list[list[tuple[float, float]]]:
+    """The edges of a closed outline as lists of points about BEVEL_STEP apart, in order and counter-clockwise; each
+    list starts on the last point of the one before."""
+    chain = []
+    for e in loop.OrderedEdges:
+        chain.append([(p.x, p.y) for p in e.discretize(Number=max(5, math.ceil(e.Length / BEVEL_STEP) + 1))])
+    for k, q in enumerate(chain):
+        nxt = chain[(k + 1) % len(chain)]
+        if min(math.dist(q[-1], nxt[0]), math.dist(q[-1], nxt[-1])) > min(math.dist(q[0], nxt[0]), math.dist(q[0], nxt[-1])):
+            chain[k] = q[::-1]
+    for k, q in enumerate(chain[1:], 1):
+        if math.dist(chain[k - 1][-1], q[0]) > math.dist(chain[k - 1][-1], q[-1]):
+            chain[k] = q[::-1]
+    pts = [p for q in chain for p in q[:-1]]
+    if sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1])) < 0:
+        chain = [q[::-1] for q in reversed(chain)]
+    for k, q in enumerate(chain):
+        q[-1] = chain[(k + 1) % len(chain)][0]
+    return chain
+
+
+def points_wire(chain: list[list[tuple[float, float]]], z: float) -> Part.Wire:
+    """Edges through lists of points at height z: a line where the points lie on one, a spline through them elsewhere."""
+    edges = []
+    for q in chain:
+        p = [V(x, y, z) for x, y in q]
+        a, b = p[0], p[-1]
+        if all(((r - a).cross(b - a)).Length / (b - a).Length < 1e-6 for r in p):
+            edges.append(Part.makeLine(a, b))
+        else:
+            curve = Part.BSplineCurve()
+            curve.interpolate(p)
+            edges.append(curve.toShape())
+    return Part.Wire(edges)
+
+
+def ring_bevel(loop: Part.Wire, z_edge: float, z_face: float, by: float) -> Part.Shape:
+    """What a bevel of one height takes off a part whose outline at z_edge is loop: a slab from a little before z_edge
+    to a little past z_face, less the ruled solid that runs in as far as it rises, edge beside edge. It starts a
+    little outside the outline, so that it crosses the part's side and does not lie on it. Both of its outlines are
+    made from the same points along the edges of the section, moved with pr.inset (the corners meet where the moved
+    edges cross), so that the ruled surface pairs them edge for edge."""
+    e = OVER / 20
+    k = 1.0 if z_face > z_edge else -1.0
+    chain = edge_points(loop)
+    flat = [p for q in chain for p in q[:-1]]
+
+    def moved(by_: float) -> list[list[tuple[float, float]]]:
+        pts, out, i = pr.inset(flat, by_), [], 0
+        for q in chain:
+            out.append([pts[(i + j) % len(pts)] for j in range(len(q))])
+            i += len(q) - 1
+        return out
+
+    keep = Part.makeLoft([points_wire(moved(-e), z_edge - k * e), points_wire(moved(by + e), z_face + k * e)], True, True)
+    z0, z1 = sorted((z_edge - k * e, z_face + k * e))
+    return Part.makeBox(BIG, BIG, z1 - z0, V(-BIG / 2, -BIG / 2, z0)).cut(keep)
 
 
 def step_cutter(d: Blueprint) -> Part.Shape:
@@ -391,8 +445,10 @@ def body(d: Blueprint, fr: pr.Front) -> tuple[Part.Shape, Part.Shape]:
     bw = d.bezel_w / 2
     plate = bezel_box(d, fr, -bw, bw).cut(behind_screen(d, d.mon_setback))
     reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(d, fr))
-    cutters = [both(rail_cutter(d, fr)), both(bevel_cutter(d)), both(step_cutter(d)), plate, both(reveal), screen(d)]
+    cutters = [both(rail_cutter(d, fr)), both(step_cutter(d)), plate, both(reveal), screen(d)]
     solid = solid.cut(cutters).removeSplitter()
+    g = d.seam_groove
+    solid = solid.cut(ring_bevel(outline_at(solid, d.body_top - g), d.body_top - g, d.body_top, g))
     t = math.tan(math.radians(d.step_lean))
     split = V(0, -1, t).normalize()
     front = solid.common(halfspace(V(0, d.step_y0, 0), split)).removeSplitter()
@@ -452,12 +508,23 @@ def recess_profile(d: Blueprint, h: pr.Hood) -> list[P2]:
             (h.y_marquee_top - OVER * tm, h.z_open_top + OVER), (-OVER, h.z_open_top + OVER)]
 
 
-def hood_bevel(d: Blueprint, h: pr.Hood) -> Part.Shape:
-    """The bevel of the seam groove at the foot of the right side of the cap: a plane along the whole depth."""
-    p0, p1 = pr.hood_bevel(d, h)
-    a = extended(p0, p1)[0]
-    far = h.half_base + OVER
-    return along(poly([a, p1, (far, p1[1]), (far, a[1])]), -OVER, h.depth + OVER)
+def leaning(shell: Part.Shape, h: pr.Hood, d: Blueprint) -> Part.Shape:
+    """The cap with its front leaning back as the side view draws it: each height of the shell moved back by the
+    front's lean there. Below and above the blend this is a shear of the shell; through the blend, a loft between
+    its level sections, each moved back as far as the front. The edges of a sheared shape get a tolerance of
+    SHEAR_TOL, as their curves no longer lie exactly on the converted faces."""
+    za, zb = h.front[0].q[1], h.front[2].p[1]
+    t0, t1 = (math.tan(math.radians(a)) for a in (d.hood_front_lean_low, d.hood_front_lean_up))
+    low, up = FreeCAD.Matrix(), FreeCAD.Matrix()
+    low.A23, up.A23, up.A24 = t0, t1, h.front_y(zb) - zb * t1
+    level = lambda z0, z1: Part.makeBox(BIG, BIG, z1 - z0, V(-BIG / 2, -BIG / 2, z0))
+    lower = shell.common(level(-OVER / 20, za)).transformGeometry(low)
+    upper = shell.common(level(zb, BIG / 4)).transformGeometry(up)
+    for part in (lower, upper):
+        part.fixTolerance(SHEAR_TOL)
+    zs = [za + (zb - za) * k / BLEND_SECTIONS for k in range(BLEND_SECTIONS + 1)]
+    blend = Part.makeLoft([outline_at(shell, z).translated(V(0, h.front_y(z), 0)) for z in zs], True, False)
+    return lower.fuse([blend, upper]).removeSplitter()
 
 
 def hood(d: Blueprint) -> dict[str, Part.Shape]:
@@ -471,13 +538,15 @@ def hood(d: Blueprint) -> dict[str, Part.Shape]:
     profile = [pr.Conic((d.hood_edge_in, 0.0), (0.0, 0.0), (0.0, d.hood_edge_back)), pr.Line((0.0, d.hood_edge_back), (0.0, h.depth + OVER))]
     shell = evolved(outline, profile)
     turn = FreeCAD.Matrix(-1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0)
-    shell = shell.transformed(turn)
-    side_view = pr.hood_side_profile(d, h.height, h.depth)
-    side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[2].q)] + side_view[3:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
+    shell = leaning(shell.transformed(turn), h, d)
+    side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
+    side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
     cap = shell.common(across(side_view))
+    g = d.seam_groove
+    cap = cap.cut(ring_bevel(outline_at(cap, g), g, 0.0, g))
     opening = prism(both_sides(opening_path(d, h)), xz(-OVER), V(0, BIG / 4, 0))
     recess = opening.common(across(poly(recess_profile(d, h))))
-    cap = cap.cut([both(hood_bevel(d, h)), recess]).removeSplitter()
+    cap = cap.cut(recess).removeSplitter()
     xr = h.half_open(h.z_band_top, d) + OVER
     lip = Part.makeBox(2 * xr, d.hood_rail_proud, h.z_rail_top - h.z_band_top, V(-xr, h.y_band_top - d.hood_rail_proud, h.z_band_top)).common(opening)
     out = {"hood": cap, "marquee_lip": lip.removeSplitter()}
@@ -529,7 +598,9 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-rail-top": cam((d.side_x(d.body_top) - 6, d.seam_y + 15, d.body_top - 10), 45, 55, 12),
             "closeup-hood-foot": cam((h.half_base - 5, h.origin[1] + 25, h.origin[2]), 40, 60, 8),
             "closeup-step-top": cam((d.side_x(d.body_top) - d.seam_groove - 6, d.depth - 8, d.body_top - 8), 40, 140, 20),
-            "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24)}
+            "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24),
+            "closeup-seam-corner-left": cam((-(d.side_x(d.body_top) - 8), d.seam_y + 6, d.body_top), 35, -42, 6),
+            "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12)}
 
 
 def export(out: str, parts: dict[str, Part.Shape], d: Blueprint) -> dict:

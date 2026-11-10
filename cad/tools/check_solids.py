@@ -59,6 +59,9 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
             "Z seam, hood": (2, d.body_top + d.seam_gap + d.seam_groove / 2),
             "Z hood": (2, h.origin[2] + 0.4 * h.height),
             "Y hood front": (1, h.origin[1] + d.hood_edge_back / 4),
+            "X hood, off centre": (0, h.half_top / 2),
+            "X seam corner": (0, d.side_x(d.body_top) - d.edge_in / 2),
+            "Y seam corner": (1, h.origin[1] + d.hood_edge_back / 2),
             "Y body top": (1, (d.seam_y + d.depth) / 2)}
 
 
@@ -152,29 +155,29 @@ def bridged(points: np.ndarray, ends: np.ndarray) -> np.ndarray:
 # ---------- the solids ----------
 
 def skins(parts: dict[str, Part.Shape]) -> list[Part.Shape]:
-    """The parts as the faces draw them: each of GROUPS fused, the others alone."""
+    """The parts as the faces draw them: each of GROUPS fused, the others alone. The faces of the fuse are not merged
+    (removeSplitter): merging the halves of a face that the front and rear body share can leave an edge with a
+    tolerance of millimetres, and the cuts are the same without it."""
     out = []
     for group in GROUPS:
         shapes = [parts[k] for k in group if k in parts]
-        out.append(shapes[0].multiFuse(shapes[1:]).removeSplitter() if len(shapes) > 1 else shapes[0])
+        out.append(shapes[0].multiFuse(shapes[1:]) if len(shapes) > 1 else shapes[0])
     return out + [s for k, s in parts.items() if not any(k in g for g in GROUPS)]
 
 
 def solid_cut(shapes: list[Part.Shape], axis: int, at: float) -> np.ndarray:
-    """The cut of the skins with the plane, as segments (n, 2, 2) in the two other coordinates."""
+    """The cut of the skins with the plane, as segments (n, 2, 2) in the two other coordinates. The cut is a slice of
+    each whole shape: a section face by face can miss part of a curve where a plane meets a spline face at a small
+    angle."""
     keep = [i for i in range(3) if i != axis]
-    lo = Part.makeCompound(shapes).BoundBox
-    size = 4 * max(lo.XLength, lo.YLength, lo.ZLength)
-    origin = [lo.Center.x, lo.Center.y, lo.Center.z]
-    origin[axis] = at
-    u = [V(*[1.0 if i == k else 0.0 for i in range(3)]) for k in keep]
-    plane = Part.Face(Part.makePolygon([V(*origin) + u[0] * a * size + u[1] * b * size for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))]))
+    normal = V(*[1.0 if i == axis else 0.0 for i in range(3)])
     segs = []
-    for face in [f for s in shapes for f in s.Faces]:
-        for e in face.section(plane).Edges:
-            pts = np.array([[p[i] for i in keep] for p in e.discretize(Distance=STEP)])
-            if len(pts) > 1:
-                segs.append(np.stack([pts[:-1], pts[1:]], axis=1))
+    for shape in shapes:
+        for w in shape.slice(normal, at):
+            for e in w.Edges:
+                pts = np.array([[p[i] for i in keep] for p in e.discretize(Distance=STEP)])
+                if len(pts) > 1:
+                    segs.append(np.stack([pts[:-1], pts[1:]], axis=1))
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
 
 

@@ -295,9 +295,9 @@ PROPORTIONS = [
     ("Body tuck toward the hood, each side at the seam / W", "0.000 (the hood leans 13.5 deg from the seam)", "0.010 +-0.006 (measured)", "0.018 +-0.006 (measured, an upper limit)", "{tuck:.3f}",
      "owner's choice: more than both, over the top third; starts at {tuck_from:.3f} of the body height, {tuck_lean:.1f} deg at the seam"),
     ("Hood crown across the width / W", "0.000", "0.000 +-0.005 (measured)", "0.000 +-0.001 (measured)", "{crown:.3f}", "same: the hood top is straight across"),
-    ("Seam (body top) above the desk / W", "0.916", "0.88 (estimated)", "not comparable", "{seam_r:.3f}", "follows from the bezel: 215 image + 2 x 45 frame + 60 apron"),
-    ("Hood height over the seam / W", "0.256", "0.33 (0.35 to bezel top)", "0.25 to 0.33 (0.36 to bezel top)", "{hood_r:.3f}", "0.341 to the bezel top, inside 0.33 to 0.35"),
-    ("Hood depth at the seam / W", "0.335", "0.28 (estimated)", "0.30 (estimated)", "{hood_d_r:.3f}", "was 0.188 in the built model; needs the upper rear 40 proud"),
+    ("Seam (body top) above the desk / W", "0.916", "0.88 (estimated)", "not comparable", "{seam_r:.3f}", "follows from the bezel: 215 image + 2 x 45 frame + {apron:.0f} apron + {brow:.0f} brow"),
+    ("Hood height over the seam / W", "0.256", "0.33 (0.35 to bezel top)", "0.25 to 0.33 (0.36 to bezel top)", "{hood_r:.3f}", "{hood_bezel_r:.3f} to the bezel top; a flat top below the top of the rear arc"),
+    ("Hood depth at the seam / W", "0.335", "0.28 (estimated)", "0.30 (estimated)", "{hood_d_r:.3f}", "needs the upper rear 40 proud; the front foot stands on the line of the rail"),
     ("Screen inset below the rail land at mid height / W", "0.096 (cheek 25.9 proud)", "about 0.05 (estimated)", "deep (CRT)", "{inset_r:.3f}",
      "flat screen {setback:.1f} behind the chord; {depth_top:.1f} below the land at the window top"),
     ("Bezel width / W", "0.885", "0.858 +-0.016 (measured)", "about 0.79", "{bezel_r:.3f}", "344.7 image + 2 x 45 frame"),
@@ -320,8 +320,9 @@ def proportions(d: Blueprint) -> list[tuple[str, str, str, str, str, str]]:
     h = pr.hood(d)
     fr = pr.front(d)
     w = d.width
-    v = dict(width=w, depth_r=d.depth / w, height_r=(d.body_top + d.hood_h) / w, deck_r=d.deck_top / w, foot_r=d.foot_y / w, recline=d.recline,
-             seam_r=d.body_top / w, hood_r=d.hood_h / w, hood_d_r=h.depth / w, bezel_r=d.bezel_w / w, land_r=d.rail_land / w,
+    v = dict(width=w, depth_r=d.depth / w, height_r=(h.origin[2] + h.height) / w, apron=d.band_len, brow=d.brow_ledge,
+             hood_bezel_r=(h.origin[2] + h.height - d.face(d.bezel_s1)[1]) / w, deck_r=d.deck_top / w, foot_r=d.foot_y / w, recline=d.recline,
+             seam_r=d.body_top / w, hood_r=(h.origin[2] + h.height - d.body_top) / w, hood_d_r=h.depth / w, bezel_r=d.bezel_w / w, land_r=d.rail_land / w,
              edge_in_r=d.edge_in / w, edge_back_r=d.deck_lean_h / w, step_r=(w - d.rear_w) / 2 / w, band_r=(d.step_y0 - d.foot_y + d.bend_t) / w,
              hood_foot_r=2 * h.half_base / w, top_flat_r=2 * h.half_top / w, rail_k=d.rail_sagitta_ratio, rail_s=fr.sagitta, rail_turn=d.rail_turn,
              bow=d.body_bow_ratio, tuck=d.body_tuck_ratio, tuck_from=d.body_tuck_from, tuck_lean=d.tuck_lean, crown=d.hood_crown_ratio,
@@ -634,7 +635,7 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
                 f"{h.y_rear(h.z_band_top) - d.hood_wall - rear:.0f} clear behind the band", (0, -7))
             dim(b, (oy, oz + h.z_band_top - 10), (oy + h.y_band_top, oz + h.z_band_top - 10), f"band top {h.y_band_top:.0f} back", (-4, -7))
             dim(b, (oy, oz + h.z_open_top - 6), (oy + h.y_marquee_top, oz + h.z_open_top - 6), f"marquee {h.y_marquee_top:.0f} under the bar", (6, -7))
-            note(b, (oy + h.depth + 8, oz + 60), f"band leans back {d.hood_band_tilt:.0f} deg;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront upright; shoulder {d.hood_shoulder_front:.0f}\nat front and rear", size=7)
+            note(b, (oy + h.depth + 8, oz + 60), f"band leans back {d.hood_band_tilt:.0f} deg;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nshoulder {d.hood_shoulder_rear:.0f} at the rear", size=7)
         else:
             note(b, (oy + h.depth + 8, oz + 60), f"speaker form {d.speaker_proud:.0f} proud;\nits face is parallel to\nthe band, not upright", size=7)
     fig.suptitle("Blueprint 05: the hood of the target", fontsize=14, y=0.985)
@@ -678,15 +679,14 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         for fid, at, to in tags:
             tag(ax, at, fid, to=to, size=7.5)
     a = axes[0, 0]
-    dim(a, (ys, bt - 14), (oy, bt - 14), f"{d.hood_shoulder_front:.0f}", (-9, -5))
-    dim(a, (oy + h.depth, bt - 14), (d.depth, bt - 14), f"{d.hood_shoulder_front:.0f}", (-9, -5))
-    note(a, (oy - 46, bt + 84), f"The cap stands on the flat body top with a seam of 1.5. Its front is upright;\nthe rail under it leans {pr.front(d).top_lean:.0f} deg at the seam, so the plane changes there.\nShoulder {d.hood_shoulder_front:.0f} at the front and rear, none at the sides.", size=7.5)
+    dim(a, (oy + h.depth, bt - 14), (d.depth, bt - 14), f"{d.hood_shoulder_rear:.0f}", (-9, -5))
+    note(a, (oy - 46, bt + 84), f"The cap stands on the body top with a seam of {d.seam_gap:.1f}. Its foot lies on the line of the rail; its front\nleans back {d.hood_front_lean_low:.0f} deg, less than the rail ({pr.front(d).top_lean:.0f} deg), then {d.hood_front_lean_up:.0f} deg.\nThe groove is level all round: a bevel of {d.seam_groove:.0f} on each part. Shoulder {d.hood_shoulder_rear:.0f} at the rear.", size=7.5)
     a = axes[0, 1]
     dim(a, (h.half_base, bt - 22), (hw, bt - 22), f"tuck {d.tuck:.1f}", (2, -7))
     note(a, (hw - 92, bt - 62), f"The side of the hood HC5 leaves the seam on the tangent of the body side RL4:\nno shoulder, a groove of {d.seam_groove:.0f}: FB5 below, HC15 above. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
     note(axes[0, 2], (hw - 92, ys + 88), "From above, the foot of the leg lies inside the\noutline of the body top everywhere.\n"
-         f"The seam groove: a bevel of {d.seam_groove:.0f} on each part, planes along the depth.\nFB5 runs out across the rail edge, HC15 in the soft edge HC4.\n"
-         f"At the front the cap stands {d.hood_shoulder_front:.0f} back on the flat body top:\nno bevel there.", size=7.5)
+         f"The seam groove: a bevel of {d.seam_groove:.0f} on each part, at one height all round:\nalong the sides, round the front corners, across the front.\n"
+         f"FB5 runs round the body top, HC15 round the foot of the cap.", size=7.5)
     note(axes[1, 0], (135, 150), "RL2 and RL3 come down the rail arc, turn through the sweep\nand run on along the deck as DK2 and DK3: one section,\none width, no jump. RL4 and DK7 are one plane.", size=7.5)
     a = axes[1, 1]
     dim(a, (hw - d.edge_in, 170), (hw, 170), f"{d.edge_in:.1f}", (-16, 0))

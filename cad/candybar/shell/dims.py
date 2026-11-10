@@ -252,14 +252,31 @@ class Blueprint(Dims):
     bezel_rim: float = 2.0
     # the bezel land lies this far below the rail land; the reveal round the plate (panel_gap wide) has the same depth
     bezel_drop: float = 2.0
-    # the flat screen stands 14 below the rail land at the top edge of the window
+    # the bezel, the window and the screen stand lower on the face than in Dims, so that the strip of face above the
+    # bezel (brow_ledge) holds the seam bevel with plain face below it; the band below the bezel gives the length up
+    band_len: float = 52.0
+    brow_ledge: float = 20.0
+    # the flat screen stands mon_setback behind the chord of the rail arc
     mon_setback: float = 7.2
     # the lit image as a thin plate on the screen face, for the renders of the solids
     screen_t: float = 1.0
-    # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides
+    # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides; at
+    # the front its foot lies on the line of the rail, at the rear it stands hood_shoulder_rear in from the upper rear
     hood_shoulder: float = 0.0
+    hood_shoulder_front: float = 0.0
+    hood_shoulder_rear: float = 4.0
     seam_groove: float = 3.0
     hood_crown_ratio: float = 0.0
+    # hood in side view: the front leans back, more over its lower part, with a blend between; a flat top below the
+    # top of the rear arc, which it cuts, with a radius in the crease; a soft edge of one radius round the front
+    hood_flat_h: float = 148.0
+    hood_front_lean_low: float = 16.0
+    hood_front_low_share: float = 0.29
+    hood_front_lean_up: float = 2.0
+    hood_front_blend_r: float = 40.0
+    hood_top_rear_r: float = 10.0
+    hood_edge_in: float = 14.0
+    hood_edge_back: float = 14.0
     # hood side: tangent to the tuck at the seam, it turns hood_side_turn degrees on its way up to a top corner of one radius
     hood_side_turn: float = 2.0
     hood_corner_ratio: float = 0.07
