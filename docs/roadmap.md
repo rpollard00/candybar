@@ -9,18 +9,20 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | Phase | Result | State |
 | --- | --- | --- |
 | 1. Layout study | Hardware envelopes, keep-out zones, two control panel tiles, layout checks | Done. All dimensions are sourced or provisional. |
-| 2. Shell form | The massing has the proportions and the main forms of the reference | Done for now: centered screen on an apron, deck that ends behind the screen face, taper. 470 x 520 x 624 mm. The sight line is 23.8 degrees. |
-| 3. Shell detail | Facets on the cheeks and the rear, blended hood corners, hood as an open arch, rear door, hand-holds | Not started. Needs a change of modelling method: solid operations at build time. |
+| 2. Shell form | The massing has the proportions and the main forms of the reference | Rejected by the owner on 2026-11-10: the third pass does not read as a New Astro City. Its layout, its checks and its dimensions stay. Its outline shell goes. |
+| 3. Shell rebuild | A shell that reads as a New Astro City: the cheek whose front edge is one long arc, facets on the cheeks, the deck and the hood, a framed bezel, a tilted hood band, a stepped rear body. The MakerWorld Mini New Astro City model is the form reference. | In work. Step 1: fit the reference to this hardware as a target, in three variants, with a render harness. Step 2: model solids against the chosen target and iterate on renders. |
 | 4. Printable modules | The shell divided into parts for the 256 mm bed, with joints, inserts and ribs. Monitor cradle, compute module mount, power supply mount, control panel latch, bezel plate mount. | Not started |
 | 5. Print checks | Each part sliced for the A1. Fit coupons for inserts, joints and button holes. | Not started |
 | 6. Dry assembly and finish | As in the project brief, sections 4 and 5 | Not started |
 
 ## Next steps
 
-1. Apply the measurements of the Mini New Astro City files and the panel research when they come.
-2. Change the shell to solid modelling. Add the cheek facets, the rear facets and the blended hood corners. Make Blender renders from the angles of the reference photos.
+1. Review the three target variants and choose one with the owner.
+2. Model the shell as solids against the chosen target. Iterate until the renders read as the reference.
 3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
 4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
+
+Modelling and iteration run on Opus subagents. The main session writes the brief and reviews the renders.
 
 ## Waiting for the owner
 
@@ -28,9 +30,8 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] The Mini New Astro City files from MakerWorld (model 700005). They need a login. The owner will get them. They are a different design from the reference cabinet, but they give real Astro City curves to measure.
+- [ ] A choice between the three target variants, when they are ready.
 - [ ] A photo of the reference cabinet from the side, if one exists.
-- [ ] A look at the apron in the third pass (decision record 0003 is a proposal).
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.
 
@@ -70,7 +71,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | `docs/Arcade_Project_Current_Design_2026-11-09.md` | The project brief |
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
-| `docs/research/` | Research notes: reference cabinets, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
+| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
 | `cad/out/report.md` | Check results and the list of dimensions to measure (a build output) |

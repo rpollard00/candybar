@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: superseded by the shell rebuild. The owner rejected the look of the pass that had the apron. How the screen gets its height is decided again with the target variants
 ---
 
 # Raise the screen on an apron under a centered bezel
