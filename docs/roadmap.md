@@ -17,7 +17,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Make the blueprint: drawings of the references and of this cabinet, with the big volumes first, then elevations, sections and both junctions, and with each face of each component labeled. The target blueprint goes into `docs/blueprint/`. The owner asked for this on 2026-11-10, because changes to one part at a time did not converge on the right proportions.
+1. The blueprint is in `docs/blueprint/` (seven sheets and `index.md`), made on 2026-11-10. The drawings of the references are in `cad/out/shell-d/reconstruction/`.
 2. The owner reviews the blueprint and answers its open questions.
 3. Build the solids from the same profiles and dimensions that draw the blueprint. A model that follows a dimensioned blueprint can be built on Opus.
 4. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
@@ -34,7 +34,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] A review of the blueprint in `docs/blueprint/`, when it is ready, and answers to its open questions.
+- [ ] A review of the blueprint in `docs/blueprint/`: are the big volumes on sheet 1 right, are the faces on sheet 7 read correctly, and answers to the seven questions in `index.md`.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.
@@ -91,6 +91,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 | `docs/Arcade_Project_Current_Design_2026-11-09.md` | The project brief |
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
+| `docs/blueprint/` | The blueprint of the target cabinet: volumes, elevations, sections, junctions, the face map, the face table and the open questions |
 | `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
 | `cad/reference/` | The picked points and known sizes for each reference photo, which the photo tools use |
 | `cad/README.md` | How to build, check and view the model |
