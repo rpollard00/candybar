@@ -229,11 +229,12 @@ def hood_stations(d: Dims) -> HoodStations:
 class Blueprint(Dims):
     """The target of the blueprint (docs/blueprint): the dimensions that differ from the built model, and new ones.
 
-    The deck, the screen and the bezel window keep the values of Dims. The blueprint changes the rail (one edge
-    section from the hood seam to the front of the deck), the rear (the upper rear stands proud) and the hood
-    (deeper, sides that arc into the top). It also holds the curves of the form as named values: the arc of the
-    rail in side view, the tuck of the body sides toward the hood in front view, and the lines that the
-    references draw straight (crown, bow), which are zero. profiles.py turns these into profiles and faces.
+    The deck and the bezel window keep the values of Dims; the flat screen stands nearer the bezel. The blueprint
+    changes the rail (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands
+    proud) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves of the form
+    as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in front view,
+    the side and top corner of the hood, and the lines that the references draw straight (crown, bow), which are
+    zero. profiles.py turns these into profiles and faces.
     """
     # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk
     step_y0: float = 345.0
@@ -244,18 +245,20 @@ class Blueprint(Dims):
     rear_step_z1: float = 350.0
     # curves of the body
     rail_sagitta_ratio: float = 0.035
-    body_tuck_ratio: float = 0.015
-    body_tuck_from: float = 0.75
+    body_tuck_ratio: float = 0.023
+    body_tuck_from: float = 0.667
     body_bow_ratio: float = 0.0
     bezel_land: float = 20.0
     bezel_rim: float = 2.0
+    # the flat screen stands 14 below the rail land at the top edge of the window
+    mon_setback: float = 7.2
     # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides
     hood_shoulder: float = 0.0
     seam_groove: float = 3.0
     hood_crown_ratio: float = 0.0
-    hood_blend_from: float = 0.45
-    hood_top_flat_ratio: float = 0.66
-    hood_blend_weight: float = 0.7
+    # hood side: tangent to the tuck at the seam, it turns hood_side_turn degrees on its way up to a top corner of one radius
+    hood_side_turn: float = 2.0
+    hood_corner_ratio: float = 0.07
     hood_rear_arc_d: float = 95.0
     hood_rear_arc_h: float = 110.0
     hood_sill_corner_r: float = 6.0
@@ -294,7 +297,7 @@ class Blueprint(Dims):
 
     @property
     def tuck_r(self) -> float:
-        """Radius of the tuck arc. The hood side continues on the same radius, so the curvature has no jump at the seam."""
+        """Radius of the tuck arc. The hood side leaves the seam on its tangent, so the outline has no corner there."""
         lean = math.radians(self.tuck_lean)
         return (self.body_top - self.tuck_z0) / math.sin(lean) if lean > 1e-9 else math.inf
 

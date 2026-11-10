@@ -38,7 +38,7 @@ CAD = os.path.dirname(HERE)
 REPO = os.path.dirname(CAD)
 sys.path.insert(0, CAD)
 from candybar.shell import profiles as pr  # noqa: E402
-from candybar.shell.dims import Blueprint  # noqa: E402
+from candybar.shell.dims import MON_ACTIVE_H, Blueprint, Dims  # noqa: E402
 
 OUT = os.path.join(REPO, "docs", "blueprint")
 RECON = os.path.join(CAD, "out", "shell-d", "reconstruction")
@@ -238,11 +238,24 @@ def hardware() -> list[dict]:
     return json.load(open(path)) if os.path.exists(path) else []
 
 
-def draw_hardware(ax: Axes, view: View, names: tuple[str, ...] = ("Monitor_Body", "PSU_Body", "Compute_")) -> None:
+def hardware_of(d: Blueprint) -> list[dict]:
+    """The hardware of the last build, with the monitor moved square to the screen to the blueprint's screen plane."""
+    su, cu = d.u
+    move = Dims().mon_setback - d.mon_setback
+    out = []
     for item in hardware():
+        corners = np.array(item["corners"], float)
+        if item["name"].startswith("Monitor"):
+            corners += (0.0, -move * cu, move * su)
+        out.append({**item, "corners": corners})
+    return out
+
+
+def draw_hardware(ax: Axes, view: View, d: Blueprint, names: tuple[str, ...] = ("Monitor_Body", "PSU_Body", "Compute_")) -> None:
+    for item in hardware_of(d):
         if not item["name"].startswith(names):
             continue
-        xy, _ = project(np.array(item["corners"], float), view)
+        xy, _ = project(item["corners"], view)
         hull = _hull(xy)
         ax.plot(*np.vstack([hull, hull[:1]]).T, color=item["colour"], lw=0.9, ls="--", zorder=8500)
 
@@ -280,21 +293,26 @@ PROPORTIONS = [
      "same as the 3D model"),
     ("Body side bow (widest at mid height) / W", "0.000", "0.000 +-0.004 (measured)", "0.000 +-0.003 (measured)", "{bow:.3f}", "same: no bow"),
     ("Body tuck toward the hood, each side at the seam / W", "0.000 (the hood leans 13.5 deg from the seam)", "0.010 +-0.006 (measured)", "0.018 +-0.006 (measured, an upper limit)", "{tuck:.3f}",
-     "between the two; starts at {tuck_from:.2f} of the body height, {tuck_lean:.1f} deg at the seam"),
+     "owner's choice: more than both, over the top third; starts at {tuck_from:.3f} of the body height, {tuck_lean:.1f} deg at the seam"),
     ("Hood crown across the width / W", "0.000", "0.000 +-0.005 (measured)", "0.000 +-0.001 (measured)", "{crown:.3f}", "same: the hood top is straight across"),
     ("Seam (body top) above the desk / W", "0.916", "0.88 (estimated)", "not comparable", "{seam_r:.3f}", "follows from the bezel: 215 image + 2 x 45 frame + 60 apron"),
     ("Hood height over the seam / W", "0.256", "0.33 (0.35 to bezel top)", "0.25 to 0.33 (0.36 to bezel top)", "{hood_r:.3f}", "0.341 to the bezel top, inside 0.33 to 0.35"),
     ("Hood depth at the seam / W", "0.335", "0.28 (estimated)", "0.30 (estimated)", "{hood_d_r:.3f}", "was 0.188 in the built model; needs the upper rear 40 proud"),
     ("Screen inset below the rail land at mid height / W", "0.096 (cheek 25.9 proud)", "about 0.05 (estimated)", "deep (CRT)", "{inset_r:.3f}",
-     "flat screen 18 behind the chord; the arc adds 13 at mid height"),
+     "flat screen {setback:.1f} behind the chord; {depth_top:.1f} below the land at the window top"),
     ("Bezel width / W", "0.885", "0.858 +-0.016 (measured)", "about 0.79", "{bezel_r:.3f}", "344.7 image + 2 x 45 frame"),
-    ("Rail land / W", "0.016", "0.05 +-0.015 (estimated)", "not read", "{land_r:.3f}", "what the bezel leaves, less the edge section"),
+    ("Rail land / W", "0.016", "0.05 +-0.015 (estimated)", "not read", "{land_r:.3f}", "what the bezel leaves, less the edge section; {land_top:.1f} at the bezel top (the tuck)"),
     ("Rail edge, in x back / W", "0.039 x 0.039 (45 deg facet)", "0.03 x 0.12 (band 10 to 18 deg)", "not read", "{edge_in_r:.3f} x {edge_back_r:.3f}",
      "the deck's own edge section (10 deg band), so the edge follows through"),
     ("Side band depth at the desk / W", "0.277", "0.27 (estimated)", "not read", "{band_r:.3f}", "follows both references; the built model has 0.35"),
     ("Rear body narrower, each side / W", "0.074", "0.01 to 0.03 (uncertain)", "not read", "{step_r:.3f}", "a shallow step behind the side band"),
     ("Hood foot width / W", "0.990", "0.94 to 0.96 (measured)", "0.95 (measured)", "{hood_foot_r:.3f}", "the outline of the body top: no shoulder, a groove at the seam"),
-    ("Hood top flat / W", "0.713", "0.66 (estimated)", "not read", "{top_flat_r:.2f}", "the widest blend that keeps a straight marquee window of 320"),
+    ("Hood side lean, seam to top corner, deg", "13.5 to 22 (one arc)", "about 6, then one long blend (estimated)", "11 to 19 (measured +-3)",
+     "{lean0:.1f} to {lean1:.1f}", "tangent to the tuck, then near straight (R {side_r:.1f} W), as on the real cabinet"),
+    ("Hood top corner radius / W", "0.074", "none: one long blend (estimated)", "0.06 to 0.07 (measured, left)", "{corner_r:.3f}",
+     "the real cabinet's tight corner"),
+    ("Hood top flat / W", "0.713", "0.66 (estimated)", "about 0.68 (estimated, owner-ref-1)", "{top_flat_r:.3f}",
+     "follows from the side and the corner; straight marquee window {mq:.0f}"),
 ]
 
 
@@ -305,9 +323,12 @@ def proportions(d: Blueprint) -> list[tuple[str, str, str, str, str, str]]:
     v = dict(width=w, depth_r=d.depth / w, height_r=(d.body_top + d.hood_h) / w, deck_r=d.deck_top / w, foot_r=d.foot_y / w, recline=d.recline,
              seam_r=d.body_top / w, hood_r=d.hood_h / w, hood_d_r=h.depth / w, bezel_r=d.bezel_w / w, land_r=d.rail_land / w,
              edge_in_r=d.edge_in / w, edge_back_r=d.deck_lean_h / w, step_r=(w - d.rear_w) / 2 / w, band_r=(d.step_y0 - d.foot_y + d.bend_t) / w,
-             hood_foot_r=2 * h.half_base / w, top_flat_r=d.hood_top_flat_ratio, rail_k=d.rail_sagitta_ratio, rail_s=fr.sagitta, rail_turn=d.rail_turn,
+             hood_foot_r=2 * h.half_base / w, top_flat_r=2 * h.half_top / w, rail_k=d.rail_sagitta_ratio, rail_s=fr.sagitta, rail_turn=d.rail_turn,
              bow=d.body_bow_ratio, tuck=d.body_tuck_ratio, tuck_from=d.body_tuck_from, tuck_lean=d.tuck_lean, crown=d.hood_crown_ratio,
-             inset_r=(d.mon_setback + fr.rise(d, d.image_s)) / w)
+             inset_r=(d.mon_setback + fr.rise(d, d.image_s)) / w, setback=d.mon_setback, depth_top=d.mon_setback + fr.rise(d, d.image_s + MON_ACTIVE_H / 2),
+             land_top=d.side_x(fr.on_rail(d, d.bezel_s1)[1]) - d.edge_in - d.bezel_w / 2 - d.panel_gap,
+             lean0=d.tuck_lean, lean1=d.tuck_lean + d.hood_side_turn, side_r=h.side_arc.r / w if isinstance(h.side_arc, pr.Arc) else math.inf,
+             corner_r=d.hood_corner_ratio, mq=pr.marquee_window(d, h)[0])
     return [(q, k, m, r, t.format(**v), why.format(**v)) for q, k, m, r, t, why in PROPORTIONS]
 
 
@@ -404,7 +425,7 @@ def sheet_volumes(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     for i, key in enumerate(("front", "side", "top")):
         ax = fig.add_subplot(grid[0, i])
         paint(ax, faces, VIEWS[key], "group", lw=0.35)
-        draw_hardware(ax, VIEWS[key])
+        draw_hardware(ax, VIEWS[key], d)
         frame(ax, VIEWS[key].name.capitalize(), *lim[key], grid=False)
         ax.axis("off")
         ax.set_title(VIEWS[key].name.capitalize(), fontsize=11)
@@ -471,7 +492,7 @@ def sheet_side_section(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     ax = fig.add_subplot(grid[0, 0])
     segs = cut(faces, 0, 0.01)
     draw_cut(ax, segs, lw=1.6)
-    draw_hardware(ax, VIEWS["side"])
+    draw_hardware(ax, VIEWS["side"], d)
     top = d.body_top + d.hood_h
     h = pr.hood(d)
     frame(ax, "Side section at the centre line (the outer skin; each line in the colour of its face)", (-95, 700), (-70, 690), "y, from the deck front (mm)", "z, above the desk (mm)")
@@ -509,8 +530,8 @@ def sheet_side_section(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(ax, cm, pm, "", size=7)
     note(ax, (40, 330), f"RL1, the rail land at the sides (black line): one arc,\nsagitta {fr.sagitta:.1f} = {d.rail_sagitta_ratio:.3f} of its chord {fr.chord:.1f} (dashed),\nR {fr.rail.r:.0f} = {fr.rail.r / d.width:.2f} W, turning {d.rail_turn:.0f} deg", to=pm)
     note(ax, (40, 262), f"chord and flat screen reclined {fr.recline:.0f} deg; the rail leans\n{fr.foot_lean:.0f} deg at its foot and {fr.top_lean:.0f} deg at the seam; sweep R {d.bend_r:.0f}", to=(p0[0] - 4, p0[1] - 6))
-    note(ax, (455, 300), f"screen {d.mon_setback + fr.rise(d, d.image_s):.0f} below the rail land at mid height,\n{d.mon_setback + fr.rise(d, d.image_s + 107.7):.0f} at the top of the window", size=7)
-    note(ax, (455, 250), "monitor, power supply and BC-250:\noutlines of the last build (dashed)", size=7)
+    note(ax, (40, 575), f"screen {d.mon_setback + fr.rise(d, d.image_s):.0f} below the rail land at mid height,\n{d.mon_setback + fr.rise(d, d.image_s + 107.7):.0f} at the top of the window", size=7)
+    note(ax, (40, 530), f"monitor, power supply and BC-250: outlines of the\nlast build (dashed); the monitor moved {Dims().mon_setback - d.mon_setback:.1f} forward\nwith the screen", size=7)
     bx = fig.add_subplot(grid[0, 1])
     sec = pr.deck_front_section(d)
     bx.plot([p[0] for p in sec], [p[1] for p in sec], color=INK, lw=1.6)
@@ -550,11 +571,11 @@ def sheet_plan_sections(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(a, (d.bezel_w / 2 + d.panel_gap, yf - 14), (hw - d.edge_in, yf - 14), f"land {d.rail_land:.1f}", (-4, -8))
     dim(a, (hw - d.edge_in, yf - 14), (hw, yf - 14), f"{d.edge_in:.1f}", (2, -8))
 
-    note(a, (153, 560), "RL4 side band: in the side plane up to z 336, flush\nwith the deck's side DK7; above that it leans in\ntoward the hood. It carries the stripe. Behind it\nthe step RB2 turns in 12 to the rear body side RB1.", size=7.5)
+    note(a, (153, 560), f"RL4 side band: in the side plane up to z {d.tuck_z0:.0f}, flush\nwith the deck's side DK7; above that it leans in\ntoward the hood. It carries the stripe. Behind it\nthe step RB2 turns in 12 to the rear body side RB1.", size=7.5)
     note(a, (153, 420), "RL1 land, RL2 radius, RL3 band leaning 10 deg,\ncrease, RL4: the deck's edge section on its side.\nThe crease lies 24 behind the land, square to the\nrail arc. BZ1, BZ2: the bezel land and inner frame.", size=7.5)
     note(axes[2], (153, 400), "The same section, carried round the sweep:\nRL2 and RL3 run on into DK2 and DK3 of the deck.\nThe land RL1 turns into the deck top DK1.", size=7.5)
     note(axes[3], (113, 235), "DK7 (deck side) and RL4 (side band) are one plane.\nAbove the crease (z 48 to 63) the band DK3 leans in\n10 deg, up to 2.7; see sheet 03.", size=7.5)
-    note(axes[0], (153, 632), "The leg of the hood, 60 above the seam. Its side HC5\nis already in from the side plane: it carries on the\ntuck of the body. HC4 is the soft edge.", size=7.5)
+    note(axes[0], (153, 632), "The leg of the hood, 60 above the seam. Its side HC5\nis already in from the side plane: it leaves the seam\non the tangent of the body's tuck. HC4 is the soft edge.", size=7.5)
     fig.suptitle("Blueprint 04: horizontal sections through the right side of the target, one scale (each line in the colour of its face)", fontsize=14, y=0.985)
     save(fig, "04-plan-sections")
 
@@ -575,11 +596,11 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     w, mh = pr.marquee_window(d, h)
     top = oz + h.height
     dim(a, (-h.half_base, oz - 16), (h.half_base, oz - 16), f"foot {2 * h.half_base:.1f} = the body top (body {d.width:.1f} below the tuck): no shoulder, a groove of {d.seam_groove:.0f} at the seam", (0, -9))
-    dim(a, (-h.half_top, top + 14), (h.half_top, top + 14), f"top flat {2 * h.half_top:.1f} = {d.hood_top_flat_ratio:.2f} W", (0, 9))
-    dim(a, (h.half_base + 40, oz), (h.half_base + 40, oz + h.z_blend), f"side: the arc of the body's tuck\ncarried on, R {d.tuck_r / d.width:.2f} W,\n{d.tuck_lean:.1f} deg at the seam", (48, 0), ha="center")
-    dim(a, (h.half_base + 40, oz + h.z_blend), (h.half_base + 40, top), f"blend into the top:\na conic, {h.height - h.z_blend:.0f} high", (40, 0), ha="center")
-    xb = h.half_width(h.z_blend)
-    dim(a, (h.half_top, top + 34), (xb, top + 34), f"blend {xb - h.half_top:.0f} wide", (0, 9))
+    dim(a, (-h.half_top, top + 14), (h.half_top, top + 14), f"top flat {2 * h.half_top:.1f} = {2 * h.half_top / d.width:.3f} W", (0, 9))
+    dim(a, (h.half_base + 40, oz), (h.half_base + 40, oz + h.z_corner), f"side: tangent to the tuck\nat the seam, near straight,\n{d.tuck_lean:.1f} to {d.tuck_lean + d.hood_side_turn:.1f} deg", (48, 0), ha="center")
+    dim(a, (h.half_base + 40, oz + h.z_corner), (h.half_base + 40, top), f"top corner R {h.corner.r:.1f}\n= {d.hood_corner_ratio:.2f} W", (40, 0), ha="center")
+    xb = h.half_width(h.z_corner)
+    dim(a, (h.half_top, top + 34), (xb, top + 34), f"corner {xb - h.half_top:.0f} wide", (0, 9))
     dim(a, (-h.half_base - 30, d.body_top), (-h.half_base - 30, top), f"hood {d.hood_h:.1f} = {d.hood_h / d.width:.2f} W", (-9, 0), turn=90)
     dim(a, (-w / 2, oz + (h.z_rail_top + h.z_open_top) / 2), (w / 2, oz + (h.z_rail_top + h.z_open_top) / 2), f"marquee window {w:.0f} x {mh:.0f}, straight ({int(w // d.marquee_module)} modules of {d.marquee_module:.0f})", size=8)
     dim(a, (-60, oz + h.z_open_top), (-60, top), f"top bar {d.hood_bar:.0f}", (-30, 0))
@@ -659,7 +680,7 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     note(a, (oy - 46, bt + 84), f"The cap stands on the flat body top with a seam of 1.5. Its front is upright;\nthe rail under it leans {pr.front(d).top_lean:.0f} deg at the seam, so the plane changes there.\nShoulder {d.hood_shoulder_front:.0f} at the front and rear, none at the sides.", size=7.5)
     a = axes[0, 1]
     dim(a, (h.half_base, bt - 22), (hw, bt - 22), f"tuck {d.tuck:.1f}", (2, -7))
-    note(a, (hw - 92, bt - 62), f"The side of the hood HC5 carries on the arc of the body side RL4 over the seam:\nno shoulder, a groove of {d.seam_groove:.0f}. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
+    note(a, (hw - 92, bt - 62), f"The side of the hood HC5 leaves the seam on the tangent of the body side RL4:\nno shoulder, a groove of {d.seam_groove:.0f}. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)
     note(axes[0, 2], (hw - 92, ys + 88), "From above, the foot of the leg lies inside the\noutline of the body top everywhere.", size=7.5)
     note(axes[1, 0], (135, 150), "RL2 and RL3 come down the rail arc, turn through the sweep\nand run on along the deck as DK2 and DK3: one section,\none width, no jump. RL4 and DK7 are one plane.", size=7.5)
     a = axes[1, 1]
@@ -729,10 +750,10 @@ def sheet_curvature(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     b.plot([-6, 6], [d.tuck_z0, d.tuck_z0], color=RED, lw=0.6)
     b.text(8, d.tuck_z0 - 5, f"the tuck starts at z {d.tuck_z0:.0f}\n({d.body_tuck_from:.2f} of the body height)", fontsize=7, va="top", color=RED)
     dim(b, (0, d.body_top + 12), (k * d.tuck, d.body_top + 12), f"{d.tuck:.1f} in at the seam, {d.tuck_lean:.1f} deg there", (0, 9))
-    frame(b, f"2. Body side and the foot of the hood in front view (RL4, HC5): distance in from the side plane, drawn x{k:.0f}\none arc of R {d.tuck_r:.0f} ({d.tuck_r / d.width:.2f} W) through the seam: no shoulder, no jump of curvature",
-          (-6, k * 17), (d.deck_top - 10, d.body_top + 62), f"in from the side plane (mm x {k:.0f})", "z, above the desk (mm)")
+    frame(b, f"2. Body side and the foot of the hood in front view (RL4, HC5): distance in from the side plane, drawn x{k:.0f}\nthe tuck: one arc of R {d.tuck_r:.0f} ({d.tuck_r / d.width:.2f} W) up to the seam; the hood side leaves it on its tangent: no shoulder, no corner",
+          (-6, k * 23), (d.deck_top - 10, d.body_top + 62), f"in from the side plane (mm x {k:.0f})", "z, above the desk (mm)")
     b.set_aspect("auto")
-    b.set_xticks([k * v for v in (0, 5, 10, 15)], ["0", "5", "10", "15"])
+    b.set_xticks([k * v for v in (0, 5, 10, 15, 20)], ["0", "5", "10", "15", "20"])
     b.legend(loc="lower right", fontsize=7.5, frameon=False)
 
     c = fig.add_subplot(grid[0, 2])
@@ -741,7 +762,7 @@ def sheet_curvature(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     win0, win1 = d.image_s - 107.712, d.image_s + 107.712
     c.plot(ss - d.bezel_s0, k * land, color=RED, lw=2.4, label="rail land RL1 (the bezel land BZ1 lies 2 below it)")
     c.plot(ss - d.bezel_s0, np.zeros_like(ss), color=INK, lw=0.8, ls="--", label="chord of the rail (the flat front of the blueprint before)")
-    c.plot([win0 - d.bezel_s0, win1 - d.bezel_s0], [-k * d.mon_setback] * 2, color="#1f77d0", lw=2.4, label="screen SC1: flat, where it was")
+    c.plot([win0 - d.bezel_s0, win1 - d.bezel_s0], [-k * d.mon_setback] * 2, color="#1f77d0", lw=2.4, label=f"screen SC1: flat, {d.mon_setback:.1f} behind the chord")
     inner0, inner1 = d.bezel_land, d.bezel_len - d.bezel_land
     for s_in, s_win in ((inner0, win0 - d.bezel_s0), (inner1, win1 - d.bezel_s0)):
         c.plot([s_in, s_win, s_win], [k * (fr.rise(d, d.bezel_s0 + s_in) - 2), -k * (d.mon_setback - d.bezel_rim), -k * d.mon_setback], color="#555", lw=1.4)
@@ -765,11 +786,12 @@ def sheet_curvature(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         e.plot([sgn * hw, sgn * hw], [-130, -d.seam_gap], color=INK, lw=0.7, ls="--")
         e.plot([sgn * hw, sgn * (hw - 12), sgn * (hw - 12 - 60 * math.tan(math.radians(7)))], [-d.seam_gap, -d.seam_gap, 60], color=INK, lw=0.7, ls=":")
     e.plot([], [], color=INK, lw=0.7, ls=":", label="the blueprint before: straight side, shoulder 12, hood side 7 deg")
-    xb_ = h.half_width(h.z_blend)
-    e.plot([xb_, h.half_top], [h.z_blend, h.height], color=INK, lw=0.7, ls="--")
-    dim(e, (h.half_top, h.height + 10), (xb_, h.height + 10), f"blend {xb_ - h.half_top:.0f} wide, {h.height - h.z_blend:.0f} high", (0, 9))
+    xb_ = h.half_width(h.z_corner)
+    e.plot([xb_, xb_ - (h.height - h.z_corner) * math.tan(math.radians(d.tuck_lean + d.hood_side_turn))], [h.z_corner, h.height], color=INK, lw=0.7, ls="--")
+    e.plot([h.half_top, xb_ - (h.height - h.z_corner) * math.tan(math.radians(d.tuck_lean + d.hood_side_turn))], [h.height, h.height], color=INK, lw=0.7, ls="--")
+    dim(e, (h.half_top, h.height + 10), (xb_, h.height + 10), f"corner R {h.corner.r:.0f} ({d.hood_corner_ratio:.2f} W)", (0, 9))
     dim(e, (-h.half_top, h.height + 10), (h.half_top, h.height + 10), f"top flat {2 * h.half_top:.0f}: straight across (crown {d.hood_crown_ratio:.0f})", (0, 9))
-    note(e, (-240, -100), f"lean of the side: 0 below z {d.tuck_z0:.0f}, {d.tuck_lean:.1f} deg at the seam,\n{math.degrees(math.asin(math.sin(math.radians(d.tuck_lean)) + h.z_blend / d.tuck_r)):.1f} deg where the blend starts", size=7.5)
+    note(e, (-150, 70), f"lean of the side: 0 below z {d.tuck_z0:.0f}, {d.tuck_lean:.1f} deg at the seam,\n{d.tuck_lean + d.hood_side_turn:.1f} deg where the top corner starts, {h.z_corner:.0f} above the seam", size=7.5)
     frame(e, "4. Upper body and hood in front view, true scale: one line from the side band over the seam into the top",
           (-270, 270), (-135, h.height + 32), "x (mm)", "z, above the seam (mm)")
     e.legend(loc="lower center", fontsize=7.5, frameon=False)
