@@ -44,8 +44,9 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | Button nuts | Seimitsu nuts, snap-in buttons, or a layout spread by half a millimeter. Three pairs of Sanwa screw nuts overlap by 0.15 to 0.28 mm. | Owner |
 | Marquee and speakers | No hardware is chosen. The hood band has provisional openings. | Owner |
 | One encoder for each control panel | Research recommends it: one USB cable is then the only connection of a panel. | Owner |
-| The PC control panel | It carries a keyboard and possibly a pointing device. The opening is 396 x 240 mm with 56 mm of height below it. Open: the keyboard size, a recessed well or a flat plate, and a trackball or pad on the panel or a mouse on the desk. | Owner |
-| Front USB ports | An internal hub on the BC-250 with ports the player can reach, for controllers. Open: how many ports, where (apron, deck front or deck side), and panel-mount sockets or a hub without its shell. | Owner |
+| Control panel tops as cut plates | A mail-order service cuts the top plate of each control panel from a drawing that the model makes: a switch plate for the keyboard, and possibly one plate for the lever and buttons in place of two printed tiles. Open: material and thickness, and whether the arcade panel also gets one. | Research, then owner |
+| The keyboard | 60%, built into the PC control panel by the owner. Open: the PCB (a standard hot-swap 60% board or hand wiring), the layout, and a pointing device beside it or none. | Owner |
+| Front USB hardware | Open: the hub, panel-mount sockets or a hub without its shell, and powered or not. | Research |
 
 ## Settled by the owner
 
@@ -54,7 +55,8 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - The image is centered in the bezel. The sight line is in the 15 to 25 degree range.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
 - Control panels are swappable. A control panel for PC games is wanted beside the arcade one. It holds a keyboard, and a mouse area if there is room.
-- USB ports that the player can reach, for controllers, through a hub inside the cabinet. The hub can lose its shell to look built in.
+- Four USB ports that the player can reach, for controllers: two USB-C and two USB-A, in the front face of the deck at the right end, through a hub inside the cabinet.
+- The PC control panel has a 60% keyboard that the owner builds.
 - This is a personal project. The reference cabinet is the inspiration, and this design goes its own way.
 - The speaker fronts follow the contour of the hood.
 - Power supply: EVGA SuperNOVA 1000 P5, fully modular, 150 mm deep.
