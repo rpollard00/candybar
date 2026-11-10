@@ -95,10 +95,10 @@ PSU = Assembly(
         box("PSU_Bay", "keepout", ("psu_w", "psu_d_max", "psu_h"), ORIGIN),
         box("PSU_FanAir", "keepout", ("psu_w", "psu_d_max", "psu_fan_clear"), (ZERO, ZERO, "psu_h")),
         box(
-            "PSU_Trunk",
+            "PSU_Plugs",
             "keepout",
-            ("psu_w", "psu_trunk_clear", "psu_trunk_h"),
-            (ZERO, "-psu_trunk_clear", "psu_trunk_z0"),
+            ("psu_w", "psu_plug_clear", "psu_plug_h"),
+            (ZERO, "-psu_plug_clear", "psu_plug_z0"),
         ),
     ),
 )

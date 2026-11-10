@@ -38,31 +38,43 @@ FRONT_RIGHT = (
     Corner("flare", "outer_w / 2", "cp_top_z", "flare_r"),
     Corner("hood_corner", "outer_w / 2 - body_taper", "cab_h", "hood_corner_r"),
 )
+# The inside stays straight while the outside tapers, so the side wall thins toward the roof
+# and the monitor's plug zones keep their room.
 FRONT_INNER_RIGHT = (
     Corner("floor", "inner_w / 2", "foot_h"),
-    Corner("roof", "inner_w / 2 - body_taper", "cab_h", "hood_corner_r - skin_t"),
+    Corner("roof", "inner_w / 2", "cab_h - skin_t", "hood_corner_r - side_t + body_taper"),
 )
 
-# Sketch x is global X, sketch y is global Y.
-PLAN_PROFILE = (
-    Corner("front_left", DECK_LEFT, ZERO, "deck_corner_r"),
-    Corner("front_right", "deck_w / 2", ZERO, "deck_corner_r"),
-    Corner("rear_right", "deck_w / 2", "cab_d"),
-    Corner("rear_left", DECK_LEFT, "cab_d"),
+# Sketch x is global X, sketch y is global Y. The right half, front to rear; the left half mirrors it.
+# The wide deck is a tray at the front; behind it the body goes down to the table at its own width.
+PLAN_RIGHT = (
+    Corner("deck_front", "deck_w / 2", ZERO, "deck_corner_r"),
+    Corner("deck_rear", "deck_w / 2", "deck_end_y", "deck_rear_r"),
+    Corner("deck_return", "outer_w / 2", "deck_end_y", "deck_return_r"),
+    Corner("body_rear", "outer_w / 2", "cab_d"),
 )
 
-# The slab of space in front of the bezel plane, from the deck top to the hood. Sketch x is global Y.
-RECESS_REACH = "150 mm"
-RECESS_PROFILE = (
-    Corner("bezel_foot", "bezel_foot_y", "cp_top_z"),
-    Corner("bezel_top", "bezel_top_y", "bezel_top_z"),
-    Corner("top_front", f"bezel_top_y - {RECESS_REACH}", "bezel_top_z"),
-    Corner("foot_front", f"bezel_foot_y - {RECESS_REACH}", "cp_top_z"),
-)
+FACE_REACH = "150 mm"
 
-# The flat shelf between the control panel and the bezel foot. Without it the hollow, which follows
-# the sweep of the cheek, would break through the deck top in front of the bezel.
-SHELF = box("Shell_Shelf", "", ("deck_w", "shelf_depth", "skin_t"), (DECK_LEFT, "cp_depth", "cp_top_z - skin_t"))
+
+def _in_front_of_bezel_plane(foot_y: str, foot_z: str) -> tuple[Corner, ...]:
+    """The slab of space in front of the bezel plane, from a line across the screen face up to the hood.
+
+    Sketch x is global Y, sketch y is global Z.
+    """
+    return (
+        Corner("foot", foot_y, foot_z),
+        Corner("top", "bezel_top_y", "bezel_top_z"),
+        Corner("top_front", f"bezel_top_y - {FACE_REACH}", "bezel_top_z"),
+        Corner("foot_front", f"{foot_y} - {FACE_REACH}", foot_z),
+    )
+
+
+# The screen face has two bands. The apron, from the shelf up, is body at the level of the cheeks.
+# Above it the bezel plate sits in a recess between the cheeks.
+RECESS_PROFILE = _in_front_of_bezel_plane("bezel_y0", "bezel_z0")
+# Nothing in front of the bezel plane is hollow, from the deck top up: that is the apron and the cheeks.
+FACE_PROFILE = _in_front_of_bezel_plane("bezel_foot_y", "cp_top_z")
 
 # Tools cut 1 mm past both faces of a wall, so that no cut ends on a face of the solid it cuts.
 OPENINGS = (
@@ -108,8 +120,9 @@ HOOD_FACE_AS_SKETCH = Pose(X_AXIS, f"90 deg - {HOOD_TILT}")
 # The cutting slab is centred on the face: half of this is in front of it, half goes through the wall.
 HOOD_CUT_THROUGH = "2 * skin_t + 4 mm"
 
-# The bezel frame: x from the plate's left edge, y back from the bezel front plane, z up the slope from the shelf.
-BEZEL = Assembly("Bezel", base=("-bezel_w / 2", "bezel_foot_y", "cp_top_z"), pose=leaning_back("recline"))
+# The bezel frame: x from the plate's left edge, y back from the bezel front plane, z up the slope
+# from the plate's bottom edge at the top of the apron.
+BEZEL = Assembly("Bezel", base=("-bezel_w / 2", "bezel_y0", "bezel_z0"), pose=leaning_back("recline"))
 # name, window width, window height, is an alternate to the first.
 BEZEL_PLATES = (
     ("Bezel_16x9", "mon_active_w", "win169_h", False),
@@ -122,10 +135,9 @@ BEZEL_PLATES = (
 def build(model: Model) -> None:
     shell = model.assembly(Assembly(OWNER, base=ORIGIN))
     side = _outline(model, shell, "Shell_SideProfile", "YZ_Plane", SIDE_PROFILE)
-    plan = _outline(model, shell, "Shell_PlanProfile", "XY_Plane", PLAN_PROFILE)
-    recess = _outline(model, shell, "Shell_RecessProfile", "YZ_Plane", RECESS_PROFILE)
-    envelope = _envelope(model, shell, side, plan, recess)
-    cavity = _cavity(model, shell, side, plan, recess)
+    plan = _outline(model, shell, "Shell_PlanProfile", "XY_Plane", _mirrored(PLAN_RIGHT))
+    envelope = _envelope(model, shell, side, plan)
+    cavity = _cavity(model, shell, side, plan)
     openings = [model.solid(shell, opening, OWNER) for opening in OPENINGS]
     voids = model.fuse(shell, "Shell_Voids", [cavity, *openings, _hood_openings(model, shell)])
     tag(model.cut(shell, SKIN, envelope, voids), "massing", OWNER)
@@ -140,7 +152,7 @@ def _outline(model: Model, shell: App.DocumentObject, name: str, plane: str, cor
 
 
 def _mirrored(right: tuple[Corner, ...]) -> tuple[Corner, ...]:
-    """A closed outline symmetric about x = 0: the right half as given, then its mirror image going back down."""
+    """A closed outline symmetric about x = 0: the right half as given, then its mirror image in reverse."""
     left = tuple(Corner(f"left_{corner.name}", f"-({corner.x})", corner.y, corner.radius) for corner in reversed(right))
     return right + left
 
@@ -149,10 +161,8 @@ def _across_deck(model: Model, shell: App.DocumentObject, name: str, outline: Ap
     return model.extrusion(shell, name, outline, X_AXIS, "deck_w", (DECK_LEFT, ZERO, ZERO))
 
 
-def _envelope(
-    model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject, recess: App.DocumentObject
-) -> App.DocumentObject:
-    """The outer form, less the recess between the cheeks. Hardware must stay inside it."""
+def _envelope(model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject) -> App.DocumentObject:
+    """The outer form, less the recess for the bezel plate. Hardware and trim must stay inside it."""
     front = _outline(model, shell, "Shell_FrontProfile", "XZ_Plane", _mirrored(FRONT_RIGHT))
     silhouettes = (
         _across_deck(model, shell, "Shell_SideSolid", side),
@@ -160,17 +170,13 @@ def _envelope(
         model.extrusion(shell, "Shell_PlanSolid", plan, Z_AXIS, "cab_h"),
     )
     outer = model.common(shell, "Shell_Outer", silhouettes)
+    recess = _outline(model, shell, "Shell_RecessProfile", "YZ_Plane", RECESS_PROFILE)
     between_cheeks = model.extrusion(shell, "Shell_Recess", recess, X_AXIS, "bezel_w", ("-bezel_w / 2", ZERO, ZERO))
     return model.cut(shell, ENVELOPE, outer, between_cheeks)
 
 
-def _cavity(
-    model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject, recess: App.DocumentObject
-) -> App.DocumentObject:
-    """The hollow inside: the silhouettes moved inward by the wall thickness, less the cheeks and the shelf.
-
-    Nothing in front of the bezel plane and above the deck top is hollow, so the cheeks stay solid.
-    """
+def _cavity(model: Model, shell: App.DocumentObject, side: App.DocumentObject, plan: App.DocumentObject) -> App.DocumentObject:
+    """The hollow inside: the silhouettes moved inward by the wall thickness, and nothing in front of the bezel plane."""
     front = _outline(model, shell, "Shell_FrontInner", "XZ_Plane", _mirrored(FRONT_INNER_RIGHT))
     side_inner = model.offset(shell, "Shell_SideInner", side, "-skin_t")
     plan_inner = model.offset(shell, "Shell_PlanInner", plan, "-skin_t")
@@ -180,9 +186,8 @@ def _cavity(
         model.extrusion(shell, "Shell_PlanInnerSolid", plan_inner, Z_AXIS, "cab_h"),
     )
     block = model.common(shell, "Shell_CavityBlock", silhouettes)
-    in_front_of_bezel = _across_deck(model, shell, "Shell_RecessFull", recess)
-    kept = model.fuse(shell, "Shell_KeptSolid", (in_front_of_bezel, model.solid(shell, SHELF, OWNER)))
-    return model.cut(shell, "Shell_Cavity", block, kept)
+    face = _outline(model, shell, "Shell_FaceProfile", "YZ_Plane", FACE_PROFILE)
+    return model.cut(shell, "Shell_Cavity", block, _across_deck(model, shell, "Shell_FaceSolid", face))
 
 
 def _hood_openings(model: Model, shell: App.DocumentObject) -> App.DocumentObject:
