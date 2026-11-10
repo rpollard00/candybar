@@ -484,6 +484,14 @@ def hood(d: Blueprint) -> Hood:
                 sample(hood_side_profile(d, height, depth, arc_top), 3.0), side_front)
 
 
+def hood_rear_corner(d: Blueprint) -> tuple[P3, P3]:
+    """The right rear corner of the cap: an upright plane at 45 degrees in plan through the corner that the step
+    makes in the body top, so that the foot of the cap has the outline of the body top there too. As a point and
+    the normal toward the side it cuts away."""
+    y = d.step_y0 + d.body_top * math.tan(math.radians(d.step_lean))
+    return (d.side_x(d.body_top), y, 0.0), (math.sqrt(0.5), math.sqrt(0.5), 0.0)
+
+
 def marquee_window(d: Blueprint, h: Hood) -> tuple[float, float]:
     """Width and height of the straight marquee window: the widest that clears the corner of the opening."""
     z_top = h.z_rail_top + (d.marquee_margin + d.marquee_h) * math.cos(math.radians(d.marquee_tilt))
@@ -533,7 +541,7 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
             "extrusion of the side profile across the width"),
     "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 52", SINGLE, "extrusion of the side profile across the width"),
     "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB5, RL1", "brow_ledge 20: a plain strip above the bezel, then the seam bevel", SINGLE, "extrusion of the side profile across the width"),
-    "FB4": ("body top", "front body", "faces up", "FB3, RL1 to RL3, FB5, RB2, RB5, HC14", "body_top 423.9; under the hood, bare for 4 at the front and rear", FLAT, "plane cut"),
+    "FB4": ("body top", "front body", "faces up", "FB3, RL1 to RL3, FB5, RB2, RB5, HC14", "body_top 423.9; all under the hood: the foot of the hood has its outline", FLAT, "plane cut"),
     "FB5": ("seam bevel, body", "front body", "faces out and up", "FB3, FB4, RL1 to RL4, RB2, RB5", "seam_groove: from the side 3 below the body top, 3 in to the top; one height all round the body top",
             "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the body 3 below its top"),
     "RL1": ("rail land", "rail", "faces the player; one convex arc in side view, chord reclined 30 deg", "BZ1, FB1 to FB3, RL2, DK1",
@@ -580,12 +588,15 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "HC7": ("hood roof", "hood cap", "faces up", "HC4, HC6, HC8", "hood_flat_h 148 above the foot; 0.713 W wide: follows from the side and the corner; hood_crown_ratio 0: no crown", FLAT, "the same extrusion"),
     "HC8": ("hood rear arc", "hood cap", "turns from the roof to the rear", "HC7, HC9", "conic 95 deep, 110 high from the top of revision 3, cut by the flat top; hood_top_rear_r 10 in the crease", SINGLE,
             "extrusion of the side profile across the width, cut by the extrusion of the front outline (the common of two extrusions)"),
-    "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, HC14, HC15", "4 in from the upper rear wall", FLAT, "extrusion"),
+    "HC9": ("hood rear wall", "hood cap", "faces the rear, upright", "HC8, HC5, HC14, HC15", "flush with the upper rear wall: hood_shoulder_rear 0", FLAT, "extrusion"),
     "HC10": ("hood soffit", "hood cap", "faces down", "HC2, HC11, MQ1", "under the straight part of the top bar, back to the marquee", FLAT, "extrusion"),
     "HC11": ("hood leg, inner wall", "hood cap", "faces the centre line", "HC1, HB1, MQ1", "from the front plane back to the band", SINGLE, "extrusion of the opening outline"),
     "HC12": ("hood ledge", "hood cap", "faces up", "HC3, HB1", "hood_ledge 14", FLAT, "extrusion"),
     "HC13": ("marquee lip", "hood cap", "faces the player; its top and bottom face up and down", "MQ1, HB1, HC11", "hood_rail_h 6 high, hood_rail_proud 5 proud; ends on the legs",
              FLAT, "extrusion across the width, cut by the opening"),
+    "HC16": ("hood rear corner", "hood cap", "faces out and back, 45 deg in plan, upright", "HC5, HC8, HC9, HC15",
+             "the corner of the step in the body top, carried up: the foot of the cap has the outline of the body top", FLAT,
+             "plane cut; it runs out where the side of the cap leans in past it"),
     "HC14": ("hood foot", "hood cap", "faces down", "HC1, HC3, HC4, HC9, HC15", "seam_gap 1.5 above the body top FB4", FLAT, "plane cut"),
     "HC15": ("seam bevel, hood", "hood cap", "faces out and down", "HC1, HC3, HC4, HC5, HC9, HC14", "seam_groove: from the side 3 above the foot, 3 in to the foot; one height all round the foot of the cap",
              "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the cap 3 above its foot"),
@@ -820,6 +831,20 @@ def faces(d: Blueprint) -> dict[str, Face]:
     na = sum(1 for y, z in rear if z >= d.hood_h - d.seam_gap - d.hood_rear_arc_h - 1e-6)
     add("HC8", strip(rear_l[:na], rear_r[:na]), both=False, edges=[rear_r[:na], rear_l[:na]])
     add("HC9", strip(rear_l[na - 1:], rear_r[na - 1:]), both=False, edges=[rear_r[na - 1:], rear_l[na - 1:], [rear_l[na - 1], rear_r[na - 1]]])
+    (cx, cy, _), cn = hood_rear_corner(d)
+    beyond = lambda q: (abs(q[0]) - cx) * cn[0] + (q[1] - cy) * cn[1]
+    for key in ("HC5", "HC6", "HC7", "HC8", "HC9"):
+        out[key].polys = [p for p in (clip(refine(q, 2.0), beyond) for q in out[key].polys) if p]
+        out[key].edges = [e for e in ([v for v in e if beyond(v) <= 1e-9] for e in out[key].edges) if len(e) >= 2]
+    width = lambda z: oy + h.y_rear(z) - (cx + cy - h.half_width(z))
+    lo, hi = 0.0, h.height
+    for _ in range(60):
+        lo, hi = ((lo + hi) / 2, hi) if width((lo + hi) / 2) > 0 else (lo, (lo + hi) / 2)
+    rows = []
+    for z in [lo * k / 24 for k in range(25)]:
+        y0, y1 = cx + cy - h.half_width(z), oy + h.y_rear(z)
+        rows.append([(cx + cy - y0, y0, oz + z), (cx + cy - y1, y1, oz + z)])
+    add("HC16", [[a, b, rows[i + 1][1], rows[i + 1][0]] for i, (a, b) in enumerate(rows[:-1])])
     xo = h.half_top
     add("HC10", [[lean(-xo, 0.0, h.z_open_top), lean(xo, 0.0, h.z_open_top), at(xo, h.y_marquee_top, h.z_open_top), at(-xo, h.y_marquee_top, h.z_open_top)]], both=False)
     inner = [(h.half_open(z, d), z) for z in round_z + [z for x, z in h.opening if round_z[-1] < z <= h.z_open_top]]
@@ -893,7 +918,7 @@ def faces(d: Blueprint) -> dict[str, Face]:
 
     body_loop = section([p for k in ("FB3", "RL1", "RL2", "RL3", "RL4", "RB1", "RB2", "RB5") for p in out[k].polys], d.body_top - g)
     body_strips, body_inner, body_cut = groove(body_loop, d.body_top - g, d.body_top, g)
-    hood_loop = section([p for k in ("HC1", "HC3", "HC4", "HC5", "HC9") for p in out[k].polys], oz + g)
+    hood_loop = section([p for k in ("HC1", "HC3", "HC4", "HC5", "HC9", "HC16") for p in out[k].polys], oz + g)
     hood_strips, hood_inner, hood_cut = groove(hood_loop, oz + g, oz, g)
     cut_to(("FB", "RL", "RB"), body_cut, d.body_top - g, d.body_top)
     cut_to(("HC", "HB", "MQ", "SP", "LG"), hood_cut, oz, oz + g)

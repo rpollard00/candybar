@@ -62,6 +62,7 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
             "X hood, off centre": (0, h.half_top / 2),
             "X seam corner": (0, d.side_x(d.body_top) - d.edge_in / 2),
             "Y seam corner": (1, h.origin[1] + d.hood_edge_back / 2),
+            "Y rear corner": (1, d.depth - 4.0 / 3.0 * d.seam_groove),
             "Y body top": (1, (d.seam_y + d.depth) / 2)}
 
 

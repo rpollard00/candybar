@@ -542,6 +542,8 @@ def hood(d: Blueprint) -> dict[str, Part.Shape]:
     side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
     side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
     cap = shell.common(across(side_view))
+    (cx, cy, _), (nx, ny, _) = pr.hood_rear_corner(d)
+    cap = cap.cut([halfspace(V(cx, cy - h.origin[1], 0), V(nx, ny, 0)), halfspace(V(-cx, cy - h.origin[1], 0), V(-nx, ny, 0))])
     g = d.seam_groove
     cap = cap.cut(ring_bevel(outline_at(cap, g), g, 0.0, g))
     opening = prism(both_sides(opening_path(d, h)), xz(-OVER), V(0, BIG / 4, 0))
@@ -600,7 +602,8 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-step-top": cam((d.side_x(d.body_top) - d.seam_groove - 6, d.depth - 8, d.body_top - 8), 40, 140, 20),
             "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24),
             "closeup-seam-corner-left": cam((-(d.side_x(d.body_top) - 8), d.seam_y + 6, d.body_top), 35, -42, 6),
-            "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12)}
+            "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12),
+            "closeup-seam-rear-corner": cam((d.side_x(d.body_top) - 8, d.depth - 8, d.body_top), 45, 140, 14)}
 
 
 def export(out: str, parts: dict[str, Part.Shape], d: Blueprint) -> dict:

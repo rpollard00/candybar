@@ -260,11 +260,11 @@ class Blueprint(Dims):
     mon_setback: float = 7.2
     # the lit image as a thin plate on the screen face, for the renders of the solids
     screen_t: float = 1.0
-    # hood cap: its foot has the outline of the body top, with a groove at the seam and no shoulder at the sides; at
-    # the front its foot lies on the line of the rail, at the rear it stands hood_shoulder_rear in from the upper rear
+    # hood cap: its foot has the outline of the body top, with a groove at the seam: no shoulder at the sides or the
+    # rear (its rear wall is flush with the upper rear); at the front its foot lies on the line of the rail
     hood_shoulder: float = 0.0
     hood_shoulder_front: float = 0.0
-    hood_shoulder_rear: float = 4.0
+    hood_shoulder_rear: float = 0.0
     seam_groove: float = 3.0
     hood_crown_ratio: float = 0.0
     # hood in side view: the front leans back, more over its lower part, with a blend between; a flat top below the

@@ -635,7 +635,7 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
                 f"{h.y_rear(h.z_band_top) - d.hood_wall - rear:.0f} clear behind the band", (0, -7))
             dim(b, (oy, oz + h.z_band_top - 10), (oy + h.y_band_top, oz + h.z_band_top - 10), f"band top {h.y_band_top:.0f} back", (-4, -7))
             dim(b, (oy, oz + h.z_open_top - 6), (oy + h.y_marquee_top, oz + h.z_open_top - 6), f"marquee {h.y_marquee_top:.0f} under the bar", (6, -7))
-            note(b, (oy + h.depth + 8, oz + 60), f"band leans back {d.hood_band_tilt:.0f} deg;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nshoulder {d.hood_shoulder_rear:.0f} at the rear", size=7)
+            note(b, (oy + h.depth + 8, oz + 60), f"band leans back {d.hood_band_tilt:.0f} deg;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nrear flush with the upper rear", size=7)
         else:
             note(b, (oy + h.depth + 8, oz + 60), f"speaker form {d.speaker_proud:.0f} proud;\nits face is parallel to\nthe band, not upright", size=7)
     fig.suptitle("Blueprint 05: the hood of the target", fontsize=14, y=0.985)
@@ -679,8 +679,7 @@ def sheet_junctions(d: Blueprint, faces: dict[str, pr.Face]) -> None:
         for fid, at, to in tags:
             tag(ax, at, fid, to=to, size=7.5)
     a = axes[0, 0]
-    dim(a, (oy + h.depth, bt - 14), (d.depth, bt - 14), f"{d.hood_shoulder_rear:.0f}", (-9, -5))
-    note(a, (oy - 46, bt + 84), f"The cap stands on the body top with a seam of {d.seam_gap:.1f}. Its foot lies on the line of the rail; its front\nleans back {d.hood_front_lean_low:.0f} deg, less than the rail ({pr.front(d).top_lean:.0f} deg), then {d.hood_front_lean_up:.0f} deg.\nThe groove is level all round: a bevel of {d.seam_groove:.0f} on each part. Shoulder {d.hood_shoulder_rear:.0f} at the rear.", size=7.5)
+    note(a, (oy - 46, bt + 84), f"The cap stands on the body top with a seam of {d.seam_gap:.1f}. Its foot lies on the line of the rail; its front\nleans back {d.hood_front_lean_low:.0f} deg, less than the rail ({pr.front(d).top_lean:.0f} deg), then {d.hood_front_lean_up:.0f} deg.\nThe groove is level all round: a bevel of {d.seam_groove:.0f} on each part. The rear of the cap is flush with the upper rear.", size=7.5)
     a = axes[0, 1]
     dim(a, (h.half_base, bt - 22), (hw, bt - 22), f"tuck {d.tuck:.1f}", (2, -7))
     note(a, (hw - 92, bt - 62), f"The side of the hood HC5 leaves the seam on the tangent of the body side RL4:\nno shoulder, a groove of {d.seam_groove:.0f}: FB5 below, HC15 above. The leg stands over the land RL1 and the edge RL2, RL3.", size=7.5)

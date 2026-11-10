@@ -21,8 +21,9 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 2. The owner reviewed the first blueprint on 2026-11-10 and found it too simple: it has straight lines where the real cabinet has curves. The body must lean and bow inward into the hood as one curve, with a bevel cut at the seam. The side profile must be a convex arc that follows the contour of a CRT. Revision 2 of the blueprint added the curves. The owner then chose their strengths, and revision 3 holds them: a rail arc of 0.035 of its chord, a tuck of 0.023 W toward the hood over the top third of the body, a hood with near-straight sides and tight top corners (0.07 W), and a screen 14 to 20 mm below the rail land. Questions 1 to 7 in `docs/blueprint/index.md` are open; the blueprint draws a default for each.
 3. The outer form is built as 11 solids from the same profiles and dimensions that draw the blueprint (`cad/candybar/shell/solids.py`, output in `cad/out/shell-bp/`). `cad/tools/check_solids.py` compares the solids with the blueprint faces in three views and eleven section planes; all are within 0.5 mm. The owner must judge the form on the renders before more work. When the owner accepts it, remove the solid code of the earlier form: `parts.py`, `hood.py`, `build.py`, `hood_sheet.py`, `hood_review.py`, `hood_overlay.py`, `section_sheet.py`, and the parts of `dims.py` that only they use.
 4. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
-5. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
-6. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
+5. Do a detail pass on the outer form. The owner asked on 2026-11-10 for a fillet on the vertical corners of the back surface, of the body and of the hood.
+6. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
+7. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
 
 Modelling and iteration run on Opus subagents. The main session writes the brief and reviews. The owner asked for a Fable agent on the hood; that agent now makes the blueprint.
 
