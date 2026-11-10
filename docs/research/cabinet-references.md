@@ -74,13 +74,46 @@ All values are ESTIMATED from pixel positions in `photo-b.png`. The scale is 3.2
 - **Sides.** Flat side panels with a vertical rear edge. A colored stripe follows the front edge. Three short horizontal slots sit near the top of the side panel.
 - **Finish.** Gloss white body, one accent color for the lever, buttons, stripe and light strip. Small black feet.
 
+### Two more photos, from the builder's Instagram
+
+`photo-e-three-quarter.png` shows the finished cabinet from the front right. `photo-d-unpainted-shell.png` is a frame from a video of the bare printed shell. Readings, all ESTIMATED from the images:
+
+- **The deck is a tray at the front only.** Behind the cheek sweep the body sides drop straight to the table at the body width. The wide deck does not run to the rear.
+- **The cheek front edge is a wide facet, not a sharp corner.** A band about as wide as the cheek runs at an angle between the side panel and the front face, from the hood down into the deck.
+- **The bezel is a separate frame** in a darker material, fitted from the front into the recess. It has a stepped inner edge around the screen opening.
+- **The hood is an open arch.** Its top and sides are thick rounded bars. The speaker and marquee band is a separate part set back under the brow of the arch.
+- **The deck top is part of the shell** in this build, with the lever and button holes printed in. It is not a removable plate. The colored control plate of the finished cabinet sits on top of it.
+- **The shell is hollow with open back and ribs on the floor.** The side panel has a shallow round recess.
+- **The side stripe** follows the cheek facet and ends in four short bars near the hood. The bars are part of the graphic, not vents.
+- **Feet:** small black feet under the deck front and the body rear.
+
+### The rear, from the builder's Instagram
+
+`photo-f-rear.png` shows the bare shell from behind, with the hood open and two loose plates beside it. Readings, all ESTIMATED from the image:
+
+- **Service opening.** A large rectangular opening low in the rear wall, with a screw boss at each corner. A separate door plate covers it. The door plate lies on the mat, partly hidden behind the cabinet. It has one large round vent in the middle and slot vents at its sides. The owner confirmed this reading.
+- **Decorative slots.** Four short horizontal slots on each side of the service opening, in the rear wall. The owner reads them as decoration, not vents. The real vents are in the door.
+- **Two recessed pockets** high on the rear wall, side by side. They are hand-holds for carrying, or recessed vents. Their floors slope.
+- **Sculpted rear.** The upper rear stands proud of the lower rear. A curved step line divides them above the service opening.
+- **Faceted rear corners.** The rear vertical edges are cut back at an angle, so the rear face is narrower than the body. The bottom edge is cut back in the same way.
+- **Hood.** The hood is a separate module that bolts to the top of the body. From behind it shows two perforated speaker grilles at the outer ends, a marquee holder between them, and screw bosses along the top and bottom rails.
+- **Floor.** The floor inside has ribs and slots.
+- **A small round hole** low on the rear wall, beside the service opening, for a switch or a power jack.
+
+This supports the layout of this project: a rear door that carries the fan vent. In the reference all the ventilation is in the door, and the side panels have none.
+
 ### Owner's direction, 2026-11-09
 
 - Reconstruct this look as well as the photos allow, and change what the build needs.
 - Speakers: the speaker fronts must follow the contour of the hood. Do not copy the square pods that face straight forward.
 - Screen: the 16:10 screen stays usable. A 16:9 bezel is a candidate for the default, because 16:9 is the more common resolution and gives a more interesting bezel.
 - Bezels are removable and swappable: 16:10 or 16:9 for PC games, 4:3 for arcade titles, and possibly a vertical (TATE) bezel.
-- More photos can come from the builder's Instagram.
+- The display is centered in the bezel, and the cabinet height follows from that.
+- The sight line to the screen center must be in the 15 to 25 degree range.
+- Eight action buttons.
+- The power supply is an EVGA SuperNOVA 1000 P5 (220-P5-1000-X1): fully modular, 150 mm deep.
+- The fan is an ARCTIC P12 Pro on top of the BC-250 heatsink. The shroud is open: an available shroud design or one made for this cabinet.
+- Practical choices for cooling, the wide screen and the controls belong to this project. The reference sets the look only.
 
 ---
 
