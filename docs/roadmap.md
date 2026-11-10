@@ -44,6 +44,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 | Button nuts | Seimitsu nuts, snap-in buttons, or a layout spread by half a millimeter. Three pairs of Sanwa screw nuts overlap by 0.15 to 0.28 mm. | Owner |
 | Marquee and speakers | No hardware is chosen. The hood band has provisional openings. | Owner |
 | One encoder for each control panel | Research recommends it: one USB cable is then the only connection of a panel. | Owner |
+| The PC control panel | What it carries: a gamepad layout, a trackball or a pad, keys. The brief leaves this open. It uses the same opening and latch as the arcade control panel. | Owner |
 
 ## Settled by the owner
 
@@ -51,6 +52,8 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - Eight action buttons.
 - The image is centered in the bezel. The sight line is in the 15 to 25 degree range.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
+- Control panels are swappable. A control panel for PC games is wanted beside the arcade one.
+- This is a personal project. The reference cabinet is the inspiration, and this design goes its own way.
 - The speaker fronts follow the contour of the hood.
 - Power supply: EVGA SuperNOVA 1000 P5, fully modular, 150 mm deep.
 - Fan: ARCTIC P12 Pro on the BC-250 heatsink.
