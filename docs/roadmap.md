@@ -55,7 +55,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - The image is centered in the bezel. The sight line is in the 15 to 25 degree range.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
 - Control panels are swappable. A control panel for PC games is wanted beside the arcade one. It holds a keyboard, and a mouse area if there is room.
-- Four USB ports that the player can reach, for controllers: two USB-C and two USB-A, in the front face of the deck at the right end, through a hub inside the cabinet.
+- Four USB ports that the player can reach, for controllers: two USB-C and two USB-A, in the right side face of the deck toward the front, out of view. They go through a hub inside the cabinet.
 - The PC control panel has a 60% keyboard that the owner builds.
 - This is a personal project. The reference cabinet is the inspiration, and this design goes its own way.
 - The speaker fronts follow the contour of the hood.
