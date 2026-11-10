@@ -93,9 +93,10 @@ def main() -> None:
     ap.add_argument("columns", nargs="+", help="LABEL=DIR or LABEL=FILE.png")
     ap.add_argument("--views", default="three-quarter-front-right")
     ap.add_argument("--title", default="")
-    ap.add_argument("--subtitle", action="append", default=[], help="LABEL=text under the column label")
+    ap.add_argument("--subtitle", action="append", default=[], help="LABEL=text under the column label (' | ' breaks lines)")
     ap.add_argument("--overlay", action="append", default=[], help="LABEL=overlay.json (default DIR/overlay.json)")
     ap.add_argument("--no-overlay", action="store_true")
+    ap.add_argument("--overlay-views", default="", help="draw overlays on these views only (default all)")
     ap.add_argument("--cell", type=int, default=760, help="cell height in pixels")
     ap.add_argument("--footer", default="")
     a = ap.parse_args()
@@ -107,18 +108,20 @@ def main() -> None:
     scale = min(a.cell / img.height for row in cells for img, cam in row if cam is not None) if any(
         cam for row in cells for _, cam in row) else 1.0
     resized: list[list[tuple[Image.Image, dict | None]]] = []
-    for row in cells:
+    for view, row in zip(views, cells):
         out_row = []
         for (label, src), (img, cam) in zip(cols, row):
             k = scale if cam is not None else a.cell / img.height
             im = img.resize((round(img.width * k), round(img.height * k)), Image.LANCZOS)
-            if cam is not None and not a.no_overlay:
+            if cam is not None and not a.no_overlay and (not a.overlay_views or view in a.overlay_views.split(",")):
                 path = overlays.get(label, os.path.join(src, "overlay.json"))
                 if os.path.exists(path):
                     draw_overlay(im, cam, json.load(open(path)), k)
             out_row.append((im, cam, k))
         resized.append(out_row)
-    gap, top, label_h = 24, 70 if a.title else 16, 74
+    lines = {k: v.split(" | ") for k, v in subs.items()}
+    gap, top = 24, 70 if a.title else 16
+    label_h = 50 + 26 * max([len(v) for v in lines.values()] or [1])
     col_w = [max(row[i][0].width for row in resized) for i in range(len(cols))]
     row_h = [max(c[0].height for c in row) for row in resized]
     footer_h = 40 if a.footer else 10
@@ -131,8 +134,8 @@ def main() -> None:
     x = gap
     for i, (label, _) in enumerate(cols):
         d.text((x, top), label, fill=INK, font=font(26, True))
-        if label in subs:
-            d.text((x, top + 34), subs[label], fill=MUTED, font=font(20))
+        for j, line in enumerate(lines.get(label, [])):
+            d.text((x, top + 34 + 26 * j), line, fill=MUTED, font=font(20))
         x += col_w[i] + gap
     y = top + label_h
     for r, row in enumerate(resized):
