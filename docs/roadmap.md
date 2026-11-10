@@ -26,7 +26,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 - [ ] Monitor: body width, height and thickness. Is it the flat model with no stand? Heights of the three ports on the left edge. Plug length with the bend, for the real cables.
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge.
-- [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. Are the fin tops of the second board closed?
+- [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
 - [ ] The Mini New Astro City files from MakerWorld (model 700005). They need a login. The owner will get them. They are a different design from the reference cabinet, but they give real Astro City curves to measure.
 - [ ] A photo of the reference cabinet from the side, if one exists.
@@ -38,8 +38,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 | Decision | Options | Depends on |
 | --- | --- | --- |
-| Where the hot air of the BC-250 leaves | Slot vents in the rear door, as on the reference. Or a vent in the left side wall. | Cooling research |
-| Fan shroud | An available design, or a design for this cabinet | Cooling research |
+| Fan shroud details | The air space between the fan and the fins (10 mm is the plan), the seal to the rear door, and the hood that turns the hot air to the door vents | A test print on the board |
 | What the apron carries | Nothing. Or the start, coin and menu buttons, which lets the control panel be less deep. | Owner |
 | Button nuts | Seimitsu nuts, snap-in buttons, or a layout spread by half a millimeter. Three pairs of Sanwa screw nuts overlap by 0.15 to 0.28 mm. | Owner |
 | Marquee and speakers | No hardware is chosen. The hood band has provisional openings. | Owner |
@@ -60,7 +59,9 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 - This is a personal project. The reference cabinet is the inspiration, and this design goes its own way.
 - The speaker fronts follow the contour of the hood.
 - Power supply: EVGA SuperNOVA 1000 P5, fully modular, 150 mm deep.
-- Fan: ARCTIC P12 Pro on the BC-250 heatsink.
+- Fan: ARCTIC P12 Pro on the BC-250 heatsink. The fin tops are opened under the fan, as on the first console. The shroud is a design for this cabinet: the fan blows down into the fins and the air leaves at the I/O end.
+- All vents are in the rear door, as on the reference: the fan vent in the middle and slot vents for the hot air at the I/O end. The side panels have no vents.
+- Control panel tops are cut plates. The arcade panel is an aluminum plate with a clear polycarbonate cover and the art between them.
 
 ## Where things are
 
