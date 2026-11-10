@@ -17,14 +17,16 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 
 ## Next steps
 
-1. Variant D of the outer form exists as solids in `cad/candybar/shell`, after eleven rounds on the body and deck and seven on the hood. Its sheets are in `cad/out/shell-d`. It is 495 x 540 x 582 mm. Next: the owner looks at the hood and the deck. Open on the hood: its depth front to back is about 0.19 of the width, against about 0.30 on the real cabinet.
-2. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
-3. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
-4. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
+1. Make the blueprint: drawings of the references and of this cabinet, with the big volumes first, then elevations, sections and both junctions, and with each face of each component labeled. The target blueprint goes into `docs/blueprint/`. The owner asked for this on 2026-11-10, because changes to one part at a time did not converge on the right proportions.
+2. The owner reviews the blueprint and answers its open questions.
+3. Build the solids from the same profiles and dimensions that draw the blueprint. A model that follows a dimensioned blueprint can be built on Opus.
+4. Make the outer form hollow, put it into the generator in place of the outline shell, and make the checks pass.
+5. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
+6. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
 
-Modelling and iteration run on Opus subagents. The main session writes the brief and reviews the renders.
+Modelling and iteration run on Opus subagents. The main session writes the brief and reviews. The owner asked for a Fable agent on the hood; that agent now makes the blueprint.
 
-The owner asked for two more things on 2026-11-10: a complete rework of the hood by a Fable agent, with a real New Astro City as a further reference, and tools that take measurements from the reference photos, because readings by eye were wrong several times. The photo tools go into `cad/tools/`, their picked points into `cad/reference/`, and their results into `docs/research/photo-measurements.md`.
+The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, and their results in `docs/research/photo-measurements.md`.
 
 ## Waiting for the owner
 
@@ -32,7 +34,7 @@ The owner asked for two more things on 2026-11-10: a complete rework of the hood
 - [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
 - [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] A look at the first renders of variant D, when they are ready.
+- [ ] A review of the blueprint in `docs/blueprint/`, when it is ready, and answers to its open questions.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.
