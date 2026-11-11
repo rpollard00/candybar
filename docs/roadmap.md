@@ -32,9 +32,9 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 
 ## Waiting for the owner
 
-- [ ] Monitor: body width, height and thickness. Is it the flat model with no stand? Heights of the three ports on the left edge. Plug length with the bend, for the real cables.
-- [ ] Player, seated as for play: eye height above the desk, and eye position in front of the cabinet front edge. This is the most important measurement now: it decides how high the screen must sit, and so the proportion of the bezel.
-- [ ] BC-250 on the first console: how far the fan face is above the board, and where the shroud sits along the board. On the second board: the width and height of the fin block.
+- [ ] Monitor: the outer case width, height and thickness of the present unit (UPERFECT 16 inch 3840 x 2400, confirmed by the owner on 2026-11-11). This is useful and not necessary: the mount is designed for a generic 16 inch 16:10 travel monitor.
+- [x] Player eye position: not needed. The owner said on 2026-11-11 that the cabinet must work for the average person, children and other adults included. The sight line is checked for a child, a small adult and a tall adult from published data.
+- [ ] BC-250 on the first console: board top face up to the outer face of the fan, with a ruler, to the nearest 2 mm. Low priority: this cabinet gets its own shroud, so the height of the stack is a design value.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
 - [ ] A review of the revised blueprint in `docs/blueprint/` after the curvature pass: are the big volumes and their curves right, are the faces on the face map read correctly, and answers to the open questions in `index.md`.
 - [ ] A photo of the reference cabinet from the side, if one exists.
@@ -74,6 +74,8 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 
 - The look follows the reference cabinet. Practical choices belong to this project (decision record 0002).
 - Eight action buttons.
+- The monitor is replaceable. The mount must take another 16 inch 16:10 travel monitor: plug space and a cable channel on both side edges, and a way to shim or adjust the body across and along the screen face so that the image is centred in the window (2026-11-11).
+- The sight line must work for the average person, children and other adults included, not for the owner's eye position (2026-11-11).
 - The cabinet must fit on a normal surface. Do not make the hood deeper unless the whole cabinet becomes deeper, and the owner does not want a deeper cabinet (2026-11-10).
 - The image is centered in the bezel. The owner first asked for a sight line of 15 to 25 degrees, and then chose a 16:10 bezel with more recline, which gives a steeper sight line.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.
