@@ -96,7 +96,8 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - The compute module has a fixed mount behind the rear door. The door is a cover with the vents and has no cable on it (2026-11-11, decision record 0005).
 - The floor is a rigid printed PETG part with more infill. No plywood and no aluminum (2026-11-11).
 - The shell is permanent. The owner does not disassemble it after it is built: it is filled, finished and painted. The pieces first lock together rigidly in the correct position, and are then fastened for good (2026-11-11). Thus a bonded seam does not show, and only the service seams stay visible: the rear door, the control panel, the bezel plate, and the hood if it must come off.
-- The monitor comes out to the front for service, through the opening behind the bezel plate (2026-11-11).
+- The exterior has no acute, narrow or tight visible place that a person cannot reach to fill, sand and paint. The inside does not get the finish of the exterior (2026-11-11).
+- The monitor comes out to the front for service, through the opening behind the bezel plate (2026-11-11). A gap of 1.3 mm each side for the monitor with its plugs is too small.
 - The cabinet can become a little wider if the proportions hold. It does not become deeper, and it has sufficient height (2026-11-11).
 - PETG is satisfactory near the BC-250. The owner's first console has a PETG case and it does not soften. A fan in the exhaust duct, which pushes the hot air out, is an option to examine (2026-11-11).
 
@@ -108,7 +109,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
 | `docs/blueprint/` | The blueprint of the target cabinet: volumes, elevations, sections, junctions, the face map, the face table and the open questions |
-| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets |
+| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets, and the finishing of PETG (bond, filler, primer, paint, and a coupon test plan) |
 | `cad/reference/` | The picked points and known sizes for each reference photo, which the photo tools use |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
