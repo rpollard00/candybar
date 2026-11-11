@@ -354,10 +354,10 @@ Questions 1 to 7 are from revision 1. They are still open. The note says what re
 1. **Edge of the rail.** The blueprint runs the deck's whole edge section (radius, 10 degree band, crease 24 mm behind the land) up the rail to the hood. The maker's mini shows only a soft radius on the rail (about 8 mm at this size). Whole section, or radius only? *Still open.*
 2. **Land of the rail.** It is 16 mm (0.03 W). The maker's mini has about 0.05 W (25 mm at this size). Keep 16, or widen the cabinet by about 18 mm? *Still open, and it matters more now: the tuck makes the land 6.4 mm at the top of the bezel.*
 3. **The crease behind the stripe.** A step 12 mm deep, deeper (3D model 20), or only a shallow line? *Still open. Its reason changed: revision 1 made it equal to the shoulder of the hood, and that shoulder is gone.*
-4. **Depth.** The hood is 140 mm deep at the seam (0.28 W) and the cabinet 580. Enough, or deeper (0.30 W gives a cabinet of 595)? *Still open.*
+4. **Depth.** The hood is 140 mm deep at the seam (0.28 W) and the cabinet 580. Enough, or deeper (0.30 W gives a cabinet of 595)? *Answered 2026-11-10: keep 580. The owner's words: "We probably don't want to deepen it unless we deepen the whole cabinet - but I don't think we need to as I want it to actually fit on a surface somewhere."*
 5. **Legs and top bar of the hood.** They are 21 mm (0.042 W). Keep 21? *Still open.*
 6. **Marquee.** It sat 38 mm under the top bar and faced down 18 degrees. A standing person did not see its top. Accept? *Answered 2026-11-10 by the answer to question 14: the marquee is now upright, 3.5 behind the front of the top bar.*
-7. **Rear.** The rear lower facet and the rear corner facets of the references are left out. Accept for now? *Still open.*
+7. **Rear.** The rear lower facet and the rear corner facets of the references are left out. Accept for now? *Answered in part 2026-11-10. The owner accepted the rear as built ("It's in the state that I meant, this looks good") and asked for a fillet on the vertical corners of the back surface in a detail pass. The facets stay left out.*
 
 New in revision 2, answered in revision 3:
 
@@ -369,7 +369,7 @@ New in revision 2, answered in revision 3:
 
 New in revision 4:
 
-13. **Depth of the upright hood band.** Three places, drawn in `cad/out/shell-bp/compare/hood-band-options.png` (side section through a speaker). (a) Recessed, as built: the band face is 5 behind the hood front at the top of the band, the ledge is 13.9, and the speaker fronts are 0.2 to 7.8 ahead of the hood front. (b) Flush at the top of the band: the ledge is 8.9, and the speaker fronts are 5.2 to 12.8 ahead of the hood front. (c) Proud, from the front edge of the sill: there is no ledge, the band face is 8.9 ahead of the hood front at its top, and the speaker fronts are 14.1 to 21.7 ahead of it, as a small version of the box on the real cabinet. Which one? *Open.*
+13. **Depth of the upright hood band.** Three places, drawn in `cad/out/shell-bp/compare/hood-band-options.png` (side section through a speaker). (a) Recessed, as built: the band face is 5 behind the hood front at the top of the band, the ledge is 13.9, and the speaker fronts are 0.2 to 7.8 ahead of the hood front. (b) Flush at the top of the band: the ledge is 8.9, and the speaker fronts are 5.2 to 12.8 ahead of the hood front. (c) Proud, from the front edge of the sill: there is no ledge, the band face is 8.9 ahead of the hood front at its top, and the speaker fronts are 14.1 to 21.7 ahead of it, as a small version of the box on the real cabinet. Which one? *Kept at (a) on 2026-11-10. The marquee is now in the plane of the band, so (b) and (c) put the marquee 1.5 and 10.4 ahead of the top bar. The owner was told this and did not ask for a change.*
 14. **Shelf under the marquee.** The lip moves forward with the band, but the marquee does not move. Thus the top of the lip is a flat shelf 36.5 deep (in a). To make it shorter, move the marquee forward (a smaller soffit) or make it face down less. Accept the shelf? *Answered 2026-11-10: no. The owner's words: "I think we can make the marquee 90 face directly forward as well, then bring it forward and just leave a small edge below it?" The marquee is now upright, with an edge of 5 on the lip.*
 
 ## How to draw the sheets again
