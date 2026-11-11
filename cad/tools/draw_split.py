@@ -3,6 +3,8 @@
     cad/.venv-tools/bin/python cad/tools/draw_split.py            -> cad/out/shell-bp/split/options.png, option-*.png, proposal.md
     cad/.venv-tools/bin/python cad/tools/draw_split.py proposal   -> the same without the elevations (they take minutes)
     cad/.venv-tools/bin/python cad/tools/draw_split.py render     -> cad/out/shell-bp/split/renders/<option>/*.png (Blender)
+    cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint  -> docs/blueprint/10-split.svg, .png (the chosen layout)
+                                                                     and 11-joints.svg, .png (the joint sheet)
 
 Run the cut first (CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split). The elevations
 are z-buffer pictures of the pieces (the STL files of the cut), each piece in its soft tint, with the bezel plate,
@@ -186,7 +188,8 @@ def piece_numbers(rows: dict) -> dict:
     return {n: i + 1 for i, n in enumerate(names)}
 
 
-def option_sheet(key: str, meas: dict, opt: sp.Option) -> str:
+def option_sheet(key: str, meas: dict, opt: sp.Option, path: str | None = None, svg: bool = False,
+                 title: str | None = None) -> str:
     manifest, seams, tri, ids = load(key)
     rows = meas["options"][key]["pieces"]
     numbers = piece_numbers(rows)
@@ -214,9 +217,11 @@ def option_sheet(key: str, meas: dict, opt: sp.Option) -> str:
     ax.text(0.12, 0.04, "seam in a design line", fontsize=7.5, va="center", transform=ax.transAxes)
     ax.plot([0.02, 0.1], [0.015, 0.015], color=CLASS_COLOUR[sp.FACE], lw=2, transform=ax.transAxes)
     ax.text(0.12, 0.015, "seam on an open face (dashed: behind)", fontsize=7.5, va="center", transform=ax.transAxes)
-    fig.suptitle(f"Seam proposal {opt.title}  (mm; the numbers are the pieces in the list)", fontsize=13, y=0.99)
-    path = os.path.join(OUT, f"option-{key}.png")
+    fig.suptitle(title or f"Seam proposal {opt.title}  (mm; the numbers are the pieces in the list)", fontsize=13, y=0.99)
+    path = path or os.path.join(OUT, f"option-{key}.png")
     fig.savefig(path, dpi=115, bbox_inches="tight")
+    if svg:
+        fig.savefig(os.path.splitext(path)[0] + ".svg", dpi=115, bbox_inches="tight")
     plt.close(fig)
     print("draw_split:", os.path.relpath(path, REPO))
     return path
@@ -325,6 +330,19 @@ def main(elevations: bool = True) -> None:
     print("draw_split:", os.path.relpath(os.path.join(OUT, "proposal.md"), REPO))
 
 
+def blueprint() -> None:
+    """The tracked sheets of the split: the chosen layout (10) and the joints (11), from the cut and joints.py."""
+    import draw_structure as ds
+
+    meas = measurements()
+    opt = next(o for o in sp.options(Blueprint(), meas["door"]) if o.key == sp.CHOSEN)
+    option_sheet(sp.CHOSEN, meas, opt, os.path.join(db.OUT, "10-split.png"), svg=True,
+                 title=f"Blueprint 10: the split that the owner chose on 2026-11-11, {opt.title} (mm; the numbers are the "
+                       "pieces in the list; the nine floor tiles have no number). Flanges, keys, ribs, carriers and grips are not "
+                       "modelled yet.")
+    print("draw_split:", os.path.relpath(ds.joints_sheet(db.OUT, "11-joints", svg=True), REPO))
+
+
 def render(keys=(sp.CHOSEN,)) -> None:
     for key in keys:
         out = os.path.join(OUT, "renders", key)
@@ -338,5 +356,7 @@ def render(keys=(sp.CHOSEN,)) -> None:
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "render":
         render()
+    elif len(sys.argv) > 1 and sys.argv[1] == "blueprint":
+        blueprint()
     else:
         main(elevations=not (len(sys.argv) > 1 and sys.argv[1] == "proposal"))

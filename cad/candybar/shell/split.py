@@ -45,23 +45,6 @@ ALL = OPTIONS_ORDER + (CHOSEN,)
 CLASS_WORDS = {HIDDEN: "in a design line", FACE: "on an open face"}
 
 
-# ---------- the words for the joints ----------
-
-JOINTS = {
-    "bond-fill": "Permanent. Glued butt joint with a printed splice plate (4 mm, 25 mm wide) bonded inside across the "
-                 "seam and 3 mm steel pins every 80 to 100 mm for alignment. A shadow chamfer of 0.4 mm on both outer "
-                 "edges, so that a small misfit reads as a straight line. The chamfer is filled, sanded and painted "
-                 "with the shell.",
-    "bond-line": "Permanent. The same glued butt joint with a splice plate and pins. The seam lies in a crease, an "
-                 "edge or under a plate, so it needs no filler.",
-    "service": "Opens again. A flange inside on each part (12 mm wide, 4 mm thick) with M4 heat-set inserts every 80 "
-               "to 100 mm and two locating pins. Screws go in from inside or from the least visible side. A chamfer "
-               "of 0.5 mm on both edges. Never filled.",
-    "base": "Floor tiles: half-lap joints 20 mm wide, bonded and screwed (M4 into inserts) from below. The walls stand "
-            "on the floor in a rebate and are screwed from below into inserts in their foot flange; the flanges cross "
-            "the tile joints, so that no tile joint is a hinge. Under the cabinet, so it is not filled.",
-}
-
 # the seams that the outer form already has: no cut is needed for them, and every option keeps them
 EXISTING = (
     ("G", "hood on the body: the level groove FB5 / HC15", "service",

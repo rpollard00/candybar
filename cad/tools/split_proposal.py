@@ -16,6 +16,7 @@ CAD = os.path.dirname(HERE)
 sys.path.insert(0, CAD)
 sys.path.insert(0, HERE)
 import draw_structure as ds  # noqa: E402
+from candybar.shell import joints as jt  # noqa: E402
 from candybar.shell import split as sp  # noqa: E402
 from candybar.shell import structure as st  # noqa: E402
 from candybar.shell.dims import Blueprint  # noqa: E402
@@ -223,7 +224,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("The owner asks: are all the panels keyed together, how is the structure aligned, and can it be dry-fitted "
       "before finishing? Yes to all three, in the concept: every seam of the chosen layout has a feature that sets "
       "its place, and the whole shell goes together with screws only before any adhesive. None of these features is "
-      "modelled yet; they are drawn on `joints.png` and their values are named (`structure.JOINT`).")
+      "modelled yet; they are drawn on `joints.png` and their values are named in `cad/candybar/shell/joints.py`.")
     w("")
     w("**Datum.** The floor, its nine tiles screwed together (joint 2), on a flat table. Every lower piece stands on "
       "it with a key under its foot flange (joint 3). The rest is set by the pieces below it.")
@@ -244,8 +245,9 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("**Where each ring closes.** The L1 ring (sides and rear) closes at the second middle piece; the B1 ring closes at "
       "the upper rear, which drops in between the two upper pieces; the top ring closes at the brow, which drops in "
       "between the two upper pieces at the front. The closing piece goes in last, from above, into two seams at once, "
-      "so those two seams get 0.5 mm of design gap at each side: the methacrylate fills gaps of 0.25 to 3.2 "
-      "(`docs/research/petg-finishing.md`). Every other seam has 0.2 (the key clearance; the coupon sets it).")
+      f"so those two seams get {ds.g(jt.OTHER_JOINTS.closing_gap)} mm of design gap at each side: the methacrylate fills "
+      "gaps of 0.25 to 3.2 (`docs/research/petg-finishing.md`). Every other seam has "
+      f"{ds.g(jt.JOINT.groove_clearance)} (the key clearance; the coupon sets it).")
     w("")
     w("**Trapped pieces.** None, if the order above is kept. Two pieces need the order: the fixed monitor cradle "
       "(422 wide) goes in from the top before the upper pieces, or later through the bezel opening (434.7 wide with no "
@@ -340,7 +342,8 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       "monitor's plug space (x 210) and the side wall (x 241.7, the wall is 5.6 thick there), with 0.9 mm to the hub "
       "at its foot. The tuck stops the rails at z 350; a short post goes on to the top beam, and it still nicks the "
       "skin by 0.2 cm3 at the tuck (trim its corner by 3 mm). The two monitor beams sit 1.2 and 2.9 mm from the room "
-      "for any 16:10 monitor. The floor (7 mm) meets the hub, which stands on the 4 mm floor now (see \"Floor\").")
+      "for any 16:10 monitor. The floor row lists the hub if this check ran while the hub stood on the 4 mm floor; the "
+      "fit study now stands the hub on the 7 mm floor (see \"Floor\").")
     w("")
     w(f"Cost of the frame of C: {struct['frame_length_m']:.1f} m of 2020 extrusion, {struct['frame_kg']:.1f} kg (ESTIMATED at "
       f"{st.EXTRUSION_KG_M} kg/m), about 16 corner brackets, 60 T-nuts and screws, a saw and a drill or a cutting "
@@ -479,7 +482,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       f"the skin; the power supply on one tile sags {est['floor']['psu_sag_mm']:.2f} mm (with a factor of 2). The tiles "
       "join with half-laps (joint 2): the ring flanges of the walls cross the tile joints, so that no joint is a "
       "hinge. Room: the power supply stands 3 mm above the present 4 mm floor, so a 7 mm floor costs no room under it. "
-      "The hub stands on the 4 mm floor now (z 4.1): it must rise 3 mm (a change for `fit.py`). Under the cabinet, "
+      "The fit study stands the hub on the 7 mm floor (`fit.Layout.floor_t`). Under the cabinet, "
       "ribs could go down into the 10 mm that the feet give, if the floor must be stiffer.")
     w("")
     w(f"**Control panel plate, printed PETG (the owner, for proving).** The outline (396 wide) is wider than the bed, "
@@ -541,18 +544,25 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("")
     w("| Joint | Locates | Clamps and stays | Spacing | Bond area | Outside | Prints without support |")
     w("| --- | --- | --- | --- | --- | --- | --- |")
-    w("| 1 skin to skin (wall or curved face) | inside flange 6 x 12 on both pieces, a key 1.5 x 4 on one face in a groove "
-      "of the other (+0.2, the coupon sets it) | thread-forming screw 3.0 x 16 for plastics through both flanges | 60 | "
-      "12 per mm of seam, plus the 4 mm butt | V-groove 1.0 wide, 0.8 deep | yes: a level flange has a 45 deg gusset under it; "
-      "an upright flange is a wall |")
-    w("| 2 floor tile to tile | half-lap 20 wide, each lap 3.5; a cone 8 x 3 in the lower lap, socket in the upper | "
-      "thread-forming 3.5 x 12 from below | 50 | 20 per mm | none (under the cabinet) | yes: both laps print flat |")
-    w("| 3 wall foot to floor | key 3 x 2.5 under the foot flange in a slot of the floor | thread-forming 3.5 x 16 up from "
-      "below | 80 | 12 per mm | none | yes: the flange is at the bed in the upright print |")
-    w("| 4 node (three pieces meet: L1 or B1 with S1, P1 with L1, the rear corners) | a cone in each flange, sockets in a "
-      "node plate 24 x 24 x 4 | one thread-forming screw into each piece | one plate | the plate | none | the plate prints flat |")
-    w("| 5 service (door, hood, bezel plate, panel, USB plate) | two pins 4 dia, +0.1 | M4 heat-set insert in the fixed part, "
-      "M4 screw | 80 to 100 | none: never bonded | chamfer 0.5 on both edges | yes: bosses on the flanges, inside |")
+    J, O, g = jt.JOINT, jt.OTHER_JOINTS, ds.g
+    w(f"| 1 skin to skin (wall or curved face) | inside flange {g(J.flange_t)} x {g(J.flange_h)} on both pieces, a key "
+      f"{g(J.key_proj)} x {g(J.key_w)} on one face in a groove of the other (+{g(J.groove_clearance)}, the coupon sets it) | "
+      f"thread-forming screw {g(J.screw_d)} x {g(J.screw_l)} for plastics through both flanges; {ds.pilot_words()} | "
+      f"{g(J.screw_pitch)} | {g(ds.bond_width())} per mm of seam beside the groove, plus the {g(J.wall_t)} mm butt | "
+      f"V-groove {g(J.vgroove_w)} wide, {g(J.vgroove_d)} deep | yes: a level flange has a {g(J.gusset_angle)} deg gusset "
+      "under it; an upright flange is a wall |")
+    w(f"| 2 floor tile to tile | half-lap {g(O.lap_w)} wide, each lap {g(st.FLOOR_T / 2)}; a cone {g(O.cone_d)} x "
+      f"{g(O.cone_h)} in the lower lap, socket in the upper | thread-forming {g(O.base_screw_d)} x {g(O.lap_screw_l)} from "
+      f"below | {g(O.lap_screw_pitch)} | {g(O.lap_w)} per mm | none (under the cabinet) | yes: both laps print flat |")
+    w(f"| 3 wall foot to floor | key {g(O.foot_key_w)} x {g(O.foot_key_h)} under the foot flange in a slot of the floor | "
+      f"thread-forming {g(O.base_screw_d)} x {g(O.foot_screw_l)} up from below | {g(O.foot_screw_pitch)} | {g(J.foot_h)} per mm "
+      "| none | yes: the flange is at the bed in the upright print |")
+    w(f"| 4 node (three pieces meet: L1 or B1 with S1, P1 with L1, the rear corners) | a cone in each flange, sockets in a "
+      f"node plate {g(O.node_plate)} x {g(O.node_plate)} x {g(O.node_plate_t)} | one thread-forming screw into each piece | "
+      "one plate | the plate | none | the plate prints flat |")
+    w(f"| 5 service (door, hood, bezel plate, panel, USB plate) | two pins {g(O.pin_d)} dia, +{g(O.pin_clearance)} | "
+      f"{O.insert} heat-set insert in the fixed part, {O.insert} screw | {g(O.service_pitch_min)} to {g(O.service_pitch_max)} | "
+      f"none: never bonded | chamfer {g(O.service_chamfer)} on both edges | yes: bosses on the flanges, inside |")
     w("")
     w("Adhesive and filler: the classes of `docs/research/petg-finishing.md` (section 1), to prove on the coupon. No "
       "strength for printed PETG is claimed.")
@@ -570,8 +580,8 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       "seams, about 500 mm of seam at most, all screwed in the dry pass and only opened and glued in that batch.")
     w("")
     w("**Coupon test before the real parts** (the brief asks for a 100 to 150 mm two-piece curved coupon; `joints.png`, "
-      "panel 6): three pairs of joint 1 on a curved face of radius 300, printed in the real orientation, with groove "
-      "clearances of +0.1, +0.2 and +0.3. It must prove: the clearance that locates with no play and no force; the "
+      f"panel 6): three pairs of joint 1 on a curved face of radius {ds.g(ds.cp.RADIUS)}, printed in the real orientation, "
+      f"with groove clearances of {', '.join('+' + ds.g(c) for c in ds.cp.CLEARANCES)}. It must prove: the clearance that locates with no play and no force; the "
       "adhesive (bonded pair pulled and bent to failure: the break must be in the plastic, not in the bond); and the "
       "filler and paint over the joint after the pair is bent to the deflection of the finger case (0.3 to 0.8 mm over "
       "the span) a few hundred times: no line may show.")
@@ -698,7 +708,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("## Material")
     w("")
     w("The material is open: PETG on the A1 (the plan), or ABS on an enclosed printer. The seams, the pieces and the "
-      "joint values do not change; the clearances are named values (`structure.JOINT`) that the coupon of each material "
+      "joint values do not change; the clearances are named values (`cad/candybar/shell/joints.py`) that the coupon of each material "
       "sets. What changes for ABS (`docs/research/abs-switch.md`):")
     w("")
     w("| Step | PETG | ABS |")

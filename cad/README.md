@@ -38,6 +38,32 @@ If a check fails, `cad/build.sh` returns a non-zero exit status.
 
 The build has two steps. The first step runs `freecadcmd`: it generates the document, does the checks, and writes the exports and the drawings. The second step runs the FreeCAD GUI program without a window and stores the view settings in the document. Without the second step, FreeCAD opens the document with all solids hidden.
 
+## The blueprint shell: split, structure, joints, coupon and width
+
+The blueprint shell (`candybar/shell/`) is a second model beside the older generator. `docs/blueprint/index.md` describes it, and its section "How to build and check the solids" gives the commands for the solids and the fit study. These commands make the split, the structure, the joint coupon and the width study. Run one FreeCAD or Blender process at a time.
+
+```sh
+# the split: cut the skin into pieces for each seam option and measure them (the skin is cached: about 12 minutes when it changes)
+CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split
+# the structure: place the frame of option C in the skin, against the hardware of the fit study (split/structure.json)
+CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.structure
+# the sheets and proposal.md (without "proposal": also the elevations of each option, which take minutes)
+cad/.venv-tools/bin/python cad/tools/draw_split.py proposal
+cad/.venv-tools/bin/python cad/tools/draw_split.py render       # renders of the chosen layout (Blender)
+cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
+# the joint coupon: printable parts, checks and README.md in cad/out/coupon; then its drawing and renders
+CANDYBAR_OUT=cad/out/coupon cad/candybar/freecad-run.sh candybar.shell.coupon
+cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupon
+# the width study: the cavity probe of a wider variant (here +20) in its own directory, then the sheets
+CANDYBAR_WIDEN=20 CANDYBAR_WIDEN_STEP=probe CANDYBAR_OUT=cad/out/probe/probe-w20 cad/candybar/freecad-run.sh candybar.shell.width_run
+cad/.venv-tools/bin/python cad/tools/draw_widths.py options          # cad/out/shell-bp/compare/width-options.png
+cad/.venv-tools/bin/python cad/tools/draw_widths.py table cad/out/probe   # the numbers as Markdown
+```
+
+`CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_OPTIONS` (for example `A,bezel`) limits a split run to some options. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.
+
+Large outputs go under `cad/out/`, which git ignores. Do not write them to `/tmp`: on this machine `/tmp` is memory. Scratch files go under `cad/out/_scratch/`.
+
 ## Parameters
 
 All dimensions are in `cad/params/*.csv`. The build copies them into the `Params` sheet of the document. Each solid, sketch dimension and position refers to the sheet by name.

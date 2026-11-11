@@ -10,7 +10,8 @@ The seams of split.py are joints, and joints are structure, so each option is al
 
 This module holds the data (members, mounts, routes, air path) and the hand estimates. It has no FreeCAD at
 import; main() (under FreeCAD) places the frame of C in the skin and against the fit study's envelopes and writes
-split/structure.json. tools/draw_split.py draws the sheets and the sections of proposal.md from both.
+split/structure.json. tools/draw_split.py draws the sheets and the sections of proposal.md from both. The joint
+values are in joints.py (Joint, OtherJoints); this module has none of its own.
 
     CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.structure
 """
@@ -263,7 +264,7 @@ def mounts(key: str) -> list[Mount]:
               "flanges at the legs; the controller beside it.", "hood"),
         Mount("encoder", "On the control panel frame under the panel, so that it leaves with the panel (one encoder for each "
               "panel).", "control panel"),
-        Mount("USB hub", "On the floor behind the USB row (fit study), in a printed clip; 3 mm higher than now.", "floor"),
+        Mount("USB hub", "On the 7 mm floor behind the USB row (fit study), in a printed clip.", "floor"),
         Mount("USB socket plate", "Screwed from inside into a frame of inserts round its opening in the deck side.", "deck side R"),
         Mount("control panel frame and latch", "The ledge under the plate takes the load; two pins at the front, a latch at "
               f"the back into {'the frame' if frame else 'the deck frame D1/D2'}.", "deck"),
@@ -447,15 +448,6 @@ def main() -> int:
 
 # ---------- the owner's choices of 2026-11-11 ----------
 
-# The joint values of the proposal, by name. cad/candybar/shell/joints.py (the coupon study) becomes the one source of
-# these numbers; until it exists they are here, and the coupon sets the clearances.
-JOINT = {
-    "flange_w": 6.0, "flange_h": 12.0, "key_w": 1.5, "key_h": 4.0, "key_clearance": 0.2, "screw_d": 3.0, "screw_l": 16.0,
-    "screw_pitch": 60.0, "groove_w": 1.0, "groove_d": 0.8, "cone_d": 8.0, "cone_h": 3.0, "cone_clearance": 0.15,
-    "lap_w": 20.0, "insert": "M4 x 8, hole 5.6", "pin_d": 4.0, "pin_clearance": 0.1, "service_chamfer": 0.5,
-}
-
-
 def floor_options(mass_kg: float) -> dict:
     """The floor under the power supply when the cabinet is lifted by its hand-holds (the supply's weight x 2 for a
     jerk), as a strip as wide as the supply spanning from the deck's back frame (y 207) to the rear wall (y 536):
@@ -517,7 +509,7 @@ ALIGNMENT = (
     ("R4 (the door's centre)", "1", "flange key; one cone; the door is bonded apart from the cabinet, on a flat table", "n, t, s"),
     ("W1 (brow beside the hood bay)", "1", "flange key; a cone at the top ring", "n, t, s"),
     ("H1 (hood bays)", "1", "flange key; a cone at the roof and one at the sill", "n, t, s"),
-    ("hood on the body top (groove)", "6", "two cones at the front and two at the rear corners of the top ring", "n, t, s"),
+    ("hood on the body top (groove)", "7", "two cones at the front and two at the rear corners of the top ring", "n, t, s"),
     ("rear door (DR)", "5", "two pins and a lip on the sill", "n, t, s"),
     ("bezel plate (reveal)", "5", "two pins in the bottom ledge; magnets on the fixed cradle; the lip on the bottom ledge", "n, t, s"),
     ("control panel (pocket)", "5", "the pocket's six edges and two pins at the front", "n, t, s"),

@@ -1,10 +1,13 @@
-"""Joint 1 of the seam proposal (skin to skin on a wall or a curved face): the one definition of its dimensions and
-the functions that make it on the edge of a wall.
+"""The joints of the seam proposal: the one definition of their dimensions, and the functions that make joint 1 on
+the edge of a wall.
 
-The numbers come from the joint sheet of the proposal (tools/draw_structure.py, joint_skin, and
-cad/out/shell-bp/split/proposal.md, "Joints"); the coupon (candybar.shell.coupon) proves them before the cabinet
-is printed. Later part modelling imports Joint and the builders from here, so that every seam and the coupon have
-one set of values.
+Joint holds joint 1 (skin to skin on a wall or a curved face). The coupon (candybar.shell.coupon) is modelled from it
+and proves it before the cabinet is printed. OtherJoints holds joints 2 to 7 (floor tiles, wall foot, node, service
+seam, hood on the body top) and the cones that locate a seam along its length: concept values, not modelled yet.
+The joint sheet (tools/draw_structure.py, joints_sheet) and the joint table of the proposal (tools/split_proposal.py,
+cad/out/shell-bp/split/proposal.md, "Joints") read both. Later part modelling imports them and the builders from
+here, so that every seam and the coupon have one set of values. tests/test_joints.py fails when a joint value is
+defined in a second place.
 
 Frame of a seam (the section across it):
   u  the distance inward from the outer face of the skin (u = 0 outside, u = wall_t on the inner face, the flange
@@ -23,6 +26,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .dims import Blueprint
+
 P2 = tuple[float, float]
 P3 = tuple[float, float, float]
 
@@ -30,7 +35,7 @@ P3 = tuple[float, float, float]
 @dataclass(frozen=True)
 class Joint:
     """Joint 1, mm and degrees."""
-    wall_t: float = 4.0              # skin
+    wall_t: float = Blueprint.wall_t # the skin: its one source is dims.Blueprint
     flange_t: float = 6.0            # flange thickness, across the seam (along z)
     flange_h: float = 12.0           # flange height, inward from the inner face of the skin (along u)
     gusset_angle: float = 45.0       # from the wall; at 45 the gusset prints with no support (the printer's limit)
@@ -95,6 +100,49 @@ class Joint:
 
 
 JOINT = Joint()
+
+
+@dataclass(frozen=True)
+class OtherJoints:
+    """Joints 2 to 7 of the seam proposal and the cones, mm. Concept values: none of these is modelled yet, and the
+    coupon of each joint sets its clearances. Joint 3 uses the foot flange of Joint (foot_h x foot_t)."""
+    # the cone that locates a seam along its length (at the ends of a joint 1 seam, in the floor laps, in a node,
+    # on the top ring under the hood); its socket is the cone with the clearance on each side
+    cone_d: float = 8.0
+    cone_h: float = 3.0
+    cone_clearance: float = 0.15
+    # joint 2, floor tile to floor tile: a half-lap (each lap half the floor), screwed from below
+    lap_w: float = 20.0
+    base_screw_d: float = 3.5        # thread-forming, for joints 2 and 3
+    lap_screw_l: float = 12.0
+    lap_screw_pitch: float = 50.0
+    # joint 3, wall foot to floor: a key under the foot flange in a slot of the floor, screwed up from below
+    foot_key_w: float = 3.0
+    foot_key_h: float = 2.5
+    foot_screw_l: float = 16.0
+    foot_screw_pitch: float = 80.0
+    # joint 4, node (three pieces meet): a plate bonded inside over the three flanges
+    node_plate: float = 24.0
+    node_plate_t: float = 4.0
+    # joint 5, service seam (opens again): heat-set inserts in the fixed part, two pins, never bonded
+    insert: str = "M4"
+    insert_l: float = 8.0
+    insert_hole_d: float = 5.6
+    service_pitch_min: float = 80.0
+    service_pitch_max: float = 100.0
+    service_boss: float = 12.0
+    pin_d: float = 4.0
+    pin_clearance: float = 0.1
+    service_chamfer: float = 0.5
+    # joint 7, hood on the body top: the top ring of the body and the foot flange of the hood; the cones locate it
+    ring_w: float = 14.0
+    ring_h: float = 12.0
+    hood_foot_t: float = 6.0
+    # the piece that closes a ring goes in last, into two seams at once: those seams get this gap at each side
+    closing_gap: float = 0.5
+
+
+OTHER_JOINTS = OtherJoints()
 
 
 # ---------- the section across the seam (u, z); "below" and "above" name the piece ----------

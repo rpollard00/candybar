@@ -6,14 +6,15 @@ proposal. draw_split.py calls these; they read what candybar.shell.split and can
 structure-<option>.png  a side view and a plan of the cavity with the hardware boxes of the fit study, and the
                         floor, ring frames, cross-members, ribs, frame members and mounts in colour
 services.png            the cable routes and the air path, with the plugs at the parts that open
-joints.png              dimensioned sections of the joints, and the coupon pair
+joints.png              dimensioned sections of the joints, and the coupon pair; every value from
+                        candybar.shell.joints (also docs/blueprint/11-joints: draw_split.py blueprint)
 """
 from __future__ import annotations
 
 import json
-
 import os
 import sys
+from dataclasses import fields
 
 import matplotlib
 
@@ -27,6 +28,8 @@ CAD = os.path.dirname(HERE)
 sys.path.insert(0, CAD)
 sys.path.insert(0, HERE)
 import draw_blueprint as db  # noqa: E402
+from candybar.shell import coupon as cp  # noqa: E402
+from candybar.shell import joints as jt  # noqa: E402
 from candybar.shell import split as sp  # noqa: E402
 from candybar.shell import structure as st  # noqa: E402
 from candybar.shell.dims import Blueprint  # noqa: E402
@@ -210,164 +213,269 @@ def services_sheet() -> str:
 
 
 # ---------- the joint sheet ----------
+# Every number on this sheet comes from candybar.shell.joints (Joint for joint 1, OtherJoints for joints 2 to 7),
+# from the floor of candybar.shell.structure, the coupon of candybar.shell.coupon and the groove of dims.Blueprint.
 
-def box(ax, x, y, w, h, c="#e8c39e", hatch=None, lw=0.8) -> None:
-    ax.add_patch(Rectangle((x, y), w, h, fc=c, ec="#333", lw=lw, hatch=hatch, zorder=3))
+J, O = jt.JOINT, jt.OTHER_JOINTS
+LOWER, UPPER = "#e8c39e", "#9ec5e8"   # the piece below the seam (key, pilots) and the piece above (groove, clearance)
+
+
+def g(v: float) -> str:
+    return f"{v:g}"
+
+
+def box(ax, x, y, w, h, c=LOWER, hatch=None, lw=0.8, ls="-"):
+    return ax.add_patch(Rectangle((x, y), w, h, fc=c, ec="#333", lw=lw, hatch=hatch, ls=ls, zorder=3))
+
+
+def section(ax, pts, x0: float, fc: str, ec: str = "#333", z: int = 3, ls="-", lw: float = 0.8):
+    """A profile of joints.py, (u, z) across the seam, drawn with z to the right (from x0) and u up (inward)."""
+    return ax.add_patch(Polygon([(x0 + zz, uu) for uu, zz in pts], closed=True, fc=fc, ec=ec, lw=lw, ls=ls, zorder=z))
 
 
 def dim(ax, p, q, text, shift=(0, 0)) -> None:
-    db.dim(ax, p, q, text, shift, size=6.5)
+    db.dim(ax, p, q, text, shift, size=6.0)
 
 
 def note(ax, at, text, to=None) -> None:
-    db.note(ax, at, text, to, size=6.5)
+    db.note(ax, at, text, to, size=6.0)
+
+
+def pilot_words() -> str:
+    """The pilot of the cabinet is open in joints.py until the coupon decides: the sheet gives both candidates."""
+    if J.pilot_d is not None:
+        return f"pilot {g(J.pilot_d)}"
+    return f"pilot {g(J.pilot_d_pet)} (PET) or {g(J.pilot_d_abs)} (ABS): open, the coupon decides"
+
+
+def bond_width() -> float:
+    """The flange face beside the groove mouth, per mm of seam: what takes the adhesive."""
+    a, b = J.groove_u()
+    return J.flange_h - (b - a + 2 * J.groove_chamfer)
 
 
 def joint_skin(ax) -> None:
-    """Skin to skin on a wall: inside flanges on both pieces, a key on one face, thread-forming screws, a V-groove."""
-    a, b = "#e8c39e", "#9ec5e8"
-    box(ax, -40, 0, 39.5, 4, a)                 # wall of piece 1 (outside at y = 0)
-    box(ax, 0.5, 0, 39.5, 4, b)                 # wall of piece 2
-    box(ax, -6.5, 4, 6, 12, a)                  # flange 1
-    box(ax, 0.5, 4, 6, 12, b)                   # flange 2
-    ax.add_patch(Polygon([(-6.5, 16), (-6.5, 4), (-18.5, 4)], fc=a, ec="#333", lw=0.8, zorder=3))  # 45 deg gusset
-    ax.add_patch(Polygon([(6.5, 16), (6.5, 4), (18.5, 4)], fc=b, ec="#333", lw=0.8, zorder=3))
-    box(ax, -0.5, 8, 1.5, 4, a)                 # key on flange 1 into a groove of flange 2
-    ax.add_patch(Polygon([(-0.5, 0), (0.5, 0), (0, 0.8)], fc="white", ec="#d62718", lw=0.8, zorder=4))  # V-groove
-    ax.plot([-12, 12], [12, 12], color="#333", lw=1.4, zorder=5)  # screw
-    ax.plot([-0.25, -0.25], [4, 16], color="#2ca02c", lw=1.2, zorder=4)
-    dim(ax, (-34, 0), (-34, 4), "4", (-4, 0))
-    dim(ax, (-6.5, 19), (6.5, 19), "2 x 6 flange", (0, 3))
-    dim(ax, (22, 4), (22, 16), "12", (4, 0))
-    note(ax, (-40, 26), "key 1.5 x 4, groove +0.2 (coupon sets it): locates", (-0.5, 10))
-    note(ax, (-40, 32), "thread-forming screw 3.0 x 16 for plastics, every 60: clamps while it cures, stays in", (-12, 12))
-    note(ax, (2, -9), "V-groove 1.0 wide, 0.8 deep on the outside: takes the filler", (0, 0.4))
-    note(ax, (8, 26), "green: adhesive on the flange faces, 10 x seam length", (0, 10))
-    note(ax, (-42, -16), "45 deg gusset under a level flange: prints with no support", (-12, 5))
-    ax.set_title("1  skin to skin on a wall or a curved face (section across the seam)", fontsize=9)
+    """Joint 1, from the profiles of joints.py: section A between two screws (key in its groove), section B at a screw.
+    Left of each seam the piece below, right of it the piece above; up is inward from the outer face (u)."""
+    w, h, t, run = J.wall_t, J.flange_h, J.flange_t, 22.0
+    for x0, title in ((-30.0, "A: between screws"), (30.0, "B: at a screw")):
+        for side, c in (("below", LOWER), ("above", UPPER)):
+            section(ax, jt.skin_profile(J, side, run), x0, c)
+            section(ax, jt.flange_profile(J, side), x0, c)
+            section(ax, jt.vgroove_profile(J, side), x0, "white", ec="#d62718", z=4)
+        ax.text(x0, -5.5, title, fontsize=6.5, ha="center", va="center", color="#333")
+    xa, xb = -30.0, 30.0
+    upper_b = section(ax, jt.flange_profile(J, "above"), xb, UPPER)
+    # A: key on the piece below, groove in the piece above, adhesive on the flange faces beside the groove
+    section(ax, jt.groove_profile(J, J.groove_clearance), xa, "white", z=4)
+    section(ax, jt.key_profile(J), xa, LOWER, z=5)
+    ga, gb = J.groove_u()
+    for u0, u1 in ((w, ga - J.groove_chamfer), (gb + J.groove_chamfer, w + h)):
+        ax.plot([xa, xa], [u0, u1], color="#2ca02c", lw=1.6, zorder=6)
+    dim(ax, (xa - run + 3, 0), (xa - run + 3, w), g(w), (-2.5, 0))
+    dim(ax, (xa - t, w + h + 2), (xa, w + h + 2), g(t), (0, 1.6))
+    dim(ax, (xa, w + h + 2), (xa + t, w + h + 2), g(t), (0, 1.6))
+    dim(ax, (xa - t - 2, w), (xa - t - 2, w + h), g(h), (-2.0, 0))
+    note(ax, (-58, 26), f"key {g(J.key_proj)} x {g(J.key_w)}, {g(J.key_u0)} inward of the skin; groove "
+         f"+{g(J.groove_clearance)} each side (the coupon sets it: {', '.join('+' + g(c) for c in cp.CLEARANCES)}), "
+         f"{g(J.groove_extra_depth)} deeper than the key", (xa + 0.8, (J.key_u[0] + J.key_u[1]) / 2))
+    note(ax, (-58, 22), f"green: adhesive on the flange faces beside the groove, {bond_width():g} per mm of seam, "
+         f"and the {g(w)} butt", (xa, w + 1))
+    note(ax, (-58, 30), f"V-groove {g(J.vgroove_w)} wide, {g(J.vgroove_d)} deep, half on each piece: takes the filler",
+         (xa, J.vgroove_d / 2))
+    note(ax, (-58, -10), f"{g(J.gusset_angle)} deg gusset under the level flange: prints with no support",
+         (xa - t - J.gusset_leg / 2, w + h / 2))
+    # B: the screw through the clearance hole of the piece above into the pilot of the piece below
+    u = J.screw_u
+    holes = ((-J.pilot_depth, 0.0, J.pilot_d_pet), (-J.pilot_counterbore_depth, 0.0, J.pilot_counterbore_d),
+             (0.0, t, J.clearance_d), (t, t + J.gusset_leg + 1.0, J.head_pocket_d))
+    for z0, z1, d in holes:
+        cut = box(ax, xb + z0, u - d / 2, z1 - z0, d, "white", lw=0.6)
+        if z0 >= t:
+            cut.set_clip_path(upper_b)   # the head pocket cuts the gusset only
+    box(ax, xb - J.pilot_depth, u - J.pilot_d_abs / 2, J.pilot_depth, J.pilot_d_abs, "none", lw=0.6, ls=(0, (2, 1.5)))
+    ax.plot([xb + t - J.screw_l, xb + t], [u, u], color="#333", lw=J.screw_d * 0.9, solid_capstyle="butt", zorder=7)
+    ax.plot([xb + t, xb + t], [u - J.screw_d, u + J.screw_d], color="#333", lw=2.2, zorder=7)
+    dim(ax, (xb + run - 3, 0), (xb + run - 3, u), g(u), (2.5, 0))
+    dim(ax, (xb - J.pilot_depth, u - 4.5), (xb, u - 4.5), g(J.pilot_depth), (0, -1.6))
+    note(ax, (-10, -14), f"thread-forming screw {g(J.screw_d)} x {g(J.screw_l)} for plastics, every "
+         f"{g(J.screw_pitch)}: clamps while it cures, stays in", (xb, u))
+    note(ax, (-10, -18), pilot_words(), (xb - J.pilot_depth / 2, u - J.pilot_d_abs / 2))
+    note(ax, (-10, -22), f"counterbore {g(J.pilot_counterbore_d)} x {g(J.pilot_counterbore_depth)}; clearance "
+         f"{g(J.clearance_d)}; head pocket {g(J.head_pocket_d)}", (xb + t / 2, u + J.clearance_d / 2))
+    note(ax, (-58, 34), f"the key stops {g(J.key_gap)} each side of a screw and {g(J.key_end_margin)} from a "
+         "free end of the seam: section B has no key")
+    ax.set_title("1  skin to skin on a wall or a curved face (sections across the seam; up: inward)", fontsize=9)
 
 
 def joint_floor(ax) -> None:
-    box(ax, -40, 0, 50, 3.5, "#e8c39e")
-    box(ax, -40, 3.5, 30, 3.5, "#e8c39e")
-    box(ax, -10, 3.5, 50, 3.5, "#9ec5e8")
-    box(ax, 10, 0, 30, 3.5, "#9ec5e8")
-    ax.add_patch(Polygon([(-4, 3.5), (4, 3.5), (0, 6.5)], fc="#e8c39e", ec="#333", lw=0.8, zorder=4))  # cone
-    ax.plot([-5, -5], [-6, 6], color="#333", lw=1.4, zorder=5)
-    ax.plot([5, 5], [-6, 6], color="#333", lw=1.4, zorder=5)
-    dim(ax, (-10, 10), (10, 10), "half-lap 20", (0, 3))
-    dim(ax, (44, 0), (44, 7), "7", (4, 0))
-    note(ax, (-40, 18), "cone 8 dia x 3 in the lower lap, socket in the upper: locates", (0, 5))
-    note(ax, (-40, 23), "thread-forming 3.5 x 12 from below, every 50; adhesive on the 20 lap", (-5, -4))
-    note(ax, (12, -12), "sandwich: skins 1.2, gyroid core 40 %", (25, 2))
-    ax.set_title("2  floor tile to floor tile (printed floor, 7 thick)", fontsize=9)
+    f, lap = st.FLOOR_T, O.lap_w
+    half = f / 2
+    box(ax, -40, 0, 40 + lap / 2, half, LOWER)
+    box(ax, -40, half, 40 - lap / 2, half, LOWER)
+    box(ax, -lap / 2, half, 40 + lap / 2, half, UPPER)
+    box(ax, lap / 2, 0, 40 - lap / 2, half, UPPER)
+    ax.add_patch(Polygon([(-O.cone_d / 2, half), (O.cone_d / 2, half), (0, half + O.cone_h)], fc=LOWER, ec="#333", lw=0.8, zorder=4))
+    for x in (-lap / 4, lap / 4):
+        ax.plot([x, x], [f - 1 - O.lap_screw_l, f - 1], color="#333", lw=1.4, zorder=5)
+    dim(ax, (-lap / 2, f + 3), (lap / 2, f + 3), f"half-lap {g(lap)}", (0, 3))
+    dim(ax, (44, 0), (44, f), g(f), (4, 0))
+    note(ax, (-40, 18), f"cone {g(O.cone_d)} dia x {g(O.cone_h)} in the lower lap, socket +{g(O.cone_clearance)} in the "
+         "upper: locates", (0, half + 1))
+    note(ax, (-40, 23), f"thread-forming {g(O.base_screw_d)} x {g(O.lap_screw_l)} from below, every "
+         f"{g(O.lap_screw_pitch)}; adhesive on the {g(lap)} lap", (-lap / 4, -4))
+    note(ax, (12, -12), f"sandwich: skins {g(st.FLOOR_SKIN)}, gyroid core {st.FLOOR_INFILL * 100:.0f} %", (25, 2))
+    ax.set_title(f"2  floor tile to floor tile (printed floor, {g(f)} thick)", fontsize=9)
 
 
 def joint_foot(ax) -> None:
-    box(ax, -30, 0, 60, 7, "#9ec5e8")           # floor tile
-    box(ax, 30, 0, 4, 60, "#e8c39e")            # wall, outside at x = 34
-    box(ax, 18, 7, 12, 4, "#e8c39e")            # foot flange on the floor
-    box(ax, 22, 7, 3, 2.5, "#e8c39e")           # key into a slot in the floor? drawn as a rib
-    ax.plot([24, 24], [-6, 11], color="#333", lw=1.4, zorder=5)
-    dim(ax, (18, 14), (30, 14), "12", (0, 3))
-    dim(ax, (-34, 0), (-34, 7), "7", (-4, 0))
-    note(ax, (-30, 30), "the wall stands on the desk outside the floor; its foot flange lies on the floor", (25, 10))
-    note(ax, (-30, 36), "key 3 x 2.5 under the flange into a slot in the floor: locates", (23.5, 8))
-    note(ax, (-30, 42), "thread-forming 3.5 x 16 up from below every 80; adhesive on the flange", (24, 2))
+    f, w = st.FLOOR_T, J.wall_t
+    x_out = 34.0
+    box(ax, -30, 0, 60, f, UPPER)                                   # floor tile
+    box(ax, x_out - w, 0, w, 60, LOWER)                             # wall, outside at x_out
+    box(ax, x_out - w - J.foot_h, f, J.foot_h, J.foot_t, LOWER)     # foot flange on the floor
+    kx = x_out - w - J.foot_h / 2 - O.foot_key_w / 2
+    box(ax, kx, f - O.foot_key_h, O.foot_key_w, O.foot_key_h, LOWER)  # key under the flange, in a slot of the floor
+    sx = x_out - w - J.foot_h / 2 + O.foot_key_w
+    ax.plot([sx, sx], [f + J.foot_t - O.foot_screw_l, f + J.foot_t], color="#333", lw=1.4, zorder=5)
+    dim(ax, (x_out - w - J.foot_h, f + J.foot_t + 3), (x_out - w, f + J.foot_t + 3), f"{g(J.foot_h)} x {g(J.foot_t)}", (0, 3))
+    dim(ax, (-34, 0), (-34, f), g(f), (-4, 0))
+    note(ax, (-30, 30), "the wall stands on the desk outside the floor; its foot flange lies on the floor", (x_out - w - 6, f + J.foot_t))
+    note(ax, (-30, 36), f"key {g(O.foot_key_w)} x {g(O.foot_key_h)} under the flange into a slot in the floor: locates",
+         (kx + O.foot_key_w / 2, f - O.foot_key_h / 2))
+    note(ax, (-30, 42), f"thread-forming {g(O.base_screw_d)} x {g(O.foot_screw_l)} up from below every "
+         f"{g(O.foot_screw_pitch)}; adhesive on the flange", (sx, 2))
     ax.set_title("3  wall foot to floor", fontsize=9)
 
 
 def joint_node(ax) -> None:
-    box(ax, -30, -2, 60, 4, "#e8c39e")          # level seam flanges seen from inside
-    box(ax, -2, 2, 4, 28, "#9ec5e8")
-    box(ax, -2, -30, 4, 28, "#b9dea0")
-    box(ax, -12, -12, 24, 24, "#f2e3a0", lw=1.2)
-    for p in ((-7, -7), (7, -7), (-7, 7), (7, 7)):
-        ax.add_patch(plt.Circle(p, 2.0, fc="white", ec="#333", lw=0.8, zorder=6))
-    note(ax, (-30, 38), "node plate 24 x 24 x 4, bonded inside over the three flanges", (0, 12))
-    note(ax, (-30, 44), "cone in each flange, socket in the plate: the plate sets all three", (7, 7))
-    note(ax, (-30, -40), "one thread-forming screw into each piece", (-7, -7))
+    p, fw = O.node_plate, 2 * J.flange_t
+    box(ax, -30, -fw / 2, 60, fw, LOWER)          # the flanges of the level seam, seen from inside
+    box(ax, -fw / 2, fw / 2, fw, 30 - fw / 2, UPPER)
+    box(ax, -fw / 2, -30, fw, 30 - fw / 2, "#b9dea0")
+    box(ax, -p / 2, -p / 2, p, p, "#f2e3a0", lw=1.2)
+    for c in ((-p / 4, -p / 4), (p / 4, -p / 4), (-p / 4, p / 4), (p / 4, p / 4)):
+        ax.add_patch(plt.Circle(c, O.cone_d / 2, fc="white", ec="#333", lw=0.8, zorder=6))
+    note(ax, (-30, 38), f"node plate {g(p)} x {g(p)} x {g(O.node_plate_t)}, bonded inside over the three flanges", (0, p / 2))
+    note(ax, (-30, 44), f"cone {g(O.cone_d)} x {g(O.cone_h)} in each flange, socket in the plate: the plate sets all three",
+         (p / 4, p / 4))
+    note(ax, (-30, -40), "one thread-forming screw into each piece", (-p / 4, -p / 4))
     ax.set_title("4  node: three pieces meet (seen from inside)", fontsize=9)
 
 
 def joint_service(ax) -> None:
-    box(ax, -40, 0, 39.5, 4, "#e8c39e")
-    box(ax, 0.5, 0, 39.5, 4, "#9ec5e8")
-    box(ax, -12.5, 4, 12, 4, "#e8c39e")
-    box(ax, 0.5, 4, 12, 9, "#9ec5e8")           # boss with insert
-    box(ax, 4.5, 6, 4, 7, "#c0c0c0")
-    ax.plot([6.5, 6.5], [-4, 13], color="#333", lw=1.6, zorder=6)
-    ax.add_patch(Polygon([(-0.5, 0), (0.5, 0), (0, 0.5)], fc="white", ec="#333", lw=0.6, zorder=4))
-    dim(ax, (0.5, 16), (12.5, 16), "boss 12", (0, 3))
-    note(ax, (-40, 26), "M4 heat-set insert (5.6 hole, 8 deep) in the fixed part; M4 screw every 80 to 100", (6.5, 10))
-    note(ax, (-40, 32), "two pins 4 dia, +0.1, for the place; chamfer 0.5 on both edges; never glued or filled", (0, 2))
+    w, b = J.wall_t, O.service_boss
+    box(ax, -40, 0, 39.5, w, LOWER)
+    box(ax, 0.5, 0, 39.5, w, UPPER)
+    box(ax, -0.5 - b, w, b, w, LOWER)                                   # flange of the part that opens
+    box(ax, 0.5, w, b, O.insert_l + 1, UPPER)                           # boss of the fixed part
+    xc = 0.5 + b / 2
+    box(ax, xc - O.insert_hole_d / 2, w + 1, O.insert_hole_d, O.insert_l, "#c0c0c0")
+    ax.plot([xc, xc], [-4, w + O.insert_l + 1], color="#333", lw=1.6, zorder=6)
+    ax.add_patch(Polygon([(-0.5, 0), (0.5, 0), (0, O.service_chamfer)], fc="white", ec="#333", lw=0.6, zorder=4))
+    dim(ax, (0.5, w + O.insert_l + 4), (0.5 + b, w + O.insert_l + 4), f"boss {g(b)}", (0, 3))
+    note(ax, (-40, 26), f"{O.insert} heat-set insert ({g(O.insert_hole_d)} hole, {g(O.insert_l)} deep) in the fixed part; "
+         f"{O.insert} screw every {g(O.service_pitch_min)} to {g(O.service_pitch_max)}", (xc, w + O.insert_l))
+    note(ax, (-40, 32), f"two pins {g(O.pin_d)} dia, +{g(O.pin_clearance)}, for the place; chamfer {g(O.service_chamfer)} "
+         "on both edges; never glued or filled", (0, 2))
     note(ax, (-40, -10), "door: 4 thumb screws into inserts", None)
-    note(ax, (-40, -14), "hood: 2 pins at the front, 2 M4 at the rear", None)
+    note(ax, (-40, -14), f"hood: 2 pins at the front, 2 {O.insert} at the rear", None)
     note(ax, (-40, -18), "bezel plate: magnets on the fixed cradle, 2 pins, a finger notch: no tool", None)
     ax.set_title("5  service seam (opens again)", fontsize=9)
 
 
 def coupon(ax) -> None:
-    t = np.linspace(-0.45, 0.45, 40)
-    r = 300.0
-    for k, (c, lo, hi) in enumerate((("#e8c39e", -0.45, 0.0), ("#9ec5e8", 0.0, 0.45))):
-        tt = np.linspace(lo, hi, 20)
-        outer = np.stack([r * np.sin(tt), r * np.cos(tt) - r], 1)
-        inner = np.stack([(r - 4) * np.sin(tt), (r - 4) * np.cos(tt) - r], 1)
-        ax.add_patch(Polygon(np.concatenate([outer, inner[::-1]]), fc=c, ec="#333", lw=0.8))
-    box(ax, -6.5, -16, 6, 12, "#e8c39e")
-    box(ax, 0.5, -16, 6, 12, "#9ec5e8")
-    dim(ax, (-130, 8), (130, 8), "2 x 130 along the arc, 60 wide, 4 skin, joint 1 between them", (0, 4))
-    note(ax, (-130, -40), "radius 300 (a curved face like the rail's land); print each half in its real orientation", (-100, -18))
-    note(ax, (-130, -48), "make three pairs: groove +0.1, +0.2, +0.3", (0, -10))
-    ax.set_title("6  coupon pair for joint 1", fontsize=9)
+    """The coupon pair as candybar.shell.coupon models it: plan of the arc, and the face seen from outside."""
+    r, n, half, w = cp.RADIUS, cp.LENGTH, cp.HALF, J.wall_t
+    top = 10.0
+    t = np.linspace(-n / 2 / r, n / 2 / r, 40)
+    outer = np.stack([r * np.sin(t), r * np.cos(t) - r + top], 1)
+    inner = np.stack([(r - w) * np.sin(t), (r - w) * np.cos(t) - r + top - w * 0], 1)
+    inner[:, 1] -= w
+    ax.add_patch(Polygon(np.concatenate([outer, inner[::-1]]), fc=LOWER, ec="#333", lw=0.8))
+    ax.text(0, top + 4, f"plan: {g(n)} along the arc, radius {g(r)}, skin {g(w)}", fontsize=6.5, ha="center")
+    y0 = -12.0
+    box(ax, -n / 2, y0 - half, n, half, UPPER)
+    box(ax, -n / 2, y0 - 2 * half, n, half, LOWER)
+    for s in jt.screw_stations(cp.path(), J.screw_pitch):
+        ax.plot([s, s], [y0 - half - J.pilot_depth, y0 - half + J.flange_t], color="#333", lw=1.4, zorder=5)
+    dim(ax, (-n / 2, y0 - 2 * half - 5), (n / 2, y0 - 2 * half - 5), f"{g(n)}", (0, -3))
+    dim(ax, (n / 2 + 5, y0 - half), (n / 2 + 5, y0), g(half), (4, 0))
+    dim(ax, (n / 2 + 5, y0 - 2 * half), (n / 2 + 5, y0 - half), g(half), (4, 0))
+    note(ax, (-n / 2, y0 - half / 2), "upper half: the groove; prints with the seam on the bed")
+    note(ax, (-n / 2, y0 - 1.5 * half), "lower half: the key and one pilot of each candidate; prints with the seam on top")
+    note(ax, (-n / 2, y0 - 2 * half - 14), f"seam level along the arc, as L1; screws at the pitch of {g(J.screw_pitch)}; "
+         f"three pairs: groove {', '.join('+' + g(c) for c in cp.CLEARANCES)}")
+    ax.set_title("6  coupon pair for joint 1 (cad/out/coupon)", fontsize=9)
 
 
-def joint_hood(ax) -> None:
+def joint_hood(ax, d: Blueprint) -> None:
     """The hood on the body top: keyed, then bolted or bonded with the same parts."""
-    box(ax, 0, 1.5, 4, 40, "#9ec5e8")            # hood wall, outside at x = 0
-    box(ax, 0, -40, 4, 40, "#e8c39e")            # body wall
-    ax.add_patch(Polygon([(0, 1.5), (0, 4.5), (-0.01, 4.5)], fc="white", ec="none"))
-    ax.plot([0, 3], [-3, 0], color="#333", lw=0.8)   # body bevel 3 x 3
-    ax.plot([0, 3], [4.5, 1.5], color="#333", lw=0.8)  # hood bevel
-    box(ax, 4, -12, 14, 12, "#e8c39e")           # top ring flange of the body
-    box(ax, 4, 1.5, 14, 6, "#9ec5e8")            # hood foot flange
-    ax.add_patch(Polygon([(7, 0), (13, 0), (10, 3)], fc="#e8c39e", ec="#333", lw=0.8, zorder=4))  # cone into a socket
-    box(ax, 14, -10, 3, 8, "#c0c0c0")             # insert in the ring
-    ax.plot([15.5, 15.5], [-8, 11], color="#333", lw=1.6, zorder=6)
-    dim(ax, (-6, 1.5), (-6, 0), "1.5", (-5, 0))
-    dim(ax, (4, -16), (18, -16), "ring 14", (0, -3))
-    note(ax, (-40, 30), "cone 8 x 3 on the ring, socket in the hood: two at the front, two at the rear corners", (10, 2))
-    note(ax, (-40, 24), "bolt: M4 into a heat-set insert in the ring, from inside the hood (two at the rear)", (15.5, 5))
-    note(ax, (-40, 18), "bond: the same faces take adhesive; the cones still set the place", (11, 4))
-    note(ax, (-40, -28), "groove 1.5 + bevels 3 x 3 stays open: a design line", (1.5, -1.5))
+    w, gap, bev = J.wall_t, d.seam_gap, d.seam_groove
+    box(ax, 0, gap, w, 40, UPPER)                                   # hood wall, outside at x = 0
+    box(ax, 0, -40, w, 40, LOWER)                                   # body wall
+    ax.plot([0, bev], [-bev, 0], color="#333", lw=0.8)              # body bevel
+    ax.plot([0, bev], [gap + bev, gap], color="#333", lw=0.8)       # hood bevel
+    box(ax, w, -O.ring_h, O.ring_w, O.ring_h, LOWER)                # top ring of the body
+    box(ax, w, gap, O.ring_w, O.hood_foot_t, UPPER)                 # foot flange of the hood
+    cx = w + 0.4 * O.ring_w
+    ax.add_patch(Polygon([(cx - O.cone_d / 2, 0), (cx + O.cone_d / 2, 0), (cx, O.cone_h)], fc=LOWER, ec="#333", lw=0.8, zorder=4))
+    ix = w + O.ring_w - O.insert_hole_d / 2 - 0.5
+    box(ax, ix - O.insert_hole_d / 2, -O.insert_l - 1, O.insert_hole_d, O.insert_l, "#c0c0c0")
+    ax.plot([ix, ix], [-O.insert_l, gap + O.hood_foot_t + 4], color="#333", lw=1.6, zorder=6)
+    dim(ax, (-6, gap), (-6, 0), g(gap), (-5, 0))
+    dim(ax, (w, -O.ring_h - 4), (w + O.ring_w, -O.ring_h - 4), f"ring {g(O.ring_w)}", (0, -3))
+    note(ax, (-40, 30), f"cone {g(O.cone_d)} x {g(O.cone_h)} on the ring, socket in the hood: two at the front, two at the "
+         "rear corners", (cx, O.cone_h / 2))
+    note(ax, (-40, 24), f"bolt: {O.insert} into a heat-set insert in the ring, from inside the hood (two at the rear)", (ix, 5))
+    note(ax, (-40, 18), "bond: the same faces take adhesive; the cones still set the place", (cx + 1, gap + 1))
+    note(ax, (-40, -28), f"groove {g(gap)} + bevels {g(bev)} x {g(bev)} stays open: a design line", (bev / 2, -bev / 2))
     ax.set_title("7  hood on the body top: keyed, to bolt or to bond", fontsize=9)
+
+
+def value_rows(obj) -> list[str]:
+    rows = []
+    for f in fields(obj):
+        v = getattr(obj, f.name)
+        if f.name == "pilot_d" and v is None:
+            v = f"open: {g(obj.pilot_d_pet)} or {g(obj.pilot_d_abs)}"
+        rows.append(f"{f.name:<20} {v if isinstance(v, str) else g(v)}")
+    return rows
 
 
 def joint_values(ax) -> None:
     ax.axis("off")
-    rows = ["Named values (structure.JOINT; joints.py of the coupon study", "becomes their one source):", ""]
-    rows += [f"{k:<16} {v}" for k, v in st.JOINT.items()]
-    rows += ["", "PETG and ABS use the same values; the coupon", "sets the clearances for the chosen material."]
-    ax.text(0, 1, "\n".join(rows), fontsize=7.5, family="DejaVu Sans Mono", va="top", transform=ax.transAxes)
+    left = ["joints.Joint (joint 1, on the coupon):", ""] + value_rows(J)
+    right = ["joints.OtherJoints (2 to 7, concept):", ""] + value_rows(O)
+    right += ["", "PETG and ABS use the same values;", "the coupon of each material sets", "the clearances and the pilot."]
+    for x, rows in ((0.0, left), (0.45, right)):
+        ax.text(x, 1, "\n".join(rows), fontsize=7.5, family="DejaVu Sans Mono", va="top", transform=ax.transAxes)
 
 
-def joints_sheet() -> str:
-    fig, axes = plt.subplots(2, 4, figsize=(27, 12))
-    joint_values(axes[1, 3])
-    for ax, f, lim in zip(axes.ravel(), (joint_skin, joint_floor, joint_foot, joint_hood, joint_node, joint_service, coupon),
-                          (((-45, 45), (-20, 36)), ((-45, 50), (-16, 28)), ((-35, 40), (-10, 64)), ((-45, 25), (-35, 40)),
-                           ((-35, 35), (-45, 50)), ((-45, 45), (-20, 36)), ((-140, 140), (-55, 15)))):
+def joints_sheet(out: str = OUT, name: str = "joints", svg: bool = False) -> str:
+    d = Blueprint()
+    fig = plt.figure(figsize=(32, 13))
+    grid = fig.add_gridspec(2, 5, hspace=0.12, wspace=0.12)
+    places = (grid[0, 0:2], grid[0, 2], grid[0, 3], grid[0, 4], grid[1, 0], grid[1, 1], grid[1, 2])
+    drawers = (joint_skin, joint_floor, joint_foot, lambda ax: joint_hood(ax, d), joint_node, joint_service, coupon)
+    limits = (((-60, 60), (-25, 38)), ((-45, 50), (-16, 28)), ((-35, 40), (-10, 64)), ((-45, 25), (-35, 40)),
+              ((-35, 35), (-45, 50)), ((-45, 45), (-20, 36)), ((-75, 80), (-160, 22)))
+    for place, f, lim in zip(places, drawers, limits):
+        ax = fig.add_subplot(place)
         f(ax)
         ax.set_xlim(*lim[0])
         ax.set_ylim(*lim[1])
         ax.set_aspect("equal")
         ax.tick_params(labelsize=6)
         ax.grid(True, color="#f0f0f0", lw=0.4)
-    fig.suptitle("Joints of the bonded seams and the service seams (mm). Step 1: the key, cone or pin sets the place in a dry "
-                 "assembly held by screws. Step 2: adhesive, the same screws, then filler in the V-groove.", fontsize=11)
-    path = os.path.join(OUT, "joints.png")
+    joint_values(fig.add_subplot(grid[1, 3:5]))
+    fig.suptitle("Joints of the bonded seams and the service seams (mm), from cad/candybar/shell/joints.py. Step 1: the key, "
+                 "cone or pin sets the place in a dry assembly held by screws. Step 2: adhesive, the same screws, then "
+                 "filler in the V-groove.\nJoint 1 is modelled on the coupon; joints 2 to 7 are not modelled yet.", fontsize=12)
+    path = os.path.join(out, name + ".png")
     fig.savefig(path, dpi=110, bbox_inches="tight")
+    if svg:
+        fig.savefig(os.path.join(out, name + ".svg"), bbox_inches="tight")
     plt.close(fig)
     return path
 

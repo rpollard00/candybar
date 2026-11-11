@@ -2,7 +2,7 @@
 
 Date: 2026-11-10. Status: a proposal for the owner's review. It is not built yet. Revision 2 adds the curves of the form: the owner found the first revision too simple, with straight lines where the references have subtle curves. Revision 3 applies the owner's answers to questions 8 to 12: a larger tuck over the top third of the body, a hood with near-straight sides and tight top corners, and a screen 10.8 mm nearer the bezel.
 
-This directory holds the target form of the cabinet as drawings: the big volumes first, then elevations, sections, the hood, the two junctions, and a map of every face. The drawings come from data. `cad/candybar/shell/dims.py` (class `Blueprint`) holds the named dimensions. `cad/candybar/shell/profiles.py` turns them into profiles and labelled faces. `cad/tools/draw_blueprint.py` draws the sheets from the profiles. `cad/candybar/shell/solids.py` builds the solids from the same profiles, so the drawing and the model cannot drift apart. `cad/tools/check_solids.py` measures the solids against the faces. `parts.py`, `hood.py` and `build.py` still build the earlier form.
+This directory holds the target form of the cabinet as drawings: the big volumes first, then elevations, sections, the hood, the two junctions, and a map of every face. The drawings come from data. `cad/candybar/shell/dims.py` (class `Blueprint`) holds the named dimensions. `cad/candybar/shell/profiles.py` turns them into profiles and labelled faces. `cad/tools/draw_blueprint.py` draws the sheets from the profiles. `cad/candybar/shell/solids.py` builds the solids from the same profiles, so the drawing and the model cannot drift apart. `cad/tools/check_solids.py` measures the solids against the faces. The solid code of the earlier form is removed (2026-11-11).
 
 Words are those of `CONTEXT.md`. New words are in the section "Words". `W` is the body width: 494.7 mm.
 
@@ -21,6 +21,8 @@ Each sheet is an SVG file and a PNG file with the same name.
 | `07-face-map` | Every face in a flat false color with its ID |
 | `08-curvature` | Each curved line against its straight chord, with the deviation drawn five times too large, and the same curve on the references as ghost lines |
 | `09-hardware` | The fit study: the hardware and its keep-out zones in the cavity of a 4 mm skin. Two side sections, three plan sections, the rear view with a proposed door opening, the sight lines of three players. Made from `cad/out/shell-bp/fit/sections.json` (see "Hardware in the shell") |
+| `10-split` | The split that the owner chose: front, right side, top and rear, each piece numbered and tinted, every seam drawn and labelled (blue in a design line, red on an open face), and the piece list with the print box of each piece. Made from the cut of `candybar.shell.split` (see "The split") |
+| `11-joints` | The joints: dimensioned sections of joints 1 to 7, the coupon pair and the named values. Every value comes from `cad/candybar/shell/joints.py` (see "The joints") |
 
 Drawings of the references are third-party material. They are in `cad/out/shell-d/reconstruction/` (ignored by git):
 
@@ -235,6 +237,8 @@ Two changes from the owner, 2026-11-10. Nothing else of the outer form moves: th
 | Monitor, present unit: gap to the skin at the top, at the bottom | 34.0, 29.4 | 34.0, 29.4 |
 | Monitor, any 16:10 unit: gap at the top, at the bottom | 1.3, 1.3 | 1.3, 1.3 |
 
+The last row was true for revision 5. After it, the opening behind the bezel lost its side ledges, and the gap is now 3.3 (see "Hardware in the shell").
+
 A check on side sections, before the fit run, found no limit up to a drop of 20. The nearest skin to the top and the bottom of the monitor room is the ledge of the opening behind the bezel (9.2 from the clamps), and it moves with the bezel. The sweep, the deck and the controls under the panel stay far from the monitor and its cradle (30 from the sweep at a drop of 20).
 
 **The front of the control panel follows the deck.** Seen from above, the deck front is a centre face and two flanks that turn back `deck_flank` (8 degrees). The panel was a rectangle, so the border of deck in front of it became narrower toward its front corners. Now the front edge of the panel is three straight segments, parallel to the centre face and to the flanks, with one border all along: 26 from the deck front to the panel (25 to the pocket). The side edges and the back edge do not move. The front corners move back 8.6, so the panel is 175 deep at the centre line and 166.4 at the sides. The corners have no radii: a cutting service cuts straight lines. `profiles.panel_outline` is the one definition. The faces CP1 and DK8, the panel plate, the pocket, the opening in the skin under the plate and the drawings all use it. Both panels (arcade and PC) have this outline.
@@ -247,12 +251,131 @@ The older generator (`cad/params/cabinet.csv`, `candybar/massing.py` and `candyb
 
 ## Hardware in the shell
 
-`cad/candybar/shell/fit.py` is a fit study of the hardware in the accepted form. It does not change the outer form. Sheet 09 draws it; `cad/out/shell-bp/fit/report.md` has all the numbers. It exits 1 when an item does not fit.
+`cad/candybar/shell/fit.py` is a fit study of the hardware in the accepted form. It does not change the outer form. Sheet 09 draws it. `cad/out/shell-bp/fit/report.md` has all the numbers. The study exits 1 when an item does not fit. Result: PASS, with a skin of 4.
 
-- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`, and it is thicker where the form turns across the width: 5.6 at the sides of the body and the hood, 4.5 in the tuck, 12.5 at the rail edge (measured square to the screen), up to 19 near the side where the deck meets the body and behind the step. The wall is open under the control panel (inside a ledge of 8, on the outline of the panel) and behind the bezel plate (inside a ledge of 6). The body top is open into the hood.
+- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`. It is thicker where the form turns across the width. Measured on 2151 points: smallest 4.00, median 4.00, largest 18.84. Examples: 5.6 at the sides of the body and the hood, 4.5 in the tuck, 12.5 at the rail edge at the middle of the bezel (square to the screen). The wall is open under the control panel (inside a ledge of 8, on the outline of the panel). It is open behind the bezel plate, with a ledge of 6 at the top and the bottom only. The body top is open into the hood.
 - **Hardware.** The sizes come from `cad/params/*.csv`. The envelopes are those of `candybar/hardware.py` and `candybar/panel.py`. The anchors come from `Blueprint`. The layout choices are the named values of `fit.Layout`. New rows in `hardware.csv`: the USB sockets and the hub, the room for the marquee modules, and the generic monitor.
-- **Monitor.** Any 16 inch 16:10 portable monitor must fit (`docs/research/hardware-envelopes.md` section 1). The room for it is the largest body of the survey (360 x 247.1 x 20.6), 8 of movement each way in the plane of the face, a clamp jaw of 6 on the top and bottom edges, the cradle (20) behind it, plug space of 22 (right-angle plugs) on both side edges over the full height, and a cable channel of 20 from each side to the BC-250. Straight plugs need 70 beside each edge: 258 from the centre line, but the cavity is 243 at mid height and 239 at the top corners (z 369). Thus the cabinet needs right-angle plugs. The report gives a gap of 1.3 for this room at its top and at its bottom. This gap is not to the sweep or to the tuck. It is from the outer face of the plug space (210 from the centre line) to the edge of the opening in the skin behind the bezel plate (434.7 / 2 less the ledge of 6: 211.3). The opening moves with the bezel, so the gap does not change when the screen moves on the face.
-- **Sight line.** Three players at a desk of 745 on a chair of 500, 60 in front of the deck, relaxed sitting 30 below the upright eye height. Child of 8 (DINBelg 2005, mean): eye 303 above the desk, 24.1 degrees from the screen normal; the bezel's inner frame hides 0.4 of the image at the bottom edge. Small adult (ANSUR II women, 5th percentile): eye 423, 8.5 degrees. Tall adult (ANSUR II men, 95th percentile): eye 585, 8.2 degrees. Each adult sees the full image. (Revision 4, before the screen went 12 lower: 25.6, 10.0 and 6.9 degrees, the same 0.4 hidden for the child.)
+- **Floor.** The power supply and the hub stand on the printed floor of 7 (`Layout.floor_t`, decision record 0006). The hub is at z 7.1, 3.1 from the skin.
+- **Compute module.** The BC-250 has a fixed mount behind the rear door (decision record 0005). The door is a cover with the vents and has no cable on it. The fan stands 5 from the door, and the shroud seals the gap. The BC-250 stands 3 above the clear space over the fan of the power supply (`Layout.bc_above_psu`, 1 more than before), so that its exhaust duct stays out of that space. The proposed door opening is 446.7 x 185.
+- **Air zones (rule R2b).** The rules R1 and R2 compare a solid with the solids and the keep-out zones of other items. They do not compare two keep-out zones. Rule R2b compares each air zone (the exhaust duct, the fan shroud, the air under the board, the fan space of the power supply) with every solid of every other item. Result: PASS, 4 air zones, no common volume with 81 solids of other items.
+- **Monitor.** Any 16 inch 16:10 portable monitor must fit (`docs/research/hardware-envelopes.md` section 1). The room for it is the largest body of the survey (360 x 247.1 x 20.6), 8 of movement each way in the plane of the face, a clamp jaw of 6 on the top and bottom edges, the cradle (20) behind it, plug space of 22 (right-angle plugs) on both side edges over the full height, and a cable channel of 20 from each side to the BC-250. Straight plugs need 258 from the centre line, but the cavity is 243 at the middle of the image and 239 at the top corners (z 369). Thus the cabinet needs right-angle plugs. The gap from this room to the skin is 3.3 at its top and at its bottom. The present unit has 34.0 at the top and 29.4 at the bottom.
+- **Monitor out to the front.** The monitor comes out to the front, through the opening behind the bezel plate (the owner, 2026-11-11). The opening is 434.7 wide, with its ledge at the top and the bottom only. Any 16:10 monitor with its plug space passes with 7.3 on each side. Its carrier, with the side flanges that hold the bezel plate (`Layout.carrier_flange`, 4), passes with 3.3 on each side.
+- **Sight line.** Three players at a desk of 745 on a chair of 500, 60 in front of the deck, relaxed sitting 30 below the upright eye height. Child of 8 (DINBelg 2005, mean): eye 303 above the desk, 24.1 degrees from the screen normal; the bezel's inner frame hides 0.4 of the image at the bottom edge. Small adult (ANSUR II women, 5th percentile): eye 423, 8.5 degrees. Tall adult (ANSUR II men, 95th percentile): eye 585, 8.2 degrees. Each adult sees the full image.
+
+## The split
+
+Sheet 10 draws the split. `cad/candybar/shell/split.py` holds the seams as data and cuts the skin into pieces. `cad/out/shell-bp/split/proposal.md` is the full study, with the options that the owner did not choose (a build output). Decision record 0006 records the choice.
+
+Decided by the owner (2026-11-11):
+
+- The seams of option B with the hood of option A ("B with the hood of A").
+- The width stays 494.7.
+- No internal frame: a stressed skin with a printed floor.
+- The bonded seams lock with keys first, and are then fastened for good. They are filled and painted.
+- The hood has keys, so that it bolts on easily. The owner will look at both a bolted and a bonded hood.
+- The floor is stiffer than the 7 mm sandwich of the study.
+- Hand-holds: examine the back corners of the cabinet.
+- The material is open: PETG on the A1, or ABS on an enclosed printer. The coupons decide.
+
+Proposed, not decided:
+
+- Ribs under the floor (12 deep, 2.4 thick, every 50, a rib splice across each tile joint), on feet of 18 mm. The cabinet then stands 18 mm above the table. The feet also give the make-up air its inlet under the floor.
+- Grips in pockets under the overhang of the upper rear, at the back corners, and a front grip under the deck nose. Lifted at the back alone, the cabinet tips onto its deck front, so a carry uses both grips.
+
+Not modelled yet: the flanges, the keys, the ribs, the carriers and the grips. The cut is the bare 4 mm skin.
+
+### Pieces
+
+22 printed pieces and 9 floor tiles. All fit the usable volume of the A1 (240 x 240 x 245). The largest is rear lower R (231 x 230 x 134).
+
+| # | Piece | Print box (mm) | On the bed |
+| --- | --- | --- | --- |
+| 1 | deck nose | 218 x 218 x 72 | upright, on the bed diagonal |
+| 2, 3 | deck side R, L | 186 x 185 x 72 | upright |
+| 4 | apron | 210 x 210 x 113 | on its rear edge, on the bed diagonal |
+| 5, 6 | lower R, L | 203 x 202 x 134 | upright |
+| 7, 8 | middle R, L | 206 x 204 x 176 | upright, on the bed diagonal |
+| 9, 10 | upper R, L | 210 x 209 x 126 | upright |
+| 11 | brow | 170 x 170 x 38 | upright |
+| 12 | upper rear | 181 x 181 x 126 | upright |
+| 13, 14 | speaker form R, L | 94 x 76 x 13 | front face on the bed |
+| 15 | logo form | 160 x 160 x 5 | front face on the bed |
+| 16, 17 | rear lower R, L | 231 x 230 x 134 | upright |
+| 18, 19 | door half R, L | 223 x 185 x 4 | outer face on the bed |
+| 20 | hood centre | 148 x 139 x 212 | on a cut face |
+| 21, 22 | hood side R, L | 139 x 129 x 148 | upright |
+| - | floor tiles, front, middle and rear, each side R, centre, side L | 212 x 190 at most | flat |
+
+The bezel plate is two halves, bonded and painted black as one plate (223 x 223 x 217 each). It is a finish piece.
+
+### Seams
+
+Class: a **bonded** seam is permanent: it is locked, screwed, bonded, filled and painted, so it does not show. A **service** seam opens again: it stays open and visible, in a design line. "Where" tells where the seam lies on the form.
+
+| Seam | Class | Where | What it joins |
+| --- | --- | --- | --- |
+| D1 | bonded | in a design line | deck to body, under the control panel |
+| D2 | bonded | on an open face | deck to body beside the panel, at the foot of the sweep |
+| F1 | bonded | in a design line | deck nose to deck side, in the crease of the flank break |
+| F2 | bonded | on an open face | deck nose to deck side, across the border to the front corner of the panel |
+| P1 | bonded | on an open face | apron to the lower pieces, up to the bottom edge of the bezel |
+| L1 | bonded | on an open face | lower to middle pieces: level at the bottom corner of the bezel, round the sides and the rear |
+| B1 | bonded | on an open face | middle to upper pieces: the belt at the lower crease of the rear slope (z 310) |
+| S1 | bonded | in a design line | front body to rear body, in the inner crease of the step |
+| R1 | bonded | on an open face | 12 on the back, from the top corner of the door to the slope crease |
+| R2 | bonded | on an open face | rear lower R to L, on the centre line below the door |
+| R3 | bonded | on an open face | upper rear to the upper pieces, above the door, in line with H1 |
+| R4 | bonded | on an open face | door half R to L, on the centre line; the door is bonded into one cover |
+| W1 | bonded | on an open face | brow to the upper pieces, 32 upright above the bezel |
+| H1 | bonded | on an open face | hood centre to hood side, between the logo form and the speaker form |
+| BA1 to BA3 | bonded | in a design line | the floor tiles, under the cabinet |
+| DR | service | in a design line | the rear door in its opening (446.7 x 185, the fit study) |
+| G | service | in a design line | the hood on the body top, in the level groove FB5 / HC15 |
+| BZ4 | service | in a design line | the bezel plate in its reveal |
+| DK8 | service | in a design line | the control panel in its pocket |
+| USB | service | in a design line | the USB socket plate in the right side of the deck |
+
+### What opens for service
+
+- The rear door lifts off (four thumb screws). The door has no cable on it. Through the opening a person reaches the BC-250, its fan headers and its I/O end.
+- The bezel plate lifts out to the front (magnets and two pins, no tool). The monitor then comes out to the front on its carrier.
+- The control panel lifts out of its pocket. Its latch is not designed yet.
+- The USB socket plate comes out with its leads.
+- The hood lifts off when it is bolted (two pins at the front, two M4 screws at the rear). When it is bonded, it does not open.
+
+### Order of assembly and the datum
+
+The datum is the floor: its nine tiles screwed together (joint 2), on a flat table. Each lower piece stands on the floor with a key under its foot flange (joint 3). The pieces below set the rest. The first pass is dry, with screws only. The second pass opens the seams in batches of one to three, bonds them and screws them again in the same holes.
+
+1. The floor.
+2. The rear lower halves.
+3. The deck nose and the deck sides.
+4. The apron and the two lower pieces (S1, D1, D2, F1, F2, P1).
+5. The fixed monitor cradle, from the top.
+6. The two middle pieces (L1).
+7. The BC-250 carrier and the power supply, through the door opening.
+8. The two upper pieces, the brow and the upper rear, from above (B1, W1, R1, R3).
+9. The door, the hood, the bezel plate and the control panel.
+
+### Where each ring closes
+
+- The L1 ring (the sides and the rear) closes at the second middle piece.
+- The B1 ring closes at the upper rear, which drops in between the two upper pieces.
+- The top ring closes at the brow, which drops in between the two upper pieces at the front.
+
+A closing piece goes in last, from above, into two seams at once. Those two seams get a design gap of 0.5 at each side (`OtherJoints.closing_gap`). Every other seam has the key clearance, 0.2 (`Joint.groove_clearance`). The coupon sets the clearance.
+
+## The joints
+
+Sheet 11 draws the joints. `cad/candybar/shell/joints.py` is the one source of their values: `Joint` for joint 1, `OtherJoints` for joints 2 to 7 and the cones. The sheet and the proposal read them, and `cad/tests/test_joints.py` fails when a joint value is set in a second place. Each bonded joint works in two steps: a key, a cone or a pin sets the place in a dry assembly held by screws; then adhesive, the same screws, and filler in the V-groove. The values are proposed. The coupon sets the clearances and the pilot hole.
+
+1. **Skin to skin** (all bonded seams of the walls). An inside flange 6 x 12 on each piece, with a 45 degree gusset, so that it prints with no support. A key 1.5 x 4 on the flange of the piece below, in a groove of the piece above (+0.2 each side). Thread-forming screws 3.0 x 16 for plastics, every 60. The pilot hole is open: 2.25 (the value for PET) or 2.4 (the value for ABS); the coupon decides. A V-groove 1.0 wide and 0.8 deep on the outside takes the filler. This joint is modelled: the coupon (`cad/out/coupon/README.md`, built by `candybar.shell.coupon`) has three pairs on a wall of radius 300, with grooves of +0.1, +0.2 and +0.3, and one pilot of each candidate in each lower half.
+2. **Floor tile to floor tile.** A half-lap 20 wide; a cone 8 x 3 in the lower lap; thread-forming screws 3.5 x 12 from below, every 50.
+3. **Wall foot to floor.** The foot flange (12 x 4) of each lower piece lies on the floor, with a key 3 x 2.5 under it in a slot of the floor. Thread-forming screws 3.5 x 16 up from below, every 80.
+4. **Node** (three pieces meet). A plate 24 x 24 x 4 bonded inside over the three flanges, with a cone in each flange.
+5. **Service seam.** M4 heat-set inserts (hole 5.6, 8 deep) in the fixed part, M4 screws every 80 to 100, two pins of 4 (+0.1), a chamfer of 0.5 on both edges. Never bonded or filled.
+6. **The coupon pair** for joint 1 (above).
+7. **Hood on the body top.** A top ring of 14 on the body, cones 8 x 3 on the ring (two at the front, two at the rear corners), sockets in the foot flange of the hood. Bolted: M4 into inserts in the ring. Bonded: the same faces take adhesive.
 
 ## Words
 
@@ -434,5 +557,6 @@ CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh --gui candybar.shell.v
 python3 cad/tools/render_views.py cad/out/shell-bp/renders cad/out/shell-bp        # the fixed views and the close-ups of the junctions
 CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.fit      # the fit study (about 10 minutes); exit status 1 when an item does not fit
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit                          # sheet 09 from the fit study
+cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint                       # sheets 10 and 11, from the cut of the split and joints.py
 python3 cad/tools/render_views.py cad/out/shell-bp/fit/renders cad/out/shell-bp/fit/cutaway --views three-quarter-front-left,three-quarter-rear-left   # the cut-away
 ```
