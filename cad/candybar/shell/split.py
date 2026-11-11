@@ -24,7 +24,7 @@ import hashlib
 import json
 import math
 import os
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import profiles as pr
@@ -54,8 +54,9 @@ JOINTS = {
     "service": "Opens again. A flange inside on each part (12 mm wide, 4 mm thick) with M4 heat-set inserts every 80 "
                "to 100 mm and two locating pins. Screws go in from inside or from the least visible side. A chamfer "
                "of 0.5 mm on both edges. Never filled.",
-    "base": "The walls stand on the base in a rebate and are screwed from below into inserts in a foot flange. The "
-            "feet go on the base. Under the cabinet, so it is not filled.",
+    "base": "Floor tiles: half-lap joints 20 mm wide, bonded and screwed (M4 into inserts) from below. The walls stand "
+            "on the floor in a rebate and are screwed from below into inserts in their foot flange; the flanges cross "
+            "the tile joints, so that no tile joint is a hinge. Under the cabinet, so it is not filled.",
 }
 
 # the seams that the outer form already has: no cut is needed for them, and every option keeps them
@@ -300,8 +301,9 @@ def base_seams(L: Lines) -> list[Seam]:
 
 
 def base_pieces() -> list[Piece]:
-    up, why = (0.0, 0.0, 1.0), "Flat, on the bed. It is not seen. A cut plate in one piece is the alternative."
-    return [Piece(f"base {row} {col}", "base", (x, y, 2.0), up, why, mirror=x > 0, bed="flat")
+    up, why = (0.0, 0.0, 1.0), ("Flat, on the bed: a sandwich of 7 mm, two skins of 1.2 mm and a gyroid core of 40 %. "
+                                "It is not seen.")
+    return [Piece(f"floor {row} {col}", "base", (x, y, 2.0), up, why, mirror=x > 0, bed="flat")
             for row, y in (("front", 100.0), ("middle", 275.0), ("rear", 450.0)) for col, x in (("side", 175.0), ("centre", 0.0))]
 
 
@@ -328,8 +330,8 @@ WHY = {
                  "gusset."),
     "deck side": ("upright", "Upright. Front, corner and side are walls; the border and the edge radius are the top."),
     "apron": ("on its rear edge, on the bed diagonal", "On its rear edge with the chord from the shelf to the bezel's bottom edge upright, along the bed "
-             "diagonal (it is 273 long). The concave sweep then faces sideways: no face that is seen overhangs more "
-             "than 45 degrees. Layer lines run across the width."),
+             "diagonal (it is 273 long). The concave sweep then faces sideways; only its lower end overhangs more "
+             "than 45 degrees (about 19 cm2: a support there, sanded before primer). Layer lines run across the width."),
     "lower": ("upright", "Upright. The side, the rail's foot and the sweep are walls or face up."),
     "middle": ("upright, on the bed diagonal", "Upright, along the bed diagonal: it is a thin wall. The side is a wall with level layer lines. The rail "
               "land is reclined 25 to 33 degrees and shows fine layer steps; they sand out under primer."),
@@ -337,7 +339,7 @@ WHY = {
     "brow": ("upright", "Upright: the brow faces up and forward."),
     "upper rear": ("upright", "Upright: the rear slope is 45 degrees, at the limit; the upper rear is a wall."),
     "rear lower": ("upright", "Upright: rear wall and side are walls."),
-    "door": ("outer face on the bed", "Outer face on the bed: the door is flat, so this gives the smoothest face and the best strength in its plane."),
+    "door": ("outer face on the bed", "Outer face on the bed: the door is a flat cover, so this gives the smoothest face and the best strength in its plane."),
     "hood centre": ("on a cut face", "On its cut face: inside the top flat the hood is a straight extrusion, so every face prints as a wall "
                    "and the rear arc and the front lean are smooth. No support, no layer steps."),
     "hood side": ("upright", "Upright: the side and the leg are near-upright walls; the top corner steps near the roof and the "
@@ -410,17 +412,17 @@ def option_a(d: Blueprint, L: Lines) -> Option:
         "of the step, the bays of the hood band (x = +-106) down the brow and the back, and the door's edges. No seam "
         "on the centre line. Three pieces across every full-width part.",
         tuple(seams), tuple(pieces),
-        "Three pieces at x = +-106, in line with the bay lines of the back, bonded into one rigid door on a printed "
-        "inner frame that also carries the compute module. The door's own gap (DR) is the service joint.",
-        "The hood (groove G), the rear door (DR), the control panel (pocket), the bezel plate (reveal), the USB plate "
-        "and the base (from below). Every other seam is bonded for good.",
-        ("Bond the base tiles (or cut the base plate) and put the feet on.",
-         "Bond the rear: rear lower centre and the two rear lower pieces, on the base.",
+        "Three pieces at x = +-106, in line with the bay lines of the back, bonded into one cover with the fan vent "
+        "and the slot vents in it and nothing wired to it. It lifts off; its own gap (DR) is the service joint.",
+        "The hood (groove G), the rear door (DR), the control panel (pocket), the bezel plate (reveal; the monitor "
+        "comes out behind it) and the USB plate. Every other seam is bonded for good, the floor tiles too.",
+        ("Bond and screw the nine floor tiles; put the feet on.",
+         "Bond the rear: rear lower centre and the two rear lower pieces, on the floor.",
          "Bond the deck: deck nose and deck sides; then the apron and the two lower pieces (D1, D2, P1, S1).",
          "Bond the two middle pieces (L1), then the brow, the two upper pieces and the upper rear (B1, W1, R1, R3).",
-         "Bond the three door pieces on their inner frame; bond the three hood pieces and the lip.",
-         "Dry assembly with all hardware (brief, section 4): monitor through the bezel opening, power supply and hub "
-         "through the door and the top, compute module on the door.",
+         "Bond the three door pieces into one cover; bond the three hood pieces and the lip.",
+         "Dry assembly with all hardware (brief, section 4): power supply and hub on the floor, compute module on its "
+         "carrier through the door opening, monitor on its carrier from the front through the bezel opening.",
          "Take the hardware out, fill and paint the permanent seams (brief, section 5), and assemble again."),
         "The most pieces of the three printed parts that are not trim: 24. Two vertical lines on the apron and two on "
         "the hood top bar are on open faces; if a filled seam ghosts through the paint, those four are the ones a "
@@ -452,8 +454,8 @@ def option_b(d: Blueprint, L: Lines) -> Option:
         "the door are halves. Halves of 247.4 do not fit the usable 240, so every other full-width part still needs "
         "three pieces across, and the centre line saves only three pieces.",
         tuple(seams), tuple(pieces),
-        "Two halves on the centre line, bonded into one rigid door on its inner frame. The seam runs 12 mm into the "
-        "left end of the fan vent.",
+        "Two halves on the centre line, bonded into one cover. The seam runs 12 mm into the left end of the fan vent, "
+        "between two of its bars.",
         a.service,
         ("As A. The hood is two halves; the rear lower and the door are halves.",) + a.assembly[5:],
         "21 printed pieces. The centre seam is visible in one place that counts: the middle of the hood's top bar, right "
@@ -515,24 +517,25 @@ def option_c(d: Blueprint, L: Lines) -> Option:
     ] + trim_pieces() + base_pieces()
     return Option(
         "C", "C: flat side panels on an inner frame",
-        "A different build: an inner frame (the base plate, two printed side frames and cross members) carries the "
-        "hardware and the loads, and the shell hangs on it. The flat side band is a separate panel on each side, cut "
+        "A different build: a chassis of 2020 aluminium extrusion on the printed floor carries the hardware and the "
+        "loads and stands without the shell; the shell hangs on it and carries no load. The flat side band is a separate panel on each side, cut "
         "out along the crease of the rail's edge section (K1), the step and the belt, and printed with its outer face "
         "on the bed. The rear door runs from corner to corner, so three of its four edges are creases. The front, the "
         "top tier and the hood are as in A.",
         tuple(seams), tuple(pieces),
-        "Two halves on the centre line, bonded into one door. It is the whole rear wall from z 112 to the slope crease, "
-        "between the two corner mitres, so it opens wider than the fit study's door (470.7 wide less the mitres).",
+        "Two halves on the centre line, bonded into one cover. It is the whole rear wall from z 112 to the slope "
+        "crease, between the two corner mitres, so the opening is wider than the fit study's (470.7 less the mitres) and "
+        "the frame of C has no post at the rear corners.",
         "As A, and every panel can come off the frame: the seams can stay dry (screwed to the frame, a shadow gap of "
         "0.5 mm) instead of bonded and filled. Then the side panels and the rails come off for service too.",
-        ("Build the inner frame on the base plate: side frames, the cross member under the deck, the monitor cradle "
-         "frame, the rear frame round the door.",
+        ("Bond the floor tiles and build the frame on them: the two inclined side rails, the top beam, the two "
+         "monitor beams, the rear arms and the rear beam, the deck beam.",
          "Fit the hardware to the frame.",
          "Screw on the deck pieces, the apron and the two frame lower pieces, then the rails and the four side panels.",
          "Screw on the rear side panels and the rear lower halves, then the top tier (upper pieces, brow, upper rear).",
          "Hood, door, control panel and bezel plate as in A.",
          "Finish: each panel can be finished off the cabinet. Fill nothing, or bond and fill as in A."),
-        "The most pieces (30) and a frame to design and print. In return the biggest face that is seen from the side "
+        "The most pieces (30) and a frame of 3.1 m of 2020 extrusion to buy, cut and drill. In return the biggest face that is seen from the side "
         "prints flat on the bed, most seams lie in creases, and nothing needs filler.")
 
 
@@ -772,9 +775,9 @@ def cover_shapes(d: Blueprint):
 
     from . import solids as so  # noqa: PLC0415
 
-    fr = pr.front(d)
     bw = d.bezel_w / 2 + d.panel_gap + 0.5
-    plate = so.bezel_box(d, fr, -bw, bw)
+    origin, up, into = so.screen_frame(d)
+    plate = so.slab(origin, up, into, (-bw, bw), (d.bezel_s0 - 0.5, d.bezel_s1 + 0.5), (-30.0, d.mon_setback + d.wall_t + 2.0))
     pocket = so.prism(so.poly(pr.panel_outline(d, d.panel_gap + 0.5)), so.xy(d.panel_top - d.panel_t - 9.0), App.Vector(0, 0, 12.0))
     return [plate, pocket]
 
@@ -902,7 +905,7 @@ def tints(shapes: dict) -> dict:
 
 
 def run(option_keys=OPTIONS_ORDER, out: Path | None = None, mods: Modules | None = None, lim: Printer | None = None,
-        log=print, write: bool = True, detail: bool = True) -> dict:
+        log=print, write: bool = True, detail: bool = True, bezel: bool = True) -> dict:
     """Cut and measure each option. Writes split/<option>/ and split/measurements.json when write is True; without
     detail it measures only the print boxes (for the test)."""
     import MeshPart  # noqa: PLC0415
@@ -914,7 +917,7 @@ def run(option_keys=OPTIONS_ORDER, out: Path | None = None, mods: Modules | None
     covers = cover_shapes(d)
     result = {"printer": vars(lim), "skin_key": mods.key, "door": door, "options": {}}
     opts = {o.key: o for o in options(d, door)}
-    for key in option_keys + ("bezel",):
+    for key in tuple(option_keys) + (("bezel",) if bezel else ()):
         if key == "bezel":
             seams, pieces = expanded(BEZEL)
         else:
@@ -942,14 +945,18 @@ def run(option_keys=OPTIONS_ORDER, out: Path | None = None, mods: Modules | None
             (here / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
             (here / "seams.json").write_text(json.dumps(lines_), encoding="utf-8")
             res["seams"] = {k: {kk: vv for kk, vv in v.items() if kk != "lines"} for k, v in lines_.items()}
-    if write:
-        base = (out or Path(os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp"))) / "split"
-        (base / "measurements.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+        if write:
+            one = {**{k: v for k, v in result.items() if k != "options"}, "options": {key: res}}
+            (here.parent / f"measurements-{key}.json").write_text(json.dumps(one, indent=1), encoding="utf-8")
     return result
 
 
 def main() -> int:
-    res = run()
+    """CANDYBAR_SPLIT_OPTIONS (for example "A" or "A,B,bezel") limits the run, so that options can run side by side;
+    each option writes split/measurements-<option>.json."""
+    keys = os.environ.get("CANDYBAR_SPLIT_OPTIONS", "")
+    picked = tuple(k for k in keys.split(",") if k and k != "bezel")
+    res = run(option_keys=picked if keys else OPTIONS_ORDER, bezel=not keys or "bezel" in keys)
     bad = [k for k, v in res["options"].items() if not v["fits"]]
     for k, v in res["options"].items():
         big = max(v["pieces"].items(), key=lambda kv: max(kv[1]["x"], kv[1]["y"], kv[1]["z"]))

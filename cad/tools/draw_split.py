@@ -1,6 +1,7 @@
 """Draw the seam proposal from what candybar.shell.split wrote, and write proposal.md.
 
     cad/.venv-tools/bin/python cad/tools/draw_split.py            -> cad/out/shell-bp/split/options.png, option-*.png, proposal.md
+    cad/.venv-tools/bin/python cad/tools/draw_split.py proposal   -> the same without the elevations (they take minutes)
     cad/.venv-tools/bin/python cad/tools/draw_split.py render     -> cad/out/shell-bp/split/renders/<option>/*.png (Blender)
 
 Run the cut first (CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split). The elevations
@@ -17,7 +18,6 @@ import math
 import os
 import subprocess
 import sys
-from datetime import date
 
 import matplotlib
 
@@ -182,7 +182,7 @@ def draw_view(ax, key: str, manifest: dict, seams: dict, tri: np.ndarray, ids: n
 
 
 def piece_numbers(rows: dict) -> dict:
-    names = [n for n in rows if not n.startswith("base")]
+    names = [n for n in rows if not n.startswith(("base", "floor"))]
     return {n: i + 1 for i, n in enumerate(names)}
 
 
@@ -197,14 +197,15 @@ def option_sheet(key: str, meas: dict, opt: sp.Option) -> str:
     ax = fig.add_subplot(grid[0, 4])
     ax.axis("off")
     res = meas["options"][key]
-    printed = {n: r for n, r in rows.items() if r["module"] != "base"}
+    printed = {n: r for n, r in rows.items() if r["module"] != "base"}  # the floor tiles are module base
     big = max(printed.items(), key=lambda kv: max(kv[1]["x"], kv[1]["z"]))
-    face = sorted({s["label"] for s in seams.values() if s["cls"] == sp.FACE and s["module"] != "base"})
-    text = [f"{opt.title}", "", f"pieces printed: {len(printed)} (+ {len(rows) - len(printed)} base tiles or one cut plate)",
+    face = sorted({s["label"] for s in seams.values() if s["cls"] == sp.FACE and s["module"] != "base" and s["joint"] != "service"})
+    service = sorted({s["label"] for s in seams.values() if s["joint"] == "service"} | {e[0] for e in sp.EXISTING})
+    text = [f"{opt.title}", "", f"pieces printed: {len(printed)} (+ {len(rows) - len(printed)} printed floor tiles)",
             f"all pieces fit {meas['printer']['xy']:.0f} x {meas['printer']['xy']:.0f} x {meas['printer']['z']:.0f}: "
             f"{'yes' if res['fits'] else 'NO'}",
             f"largest: {big[0]}, {big[1]['x']:.0f} x {big[1]['y']:.0f} x {big[1]['z']:.0f}", "",
-            f"seams on open faces: {', '.join(face)}", ""]
+            f"bonded seams on open faces (filled): {', '.join(face)}", f"service seams: {', '.join(service)}", ""]
     for n, i in numbers.items():
         r = rows[n]
         text.append(f"{i:>2} {n:<22.22s} {r['x']:>4.0f} x {r['y']:>4.0f} x {r['z']:>4.0f} {'' if r['fits'] else ' NO'}")
@@ -237,26 +238,22 @@ def stack(paths: list[str], out: str) -> None:
 
 # ---------- the faces a seam crosses, and the hardware near it ----------
 
-def face_cloud(d: Blueprint, step: float = 3.0):
-    """Points on every labelled face of the blueprint, about step apart, with the face ID of each."""
+def face_cloud(d: Blueprint, step: float = 4.0, cap: int = 60):
+    """Points on every labelled face of the blueprint, about step apart (at most cap x cap on one triangle), with the
+    face ID of each, in a k-d tree."""
     from scipy.spatial import cKDTree
 
     tri, ids = db.triangles_of(pr.faces(d))
     pts, out_ids = [], []
-
-    def split(t: np.ndarray, fid: str, depth: int = 0) -> None:
-        if depth > 9 or max(np.linalg.norm(t[1] - t[0]), np.linalg.norm(t[2] - t[1]), np.linalg.norm(t[0] - t[2])) <= step:
-            pts.append(t.mean(axis=0))
-            out_ids.append(fid)
-            return
-        a, b, c = t
-        ab, bc, ca = (a + b) / 2, (b + c) / 2, (c + a) / 2
-        for q in ((a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca)):
-            split(np.array(q), fid, depth + 1)
-
     for t, fid in zip(tri, ids):
-        split(t, fid)
-    return cKDTree(np.array(pts)), np.array(out_ids, dtype=object)
+        edge = max(np.linalg.norm(t[1] - t[0]), np.linalg.norm(t[2] - t[1]), np.linalg.norm(t[0] - t[2]))
+        n = int(min(cap, max(1, np.ceil(edge / step))))
+        i, j = np.meshgrid(np.arange(n + 1), np.arange(n + 1))
+        keep = i + j <= n
+        u, v = i[keep] / n, j[keep] / n
+        pts.append(t[0] + np.outer(u, t[1] - t[0]) + np.outer(v, t[2] - t[0]))
+        out_ids += [fid] * len(u)
+    return cKDTree(np.concatenate(pts)), np.array(out_ids, dtype=object)
 
 
 def crossed(lines: list, tree, fids: np.ndarray) -> list[str]:
@@ -293,242 +290,33 @@ def near_hardware(lines: list, boxes: list[dict]) -> list[str]:
 
 # ---------- proposal.md ----------
 
-def fmt(v: float) -> str:
-    return f"{v:.0f}"
+def measurements() -> dict:
+    """The per-option files of the cut, merged."""
+    out = None
+    for key in (*sp.OPTIONS_ORDER, "bezel"):
+        one = json.load(open(os.path.join(OUT, f"measurements-{key}.json")))
+        if out is None:
+            out = one
+        else:
+            out["options"].update(one["options"])
+    return out
 
 
-def proposal(meas: dict, opts: dict, d: Blueprint) -> str:
-    tree, fids = face_cloud(d)
-    boxes = hardware_boxes()
-    lim = meas["printer"]
-    L = []
-    w = L.append
-    w("# Seam proposal for the printed shell")
-    w("")
-    w(f"Date: {date.today().isoformat()}. Status: a proposal for the owner. Nothing is cut or joined in the model yet. "
-      "This file is written by `cad/tools/draw_split.py` from the seam data in `cad/candybar/shell/split.py` and the "
-      "cut that `candybar.shell.split` makes. Do not edit it by hand.")
-    w("")
-    w("Drawings: `options.png` (all three options) and `option-A.png`, `option-B.png`, `option-C.png` (larger). Renders: "
-      "`renders/<option>/three-quarter-front-left.png` and `three-quarter-rear-left.png`, each piece in its own soft tint. "
-      "On the drawings a blue seam lies in a design line and a red seam lies on an open face. A thin dashed line is a "
-      "seam behind the surface that the view shows.")
-    w("")
-    w("## What decides the seams")
-    w("")
-    w("**Finish.** The brief makes the shell a painted shell, not raw PETG. Section 5 of its checklist: \"Remove "
-      "electronics and glass before sanding or painting. Fill only permanent seams and apply the coupon-proven finish.\" "
-      "The finishing steps: \"Dry-fit and stabilize the assembly; level only the necessary ridges; fill small defects "
-      "with a tested compatible product; prime and guide-coat; sand according to the coating instructions; then apply "
-      "color, graphics and optional clear.\" And: \"Keep permanent filled seams within cosmetic subassemblies; do not "
-      "fill joints needed to remove the monitor, controls or computer.\"")
-    w("")
-    w("So a seam that is bonded for good is filled and painted, and in the finished cabinet it does not show. Two "
-      "things still make its place matter. A filled seam on a thin PETG wall can show again as a fine line when the "
-      "wall flexes or the temperature changes (the brief asks for a finished, two-piece coupon to test this), and the "
-      "brief says: \"Put seams away from high-load palm-rest and joystick areas.\" A seam that opens again is never "
-      "filled, so it must lie in a line of the design. Thus every option puts the service seams in design lines, and "
-      "puts the bonded seams in design lines where it can, and where it cannot, at a place where a line would look "
-      "deliberate if it shows.")
-    w("")
-    w(f"**Printer.** {lim['source']}: {lim['xy']:.0f} x {lim['xy']:.0f} mm on the bed, {lim['z']:.0f} mm high (the bed is "
-      f"{lim['bed']:.0f}). A piece may turn on the bed (yaw) to fit; the box in the tables is the box after that turn. "
-      f"The body is 494.7 wide. Half of it is 247.4, which is more than {lim['xy']:.0f}: a full-width part needs three "
-      "pieces across, whatever the option. Only parts narrower than 480 (the hood, the rear wall, the door) can be two "
-      "halves.")
-    w("")
-    w("**Lines that the form already has** (face IDs of `docs/blueprint/index.md`), where a seam can hide:")
-    w("")
-    for line in ("the level groove between hood and body: FB5 / HC15 (already a gap: the hood's service joint)",
-                 "the reveal round the bezel plate: BZ4 (the plate's joint); its bottom and top corners on the rail land RL1",
-                 "the pocket round the control panel: DK8; the opening under the panel; the panel's front corners where its "
-                 "front turns to the flank (x = +-136.8)",
-                 "the crease of the deck front where the centre face DK4 turns 8 degrees to the flank DK5 (x = +-138.5)",
-                 "the crease of the edge section at the bottom of the band (DK3 / DK4..DK7, RL3 / RL4), 24 mm below the "
-                 "top, round the deck and up the rail",
-                 "the foot of the sweep FB1 (y 207), where the deck top starts to rise",
-                 "the outer and inner crease of the step RB2 (leaning 28 degrees)",
-                 "the creases of the rear slope RB4 (z 310 and 350) and the rear corners (RB1 / RB3)",
-                 "the outline of the rear door in RB3 (fit study: 446.7 x 186)",
-                 "the bays of the hood band: the gaps between the logo form LG1 and the speaker forms SP1 (x = +-88 to +-106)",
-                 "the hood's own edges: the sill HC3 / ledge HC12, the soffit HC10, the leg's inner wall HC11",
-                 "under-edges and the base FL1, and the back"):
-        w(f"- {line}")
-    w("")
-    w("## The three options at a glance")
-    w("")
-    w("| Option | Printed pieces | Largest piece (print box, mm) | All fit | Seams on open faces |")
-    w("| --- | --- | --- | --- | --- |")
-    for key, opt in opts.items():
-        res = meas["options"][key]
-        printed = {n: r for n, r in res["pieces"].items() if r["module"] != "base"}
-        big = max(printed.items(), key=lambda kv: max(kv[1]["x"], kv[1]["z"]))
-        face = sorted({s["label"] for s in res["seams"].values() if s["cls"] == sp.FACE and s["module"] != "base"})
-        w(f"| {opt.title} | {len(printed)} (+ base) | {big[0]}: {fmt(big[1]['x'])} x {fmt(big[1]['y'])} x {fmt(big[1]['z'])} | "
-          f"{'yes' if res['fits'] else 'NO'} | {', '.join(face)} |")
-    w("")
-    w("The base under the cabinet is the same in all three: nine printed tiles (seams BA1 to BA3, hidden) or one cut "
-      "plate. The bezel plate is a question of its own (below).")
-    w("")
-    for key, opt in opts.items():
-        res = meas["options"][key]
-        lines_ = json.load(open(os.path.join(OUT, key, "seams.json")))
-        w(f"## {opt.title}")
-        w("")
-        w(opt.idea)
-        w("")
-        w("### Pieces")
-        w("")
-        w("| # | Piece | Print box (mm) | Fits | On the bed | Skin (g) | Seen (cm2) | Seen face over 45 deg (cm2) | Shallow tops (cm2) | Why this way |")
-        w("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-        nums = piece_numbers(res["pieces"])
-        pieces = {p.full: p for p in sp.expanded(opt)[1]}
-        for n, r in res["pieces"].items():
-            p = pieces[n]
-            why = "" if p.side == "L" and pieces.get(n[:-1] + "R") else p.why
-            w(f"| {nums.get(n, '')} | {n} | {fmt(r['x'])} x {fmt(r['y'])} x {fmt(r['z'])} | {'yes' if r['fits'] else '**no**'} | "
-              f"{p.bed} | {r['mass_g']} | {r['seen']} | {r['overhang_seen']} | {r['terrace_seen']} | {why or 'as R'} |")
-        total = sum(r["mass_g"] for r in res["pieces"].values())
-        w("")
-        w(f"Skin mass of all pieces: {total / 1000:.2f} kg of PETG at {sp.PETG_G_PER_CM3} g/cm3, solid 4 mm skin; ribs, "
-          "flanges and splice plates are not in it. \"Seen face over 45 deg\" is the area of faces that a person sees and "
-          "that would need support in this orientation; \"shallow tops\" are faces seen at 1 to 25 degrees from level, "
-          "which show layer terraces. Mirrored pieces (R, L) are measured each.")
-        if res["problems"]:
-            w("")
-            w("Problems of the cut: " + "; ".join(json.dumps(q) for q in res["problems"]))
-        w("")
-        w("### Seams")
-        w("")
-        w("| Seam | Class | Joint | Faces crossed | Seen length (mm) | Hardware within 18 mm | How it reads |")
-        w("| --- | --- | --- | --- | --- | --- | --- |")
-        done = set()
-        for name, s in res["seams"].items():
-            if s["side"] == "L":
-                continue
-            ls = lines_[name]["lines"]
-            other = lines_.get(f"{s['label']} L", {}).get("lines", [])
-            both = " (each side)" if other else ""
-            near = near_hardware(ls + other, boxes)
-            w(f"| {s['label']} | {sp.CLASS_WORDS[s['cls']]} | {s['joint']} | {', '.join(crossed(ls, tree, fids))} | "
-              f"{s['seen_mm']:.0f}{both} | {', '.join(near) if near else 'none'} | {s['reads']} |")
-            done.add(s["label"])
-        for label, what, joint, words in sp.EXISTING:
-            w(f"| {label} | in a design line | {joint} | {what} | existing | | {words} |")
-        w("")
-        w("### Joints")
-        w("")
-        used = sorted({s["joint"] for s in res["seams"].values()} | {"service"})
-        for j in used:
-            w(f"- **{j}**: {sp.JOINTS[j]}")
-        w("")
-        w(f"**What opens for service.** {opt.service}")
-        w("")
-        w(f"**Rear door.** {opt.door}")
-        w("")
-        w("**Assembly order.**")
-        w("")
-        for i, step in enumerate(opt.assembly, 1):
-            w(f"{i}. {step}")
-        w("")
-        w(f"**Against it.** {opt.against}")
-        w("")
-    bz = meas["options"].get("bezel", {})
-    w("## The bezel plate")
-    w("")
-    w("The plate is 434.7 x 305.4 on a face reclined 30 degrees. It is wider than the bed in every orientation, so a "
-      "printed plate needs a seam. The owner wants four plates (16:9, 16:10, 4:3, vertical); the land is the same on "
-      "all of them and the window differs.")
-    w("")
-    for k, title, words in sp.BEZEL_OPTIONS:
-        w(f"{k}. **{title}.** {words}")
-    w("")
-    if bz:
-        w("Measured for option 1 (the 16:10 plate of the outer form):")
-        w("")
-        w("| Piece | Print box (mm) | Fits | On the bed | Mass (g, solid) | Seen face over 45 deg (cm2) |")
-        w("| --- | --- | --- | --- | --- | --- |")
-        beds = {p.full: p.bed for p in sp.expanded(sp.BEZEL)[1]}
-        for n, r in bz["pieces"].items():
-            w(f"| {n} | {fmt(r['x'])} x {fmt(r['y'])} x {fmt(r['z'])} | {'yes' if r['fits'] else '**no**'} | {beds[n]} | "
-              f"{r['mass_g']} | {r['overhang_seen']} |")
-        w("")
-    w(f"Recommendation: option {sp.BEZEL_RECOMMENDED}. It keeps the accepted form of the land and the inner frame, prints "
-      "without support with the arc smooth, and is the fewest pieces. The seam on the centre line is on the black "
-      "plate, filled and painted with it; the plate is one part for the owner. A plate for another aspect ratio is "
-      "the same two pieces with another window.")
-    w("")
-    w("## The rear door")
-    w("")
-    w(f"The fit study proposes an opening of {meas['door']['w']:.1f} x {meas['door']['h']:.0f} (z {meas['door']['z0']:.0f} "
-      f"to {meas['door']['z1']:.0f}). It is wider than the bed, so the door is two or three pieces. The compute module "
-      "(its backplate spans x -178 to 129) and the fan vent (x -14 to 111) bridge any split, so the door pieces are "
-      "bonded on an inner frame into one rigid door, and only the door's outline opens.")
-    w("")
-    for key, opt in opts.items():
-        w(f"- {opt.title}: {opt.door}")
-    w("- In every option: a cut aluminium door (one piece, with the vents cut) is an alternative to a printed one. "
-      "It is stiffer and carries the compute module with no splice.")
-    w("")
-    w("## Recommendation")
-    w("")
-    w("**Option A**, with the door of B if the owner wants fewer pieces on the door. Reasons:")
-    w("")
-    w("- Looks: every service seam and most bonded seams lie in a line that the form has. The seams that cross an "
-      "open face are short, mirrored and in line with something the eye already reads: the panel's front corners on "
-      "the apron, the hood's bays on the brow and the back, the bezel's bottom corner and the slope crease as two "
-      "level lines round the body. None is on the centre line of the front.")
-    w("- Print: the hood's centre piece is a straight extrusion and prints with no support and no layer steps; the "
-      "side pieces print upright with level layer lines on the sides. The pieces that are seen most (deck front, "
-      "apron, rails) have no seen face over 45 degrees (see the tables).")
-    w("- Count: 24 printed pieces against 21 for B. The three that B saves cost a seam in the middle of the hood's "
-      "top bar, right above the marquee, and a hood that prints with support across the marquee opening.")
-    w("- C is the build to choose if the owner does not want filler at all, or wants every panel to come off. It "
-      "costs six more pieces and an inner frame that is not designed.")
-    w("")
-    w("## Questions for the owner")
-    w("")
-    w("1. Finish: fill and paint the bonded seams (A, B), or keep every seam dry as a crisp shadow line (C)? This "
-      "decides between A and C more than anything else.")
-    w("2. Option A, B or C? And if A: the door in three pieces in line with the bays of the back, or two halves?")
-    w("3. The two level lines L1 (at the bezel's bottom corner, z 134) and B1 (at the slope crease, z 310) cross the "
-      "side band, where a stripe decal may go. Is a seam under the stripe acceptable, or should the stripe's edge "
-      "follow L1?")
-    w("4. The apron lines P1 at x = +-137 are below the screen, in line with the panel's front corners. Accept, or "
-      "move them to the panel's side edges (x = +-199)? The second puts a 398 mm centre piece on the bed, which does "
-      "not fit, so the apron would then need a seam on the centre line.")
-    w("5. Base: nine printed tiles, or one cut plate (plywood or aluminium) that also stiffens the cabinet and "
-      "carries the feet?")
-    w("6. Bezel: option 1 (two halves, a filled seam on the centre line of the black plate), or option 3 (a cut "
-      "sheet, which changes the land)?")
-    w("7. The usable bed: printer.csv gives 240 (bed less brim, provisional, to be confirmed with a 240 x 240 test "
-      "print). If the test shows that 248 prints well, halves of 247.4 fit, and the deck and the apron could be two "
-      "pieces with a centre seam. Do you want that tested?")
-    w("")
-    w("## How the numbers were made, and what is not checked")
-    w("")
-    w("- The skin is the outer form less the cavity of `cavity.py` (4 mm, open under the panel and behind the bezel). "
-      "The cavity is made of 1 mm slabs, so the inner face of the skin is stepped; the masses include this. The "
-      "floor is the base, cut off along the cavity's outline.")
-    w("- Each piece is the skin cut by the seam polygons of its option and named by a seed point. The print box is "
-      f"the box of the piece's tessellation (0.5 mm) after the turn on the bed that makes its larger side smallest, in "
-      f"steps of 0.5 degrees. The limits are those of params/printer.csv.")
-    w("- \"Hardware within 18 mm\" uses the boxes of the fit study (`fit/sections.json`): a flange 12 mm deep behind "
-      "the 4 mm skin, and 2 mm. It is a box test, so it can name an item that is near but not in the way.")
-    w("- Not checked: the joints themselves (flanges, pins, splice plates and inserts are not modelled), the warp of "
-      "the long thin pieces on the bed, the slicer's own estimate of time and supports, and the fillet of the rear "
-      "corners that the detail pass will add (the corner seams of C lie in it).")
-    w("")
-    return "\n".join(L)
+def main(elevations: bool = True) -> None:
+    import draw_structure as ds
+    import split_proposal
 
-
-def main() -> None:
-    meas = json.load(open(os.path.join(OUT, "measurements.json")))
+    meas = measurements()
     d = Blueprint()
     opts = {o.key: o for o in sp.options(d, meas["door"])}
-    paths = [option_sheet(k, meas, opts[k]) for k in sp.OPTIONS_ORDER]
-    stack(paths, os.path.join(OUT, "options.png"))
-    text = proposal(meas, opts, d)
+    if elevations:
+        paths = [option_sheet(k, meas, opts[k]) for k in sp.OPTIONS_ORDER]
+        stack(paths, os.path.join(OUT, "options.png"))
+    for k in sp.OPTIONS_ORDER:
+        print("draw_split:", os.path.relpath(ds.structure_sheet(k, opts[k], d), REPO))
+    print("draw_split:", os.path.relpath(ds.services_sheet(), REPO))
+    print("draw_split:", os.path.relpath(ds.joints_sheet(), REPO))
+    text = split_proposal.write(meas, opts, d, face_cloud, crossed, near_hardware, hardware_boxes())
     with open(os.path.join(OUT, "proposal.md"), "w", encoding="utf-8") as fh:
         fh.write(text)
     print("draw_split:", os.path.relpath(os.path.join(OUT, "proposal.md"), REPO))
@@ -548,4 +336,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "render":
         render()
     else:
-        main()
+        main(elevations=not (len(sys.argv) > 1 and sys.argv[1] == "proposal"))
