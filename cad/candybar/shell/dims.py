@@ -292,6 +292,8 @@ class Blueprint(Dims):
     marquee_tilt: float = 0.0
     hood_marquee_edge: float = 5.0
     hood_marquee_open_h: float = 36.1
+    # the printed skin: the inner surface of the deck, the body and the hood stands at least wall_t inside the outer one
+    wall_t: float = 4.0
 
     @property
     def edge_in(self) -> float:
@@ -353,8 +355,34 @@ OPTIONS: dict[str, dict[str, float]] = {
     "3-short-band": {"recline": 30.0, "band_len": 60.0, "frame_side": 45.0, "frame_v": 45.0},
     "4-on-deck": {"recline": 36.0, "band_len": 0.0, "frame_side": 40.0, "frame_v": 40.0},
 }
+# the two eye positions of the earlier form (shell/build.py); the blueprint uses PEOPLE
 EYE = (-60.0, 530.0)
 EYE_LOW = (-60.0, 450.0)
+
+
+@dataclass(frozen=True)
+class Seated:
+    """A player at the desk: the eye height above the seat, sitting upright, from published data."""
+    name: str
+    eye_above_seat: float
+    source: str
+
+
+# the desk and the chair: a desk of normal height (the middle of 730 to 760) and an office chair at the low end of
+# 480 to 530 (controls-ergonomics.md 5.4 and 5.5); relaxed sitting lowers the eye by SLUMP (same section); the eyes
+# are EYE_Y in front of the deck's front edge (as in the earlier form)
+DESK_H = 745.0
+CHAIR_H = 500.0
+SLUMP = 30.0
+EYE_Y = -60.0
+PEOPLE = (Seated("child of 8", 578.0, "DINBelg 2005, boys of 8 years, mean sitting eye height (dinbelg.be)"),
+          Seated("small adult", 698.0, "ANSUR II women, 5th percentile eye height above the seat (controls-ergonomics.md 5.2)"),
+          Seated("tall adult", 860.0, "ANSUR II men, 95th percentile eye height above the seat (controls-ergonomics.md 5.2)"))
+
+
+def eye_of(p: Seated) -> tuple[float, float]:
+    """The eye of a seated player in (y, z) of the cabinet: z above the desk top."""
+    return EYE_Y, CHAIR_H + p.eye_above_seat - SLUMP - DESK_H
 
 
 def sight(d: Dims, eye: tuple[float, float] = EYE) -> tuple[float, float]:

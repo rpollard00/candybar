@@ -105,6 +105,33 @@ Edges are named as seen from the front, screen in landscape.
 
 All plugs enter sideways, parallel to the screen. No connector is on the back or the bottom.
 
+### Other 16 inch 16:10 portable monitors (survey of 2026-11-10)
+
+The owner wants the cabinet to take a replacement monitor. A 16.0 inch 16:10 panel has the same lit area on all these units (344.68 x 215.42 where the maker gives it), so the bezel window stays. The body changes. Values are the maker's numbers unless the status says otherwise.
+
+| Model | Body W x H x T | Bezel each side across / along (ESTIMATED: (body - lit area) / 2) | Ports | VESA | Status |
+| --- | --- | --- | --- | --- | --- |
+| UPERFECT BE16CU (the present unit) | 354 x 230 x 10 | 4.7 / 7.3 | Left: 2 x USB-C, mini-HDMI. Right: controls, 3.5 mm jack. | 75 x 75, M4 | SOURCED, see above |
+| ASUS ZenScreen MB16QHG | 359.7 x 247.1 x 7 to 20.6 (built-in kickstand) | 7.5 / 15.8 | 2 x USB-C, HDMI, 3.5 mm jack; edge not stated | None. A 1/4 inch tripod socket. | SOURCED https://www.asus.com/displays-desktops/monitors/zenscreen/asus-zenscreen-mb16qhg/techspec/ |
+| ViewSonic VG1656-2K | 356.7 x 234.9 x 9.6 | 6.0 / 9.7 | One USB-C on the left, one on the right | Not stated | SOURCED https://www.viewsonic.com/global/products/sheet/VG1656-2K |
+| Lenovo ThinkVision M16 | 360.0 wide; 252.1 high with its stand at the lowest position; panel 7 thick, 27 with the stand | 7.7 / not read | One USB-C on the left, one on the right | Not stated | SOURCED https://psref.lenovo.com (ThinkVision M16 spec); thickness SOURCED (summary) from notebookcheck.net |
+| Arzopa Z1RC | 356 x 240 x 9 (retail listings; one review measured 14 x 9 7/16 x 5/16 in) | 5.7 / 12.3 | Not read | Not read | SOURCED (summary) from retailer pages and the-gadgeteer.com; no maker page read |
+
+Result, the generic body the cabinet must take (`hardware.csv`):
+
+| Value | Named value | From |
+| --- | --- | --- |
+| Width 360 | `mon_gen_w` | Lenovo ThinkVision M16 |
+| Height 247.1 | `mon_gen_h` | ASUS MB16QHG. The M16 height without its stand is not stated. |
+| Thickness 20.6, thinnest 7 | `mon_gen_t`, `mon_gen_t_min` | ASUS MB16QHG at its kickstand and at its thin edge |
+| Movement in the plane of the face, 8 each way | `mon_adjust` | Half the spread of the bezel widths is 1.5 across and 4.3 along the face. Both are below the floor of 8, so 8 is used. PROVISIONAL |
+
+Notes:
+
+- Two of five units have no VESA holes, or none that the maker states. The mount must not need them: a clamp on the top and bottom edges (`mon_clamp_edge`) holds any of these bodies.
+- Three of five units have ports on both side edges. The cabinet keeps plug space on both side edges over the whole height.
+- 15.6 inch 16:9 units (for example ASUS MB16AWP, 344.16 x 193.59 lit) do not fit the window. They are not in the survey.
+
 ### Keep-out zones
 
 - Left edge, lower half: a straight plug plus cable bend needs 65 to 75 beyond the body edge.

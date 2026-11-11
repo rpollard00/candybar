@@ -55,3 +55,24 @@ psu_plug_h,40,mm,provisional,Highest modular socket above the PSU underside with
 psu_bundle_w,140,mm,provisional,Coil the 24-pin lead with its bridging plug and the slack of the PCIe lead; measure the box,estimate: only two modular leads are fitted,Stowed cable width
 psu_bundle_d,90,mm,provisional,,estimate,Stowed cable depth
 psu_bundle_h,60,mm,provisional,,estimate,Stowed cable height
+usb_a_back_w,39,mm,sourced,,DataPro 1698: space needed behind the panel (pc-panel-and-front-usb.md A4),USB-A socket body width behind the wall
+usb_a_back_h,13,mm,sourced,,DataPro 1698: space needed behind the panel (pc-panel-and-front-usb.md A4),USB-A socket body height behind the wall
+usb_c_back_w,28.2,mm,sourced,,DataPro 1678: space needed behind the panel (pc-panel-and-front-usb.md A4),USB-C socket body width behind the wall
+usb_c_back_h,8.7,mm,sourced,,DataPro 1678: space needed behind the panel (pc-panel-and-front-usb.md A4),USB-C socket body height behind the wall
+usb_body_depth,32,mm,provisional,Body and strain relief behind the flange,pc-panel-and-front-usb.md A4: estimated from the product photos,Socket body depth behind the inner wall face
+usb_clear_depth,60,mm,provisional,Body plus the cable bend behind the flange,"pc-panel-and-front-usb.md A5: 32 body + 25 cable bend, rounded up",Clear depth behind the inner wall face
+usb_pitch,38,mm,provisional,,pc-panel-and-front-usb.md A5 (order A C A C),Socket centre to socket centre along the row
+usb_wall_max,2.5,mm,sourced,,DataPro 1698 and 1678 (pc-panel-and-front-usb.md A4),Thickest wall through which a socket mates fully
+usb_hub_l,110,mm,provisional,"Hub length, when the hub is chosen",estimate: a four-port powered hub board in a case,Hub length
+usb_hub_w,45,mm,provisional,"Hub width, when the hub is chosen",estimate: a four-port powered hub board in a case,Hub width
+usb_hub_h,20,mm,provisional,"Hub height, when the hub is chosen",estimate: a four-port powered hub board in a case,Hub height
+usb_hub_plug_clear,30,mm,provisional,Plug body plus cable bend at each end of the hub,estimate,Space at each end of the hub
+mq_led_depth,25,mm,provisional,"Depth of the light module with its driver board, when chosen",estimate: no marquee hardware is chosen,Space behind the marquee cover for the light modules
+mon_gen_w,360,mm,sourced,,hardware-envelopes.md 1 survey: Lenovo ThinkVision M16 (PSREF) is the widest,"Any 16 inch 16:10 portable monitor: body width the cabinet must take"
+mon_gen_h,247.1,mm,sourced,,hardware-envelopes.md 1 survey: ASUS ZenScreen MB16QHG (techspec) is the tallest,"Any 16 inch 16:10 portable monitor: body height the cabinet must take"
+mon_gen_t,20.6,mm,sourced,,hardware-envelopes.md 1 survey: ASUS ZenScreen MB16QHG at its built-in kickstand,"Any 16 inch 16:10 portable monitor: body thickness the cabinet must take"
+mon_gen_t_min,7,mm,sourced,,hardware-envelopes.md 1 survey: ASUS ZenScreen MB16QHG at its thin edge,Thinnest body in the survey
+mon_adjust,8,mm,provisional,,"hardware-envelopes.md 1 survey: half the spread of the bezel widths is 1.5 across and 4.3 along the face; the floor is 8",Movement of the body in its own plane each way to centre the image in the window
+mon_side_clear_straight,70,mm,provisional,Plug body plus cable bend beyond a side edge with straight plugs,hardware-envelopes.md 8 (65 to 75),Space beside each monitor edge with straight plugs
+mon_clamp_edge,6,mm,provisional,,design choice: the clamp of a later cradle grips the top and bottom edges,Clamp jaw beyond the top and bottom edges of the body
+mon_cable_w,20,mm,provisional,Bundle of the video and power cables of the monitor,estimate: a USB-C and a mini-HDMI cable side by side with room to pass a plug,Width and height of the cable channel from each side of the monitor to the compute module

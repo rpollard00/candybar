@@ -2,6 +2,7 @@
 
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py target      -> docs/blueprint/*.svg, *.png, faces.md
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py band-options -> cad/out/shell-bp/compare/hood-band-options.png
+    cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit         -> docs/blueprint/09-hardware.svg, .png (from candybar.shell.fit)
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   -> cad/out/shell-d/reconstruction/k-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      -> cad/out/shell-d/reconstruction/m-*.png, r-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py compare     -> cad/out/shell-d/sheet-side-profile.png
@@ -920,6 +921,117 @@ def band_options() -> None:
     save(fig, "hood-band-options", os.path.join(CAD, "out", "shell-bp", "compare"), svg=False)
 
 
+# ---------- sheet 09: the hardware in the shell (from the fit study) ----------
+
+FIT_DATA = os.path.join(CAD, "out", "shell-bp", "fit", "sections.json")
+FIT_COLOUR = {"Monitor": "#3a4f80", "MonitorRoom": "#7a8fc0", "Cables": "#d07020", "Compute": "#2f7a3a", "PSU": "#6b6f78", "CableBundle": "#a07020",
+              "Hub": "#6a4fa0", "Speaker": "#c04040", "Marquee": "#c08a10", "USB": "#2070c0", "Panel": "#202020"}
+FIT_LABEL = {"MonitorRoom": "any 16:10 monitor", "Cables": "monitor cables", "Panel": "control panel", "CableBundle": "stowed cables",
+             "Compute": "BC-250", "PSU": "power supply", "USB": "USB sockets"}
+# what the rear view shows: the items near the rear door
+FIT_REAR = ("Compute", "PSU", "CableBundle", "Cables", "Speaker", "Marquee")
+# clearances at most this wide get a dimension, in the view whose plane is nearest to them, when it is this near
+FIT_DIM_MAX, FIT_DIM_NEAR = 15.0, 60.0
+
+
+def fit_items(ax: Axes, items: list[dict], flip: bool = False) -> None:
+    """Hardware solid, keep-out zones dashed, one label for each item."""
+    seen: dict[str, list[np.ndarray]] = {}
+    for r in items:
+        c = FIT_COLOUR.get(r["group"], INK)
+        for line in r["lines"]:
+            p = np.array(line)
+            if flip:
+                p[:, 0] = -p[:, 0]
+            ax.plot(p[:, 0], p[:, 1], color=c, lw=1.1 if r["role"] == "hardware" else 0.8, ls="-" if r["role"] == "hardware" else "--", zorder=60)
+            seen.setdefault(r["group"], []).append(p)
+    for name, ps in seen.items():
+        allp = np.concatenate(ps)
+        ax.text(*allp.mean(axis=0), FIT_LABEL.get(name, name), fontsize=6.5, color=FIT_COLOUR.get(name, INK), ha="center", va="center", zorder=70,
+                bbox=dict(fc="white", ec="none", pad=0.3, alpha=0.75))
+
+
+def fit_shell(ax: Axes, outer: list, cavity: list, flip: bool = False) -> None:
+    k = -1.0 if flip else 1.0
+    for line in cavity:
+        p = np.array(line)
+        ax.fill(k * p[:, 0], p[:, 1], color="#eef3f8", zorder=1)
+        ax.plot(k * p[:, 0], p[:, 1], color="#7a8ca0", lw=0.6, zorder=5)
+    for line in outer:
+        p = np.array(line)
+        ax.plot(k * p[:, 0], p[:, 1], color=INK, lw=0.9, zorder=6)
+
+
+def fit_dims(ax: Axes, rows: list[dict], axis: int, at: float, axes: tuple[int, int], planes: dict) -> None:
+    """The tight clearances that lie nearest to this plane, as dimensions."""
+    done = set()
+    for r in rows:
+        for key, pts, other in (("skin_gap", "skin_points", "skin"), ("neighbour_gap", "neighbour_points", r["neighbour"])):
+            g, (a, b) = r[key], r[pts]
+            if a is None or not 0.0 < g <= FIT_DIM_MAX:
+                continue
+            mid = [(a[i] + b[i]) / 2 for i in range(3)]
+            nearest = min(planes.values(), key=lambda pl: abs(mid[pl["axis"]] - pl["at"]) if pl["axis"] != 1 else math.inf)
+            if nearest["axis"] != axis or nearest["at"] != at or abs(mid[axis] - at) > FIT_DIM_NEAR:
+                continue
+            tag_ = tuple(sorted((r["item"], other))) + (round(g, 1),)
+            if tag_ in done:
+                continue
+            done.add(tag_)
+            p, q = (a[axes[0]], a[axes[1]]), (b[axes[0]], b[axes[1]])
+            dim(ax, p, q, f"{g:.1f}", (8, 6), size=6.5)
+
+
+def sheet_fit() -> None:
+    data = json.load(open(FIT_DATA))
+    secs, rear, rows = data["sections"], data["rear"], data["clearances"]
+    fig = plt.figure(figsize=(24, 16))
+    grid = fig.add_gridspec(2, 3, hspace=0.18, wspace=0.12)
+    names = list(secs)
+    places = [grid[0, 0], grid[0, 1], grid[1, 0], grid[1, 1], grid[1, 2]]
+    for name, place in zip(names, places):
+        s = secs[name]
+        ax = fig.add_subplot(place)
+        axes = tuple(i for i in range(3) if i != s["axis"])
+        fit_shell(ax, s["outer"], s["cavity"])
+        fit_items(ax, s["items"])
+        fit_dims(ax, rows, s["axis"], s["at"], axes, secs)
+        labels = {0: "x (mm)", 1: "y, from the deck front (mm)", 2: "z, above the desk (mm)"}
+        pts = [p for l in s["outer"] for p in l]
+        if name == names[0]:
+            for r in data["sight"]:
+                for edge in ("top", "bottom"):
+                    ax.plot([r["eye_y"], r[edge][0]], [r["eye_z"], r[edge][1]], color=BLUE, lw=0.6, ls=":", zorder=55)
+                ax.plot(r["eye_y"], r["eye_z"], "o", color=BLUE, ms=3, zorder=56)
+                ax.text(r["eye_y"] - 6, r["eye_z"], f"{r['person']}\n{r['to_normal_deg']:.0f} deg to the normal", fontsize=6.5, color=BLUE, ha="right", va="center")
+                pts.append((r["eye_y"] - 120, r["eye_z"]))
+        frame(ax, f"{name} ({'xyz'[s['axis']]} = {s['at']:.0f})", (min(p[0] for p in pts) - 15, max(p[0] for p in pts) + 15),
+              (min(p[1] for p in pts) - 15, max(p[1] for p in pts) + 15), labels[axes[0]], labels[axes[1]])
+    ax = fig.add_subplot(grid[0, 2])
+    for k, lines in rear["outer"].items():
+        for line in lines:
+            p = np.array(line)
+            ax.plot(-p[:, 0], p[:, 1], color=INK if k.startswith("lower") else "#888", lw=0.9, zorder=6)
+    for r in rear["items"]:
+        if r["group"] not in FIT_REAR:
+            continue
+        x0, z0, x1, z1 = r["box"]
+        c = FIT_COLOUR.get(r["group"], INK)
+        ax.plot([-x0, -x1, -x1, -x0, -x0], [z0, z0, z1, z1, z0], color=c, lw=1.0 if r["role"] == "hardware" else 0.7,
+                ls="-" if r["role"] == "hardware" else "--", zorder=40)
+    door = rear["door"]
+    ax.plot([-door["x0"], -door["x1"], -door["x1"], -door["x0"], -door["x0"]], [door["z0"], door["z0"], door["z1"], door["z1"], door["z0"]],
+            color=RED, lw=1.4, ls="-.", zorder=50)
+    dim(ax, (-door["x0"], door["z1"] + 12), (-door["x1"], door["z1"] + 12), f"door opening {door['w']:.0f} wide (proposed)", (0, 7))
+    dim(ax, (-door["x1"] - 14, door["z0"]), (-door["x1"] - 14, door["z1"]), f"{door['h']:.0f}", (-12, 0), turn=90)
+    allp = np.concatenate([np.array(l) for ls_ in rear["outer"].values() for l in ls_])
+    frame(ax, "rear view, seen from behind: the lower rear wall (black), the upper rear (grey), the items\nnear the rear as boxes (BC-250, power supply, cables, speakers, marquee), the proposed door opening (red)",
+          (-allp[:, 0].max() - 30, -allp[:, 0].min() + 30), (allp[:, 1].min() - 15, allp[:, 1].max() + 15), "x, seen from behind (mm)", "z, above the desk (mm)")
+    fig.suptitle(f"Blueprint 09: the hardware in the shell, with a skin of {data['wall_t']:g} (fit study). Hardware solid, keep-out zones dashed, the cavity shaded;\n"
+                 f"the clearances of {FIT_DIM_MAX:.0f} mm and less are dimensioned in the view nearest to them", fontsize=13, y=0.995)
+    save(fig, "09-hardware")
+
+
 # ---------- the 3D reference model (a mesh; third-party material, drawn only below cad/out) ----------
 
 K_DIR = os.path.join(CAD, "vendor", "mini-new-astro-city", "assembled")
@@ -1564,6 +1676,8 @@ def overlays() -> None:
 if __name__ == "__main__":
     if sys.argv[1] == "overlays":
         overlays()
+    elif sys.argv[1] == "fit":
+        sheet_fit()
     elif sys.argv[1] == "band-options":
         band_options()
     elif sys.argv[1] == "target":
