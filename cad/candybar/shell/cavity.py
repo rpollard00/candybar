@@ -40,8 +40,11 @@ class Openings:
     """Where the skin is open under a plate: the plate rests on a ledge of this width round the opening."""
     panel_ledge: float = 8.0
     # behind the bezel the opening must take any 16:10 monitor with its adjustment and its plug space on both sides
-    # (2 x 210 wide); the bezel plate is 434.7 wide
+    # (2 x 210 wide); the bezel plate is 434.7 wide. The plate rests on a ledge at its top and bottom only (the owner,
+    # 2026-11-11): at its sides the flanges of the monitor carrier hold it, so that the monitor comes out to the front
+    # with 7.3 to spare on each side
     bezel_ledge: float = 6.0
+    bezel_side_ledge: float = 0.0
 
 
 @dataclass
@@ -120,11 +123,12 @@ def same(a: Part.Shape | None, b: Part.Shape | None) -> bool:
 
 
 def openings(d: Blueprint, o: Openings) -> list[Part.Shape]:
-    """The skin removed under the control panel and behind the bezel plate, inside their ledges."""
+    """The skin removed under the control panel and behind the bezel plate, inside their ledges (the bezel's at its
+    top and bottom only)."""
     w = d.wall_t
     z1 = d.panel_top - d.panel_t
     panel = so.prism(so.poly(pr.panel_outline(d, -o.panel_ledge)), so.xy(z1 - w - SLAB), V(0, 0, w + SLAB))
-    bx = d.bezel_w / 2 - o.bezel_ledge
+    bx = d.bezel_w / 2 - o.bezel_side_ledge
     s0, s1 = d.bezel_s0 + o.bezel_ledge, d.bezel_s1 - o.bezel_ledge
     origin, up, into = so.screen_frame(d)
     bezel = so.slab(origin, up, into, (-bx, bx), (s0, s1), (d.mon_setback, d.mon_setback + w + SLAB))

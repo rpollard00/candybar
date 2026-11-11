@@ -38,6 +38,9 @@ HIDDEN, FACE = "hidden", "face"
 PETG_G_PER_CM3 = 1.27
 CAD = Path(__file__).resolve().parents[2]
 OPTIONS_ORDER = ("A", "B", "C")
+# the layout that the owner chose on 2026-11-11: B, with the hood of A
+CHOSEN = "chosen"
+ALL = OPTIONS_ORDER + (CHOSEN,)
 # what each class means in the tables and on the drawings
 CLASS_WORDS = {HIDDEN: "in a design line", FACE: "on an open face"}
 
@@ -539,9 +542,22 @@ def option_c(d: Blueprint, L: Lines) -> Option:
         "prints flat on the bed, most seams lie in creases, and nothing needs filler.")
 
 
+def option_chosen(d: Blueprint, L: Lines) -> Option:
+    """The owner's choice (2026-11-11): the seams of B, and the hood of A in three pieces at x = +-106."""
+    a, b = option_a(d, L), option_b(d, L)
+    seams = tuple(x for x in b.seams if x.label != "H1") + tuple(x for x in a.seams if x.label == "H1")
+    pieces = tuple(p for p in b.pieces if p.module != "hood") + tuple(p for p in a.pieces if p.module == "hood")
+    return Option(
+        CHOSEN, "Chosen: B with the hood of A",
+        "Decided by the owner on 2026-11-11. The seams of B (the fewest pieces) with the hood of A: three pieces at "
+        "x = +-106, whose centre piece prints as a straight extrusion. The centre seams of B lie on the back (rear "
+        "wall below the door, the door). The width stays 494.7.",
+        seams, pieces, b.door, b.service, b.assembly, "")
+
+
 def options(d: Blueprint, door: dict) -> list[Option]:
     L = lines(d, door)
-    return [option_a(d, L), option_b(d, L), option_c(d, L)]
+    return [option_a(d, L), option_b(d, L), option_c(d, L), option_chosen(d, L)]
 
 
 BEZEL_OPTIONS = (
@@ -904,7 +920,7 @@ def tints(shapes: dict) -> dict:
     return {n: colour[pair(n)] for n in names}
 
 
-def run(option_keys=OPTIONS_ORDER, out: Path | None = None, mods: Modules | None = None, lim: Printer | None = None,
+def run(option_keys=ALL, out: Path | None = None, mods: Modules | None = None, lim: Printer | None = None,
         log=print, write: bool = True, detail: bool = True, bezel: bool = True) -> dict:
     """Cut and measure each option. Writes split/<option>/ and split/measurements.json when write is True; without
     detail it measures only the print boxes (for the test)."""
@@ -956,7 +972,7 @@ def main() -> int:
     each option writes split/measurements-<option>.json."""
     keys = os.environ.get("CANDYBAR_SPLIT_OPTIONS", "")
     picked = tuple(k for k in keys.split(",") if k and k != "bezel")
-    res = run(option_keys=picked if keys else OPTIONS_ORDER, bezel=not keys or "bezel" in keys)
+    res = run(option_keys=picked if keys else ALL, bezel=not keys or "bezel" in keys)
     bad = [k for k, v in res["options"].items() if not v["fits"]]
     for k, v in res["options"].items():
         big = max(v["pieces"].items(), key=lambda kv: max(kv[1]["x"], kv[1]["y"], kv[1]["z"]))

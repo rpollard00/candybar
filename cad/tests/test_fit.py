@@ -64,6 +64,24 @@ class FitChecksTest(unittest.TestCase):
                 room = over if bb.ZMin >= d.panel_top - 1e-6 else under
                 self.assertLess(s.world.cut(room).Volume, 1e-3)
 
+    def test_no_air_zone_shares_room_with_another_item(self) -> None:
+        self.assertEqual([lv for lv, _, _ in fit.air_zones(self.found)], [check.PASS])
+
+    def test_air_zones_notice_the_duct_in_the_power_supply_fan_space(self) -> None:
+        """The BC-250 5 lower: its exhaust duct enters the 25 mm space over the power supply's fan."""
+        d, lay = Blueprint(), fit.Layout()
+        base = fit.sheet(params.load(support.PARAMS), "FitTestLow")
+        v = lambda name: params.value(base, name)
+        values = fit.anchors(d, lay, v, d.width / 2 - d.wall_t) | ROOM
+        values["bc_top_z"] -= 5.0
+        doc = fit.build_items(fit.sheet_rows(support.PARAMS, values))
+        try:
+            failed = {subject for lv, subject, _ in fit.air_zones(fit.items(doc)) if lv == check.FAIL}
+        finally:
+            App.closeDocument("FitTestLow")
+            App.closeDocument(doc.Name)
+        self.assertIn("Compute_ExhaustDuct / PSU_FanAir", failed)
+
     def test_every_item_is_built(self) -> None:
         names = {it.name for it in self.found}
         for name in ("Monitor", "Compute", "PSU", "CableBundle", "Lever", "Encoder", "Hub", "SpeakerR", "SpeakerL", "Marquee"):

@@ -119,7 +119,8 @@ def structure_sheet(key: str, opt: sp.Option, d: Blueprint) -> str:
         for view, ax in (("side", a1), ("plan", a2)):
             for pts in member_shapes(m, view):
                 fade = 0.07 if m.kind == "floor" and view == "plan" else 0.30 if m.kind in ("ring", "floor", "rib") else 0.55
-                ax.add_patch(Polygon(pts, closed=True, fc=c, ec=c, alpha=fade,
+                hollow = m.kind == "rib" or (m.kind == "ring" and view == "plan")
+                ax.add_patch(Polygon(pts, closed=True, fc="none" if hollow else c, ec=c, alpha=0.9 if hollow else fade,
                                      lw=1.2, ls=(0, (3, 2)) if m.kind == "rib" else "-", zorder=5))
         pts = member_shapes(m, "side")[0]
         a1.annotate(m.name, xy=pts.mean(axis=0), xytext=pts.mean(axis=0) + (0, 0), fontsize=6.3, color=c, ha="center",
@@ -302,7 +303,7 @@ def joint_service(ax) -> None:
     note(ax, (-40, 32), "two pins 4 dia, +0.1, for the place; chamfer 0.5 on both edges; never glued or filled", (0, 2))
     note(ax, (-40, -10), "door: 4 thumb screws into inserts", None)
     note(ax, (-40, -14), "hood: 2 pins at the front, 2 M4 at the rear", None)
-    note(ax, (-40, -18), "bezel plate: 4 magnets, 2 pins, a lip on the ledge: no tool", None)
+    note(ax, (-40, -18), "bezel plate: magnets on the fixed cradle, 2 pins, a finger notch: no tool", None)
     ax.set_title("5  service seam (opens again)", fontsize=9)
 
 
@@ -322,11 +323,41 @@ def coupon(ax) -> None:
     ax.set_title("6  coupon pair for joint 1", fontsize=9)
 
 
+def joint_hood(ax) -> None:
+    """The hood on the body top: keyed, then bolted or bonded with the same parts."""
+    box(ax, 0, 1.5, 4, 40, "#9ec5e8")            # hood wall, outside at x = 0
+    box(ax, 0, -40, 4, 40, "#e8c39e")            # body wall
+    ax.add_patch(Polygon([(0, 1.5), (0, 4.5), (-0.01, 4.5)], fc="white", ec="none"))
+    ax.plot([0, 3], [-3, 0], color="#333", lw=0.8)   # body bevel 3 x 3
+    ax.plot([0, 3], [4.5, 1.5], color="#333", lw=0.8)  # hood bevel
+    box(ax, 4, -12, 14, 12, "#e8c39e")           # top ring flange of the body
+    box(ax, 4, 1.5, 14, 6, "#9ec5e8")            # hood foot flange
+    ax.add_patch(Polygon([(7, 0), (13, 0), (10, 3)], fc="#e8c39e", ec="#333", lw=0.8, zorder=4))  # cone into a socket
+    box(ax, 14, -10, 3, 8, "#c0c0c0")             # insert in the ring
+    ax.plot([15.5, 15.5], [-8, 11], color="#333", lw=1.6, zorder=6)
+    dim(ax, (-6, 1.5), (-6, 0), "1.5", (-5, 0))
+    dim(ax, (4, -16), (18, -16), "ring 14", (0, -3))
+    note(ax, (-40, 30), "cone 8 x 3 on the ring, socket in the hood: two at the front, two at the rear corners", (10, 2))
+    note(ax, (-40, 24), "bolt: M4 into a heat-set insert in the ring, from inside the hood (two at the rear)", (15.5, 5))
+    note(ax, (-40, 18), "bond: the same faces take adhesive; the cones still set the place", (11, 4))
+    note(ax, (-40, -28), "groove 1.5 + bevels 3 x 3 stays open: a design line", (1.5, -1.5))
+    ax.set_title("7  hood on the body top: keyed, to bolt or to bond", fontsize=9)
+
+
+def joint_values(ax) -> None:
+    ax.axis("off")
+    rows = ["Named values (structure.JOINT; joints.py of the coupon study", "becomes their one source):", ""]
+    rows += [f"{k:<16} {v}" for k, v in st.JOINT.items()]
+    rows += ["", "PETG and ABS use the same values; the coupon", "sets the clearances for the chosen material."]
+    ax.text(0, 1, "\n".join(rows), fontsize=7.5, family="DejaVu Sans Mono", va="top", transform=ax.transAxes)
+
+
 def joints_sheet() -> str:
-    fig, axes = plt.subplots(2, 3, figsize=(21, 12))
-    for ax, f, lim in zip(axes.ravel(), (joint_skin, joint_floor, joint_foot, joint_node, joint_service, coupon),
-                          (((-45, 45), (-20, 36)), ((-45, 50), (-16, 28)), ((-35, 40), (-10, 64)), ((-35, 35), (-45, 50)),
-                           ((-45, 45), (-20, 36)), ((-140, 140), (-55, 15)))):
+    fig, axes = plt.subplots(2, 4, figsize=(27, 12))
+    joint_values(axes[1, 3])
+    for ax, f, lim in zip(axes.ravel(), (joint_skin, joint_floor, joint_foot, joint_hood, joint_node, joint_service, coupon),
+                          (((-45, 45), (-20, 36)), ((-45, 50), (-16, 28)), ((-35, 40), (-10, 64)), ((-45, 25), (-35, 40)),
+                           ((-35, 35), (-45, 50)), ((-45, 45), (-20, 36)), ((-140, 140), (-55, 15)))):
         f(ax)
         ax.set_xlim(*lim[0])
         ax.set_ylim(*lim[1])
@@ -361,7 +392,7 @@ def width_study(meas: dict, step: float = 0.5) -> dict:
     largest dW at which every piece still fits, and the result at +20 and +38."""
     lim = sp.Printer(**{k: meas["printer"][k] for k in ("xy", "z", "bed", "source")})
     out = {}
-    for key in sp.OPTIONS_ORDER:
+    for key in sp.ALL:
         man = json.load(open(os.path.join(OUT, key, "manifest.json")))
         rows = meas["options"][key]["pieces"]
         parts = {}

@@ -212,7 +212,8 @@ def skin_members(d: Blueprint, key: str) -> list[Member]:
                note="the service flange under the groove: closes the open body top, carries the hood"),
         Member("deck frame D1/D2", "ring", box=(-x, x, 188.0, 211.0, d.wall_t, 72.0), note="flanges of D1 and D2, across the deck's back"),
         Member("monitor cradle", "cross", p=(300.0, 125.0), q=(450.0, 380.0), x0=-211.0, sx=422.0, sn=20.0,
-               note="a printed frame between the two middle pieces, screwed to their inner flanges at the rails"),
+               note="the fixed frame between the two middle pieces, screwed to their inner flanges at the rails; it "
+                    "holds the magnets for the bezel plate; the monitor's carrier slides out of it to the front"),
         Member("door opening frame", "ring", box=(-231.0, 231.0, 524.0, 536.0, 100.0, 310.0),
                note="flanges round the door opening (rear lower and upper rear pieces); the door screws to it and closes the ring"),
         Member("BC-250 carrier", "cross", box=(-185.0, 155.0, 455.0, 470.0, 112.0, 268.0),
@@ -220,9 +221,17 @@ def skin_members(d: Blueprint, key: str) -> list[Member]:
         Member("panel frame", "cross", box=(-199.0, 199.0, 26.0, 202.0, 58.0, 65.0), note="the ledge under the control panel and its latch"),
         Member("side ribs", "rib", box=(x - 12.0, x - 4.0, 210.0, 520.0, 20.0, 400.0), mirror=True,
                note="ribs 8 high, 3 thick, at most 110 apart on the side band and the rear side"),
-        Member("hand-hold", "mount", box=(x - 30.0, x - 4.0, 470.0, 530.0, 270.0, 305.0), mirror=True,
-               note="a recess under the B1 flange on each rear side, near the centre of mass in depth"),
     ]
+    if key == "chosen":
+        out += [Member("rear grip", "mount", box=(165.0, 225.0, 545.0, 578.0, 312.0, 336.0), mirror=True,
+                       note="a pocket up into the overhang of the upper rear, near each rear corner, open downward"),
+                Member("front grip", "mount", box=(-110.0, 110.0, 0.0, 30.0, -18.0, 0.0),
+                       note="under the deck nose, in the 18 mm that the feet give"),
+                Member("floor ribs", "rib", box=(-230.0, 230.0, 20.0, 520.0, -12.0, 0.0),
+                       note="ribs 12 deep, 2.4 thick, every 50, under the floor; a rib splice across each tile joint")]
+    else:
+        out.append(Member("hand-hold", "mount", box=(x - 30.0, x - 4.0, 470.0, 530.0, 270.0, 305.0), mirror=True,
+                          note="a recess under the B1 flange on each rear side, near the centre of mass in depth"))
     return out
 
 
@@ -305,7 +314,7 @@ AIR = (
     ("power supply fan", "power supply (its top face)", "Draws cabinet air; off below about 200 W (sister unit data)."),
     ("power supply grille", "rear lower wall: rear lower L and centre (A, the seam R2 L crosses it), rear lower L (B, C)",
      "The power supply's own exhaust out of its rear face."),
-    ("make-up air inlet", "floor tile under the deck (the feet give 10 mm)", "Replaces the air that the power supply and leaks take out. "
+    ("make-up air inlet", "floor tile under the deck (the feet give 18 mm)", "Replaces the air that the power supply and leaks take out. "
      "The owner wants no side vents, so the inlet is in the floor."),
 )
 
@@ -434,3 +443,91 @@ def main() -> int:
         print(f"{r['member']:24s} {r['length_mm']:5d} in skin {r['in_skin_mm3']:7d} hits {[h['item'] for h in r['hits']]} nearest {r['nearest_mm']} {r['nearest']}")
     print(f"frame {out['frame_length_m']:.2f} m, {out['frame_kg']:.2f} kg")
     return 0
+
+
+# ---------- the owner's choices of 2026-11-11 ----------
+
+# The joint values of the proposal, by name. cad/candybar/shell/joints.py (the coupon study) becomes the one source of
+# these numbers; until it exists they are here, and the coupon sets the clearances.
+JOINT = {
+    "flange_w": 6.0, "flange_h": 12.0, "key_w": 1.5, "key_h": 4.0, "key_clearance": 0.2, "screw_d": 3.0, "screw_l": 16.0,
+    "screw_pitch": 60.0, "groove_w": 1.0, "groove_d": 0.8, "cone_d": 8.0, "cone_h": 3.0, "cone_clearance": 0.15,
+    "lap_w": 20.0, "insert": "M4 x 8, hole 5.6", "pin_d": 4.0, "pin_clearance": 0.1, "service_chamfer": 0.5,
+}
+
+
+def floor_options(mass_kg: float) -> dict:
+    """The floor under the power supply when the cabinet is lifted by its hand-holds (the supply's weight x 2 for a
+    jerk), as a strip as wide as the supply spanning from the deck's back frame (y 207) to the rear wall (y 536):
+    a 7 mm sandwich alone, the same with ribs under it, and a 10 mm sandwich with the supply raised 3 mm. The core
+    is left out of the stiffness (ESTIMATED: a gyroid core of 40 % adds little in bending)."""
+    p = 3.27 * G * 2
+    span, a = 536.0 - 207.0, 461.0 - 207.0
+    b = span - a
+    width = 150.0
+
+    def ei(parts: list[tuple[float, float, float]]) -> float:
+        """Rectangles (width, height, z of the centre): E I about the common neutral axis."""
+        area = sum(w * h for w, h, _ in parts)
+        zc = sum(w * h * z for w, h, z in parts) / area
+        return E_PETG * sum(w * h ** 3 / 12 + w * h * (z - zc) ** 2 for w, h, z in parts)
+
+    s = FLOOR_SKIN
+    sandwich = lambda t: [(width, s, s / 2), (width, s, t - s / 2)]
+    rib_h, rib_t, rib_pitch = 12.0, 2.4, 50.0
+    ribs = [(rib_t, rib_h, -rib_h / 2)] * int(width / rib_pitch)
+    lap = [(width, FLOOR_T, FLOOR_T / 2)]  # the bonded half-lap of a tile joint: solid 7 mm over 20 mm
+    rows = {"sandwich 7 mm": ei(sandwich(FLOOR_T)), "sandwich 7 mm with ribs 12 x 2.4 every 50 under it": ei(sandwich(FLOOR_T) + ribs),
+            "sandwich 10 mm (the supply 3 mm higher)": ei(sandwich(10.0))}
+    out = {k: {"EI": v, "sag_mm": p * a ** 2 * b ** 2 / (3 * v * span)} for k, v in rows.items()}
+    out["joint, solid 7 mm lap"] = {"EI": ei(lap), "sag_mm": p * a ** 2 * b ** 2 / (3 * ei(lap) * span)}
+    out["joint, lap with a rib splice"] = {"EI": ei(lap + ribs), "sag_mm": p * a ** 2 * b ** 2 / (3 * ei(lap + ribs) * span)}
+    out["load_N"] = p
+    out["rib_h"], out["foot_h"] = rib_h, rib_h + 6.0
+    return out
+
+
+def hand_holds(total_kg: float, com_y: float) -> dict:
+    """Where the cabinet's weight goes for three ways to lift it. Rear grips under the overhang of the upper rear at
+    y 560; a second grip under the deck nose at y 20; the side recesses at the centre of mass."""
+    w = total_kg * G
+    rear, front = 560.0, 20.0
+    k = (com_y - front) / (rear - front)
+    return {"weight_N": w, "com_y": com_y, "com_to_rear": 580.0 - com_y,
+            "rear_only": "it tips nose down onto the deck front: the rear grips carry the cabinet only while its front "
+                         "rests on the table",
+            "rear_share": k, "front_share": 1 - k, "rear_N_each": w * k / 2, "front_N": w * (1 - k)}
+
+
+# seam, the joint, what locates it, the directions it fixes (n: square to the seam; t: across the wall, so that the
+# faces lie flush; s: along the seam)
+ALIGNMENT = (
+    ("floor tiles (BA1 to BA3)", "2", "cones in the half-laps", "n, t, s"),
+    ("wall feet to the floor", "3", "a key under each foot flange in a slot of the floor; the floor is the datum", "n, t, s"),
+    ("D1 (deck to body, under the panel)", "1", "flange key; one cone at each end of the seam", "n, t, s"),
+    ("D2 (deck to body, at the sweep foot)", "1", "flange key; a cone at the deck's top corner", "n, t, s"),
+    ("F1, F2 (deck nose at the flank break)", "1", "flange key down the front and across the border; a cone at the top", "n, t, s"),
+    ("P1 (apron at the panel corners)", "1", "flange key; one cone near the bezel edge", "n, t, s"),
+    ("S1 (front to rear body, step crease)", "1", "flange key; node 4 with L1", "n, t, s"),
+    ("L1 (level at the bezel's bottom corner)", "1 and 4", "flange key round the ring; nodes with S1, P1 and R1", "n, t, s"),
+    ("B1 (belt in the slope crease)", "1 and 4", "flange key round the ring; nodes with R1 and W1", "n, t, s"),
+    ("R1 (rear, door corner to the crease)", "1", "flange key; node with B1", "n, t; s from the node"),
+    ("R2 (rear wall below the door, centre)", "1", "flange key; one cone", "n, t, s"),
+    ("R3 (upper rear above the door)", "1", "flange key; node with B1", "n, t, s"),
+    ("R4 (the door's centre)", "1", "flange key; one cone; the door is bonded apart from the cabinet, on a flat table", "n, t, s"),
+    ("W1 (brow beside the hood bay)", "1", "flange key; a cone at the top ring", "n, t, s"),
+    ("H1 (hood bays)", "1", "flange key; a cone at the roof and one at the sill", "n, t, s"),
+    ("hood on the body top (groove)", "6", "two cones at the front and two at the rear corners of the top ring", "n, t, s"),
+    ("rear door (DR)", "5", "two pins and a lip on the sill", "n, t, s"),
+    ("bezel plate (reveal)", "5", "two pins in the bottom ledge; magnets on the fixed cradle; the lip on the bottom ledge", "n, t, s"),
+    ("control panel (pocket)", "5", "the pocket's six edges and two pins at the front", "n, t, s"),
+)
+
+ABS_CHANGES = (
+    ("bond", "slow methacrylate (MMA) on the flange", "acetone or ABS slurry welds the flange; joints near the strength of one part in two studies"),
+    ("groove", "polyester glazing putty that lists plastics; optional PETG weld", "ABS slurry or a polyester putty that names ABS on its data sheet"),
+    ("sanding", "wet only (PETG gums dry)", "wet or dry"),
+    ("primer and lacquer", "scuff and prime every face; hobby lacquer only over primer", "1K plastic primers name ABS; hobby lacquers grip it, but thinners crack stressed ABS"),
+    ("shrink", "0.76 % and 0.54 % in X and Y (one study)", "0.59 % and 0.69 % in X and Y, 0.92 % growth in Z (same study): the clearances stay; warp, not shrink, decides"),
+    ("printer", "the A1", "an enclosed printer with a chamber, a vent to outdoors; flat floor tiles may warp"),
+)

@@ -75,8 +75,14 @@ class Layout:
     # BC-250: the DisplayPort plug space ends this far from the inner side wall (3 in the earlier layout; 4 here,
     # because behind the step the cavity of this study is up to 3.4 narrower than a true offset)
     bc_side_gap: float = 4.0
-    # BC-250: its lower edge this far above the clear space over the supply's fan (as in the earlier layout)
-    bc_above_psu: float = 2.0
+    # BC-250: its lower edge this far above the clear space over the supply's fan; 3 so that its exhaust duct, which
+    # starts 3 below the board, stays out of that space (2 in the earlier layout gave 7.2 cm3 of overlap)
+    bc_above_psu: float = 3.0
+    # the printed floor (split proposal: a 7 mm sandwich); the hub stands on it
+    floor_t: float = 7.0
+    # monitor carrier: a flange on each side, outboard of the plug space, that holds the side of the bezel plate
+    carrier_flange: float = 4.0
+    carrier_flange_t: float = 4.0
     # lever: centre from the panel centre line (as in the earlier layout), and at this share of the panel depth
     stick_x: float = -75.0
     stick_y_share: float = 0.5
@@ -170,7 +176,9 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
     row_end = out["fit_usb_y0"] + (len(USB_ORDER) - 1) * v("usb_pitch") + v(f"usb_{USB_ORDER[-1].lower()}_back_w") / 2
     out["fit_hub_x0"] = rear_x - lay.hub_side_gap - v("usb_hub_w")
     out["fit_hub_y0"] = row_end + lay.hub_back_gap + v("usb_hub_plug_clear")
-    out["fit_hub_z0"] = w + SEAT
+    out["fit_hub_z0"] = max(w, lay.floor_t) + SEAT
+    out["fit_flange_w"] = lay.carrier_flange
+    out["fit_flange_t"] = lay.carrier_flange_t
     centre = so.on_screen(d, 0.0, d.image_s, d.mon_setback)
     out["fit_img_y"], out["fit_img_z"] = centre.y, centre.z
     z = bc_bottom + lay.cable_at_board_share * v("bc_pcb_w_pwr")
@@ -225,7 +233,12 @@ MONITOR_ANY = Assembly("MonitorAny", base=(ZERO, "fit_img_y", "fit_img_z"), pose
     box("MonitorAny_ClampBottom", "keepout", (SWEPT_W, "mon_gen_t", "mon_clamp_edge"), (f"-({SWEPT_W}) / 2", ZERO, f"-({SWEPT_H}) / 2 - mon_clamp_edge")),
     box("MonitorAny_Cradle", "keepout", (SWEPT_W, "cradle_t", f"{SWEPT_H} + 2 * mon_clamp_edge"), (f"-({SWEPT_W}) / 2", "mon_gen_t", f"-({SWEPT_H}) / 2 - mon_clamp_edge")),
     box("MonitorAny_PlugsLeft", "keepout", ("mon_side_clear", "mon_gen_t", SWEPT_H), (f"-({SWEPT_W}) / 2 - mon_side_clear", ZERO, f"-({SWEPT_H}) / 2")),
-    box("MonitorAny_PlugsRight", "keepout", ("mon_side_clear", "mon_gen_t", SWEPT_H), (f"({SWEPT_W}) / 2", ZERO, f"-({SWEPT_H}) / 2")))))
+    box("MonitorAny_PlugsRight", "keepout", ("mon_side_clear", "mon_gen_t", SWEPT_H), (f"({SWEPT_W}) / 2", ZERO, f"-({SWEPT_H}) / 2")),
+    # the carrier's side flanges: they hold the sides of the bezel plate and leave with the carrier
+    box("MonitorAny_FlangeLeft", "keepout", ("fit_flange_w", "fit_flange_t", SWEPT_H),
+        (f"-({SWEPT_W}) / 2 - mon_side_clear - fit_flange_w", ZERO, f"-({SWEPT_H}) / 2")),
+    box("MonitorAny_FlangeRight", "keepout", ("fit_flange_w", "fit_flange_t", SWEPT_H),
+        (f"({SWEPT_W}) / 2 + mon_side_clear", ZERO, f"-({SWEPT_H}) / 2")))))
 
 # A cable channel from the plug space on each side back to the air space in front of the BC-250, and one across
 # the cabinet there, so that a cable from the right side reaches the I/O end on the left.
@@ -432,7 +445,28 @@ def run_checks(doc: App.Document, found: list[Item], cav: cavity.Cavity, bezel: 
             elif not in_cavity(s.world.BoundBox.Center, cav):
                 contained.append((check.FAIL, s.name, "lies outside the form"))
     rules["containment in the cavity"] = contained or [(check.PASS, f"{sum(len(i.solids) for i in found)} solids", "the hardware and the keep-out zones lie inside the cavity")]
+    rules["R2b air zones"] = air_zones(found)
     return rules
+
+
+# the zones that air must have: the duct, the fan's intake space, the air under the board, the shroud
+AIR_ZONES = ("Compute_ExhaustDuct", "Compute_UndersideAir", "Compute_FanShroud", "PSU_FanAir")
+
+
+def air_zones(found: list[Item]) -> list[tuple[str, str, str]]:
+    """Each air zone against every solid of another owner, keep-out zones included (R2 of check.py compares a solid
+    with the keep-out zones of others, not two keep-out zones): a common volume above TOL fails."""
+    solids = [(it.owner, s) for it in found for s in it.solids if s.role in ENVELOPE]
+    zones = [(o, s) for o, s in solids if s.name in AIR_ZONES]
+    rows = []
+    for owner, z in zones:
+        for other, s in solids:
+            if other == owner or not z.world.BoundBox.intersect(s.world.BoundBox):
+                continue
+            v = z.world.common(s.world).Volume
+            if v > TOL:
+                rows.append((check.FAIL, f"{z.name} / {s.name}", f"{v:.0f} mm3 in common"))
+    return rows or [(check.PASS, f"{len(zones)} air zones", f"no common volume with {len(solids)} solids of other items")]
 
 
 def clearances(found: list[Item], cav: cavity.Cavity, rules: dict, reach: float) -> list[dict]:
@@ -516,6 +550,9 @@ def monitor_margins(doc: App.Document, found: list[Item], cav: cavity.Cavity, d:
         rows.append({"where": where, "z": p.z, "cavity_half_width": inner,
                      "right_angle_needs": swept + v("mon_side_clear"), "straight_needs": swept + v("mon_side_clear_straight")})
     out["plugs"] = rows
+    half = d.bezel_w / 2 - cavity.Openings().bezel_side_ledge
+    plugs = v("mon_gen_w") / 2 + v("mon_adjust") + v("mon_side_clear")
+    out["pass"] = {"opening_half": half, "room_gap": half - plugs, "flange_gap": half - plugs - v("fit_flange_w")}
     return out
 
 
@@ -726,7 +763,11 @@ def markdown(rep: dict) -> str:
               f"Marquee: window {rep['marquee']['fit_mq_w']:.0f} x {rep['marquee']['fit_mq_h']:.0f}; room behind the cover {rep['marquee']['room']:.1f} deep.", "",
               "## Monitor", "", "Gap to the skin, mm, from the top 10 of the monitor (the tuck) and from its bottom 10 (the sweep).", "",
               "| Unit | Top | Bottom |", "| --- | --- | --- |"]
-    lines += [f"| {k} | {m['top']:.1f} | {m['bottom']:.1f} |" for k, m in rep["monitor"].items() if k != "plugs"]
+    lines += [f"| {k} | {m['top']:.1f} | {m['bottom']:.1f} |" for k, m in rep["monitor"].items() if k not in ("plugs", "pass")]
+    ps = rep["monitor"]["pass"]
+    lines += ["", f"Out to the front: the opening behind the bezel is {2 * ps['opening_half']:.1f} wide (ledges at its top and "
+              f"bottom only). Any 16:10 monitor with its plug space passes with {ps['room_gap']:.1f} on each side; its carrier "
+              f"with the side flanges that hold the bezel plate passes with {ps['flange_gap']:.1f}.", ""]
     lines += ["", "| Height | z | Cavity half width | Needed, right-angle plugs | Needed, straight plugs |", "| --- | --- | --- | --- | --- |"]
     lines += [f"| {r['where']} | {r['z']:.0f} | {r['cavity_half_width']:.1f} | {r['right_angle_needs']:.1f} | {r['straight_needs']:.1f} |" for r in rep["monitor"]["plugs"]]
     st = rep["seat"]

@@ -293,7 +293,7 @@ def near_hardware(lines: list, boxes: list[dict]) -> list[str]:
 def measurements() -> dict:
     """The per-option files of the cut, merged."""
     out = None
-    for key in (*sp.OPTIONS_ORDER, "bezel"):
+    for key in (*sp.ALL, "bezel"):
         one = json.load(open(os.path.join(OUT, f"measurements-{key}.json")))
         if out is None:
             out = one
@@ -312,7 +312,10 @@ def main(elevations: bool = True) -> None:
     if elevations:
         paths = [option_sheet(k, meas, opts[k]) for k in sp.OPTIONS_ORDER]
         stack(paths, os.path.join(OUT, "options.png"))
-    for k in sp.OPTIONS_ORDER:
+    if elevations or not os.path.exists(os.path.join(OUT, "chosen.png")):
+        os.replace(option_sheet(sp.CHOSEN, meas, opts[sp.CHOSEN]), os.path.join(OUT, "chosen.png"))
+        print("draw_split:", os.path.relpath(os.path.join(OUT, "chosen.png"), REPO))
+    for k in sp.ALL:
         print("draw_split:", os.path.relpath(ds.structure_sheet(k, opts[k], d), REPO))
     print("draw_split:", os.path.relpath(ds.services_sheet(), REPO))
     print("draw_split:", os.path.relpath(ds.joints_sheet(), REPO))
@@ -322,8 +325,8 @@ def main(elevations: bool = True) -> None:
     print("draw_split:", os.path.relpath(os.path.join(OUT, "proposal.md"), REPO))
 
 
-def render() -> None:
-    for key in sp.OPTIONS_ORDER:
+def render(keys=(sp.CHOSEN,)) -> None:
+    for key in keys:
         out = os.path.join(OUT, "renders", key)
         cmd = [sys.executable, os.path.join(HERE, "render_views.py"), out, os.path.join(OUT, key),
                os.path.join(SHELL, "bezel.stl") + "=black", os.path.join(SHELL, "control_panel.stl") + "=black",
