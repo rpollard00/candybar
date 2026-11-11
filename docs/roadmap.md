@@ -109,7 +109,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 | `CONTEXT.md` | The glossary |
 | `docs/adr/` | Decision records |
 | `docs/blueprint/` | The blueprint of the target cabinet: volumes, elevations, sections, junctions, the face map, the face table and the open questions |
-| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets, and the finishing of PETG (bond, filler, primer, paint, and a coupon test plan) |
+| `docs/research/` | Research notes: reference cabinets, the measured Mini New Astro City model, measurements from the reference photos, hardware envelopes, controls and ergonomics, cooling and the power supply, the PC control panel and the USB sockets, the finishing of PETG (bond, filler, primer, paint, and a coupon test plan), and a study of a change to ABS with a budget for an enclosed printer (the owner examines this; the plan stays PETG until the owner decides) |
 | `cad/reference/` | The picked points and known sizes for each reference photo, which the photo tools use |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
