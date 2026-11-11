@@ -287,8 +287,11 @@ class Blueprint(Dims):
     # hood front at the top of the band, and the ledge on the sill is what is left between them
     hood_band_tilt: float = 0.0
     hood_band_recess: float = 5.0
-    # the top edge of the marquee stands hood_soffit_d behind the hood front at the top of the opening
-    hood_soffit_d: float = 23.3
+    # marquee: upright, so that it faces directly forward; it stands hood_marquee_edge behind the front of the lip,
+    # which leaves a small edge on top of the lip; between the lip and the top bar the opening is hood_marquee_open_h
+    marquee_tilt: float = 0.0
+    hood_marquee_edge: float = 5.0
+    hood_marquee_open_h: float = 36.1
 
     @property
     def edge_in(self) -> float:

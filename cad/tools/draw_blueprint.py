@@ -636,9 +636,10 @@ def sheet_hood(d: Blueprint, faces: dict[str, pr.Face]) -> None:
                 f"{h.y_rear(h.z_band_top) - d.hood_wall - rear:.0f} clear behind the band", (0, -7))
             dim(b, (oy, oz + h.z_band_top - 10), (oy + h.y_band_top, oz + h.z_band_top - 10), f"band {h.y_band_top:.1f} back", (-4, -7))
             yr = h.y_band_top - d.hood_rail_proud
-            dim(b, (oy + yr, oz + h.z_rail_top + 4), (oy + h.y_marquee_bottom, oz + h.z_rail_top + 4), f"shelf {h.y_marquee_bottom - yr:.1f}", (0, 5))
-            dim(b, (oy, oz + h.z_open_top - 6), (oy + h.y_marquee_top, oz + h.z_open_top - 6), f"marquee {h.y_marquee_top:.0f} under the bar", (6, -7))
-            note(b, (oy + h.depth + 8, oz + 60), f"band upright, {d.hood_band_recess:.0f} behind the hood front\nat its top; the top of the lip is one flat\nshelf back to the marquee;\nmarquee faces down {d.marquee_tilt:.0f} deg;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nrear flush with the upper rear", size=7)
+            dim(b, (oy + yr, oz + h.z_rail_top + 4), (oy + h.y_marquee_bottom, oz + h.z_rail_top + 4), f"edge {h.y_marquee_bottom - yr:.1f}", (16, 5))
+            yf = h.front_y(h.z_open_top)
+            dim(b, (oy + yf, oz + h.z_open_top - 6), (oy + h.y_marquee_top, oz + h.z_open_top - 6), f"soffit {h.y_marquee_top - yf:.1f}", (22, 0))
+            note(b, (oy + h.depth + 8, oz + 60), f"band upright, {d.hood_band_recess:.0f} behind the hood front\nat its top; the marquee upright in the\nplane of the band, an edge of {d.hood_marquee_edge:.0f}\non top of the lip;\nfront leans back {d.hood_front_lean_low:.0f}, then {d.hood_front_lean_up:.0f} deg;\nfoot on the line of the rail;\nrear flush with the upper rear", size=7)
         else:
             ys = h.y_band_top - d.speaker_proud
             zb, zt = h.z_sill + d.speaker_foot_gap, h.z_band_top - d.speaker_head_gap
@@ -907,12 +908,15 @@ def band_options() -> None:
             f"band face {abs(recess):.1f} {'behind' if recess >= 0 else 'ahead of'} the front", (36, -7), size=7)
         dim(ax, (oy + h.front_y(h.z_sill), oz + h.z_sill + 2), (oy + h.y_band_foot, oz + h.z_sill + 2), f"ledge {abs(h.y_band_foot - h.front_y(h.z_sill)):.1f}", (26, 0), size=7)
         dim(ax, (oy + h.y_band_top - d.hood_rail_proud, oz + h.z_rail_top + 2), (oy + h.y_marquee_bottom, oz + h.z_rail_top + 2),
-            f"shelf {h.y_marquee_bottom - h.y_band_top + d.hood_rail_proud:.1f} to the marquee", (0, 6), size=7)
+            f"edge {h.y_marquee_bottom - h.y_band_top + d.hood_rail_proud:.1f}", (-16, 6), size=7)
+        soffit = h.y_marquee_top - h.front_y(h.z_open_top)
+        dim(ax, (oy + h.front_y(h.z_open_top), oz + h.z_open_top - 3), (oy + h.y_marquee_top, oz + h.z_open_top - 3),
+            f"marquee {abs(soffit):.1f} {'behind' if soffit >= 0 else 'ahead of'} the top bar", (40, -7), size=7)
         note(ax, (oy + 22, oz + 45), f"speaker form {d.speaker_proud:.0f} proud, front upright:\nat its top (z {zt:.0f}) {ahead(h.front_y(zt))} the front,\n"
              f"at its foot (z {zb:.0f}) {ahead(h.front_y(zb))} the front;\n{ahead(h.front_y(0.0))} the foot of the front", size=7)
         ax.legend(loc="lower right", fontsize=6.5)
     fig.suptitle("Hood band, upright: three places in depth (side section through a speaker, x = "
-                 f"{x:.0f}; the marquee {pr.marquee_window(d0, h0)[0]:.0f} x {d0.marquee_h:.0f} and the soffit {d0.hood_soffit_d:.1f} do not move)", fontsize=12)
+                 f"{x:.0f}; the marquee {pr.marquee_window(d0, h0)[0]:.0f} x {d0.marquee_h:.0f}, upright, moves with the band: an edge of {d0.hood_marquee_edge:.0f} on the lip)", fontsize=12)
     save(fig, "hood-band-options", os.path.join(CAD, "out", "shell-bp", "compare"), svg=False)
 
 

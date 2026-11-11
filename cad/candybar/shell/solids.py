@@ -503,9 +503,10 @@ def opening_path(d: Blueprint, h: pr.Hood) -> pr.Path:
 def recess_profile(d: Blueprint, h: pr.Hood) -> list[P2]:
     """How deep the opening goes at each height, in (y, z): ledge, hood band, lip, marquee, soffit."""
     tb, tm = math.tan(math.radians(d.hood_band_tilt)), math.tan(math.radians(d.marquee_tilt))
-    return [(-OVER, h.z_sill - OVER), (h.y_band_foot - OVER * tb, h.z_sill - OVER), (h.y_band_top, h.z_band_top),
-            (h.y_band_top, h.z_rail_top), (h.y_marquee_bottom, h.z_rail_top), (h.y_marquee_top, h.z_open_top),
-            (h.y_marquee_top - OVER * tm, h.z_open_top + OVER), (-OVER, h.z_open_top + OVER)]
+    pts = [(-OVER, h.z_sill - OVER), (h.y_band_foot - OVER * tb, h.z_sill - OVER), (h.y_band_top, h.z_band_top),
+           (h.y_band_top, h.z_rail_top), (h.y_marquee_bottom, h.z_rail_top), (h.y_marquee_top, h.z_open_top),
+           (h.y_marquee_top - OVER * tm, h.z_open_top + OVER), (-OVER, h.z_open_top + OVER)]
+    return [p for p, q in zip(pts, pts[-1:] + pts[:-1]) if math.dist(p, q) > 1e-9]
 
 
 def leaning(shell: Part.Shape, h: pr.Hood, d: Blueprint) -> Part.Shape:
