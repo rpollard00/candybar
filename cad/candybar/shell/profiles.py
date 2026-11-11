@@ -303,6 +303,22 @@ def deck_plan(d: Blueprint) -> Path:
             Line((xc - ts, 0.0), (0.0, 0.0))]
 
 
+def panel_outline(d: Blueprint, grow: float = 0.0) -> list[P2]:
+    """The outline of the control panel plate in plan, in (x, y), counter-clockwise, moved out by grow (panel_gap
+    for the pocket, a negative ledge for the opening under the plate). The front follows the deck's front contour:
+    a straight segment parallel to the centre face, and one parallel to each flank, deck_nose + panel_gap behind
+    them. The side edges and the back edge stay where the rectangle of panel_w x panel_d had them. Straight lines
+    only, so that a cutting service can cut the plate."""
+    a = math.radians(d.deck_flank)
+    xc = d.deck_centre_frac * d.width / 2
+    border = d.deck_nose + d.panel_gap - grow
+    xs = d.panel_w / 2 + grow
+    yb = d.deck_nose + d.panel_gap + d.panel_d + grow
+    xk = xc - border * math.tan(a / 2)
+    yf = (xs - xc) * math.tan(a) + border / math.cos(a)
+    return [(-xs, yf), (-xk, border), (xk, border), (xs, yf), (xs, yb), (-xs, yb)]
+
+
 # ---------- the hood, in its own frame: x across, y back from its front plane, z up from its base ----------
 
 @dataclass(frozen=True)
@@ -525,7 +541,7 @@ def mirror(polys: list[list[P3]]) -> list[list[P3]]:
 FLAT, SINGLE, DOUBLE = "flat", "single-curved", "double-curved"
 FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     # id: (name, component, facing, joins, the dimension that sets it, curvature, how to build it and what it means for the print)
-    "DK1": ("deck top border", "deck", "faces up", "CP1, DK2, FB1, RL1", "deck_top 72; flat border 12 or more in front of the panel", FLAT, "extrusion"),
+    "DK1": ("deck top border", "deck", "faces up", "CP1, DK2, FB1, RL1", "deck_top 72; a border of deck_nose 25 in front of the pocket, the same all along the front: the pocket follows the deck's front contour", FLAT, "extrusion"),
     "DK2": ("deck edge radius", "deck", "turns from up to 10 deg off vertical", "DK1, DK3", "deck_top_r 10.5, turning 80 deg",
             "single-curved; double-curved round the corners", "sweep of the edge section along the deck outline"),
     "DK3": ("deck edge band", "deck", "leans 10 deg from vertical, faces out", "DK2, DK4 to DK7 at the crease", "deck_lean 10, crease deck_lean_h 24 below the top",
@@ -534,18 +550,18 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "DK5": ("deck front, flank", "deck", "vertical, turned back 8 deg", "DK4, DK6", "deck_flank 8", FLAT, "extrusion of the deck outline"),
     "DK6": ("deck front corner", "deck", "vertical, round in plan", "DK5, DK7", "deck_corner_frac 0.09 of the width (R 44.5)", SINGLE, "extrusion of the deck outline"),
     "DK7": ("deck side", "deck", "faces sideways, vertical", "DK6, RL4 (same plane)", "at the full width; flush with RL4", FLAT, "extrusion of the deck outline"),
-    "DK8": ("panel pocket", "deck", "the wall faces the pocket, the floor faces up", "DK1, CP1", "deck_top - panel_top 2 deep, panel_gap 1 round the panel",
-            FLAT, "pocket cut; the panel plate sits in a seat of panel_t below the floor"),
-    "CP1": ("control panel", "control panel", "faces up", "DK1", "396 x 175, 2 below the deck top", FLAT, "cut plate"),
+    "DK8": ("panel pocket", "deck", "the wall faces the pocket, the floor faces up", "DK1, CP1", "deck_top - panel_top 2 deep, panel_gap 1 round the panel: six straight edges",
+            FLAT, "pocket cut from the panel outline moved out by panel_gap; the panel plate sits in a seat of panel_t below the floor"),
+    "CP1": ("control panel", "control panel", "faces up", "DK1", "396 wide, 175 deep at the centre line and 166.4 at the sides, 2 below the deck top; the front is three straight segments 26 behind the centre face and the flanks of the deck (panel_outline)", FLAT, "cut plate: straight lines only"),
     "FB1": ("sweep", "front body", "concave, from up to the foot of the rail arc", "DK1, FB2, RL1", "bend_r 50, turning 68 deg", SINGLE,
             "extrusion of the side profile across the width"),
-    "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 52", SINGLE, "extrusion of the side profile across the width"),
-    "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB5, RL1", "brow_ledge 20: a plain strip above the bezel, then the seam bevel", SINGLE, "extrusion of the side profile across the width"),
+    "FB2": ("apron", "front body", "faces the player; follows the rail arc", "FB1, BZ1, RL1", "band_len 40", SINGLE, "extrusion of the side profile across the width"),
+    "FB3": ("brow band", "front body", "faces the player; follows the rail arc", "BZ1, FB5, RL1", "brow_ledge 32: a plain strip of 28.5 above the bezel, then the seam bevel", SINGLE, "extrusion of the side profile across the width"),
     "FB4": ("body top", "front body", "faces up", "FB3, RL1 to RL3, FB5, RB2, RB5, HC14", "body_top 423.9; all under the hood: the foot of the hood has its outline", FLAT, "plane cut"),
     "FB5": ("seam bevel, body", "front body", "faces out and up", "FB3, FB4, RL1 to RL4, RB2, RB5", "seam_groove: from the side 3 below the body top, 3 in to the top; one height all round the body top",
             "flat on the straight runs; single-curved round the corners", "a ruled cut from the section of the body 3 below its top"),
     "RL1": ("rail land", "rail", "faces the player; one convex arc in side view, chord reclined 30 deg", "BZ1, FB1 to FB3, RL2, DK1",
-            "rail_sagitta_ratio 0.035 of the chord (13.0); 16.0 wide, 6.4 at the top of the bezel", SINGLE,
+            "rail_sagitta_ratio 0.035 of the chord (13.0); 16.0 wide, 9.0 at the top of the bezel", SINGLE,
             "extrusion of the side profile; on a print that stands upright the arc is in the layer plane and prints smooth"),
     "RL2": ("rail edge radius", "rail", "turns from the land to 10 deg off the side", "RL1, RL3, DK2, FB5", "same section as DK2; above the start of the tuck, measured in from the side at each height",
             DOUBLE, "sweep of the edge section along the rail arc; above the start of the tuck the side leans in, so loft between sections there"),
@@ -713,16 +729,27 @@ def faces(d: Blueprint) -> dict[str, Face]:
     ya = d.foot_y - d.bend_t
     flat = [r[0] for r in rows_b]
     ring_out = [(x, y) for x, y, _ in flat[::-1]] + [(-x, y) for x, y, _ in flat]
-    px, py0, py1 = d.panel_w / 2 + d.panel_gap, d.deck_nose, d.deck_nose + d.panel_d + 2 * d.panel_gap
-    cy = (py0 + py1) / 2
+    rim = panel_outline(d, d.panel_gap)
+    cy = (d.deck_nose + d.deck_nose + d.panel_d + 2 * d.panel_gap) / 2
+    rim_edges = list(zip(rim, rim[1:] + rim[:1]))
 
     def on_pocket(p: P2) -> P2:
+        """Where the ray from the middle of the pocket toward p crosses the rim of the pocket."""
         dx, dy = p[0], p[1] - cy
-        k = min(px / abs(dx) if abs(dx) > 1e-9 else math.inf, ((py1 - py0) / 2) / abs(dy) if abs(dy) > 1e-9 else math.inf)
-        return dx * k, cy + dy * k
+        best = math.inf
+        for (x0, y0), (x1, y1) in rim_edges:
+            ex, ey = x1 - x0, y1 - y0
+            den = dx * ey - dy * ex
+            if abs(den) < 1e-12:
+                continue
+            k = (x0 * ey - (y0 - cy) * ex) / den
+            t = (x0 * dy - (y0 - cy) * dx) / den
+            if k > 0 and -1e-9 <= t <= 1 + 1e-9:
+                best = min(best, k)
+        return dx * best, cy + dy * best
 
     closed = ring_out + ring_out[:1]
-    corners = [(px, py0), (px, py1), (-px, py1), (-px, py0)]
+    corners = rim
     angle = lambda p: math.atan2(p[1] - cy, p[0])
     turn = lambda a: (a + math.pi) % (2 * math.pi) - math.pi
 
@@ -735,14 +762,12 @@ def faces(d: Blueprint) -> dict[str, Face]:
     add("DK1", [[(*closed[i], top), (*closed[i + 1], top), (*on_pocket(closed[i + 1]), top),
                  *[(*c, top) for c in reversed(between(on_pocket(closed[i]), on_pocket(closed[i + 1])))], (*on_pocket(closed[i]), top)]
                 for i in range(len(closed) - 1)], both=False,
-        edges=[[(x, y, top) for x, y in closed], [(px, py0, top), (px, py1, top), (-px, py1, top), (-px, py0, top), (px, py0, top)]])
-    pw = d.panel_w / 2
-    panel = [(pw, py0 + d.panel_gap, d.panel_top), (pw, py1 - d.panel_gap, d.panel_top), (-pw, py1 - d.panel_gap, d.panel_top), (-pw, py0 + d.panel_gap, d.panel_top)]
+        edges=[[(x, y, top) for x, y in closed], [(x, y, top) for x, y in rim + rim[:1]]])
+    panel = [(x, y, d.panel_top) for x, y in panel_outline(d)]
     add("CP1", [panel], both=False, edges=[panel + panel[:1]])
-    rim = [(px, py0), (px, py1), (-px, py1), (-px, py0)]
-    seat = [(p[0], p[1], d.panel_top) for p in panel]
-    add("DK8", [[(*rim[k], top), (*rim[k - 1], top), (*rim[k - 1], d.panel_top), (*rim[k], d.panel_top)] for k in range(4)]
-        + [[(*rim[k], d.panel_top), (*rim[k - 1], d.panel_top), seat[k - 1], seat[k]] for k in range(4)], both=False)
+    n = len(rim)
+    add("DK8", [[(*rim[k], top), (*rim[k - 1], top), (*rim[k - 1], d.panel_top), (*rim[k], d.panel_top)] for k in range(n)]
+        + [[(*rim[k], d.panel_top), (*rim[k - 1], d.panel_top), panel[k - 1], panel[k]] for k in range(n)], both=False)
 
     # body top, side band, step, rear body: every side face follows the tuck of the body toward the hood
     ys = d.seam_y

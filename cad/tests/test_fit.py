@@ -8,6 +8,7 @@ import Part
 
 from candybar import check, params
 from candybar.shell import cavity, fit
+from candybar.shell import solids as so
 from candybar.shell import profiles as pr
 from candybar.shell.dims import Blueprint
 
@@ -48,6 +49,20 @@ class FitChecksTest(unittest.TestCase):
         failed = {subject for lv, subject, _ in self.containment([wall]) if lv == check.FAIL}
         self.assertIn("PSU_Body", failed)
         self.assertFalse({name for name in failed if not name.startswith("PSU")})
+
+    def test_every_control_stays_inside_the_panel_outline(self) -> None:
+        """Below the plate a control must pass through the opening (the outline less the ledge); above it, a cap or
+        the ball must stand on the plate."""
+        d = Blueprint()
+        prism = lambda grow: so.prism(so.poly(pr.panel_outline(d, grow)), so.xy(-100.0), App.Vector(0, 0, 400))
+        under, over = prism(-cavity.Openings().panel_ledge), prism(0.0)
+        panel = [s for it in self.found if it.group == "Panel" for s in it.solids]
+        self.assertGreater(len(panel), 40)
+        for s in panel:
+            with self.subTest(solid=s.name):
+                bb = s.world.BoundBox
+                room = over if bb.ZMin >= d.panel_top - 1e-6 else under
+                self.assertLess(s.world.cut(room).Volume, 1e-3)
 
     def test_every_item_is_built(self) -> None:
         names = {it.name for it in self.found}

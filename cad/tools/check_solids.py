@@ -53,6 +53,7 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
             "X rail land": (0, (d.bezel_w / 2 + d.panel_gap + hw - d.edge_in) / 2),
             "X side band": (0, hw - 1.0),
             "Z deck": (2, d.deck_top - d.deck_lean_h / 2),
+            "Z panel pocket": (2, (d.panel_top + d.deck_top) / 2),
             "Z mid body": (2, (d.deck_top + d.body_top) / 2),
             "Z tuck": (2, (d.tuck_z0 + d.body_top) / 2),
             "Z seam, body": (2, d.body_top - d.seam_groove / 2),
