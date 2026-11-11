@@ -22,6 +22,7 @@ Example:
 """
 from __future__ import annotations
 
+import atexit
 import json
 import math
 import os
@@ -427,7 +428,9 @@ def run_blender(job_path: str) -> None:
     an.links.new(comb.outputs["Vector"], emit.inputs["Color"])
     an.links.new(emit.outputs["Emission"], outn.inputs["Surface"])
 
+    # the pass images are scratch: remove them at exit, or every run leaves 20 to 45 MB in /tmp (a RAM disk here)
     tmp = tempfile.mkdtemp(prefix="render_views_")
+    atexit.register(shutil.rmtree, tmp, ignore_errors=True)
 
     def load_pixels(path: str) -> np.ndarray:
         img = bpy.data.images.load(path)
