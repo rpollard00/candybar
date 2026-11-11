@@ -20,11 +20,13 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 1. The blueprint is in `docs/blueprint/` (seven sheets and `index.md`), made on 2026-11-10. The drawings of the references are in `cad/out/shell-d/reconstruction/`.
 2. The owner reviewed the first blueprint on 2026-11-10 and found it too simple: it has straight lines where the real cabinet has curves. The body must lean and bow inward into the hood as one curve, with a bevel cut at the seam. The side profile must be a convex arc that follows the contour of a CRT. Revision 2 of the blueprint added the curves. The owner then chose their strengths, and revision 3 holds them: a rail arc of 0.035 of its chord, a tuck of 0.023 W toward the hood over the top third of the body, a hood with near-straight sides and tight top corners (0.07 W), and a screen 14 to 20 mm below the rail land. Questions 1 to 7 in `docs/blueprint/index.md` are open; the blueprint draws a default for each.
 3. The outer form is built as 11 solids from the same profiles and dimensions that draw the blueprint (`cad/candybar/shell/solids.py`, output in `cad/out/shell-bp/`). `cad/tools/check_solids.py` compares the solids with the blueprint faces in three views and eleven section planes; all are within 0.5 mm. The owner must judge the form on the renders before more work. When the owner accepts it, remove the solid code of the earlier form: `parts.py`, `hood.py`, `build.py`, `hood_sheet.py`, `hood_review.py`, `hood_overlay.py`, `section_sheet.py`, and the parts of `dims.py` that only they use.
-4. Fit study, in work since 2026-11-11: give the shell a wall thickness, place the hardware in it, and check interference, keep-out zones, containment and the air path. The owner accepted the outer form and merged it on 2026-11-11. The shell does not change without the owner. After the study, put the shell into the generator in place of the outline shell and make the checks pass.
-5. Divide the shell into parts that fit the 256 mm bed, with seams and joints. The owner chooses the seam lines from a drawing, because they are visible.
-6. Do a detail pass on the outer form. The owner asked on 2026-11-10 for a fillet on the vertical corners of the back surface, of the body and of the hood.
-7. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct.
-8. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
+4. Fit study: done on 2026-11-10. The shell has a skin of 4 mm (`cad/candybar/shell/cavity.py`) and the hardware is in it (`cad/candybar/shell/fit.py`). The checks pass: interference, keep-out zones, containment, the air path and the sight line. The results are in `docs/blueprint/index.md` ("Hardware in the shell") and on sheet 09. The shell does not change without the owner. Still to do in this step: put the shell into the generator in place of the outline shell (`massing.py`), make its checks pass, and remove the solid code of the earlier form. The generator still has a rectangular control panel.
+5. Revision 5 of the outer form, 2026-11-10, from the owner's review of the front and top views: the screen is 12 mm lower on the face, and the front edge of the control panel follows the front contour of the deck. The fit study passes with it.
+6. Divide the shell into parts that fit the 256 mm bed, with seams and joints. The owner chooses the seam lines from a drawing, because they are visible.
+7. Do a detail pass on the outer form. The owner asked on 2026-11-10 for a fillet on the vertical corners of the back surface, of the body and of the hood.
+8. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct. From the fit study: the power supply needs a grille in the rear wall below the door, the cabinet needs an inlet for make-up air, and the door opening (447 x 186 mm) is wider than the bed, so the door has two parts or more.
+9. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
+10. Design the monitor cradle. From the fit study: clamps on the top edge and the bottom edge, 8 mm of adjustment each way, a cable channel on each side, and right-angle plugs (straight plugs do not fit: they are 15 to 19 mm too long at the sides).
 
 Modelling and iteration run on Opus subagents. The main session writes the brief and reviews. The owner asked for a Fable agent on the hood; that agent now makes the blueprint.
 
@@ -36,7 +38,8 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - [x] Player eye position: not needed. The owner said on 2026-11-11 that the cabinet must work for the average person, children and other adults included. The sight line is checked for a child, a small adult and a tall adult from published data.
 - [ ] BC-250 on the first console: board top face up to the outer face of the fan, with a ruler, to the nearest 2 mm. Low priority: this cabinet gets its own shroud, so the height of the stack is a design value.
 - [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
-- [ ] A review of the revised blueprint in `docs/blueprint/` after the curvature pass: are the big volumes and their curves right, are the faces on the face map read correctly, and answers to the open questions in `index.md`.
+- [ ] A review of revision 5: the screen position (`cad/out/shell-bp/compare/screen-drop-options.png` shows drops of 8, 12 and 16 mm; 12 is built) and the outline of the control panel.
+- [ ] Answers to the open questions 1, 2, 3 and 5 in `docs/blueprint/index.md`. Question 2 matters most: the rail land beside the top corners of the bezel is 9 mm, and 16 mm lower down.
 - [ ] A photo of the reference cabinet from the side, if one exists.
 
 `cad/out/report.md` has the full list of dimensions to measure, with instructions.
@@ -76,6 +79,8 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - Eight action buttons.
 - The monitor is replaceable. The mount must take another 16 inch 16:10 travel monitor: plug space and a cable channel on both side edges, and a way to shim or adjust the body across and along the screen face so that the image is centred in the window (2026-11-11).
 - The sight line must work for the average person, children and other adults included, not for the owner's eye position (2026-11-11).
+- The bezel must stand clear of the tuck at its top corners. The screen is 12 mm lower on the face than in revision 4: the strip of face above the bezel is 32 mm and the band below it 40 mm (2026-11-10).
+- The front edge of the control panel follows the front contour of the deck. It is not a rectangle (2026-11-10).
 - The cabinet must fit on a normal surface. Do not make the hood deeper unless the whole cabinet becomes deeper, and the owner does not want a deeper cabinet (2026-11-10).
 - The image is centered in the bezel. The owner first asked for a sight line of 15 to 25 degrees, and then chose a 16:10 bezel with more recline, which gives a steeper sight line.
 - Bezel plates are swappable: 16:9, 16:10, 4:3 and vertical.

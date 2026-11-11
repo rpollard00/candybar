@@ -259,11 +259,8 @@ def deck(d: Blueprint) -> tuple[Part.Shape, Part.Shape]:
     solid = evolved(both_sides(plan), edge_profile(d, d.deck_top))
     ya = d.foot_y - d.bend_t
     solid = solid.common(Part.makeBox(BIG, ya + OVER, d.deck_top + OVER, V(-BIG / 2, -OVER, -OVER)))
-    px, py0 = d.panel_w / 2 + d.panel_gap, d.deck_nose
-    py1 = py0 + d.panel_d + 2 * d.panel_gap
-    pocket = Part.makeBox(2 * px, py1 - py0, OVER, V(-px, py0, d.panel_top))
-    pw = d.panel_w / 2
-    panel = Part.makeBox(2 * pw, d.panel_d, d.panel_t, V(-pw, py0 + d.panel_gap, d.panel_top - d.panel_t))
+    pocket = prism(poly(pr.panel_outline(d, d.panel_gap)), xy(d.panel_top), V(0, 0, OVER))
+    panel = prism(poly(pr.panel_outline(d)), xy(d.panel_top - d.panel_t), V(0, 0, d.panel_t))
     return solid.cut([pocket, panel]).removeSplitter(), panel
 
 

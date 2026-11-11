@@ -229,7 +229,8 @@ def hood_stations(d: Dims) -> HoodStations:
 class Blueprint(Dims):
     """The target of the blueprint (docs/blueprint): the dimensions that differ from the built model, and new ones.
 
-    The deck and the bezel window keep the values of Dims; the flat screen stands nearer the bezel. The blueprint
+    The deck and the bezel window keep the values of Dims; the flat screen stands nearer the bezel, and the control
+    panel's front follows the deck's front contour (profiles.panel_outline). The blueprint
     changes the rail (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands
     proud) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves of the form
     as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in front view,
@@ -253,9 +254,10 @@ class Blueprint(Dims):
     # the bezel land lies this far below the rail land; the reveal round the plate (panel_gap wide) has the same depth
     bezel_drop: float = 2.0
     # the bezel, the window and the screen stand lower on the face than in Dims, so that the strip of face above the
-    # bezel (brow_ledge) holds the seam bevel with plain face below it; the band below the bezel gives the length up
-    band_len: float = 52.0
-    brow_ledge: float = 20.0
+    # bezel (brow_ledge) holds the seam bevel with plain face below it, and the top corners of the bezel stand clear
+    # of the tuck; the band below the bezel gives the length up. Their sum keeps the body top where it was.
+    band_len: float = 40.0
+    brow_ledge: float = 32.0
     # the flat screen stands mon_setback behind the chord of the rail arc
     mon_setback: float = 7.2
     # the lit image as a thin plate on the screen face, for the renders of the solids

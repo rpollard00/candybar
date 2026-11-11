@@ -2,6 +2,7 @@
 
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py target      -> docs/blueprint/*.svg, *.png, faces.md
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py band-options -> cad/out/shell-bp/compare/hood-band-options.png
+    cad/.venv-tools/bin/python cad/tools/draw_blueprint.py screen-drop-options -> cad/out/shell-bp/compare/screen-drop-options.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit         -> docs/blueprint/09-hardware.svg, .png (from candybar.shell.fit)
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py reference   -> cad/out/shell-d/reconstruction/k-*.png
     cad/.venv-tools/bin/python cad/tools/draw_blueprint.py photos      -> cad/out/shell-d/reconstruction/m-*.png, r-*.png
@@ -287,7 +288,7 @@ PROPORTIONS = [
      "540 at the desk holds the power supply and the BC-250; the upper rear is 40 proud for the hood"),
     ("Height / W", "1.172", "about 1.25 (estimated)", "1.927 (floor cabinet)", "{height_r:.3f}", "a 16:10 screen is lower than 4:3 at the same width"),
     ("Deck top above the desk / W", "0.185", "about 0.2 (estimated)", "not comparable", "{deck_r:.3f}", "70 mm panel height for the hands; 58 inside is enough for the lever"),
-    ("Deck front to screen foot / W", "0.380", "about 0.42 (estimated)", "0.49 (estimated)", "{foot_r:.3f}", "396 x 175 control panel with its border"),
+    ("Deck front to screen foot / W", "0.380", "about 0.42 (estimated)", "0.49 (estimated)", "{foot_r:.3f}", "396 x 175 control panel (166.4 deep at the sides, the front follows the deck) with its border"),
     ("Recline of the screen and of the rail's chord, deg", "32.5", "about 30 (estimated)", "26 (estimated)", "{recline:.0f}", "owner's choice for the 16:10 bezel"),
     ("Rail arc in side view, sagitta / chord", "0.091 (one arc, R 1.154 W)", "0.000 +-0.002 (measured: straight)", "not measured (+-0.03)", "{rail_k:.3f}",
      "a subtle arc between the maker's straight rail and the 3D model's strong one; sagitta {rail_s:.1f}, turn {rail_turn:.0f} deg"),
@@ -316,6 +317,12 @@ PROPORTIONS = [
     ("Hood top flat / W", "0.713", "0.66 (estimated)", "about 0.68 (estimated, owner-ref-1)", "{top_flat_r:.3f}",
      "follows from the side and the corner; straight marquee window {mq:.0f}"),
 ]
+
+
+def panel_text(d: Blueprint) -> str:
+    """The size of the control panel: its depth at the centre line and at the sides (the front follows the deck)."""
+    o = pr.panel_outline(d)
+    return f"control panel {d.panel_w:.0f} x {o[-1][1] - o[1][1]:.0f}, {o[-1][1] - o[0][1]:.1f} at the sides"
 
 
 def proportions(d: Blueprint) -> list[tuple[str, str, str, str, str, str]]:
@@ -370,7 +377,7 @@ def sheet_elevations(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(a, (-d.rear_w / 2, d.depth + 55), (d.rear_w / 2, d.depth + 55), f"rear body {d.rear_w:.0f}", (0, 11))
     dim(a, (hw + 24, 0), (hw + 24, d.depth), f"{d.depth:.0f}", (12, 0), turn=90)
     dim(a, (-hw - 24, 0), (-hw - 24, d.foot_y - d.bend_t), f"{d.foot_y - d.bend_t:.0f}", (-16, 0))
-    dim(a, (-d.panel_w / 2, 113), (d.panel_w / 2, 113), f"control panel {d.panel_w:.0f} x {d.panel_d:.0f}", (0, 12))
+    dim(a, (-d.panel_w / 2, 113), (d.panel_w / 2, 113), panel_text(d), (0, 12))
     a = axes[1, 1]
     dim(a, (-hw, -30), (hw, -30), f"{w:.1f}", (0, -12))
     dim(a, (-d.rear_w / 2, -52), (d.rear_w / 2, -52), f"rear body {d.rear_w:.0f}", (0, -11))
@@ -460,7 +467,7 @@ def sheet_volumes(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(a, (-d.rear_w / 2, d.depth + 22), (d.rear_w / 2, d.depth + 22), "rear body " + r(d.rear_w), (0, 12))
     dim(a, (hw + 22, 0), (hw + 22, d.foot_y - d.bend_t), "deck " + r(d.foot_y - d.bend_t), (12, 0), turn=90)
     dim(a, (hw + 22, d.seam_y), (hw + 22, d.depth), "body top " + r(d.depth - d.seam_y), (12, 0), turn=90)
-    dim(a, (-d.panel_w / 2, 113), (d.panel_w / 2, 113), f"control panel {d.panel_w:.0f} x {d.panel_d:.0f}", (0, 12))
+    dim(a, (-d.panel_w / 2, 113), (d.panel_w / 2, 113), panel_text(d), (0, 12))
     for ax in axes.values():
         ax.plot([], [], color="#1f77d0", ls="--", lw=0.9, label="monitor 354 x 230 x 10")
         ax.plot([], [], color="#d62728", ls="--", lw=0.9, label="power supply")
@@ -919,6 +926,54 @@ def band_options() -> None:
     fig.suptitle("Hood band, upright: three places in depth (side section through a speaker, x = "
                  f"{x:.0f}; the marquee {pr.marquee_window(d0, h0)[0]:.0f} x {d0.marquee_h:.0f}, upright, moves with the band: an edge of {d0.hood_marquee_edge:.0f} on the lip)", fontsize=12)
     save(fig, "hood-band-options", os.path.join(CAD, "out", "shell-bp", "compare"), svg=False)
+
+
+# the screen face of revision 4, before the screen went down: the band below the bezel and the strip above it
+REV4_BAND, REV4_BROW = 52.0, 20.0
+
+
+def screen_face_numbers(d: Blueprint) -> dict[str, float]:
+    """The strips above and below the bezel, and what the tuck leaves beside the bezel's top corner in front view."""
+    fr = pr.front(d)
+    z = fr.on_rail(d, d.bezel_s1)[1]
+    brow = [p for q in pr.faces(d)["FB3"].polys for p in q]
+    lo, hi = min(brow, key=lambda p: p[2]), max(brow, key=lambda p: p[2])
+    return {"band": d.band_len, "brow": d.brow_ledge, "plain": math.dist(lo[1:], hi[1:]), "z_top": z,
+            "gap": d.side_x(z) - d.bezel_w / 2, "land": d.side_x(z) - d.edge_in - d.bezel_w / 2 - d.panel_gap}
+
+
+def screen_drop_options() -> None:
+    """The screen face in front elevation for three drops of the bezel, the window and the screen down the face, side
+    by side to one scale. Each drop is measured from revision 4 (band_len 52, brow_ledge 20); the body top stays."""
+    d0 = Blueprint()
+    drops = (8.0, REV4_BAND - d0.band_len, 16.0)
+    fig, axes = plt.subplots(1, 3, figsize=(19, 5.6))
+    extent = (-262.0, 262.0, 80.0, 445.0)
+    for ax, drop in zip(axes, drops):
+        d = replace(d0, band_len=REV4_BAND - drop, brow_ledge=REV4_BROW + drop)
+        tri, ids = triangles_of(pr.faces(d))
+        built = " (built)" if abs(d.band_len - d0.band_len) < 1e-9 else ""
+        n = screen_face_numbers(d)
+        show(ax, raster(tri, ids, VIEWS["front"], extent, px_per_mm=4.0, closed=False), "white",
+             f"drop {drop:.0f}{built}: strip above {n['brow']:.0f}, strip below {n['band']:.0f}")
+        ax.set_xlim(extent[0], extent[1])
+        ax.set_ylim(extent[2], extent[3])
+        hw, bw = d.width / 2, d.bezel_w / 2
+        ax.plot([hw - 40, hw + 6], [d.tuck_z0, d.tuck_z0], color=BLUE, lw=0.8, ls="--", zorder=50)
+        note(ax, (hw - 150, d.tuck_z0 - 10), f"tuck starts, z {d.tuck_z0:.0f}", size=7)
+        z = n["z_top"]
+        dim(ax, (bw, z + 4), (d.side_x(z), z + 4), f"{n['gap']:.1f}", (-22, 7), size=7)
+        dim(ax, (bw + d.panel_gap, z - 5), (d.side_x(z) - d.edge_in, z - 5), f"land {n['land']:.1f}", (-34, -6), size=7)
+        top = d.face(d.top_s)[1]
+        su, cu = d.u
+        dim(ax, (-60, d.face(d.bezel_s1)[1]), (-60, top), f"{n['brow']:.0f} on the face\n{n['plain']:.1f} plain", (-34, 0), size=7)
+        dim(ax, (-60, d.face(d.bezel_s0 - d.band_len)[1]), (-60, d.face(d.bezel_s0)[1]), f"{n['band']:.0f} on the face", (-30, 0), size=7)
+        note(ax, (-250, 92), f"bezel top z {z:.1f}; image centre z {d.face(d.image_s)[1]:.1f}", size=7)
+    fig.suptitle("Screen face, front elevation: the bezel, the window and the screen moved down the face from revision 4 "
+                 f"(band below {REV4_BAND:.0f}, strip above {REV4_BROW:.0f}). The body top, the rails and the hood stay. "
+                 "Gap: bezel top corner to the side outline. Land: the rail land at that corner.", fontsize=10.5)
+    fig.tight_layout()
+    save(fig, "screen-drop-options", os.path.join(CAD, "out", "shell-bp", "compare"), svg=False)
 
 
 # ---------- sheet 09: the hardware in the shell (from the fit study) ----------
@@ -1678,6 +1733,8 @@ if __name__ == "__main__":
         overlays()
     elif sys.argv[1] == "fit":
         sheet_fit()
+    elif sys.argv[1] == "screen-drop-options":
+        screen_drop_options()
     elif sys.argv[1] == "band-options":
         band_options()
     elif sys.argv[1] == "target":

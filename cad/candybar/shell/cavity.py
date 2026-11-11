@@ -9,7 +9,7 @@ measures the wall that results). On faces that turn across X (the sides of the t
 and bevels of the hood, the corners of the deck) the wall comes out thicker than wall_t.
 
 Two openings go through the skin, because a plate closes them: under the control panel, inside a ledge of
-panel_ledge on which the plate rests, and behind the bezel plate, inside a ledge of bezel_ledge. The body top is
+panel_ledge on which the plate rests (the outline of the plate, profiles.panel_outline, moved in), and behind the bezel plate, inside a ledge of bezel_ledge. The body top is
 open into the hood: the seam gap is filled before the offset.
 """
 from __future__ import annotations
@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import FreeCAD
 import Part
 
+from . import profiles as pr
 from . import solids as so
 from .dims import Blueprint
 
@@ -121,11 +122,8 @@ def same(a: Part.Shape | None, b: Part.Shape | None) -> bool:
 def openings(d: Blueprint, o: Openings) -> list[Part.Shape]:
     """The skin removed under the control panel and behind the bezel plate, inside their ledges."""
     w = d.wall_t
-    px, l = d.panel_w / 2 - o.panel_ledge, o.panel_ledge
-    y0 = d.deck_nose + d.panel_gap + l
-    y1 = d.deck_nose + d.panel_gap + d.panel_d - l
     z1 = d.panel_top - d.panel_t
-    panel = Part.makeBox(2 * px, y1 - y0, w + SLAB, V(-px, y0, z1 - w - SLAB))
+    panel = so.prism(so.poly(pr.panel_outline(d, -o.panel_ledge)), so.xy(z1 - w - SLAB), V(0, 0, w + SLAB))
     bx = d.bezel_w / 2 - o.bezel_ledge
     s0, s1 = d.bezel_s0 + o.bezel_ledge, d.bezel_s1 - o.bezel_ledge
     origin, up, into = so.screen_frame(d)
