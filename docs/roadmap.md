@@ -1,6 +1,6 @@
 # Roadmap
 
-Last update: 2026-11-10. Update this file at the end of each work session.
+Last update: 2026-11-11. Update this file at the end of each work session.
 
 The goal is a cabinet that can be printed on the Bambu A1 and assembled, and that looks like the reference cabinet. `CONTEXT.md` defines the words. `docs/adr/` records the decisions that are hard to reverse.
 
@@ -22,7 +22,7 @@ The goal is a cabinet that can be printed on the Bambu A1 and assembled, and tha
 3. The outer form is built as 11 solids from the same profiles and dimensions that draw the blueprint (`cad/candybar/shell/solids.py`, output in `cad/out/shell-bp/`). `cad/tools/check_solids.py` compares the solids with the blueprint faces in three views and eleven section planes; all are within 0.5 mm. The owner must judge the form on the renders before more work. When the owner accepts it, remove the solid code of the earlier form: `parts.py`, `hood.py`, `build.py`, `hood_sheet.py`, `hood_review.py`, `hood_overlay.py`, `section_sheet.py`, and the parts of `dims.py` that only they use.
 4. Fit study: done on 2026-11-10. The shell has a skin of 4 mm (`cad/candybar/shell/cavity.py`) and the hardware is in it (`cad/candybar/shell/fit.py`). The checks pass: interference, keep-out zones, containment, the air path and the sight line. The results are in `docs/blueprint/index.md` ("Hardware in the shell") and on sheet 09. The shell does not change without the owner. Still to do in this step: put the shell into the generator in place of the outline shell (`massing.py`), make its checks pass, and remove the solid code of the earlier form. The generator still has a rectangular control panel.
 5. Revision 5 of the outer form, 2026-11-10, from the owner's review of the front and top views: the screen is 12 mm lower on the face, and the front edge of the control panel follows the front contour of the deck. The fit study passes with it.
-6. Divide the shell into parts that fit the 256 mm bed, with seams and joints. The owner chooses the seam lines from a drawing, because they are visible.
+6. Structure, mounting and seams, in work since 2026-11-11 as one study, because a seam is a joint and a joint is structure. The study gives, for each option: the seam lines, the structure (floor, flanges, cross-members, ribs), the load paths, the mount of each component, the cable routes and the air path. The owner asked for it before the split ("It needs to hold up as a physical object"). The owner chooses from the drawings in `cad/out/shell-bp/split/`. Then divide the shell into parts that fit the 256 mm bed.
 7. Do a detail pass on the outer form. The owner asked on 2026-11-10 for a fillet on the vertical corners of the back surface, of the body and of the hood.
 8. Design the rear door with its vents, the hand-holds, and the shroud with its exhaust duct. From the fit study: the power supply needs a grille in the rear wall below the door, the cabinet needs an inlet for make-up air, and the door opening (447 x 186 mm) is wider than the bed, so the door has two parts or more.
 9. Design the control panel frame, its latch, and the cut plates. Make the drawings for the cutting service.
@@ -92,7 +92,10 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - Power supply: EVGA SuperNOVA 1000 P5, fully modular, 150 mm deep.
 - Fan: ARCTIC P12 Pro on the BC-250 heatsink. The fin tops are opened under the fan, as on the first console. The shroud is a design for this cabinet: the fan blows down into the fins and the air leaves at the I/O end.
 - All vents are in the rear door, as on the reference: the fan vent in the middle and slot vents for the hot air at the I/O end. The side panels have no vents.
-- Control panel tops are cut plates. The arcade panel is an aluminum plate with a clear polycarbonate cover and the art between them.
+- Control panel tops are cut plates. The arcade panel is an aluminum plate with a clear polycarbonate cover and the art between them. A printed PETG plate comes first, for construction and proving at least (2026-11-11). The maker of the reference cabinet prints his plates in ABS and puts cut acrylic on top.
+- The compute module has a fixed mount behind the rear door. The door is a cover with the vents and has no cable on it (2026-11-11, decision record 0005).
+- The floor is a rigid printed PETG part with more infill. No plywood and no aluminum (2026-11-11).
+- PETG is satisfactory near the BC-250. The owner's first console has a PETG case and it does not soften. A fan in the exhaust duct, which pushes the hot air out, is an option to examine (2026-11-11).
 
 ## Where things are
 

@@ -72,10 +72,10 @@ The strip across the front of the hood that holds the two speaker grilles and th
 The display in the middle of the hood band.
 
 **Rear door**:
-The removable panel in the rear wall. It carries the compute module and its vents.
+The removable panel in the rear wall. It carries the vents and nothing else. The compute module stands behind it on a fixed mount.
 
 **Compute module**:
-The BC-250 with its heatsink, fan and shroud, handled as one removable unit.
+The BC-250 with its heatsink, fan and shroud, handled as one unit on a fixed mount behind the rear door.
 _Avoid_: compute assembly, compute tray
 
 **Recline**:
