@@ -30,6 +30,19 @@ def lies_in_a_face_of(solid: Part.Shape, flat: Part.Face) -> bool:
     return False
 
 
+def lit_centre(doc: App.Document) -> App.Vector:
+    """The middle of the monitor's lit image, on its front glass, in the global frame."""
+    up_the_glass = params.value(doc, "mon_bezel_bottom") + params.value(doc, "mon_active_h") / 2
+    return doc.getObject("Monitor").Placement.multVec(App.Vector(params.value(doc, "mon_w") / 2, 0, up_the_glass))
+
+
+def window_centre(plate: Part.Shape) -> App.Vector:
+    """The middle of a bezel plate's window, on the face of the plate that lies against the monitor."""
+    back = max((face for face in plate.Faces if face.normalAt(0, 0).y > 0), key=lambda face: face.Area)
+    (window,) = [wire for wire in back.Wires if not wire.isSame(back.OuterWire)]
+    return window.BoundBox.Center
+
+
 class ShellTest(unittest.TestCase):
     def setUp(self) -> None:
         self.doc: App.Document = self.enterContext(support.saved_document())
@@ -78,11 +91,73 @@ class ShellTest(unittest.TestCase):
         self.assertAlmostEqual(self.value("cab_h"), height_before + 25, places=4)
         self.assertAlmostEqual(self.shape(massing.SKIN).BoundBox.ZMax, top_before + 25, places=4)
 
+    def assert_lit_image_is_centred_in_every_bezel_plate(self) -> None:
+        lit = lit_centre(self.doc)
+        for name, *_ in massing.BEZEL_PLATES:
+            plate = self.shape(name)
+            self.assertLess(window_centre(plate).distanceToPoint(lit), 1e-6, name)
+            half_a_plate_in_front = self.value("mon_setback") / 2
+            self.assertAlmostEqual(plate.BoundBox.Center.distanceToPoint(lit), half_a_plate_in_front, places=6, msg=name)
+
+    def test_lit_image_is_centred_in_every_bezel_window_and_plate(self) -> None:
+        self.assert_lit_image_is_centred_in_every_bezel_plate()
+
+    def test_screen_face_is_solid_apron_below_and_a_recess_for_the_bezel_above(self) -> None:
+        skin, bezel = self.shape(massing.SKIN), self.doc.getObject("Bezel").getGlobalPlacement()
+        middle, in_front, behind = self.value("bezel_w") / 2, -1.0, self.value("skin_t")
+        on_the_apron, on_the_plate = -self.value("apron_len") / 2, self.value("bezel_len") / 2
+
+        def is_solid(across: float, back: float, up: float) -> bool:
+            return skin.isInside(bezel.multVec(App.Vector(across, back, up)), 1e-6, True)
+
+        self.assertTrue(is_solid(middle, in_front, on_the_apron))
+        self.assertFalse(is_solid(middle, behind, on_the_apron))
+        self.assertFalse(is_solid(middle, in_front, on_the_plate))
+        self.assertTrue(is_solid(-self.value("bezel_side_margin"), in_front, on_the_plate))
+
+    def test_apron_lifts_the_monitor_and_the_bezel_plates_together(self) -> None:
+        monitor_before = self.shape("Monitor_Body").BoundBox.ZMin
+        plate_before = self.shape("Bezel_16x9").BoundBox.ZMin
+        self.edit(apron_len=self.value("apron_len") + 30)
+        rise = 30 * math.cos(math.radians(self.value("recline")))
+        self.assertAlmostEqual(self.shape("Monitor_Body").BoundBox.ZMin, monitor_before + rise, places=4)
+        self.assertAlmostEqual(self.shape("Bezel_16x9").BoundBox.ZMin, plate_before + rise, places=4)
+        self.assert_lit_image_is_centred_in_every_bezel_plate()
+
+    def test_bezel_margin_shortens_the_plate_about_the_lit_image(self) -> None:
+        def plate_length() -> float:
+            return support.solids(self.doc)["Bezel_16x9"].assembly.BoundBox.ZLength
+
+        before = plate_length()
+        self.assertAlmostEqual(before, self.value("mon_active_h") + 2 * self.value("bezel_margin"), places=4)
+        self.edit(bezel_margin=self.value("bezel_margin") - 20)
+        self.assertAlmostEqual(plate_length(), before - 40, places=4)
+        self.assert_lit_image_is_centred_in_every_bezel_plate()
+
+    def test_wide_deck_is_a_tray_at_the_front_only(self) -> None:
+        skin = self.shape(massing.SKIN)
+        deck_z, tray_end = self.value("cp_top_z") - 20, self.value("deck_end_y")
+        self.assertAlmostEqual(support.width_across(skin, tray_end - 30, deck_z), self.value("deck_w"), places=4)
+        self.assertAlmostEqual(support.width_across(skin, tray_end + 30, deck_z), self.value("outer_w"), places=4)
+
+    def test_body_tapers_on_the_outside_and_stays_straight_inside(self) -> None:
+        skin, cavity = self.shape(massing.SKIN), self.doc.getObject("Shell_Cavity").Shape
+        deck_top, roof = self.value("cp_top_z"), self.value("cab_h")
+        z, y = roof - self.value("hood_corner_r") - 15, self.value("cab_d") - 40
+        way_up = (z - deck_top) / (roof - deck_top)
+        tapered = self.value("outer_w") - 2 * self.value("body_taper") * way_up
+        self.assertAlmostEqual(support.width_across(skin, y, z), tapered, places=4)
+        self.assertAlmostEqual(support.width_across(cavity, y, z), self.value("inner_w"), places=4)
+
+    def test_body_taper_can_go_to_none_and_almost_to_the_wall_thickness(self) -> None:
+        for taper in (0, 6.9):
+            with self.subTest(taper=taper):
+                self.edit(body_taper=taper)
+
     def test_deck_flare_widens_the_deck_and_not_the_hood(self) -> None:
         deck_z, hood_z = self.value("cp_top_z") - 20, self.value("cab_h") - 80
         deck_before, hood_before = (support.width_at(self.shape(massing.SKIN), z) for z in (deck_z, hood_z))
         self.assertAlmostEqual(deck_before, self.value("deck_w"), places=4)
-        self.assertAlmostEqual(hood_before, self.value("outer_w"), places=4)
         self.edit(deck_flare=self.value("deck_flare") + 10)
         deck_after, hood_after = (support.width_at(self.shape(massing.SKIN), z) for z in (deck_z, hood_z))
         self.assertAlmostEqual(deck_after, deck_before + 20, places=4)
@@ -90,10 +165,10 @@ class ShellTest(unittest.TestCase):
 
     def test_monitor_width_widens_the_body(self) -> None:
         hood_z = self.value("cab_h") - 80
-        before = support.width_at(self.shape(massing.SKIN), hood_z)
+        before, outer_before = support.width_at(self.shape(massing.SKIN), hood_z), self.value("outer_w")
         self.edit(mon_w=self.value("mon_w") + 6)
         self.assertAlmostEqual(support.width_at(self.shape(massing.SKIN), hood_z), before + 6, places=4)
-        self.assertAlmostEqual(self.value("outer_w"), before + 6, places=4)
+        self.assertAlmostEqual(self.value("outer_w"), outer_before + 6, places=4)
 
     def test_sweep_radius_reshapes_the_cheek_foot(self) -> None:
         before = self.shape(massing.SKIN).Volume

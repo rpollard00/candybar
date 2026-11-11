@@ -1,0 +1,301 @@
+{
+ "photo": "cad/vendor/sega-new-astro-city/photo-real-three-quarter.png",
+ "sha256": "56ee606137fae461a49ba6900454fc11cc53da2dc2a1d928fb763a4c1c6ca267",
+ "note": "Real Sega New Astro City from the front left. Assumed uncropped phone photo: principal point at the centre, f from a 26 mm equivalent lens (900 px).",
+ "sigma_px": 1.0,
+ "points": {
+  "podL_tl": [
+   274.0,
+   238.0
+  ],
+  "podL_bl": [
+   274.0,
+   297.0
+  ],
+  "podR_tr": [
+   530.5,
+   254.0
+  ],
+  "podR_br": [
+   530.5,
+   302.0
+  ],
+  "podL_r": [
+   339.5,
+   270.0
+  ],
+  "podR_l": [
+   483.5,
+   270.0
+  ],
+  "hood_l": [
+   240.0,
+   300.0,
+   4.0
+  ],
+  "hood_r": [
+   534.0,
+   300.0,
+   2.5
+  ],
+  "c_top": [
+   410.0,
+   195.0,
+   2.0
+  ],
+  "c_strip_bot": [
+   410.0,
+   251.0,
+   2.0
+  ],
+  "c_logo_top": [
+   410.0,
+   257.0,
+   2.0
+  ],
+  "c_logo_bot": [
+   410.0,
+   301.0,
+   2.0
+  ],
+  "c_bezel_top": [
+   410.0,
+   322.2
+  ],
+  "podL_t2": [
+   310.0,
+   240.5
+  ],
+  "podL_b2": [
+   310.0,
+   296.0
+  ]
+ },
+ "camera": {
+  "f_px": 900
+ },
+ "regions": {
+  "hood": [
+   140,
+   160,
+   680,
+   360
+  ]
+ },
+ "probes": {
+  "hood-v1": {
+   "from": [
+    410,
+    165
+   ],
+   "to": [
+    410,
+    350
+   ],
+   "width": 5,
+   "region": "hood"
+  },
+  "hood-v2": {
+   "from": [
+    310,
+    165
+   ],
+   "to": [
+    310,
+    350
+   ],
+   "width": 5,
+   "region": "hood"
+  },
+  "hood-h1": {
+   "from": [
+    145,
+    270
+   ],
+   "to": [
+    600,
+    270
+   ],
+   "width": 3,
+   "region": "hood"
+  },
+  "hood-h2": {
+   "from": [
+    145,
+    318
+   ],
+   "to": [
+    600,
+    318
+   ],
+   "width": 3,
+   "region": "hood"
+  }
+ },
+ "planes": {
+  "pods": {
+   "rect": [
+    "podL_tl",
+    "podR_tr",
+    "podR_br",
+    "podL_bl"
+   ],
+   "show": [
+    "hood_l",
+    "hood_r",
+    "c_top",
+    "c_bezel_top",
+    "c_strip_bot",
+    "c_logo_top",
+    "c_logo_bot"
+   ]
+  }
+ },
+ "measures": [
+  {
+   "name": "hood_w",
+   "kind": "du",
+   "plane": "pods",
+   "points": [
+    "hood_l",
+    "hood_r"
+   ]
+  },
+  {
+   "name": "podL_w",
+   "kind": "du",
+   "plane": "pods",
+   "points": [
+    "podL_tl",
+    "podL_r"
+   ]
+  },
+  {
+   "name": "podR_w",
+   "kind": "du",
+   "plane": "pods",
+   "points": [
+    "podR_l",
+    "podR_tr"
+   ]
+  },
+  {
+   "name": "pod_outer_span",
+   "kind": "du",
+   "plane": "pods",
+   "points": [
+    "podL_tl",
+    "podR_tr"
+   ]
+  },
+  {
+   "name": "top_to_bezel",
+   "kind": "dv",
+   "plane": "pods",
+   "points": [
+    "c_top",
+    "c_bezel_top"
+   ]
+  },
+  {
+   "name": "strip_band",
+   "kind": "dv",
+   "plane": "pods",
+   "points": [
+    "c_top",
+    "c_strip_bot"
+   ]
+  },
+  {
+   "name": "logo_h",
+   "kind": "dv",
+   "plane": "pods",
+   "points": [
+    "c_logo_top",
+    "c_logo_bot"
+   ]
+  },
+  {
+   "name": "ledge",
+   "kind": "dv",
+   "plane": "pods",
+   "points": [
+    "c_logo_bot",
+    "c_bezel_top"
+   ]
+  },
+  {
+   "name": "pod_h",
+   "kind": "dv",
+   "plane": "pods",
+   "points": [
+    "podL_t2",
+    "podL_b2"
+   ]
+  },
+  {
+   "name": "podL_w/hood_w",
+   "kind": "ratio",
+   "of": [
+    "podL_w",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "podR_w/hood_w",
+   "kind": "ratio",
+   "of": [
+    "podR_w",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "pod_outer_span/hood_w",
+   "kind": "ratio",
+   "of": [
+    "pod_outer_span",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "top_to_bezel/hood_w",
+   "kind": "ratio",
+   "of": [
+    "top_to_bezel",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "strip_band/hood_w",
+   "kind": "ratio",
+   "of": [
+    "strip_band",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "logo_h/hood_w",
+   "kind": "ratio",
+   "of": [
+    "logo_h",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "ledge/hood_w",
+   "kind": "ratio",
+   "of": [
+    "ledge",
+    "hood_w"
+   ]
+  },
+  {
+   "name": "pod_h/hood_w",
+   "kind": "ratio",
+   "of": [
+    "pod_h",
+    "hood_w"
+   ]
+  }
+ ]
+}

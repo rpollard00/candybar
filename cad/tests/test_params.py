@@ -70,6 +70,13 @@ class SheetTest(unittest.TestCase):
         self.doc.recompute()
         self.assertEqual(params.value(self.doc, "edge_x"), -250)
 
+    def test_formula_may_use_a_parameter_from_a_later_row_and_follows_its_edits(self) -> None:
+        self.write("edge_x,=stick_x - half_w,mm,derived,,,Edge", "half_w,=panel_w / 2,mm,derived,,,Half", GOOD, STICK_X)
+        self.assertEqual(params.value(self.doc, "edge_x"), -265)
+        params.edit(self.doc, "panel_w", 400)
+        self.doc.recompute()
+        self.assertEqual(params.value(self.doc, "edge_x"), -275)
+
     def test_name_that_is_a_unit_is_rejected(self) -> None:
         with self.assertRaisesRegex(params.ParamError, r"controls\.csv row 3 \('deg'\): FreeCAD rejects this name"):
             self.write(GOOD, "deg,22,deg,provisional,,,Recline")

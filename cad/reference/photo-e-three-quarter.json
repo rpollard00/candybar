@@ -1,0 +1,657 @@
+{
+ "photo": "cad/vendor/reddit-mgs-mini-astro/photo-e-three-quarter.png",
+ "sha256": "e50b74910060a56b4625b1a29703cc1043be1fec2d2a278b0d5267e0990a0483",
+ "note": "Reference cabinet, finished, from the front right. Instagram screenshot, so the principal point may be off centre.",
+ "sigma_px": 1.0,
+ "points": {
+  "deck_b1": [
+   180.0,
+   1280.5
+  ],
+  "deck_b2": [
+   240.0,
+   1321.5
+  ],
+  "deck_b3": [
+   300.0,
+   1362.5
+  ],
+  "bz_t1": [
+   600.0,
+   486.8
+  ],
+  "bz_t2": [
+   850.0,
+   529.2
+  ],
+  "bz_l1": [
+   463.2,
+   640.0
+  ],
+  "bz_l2": [
+   373.8,
+   900.0
+  ],
+  "bz_r1": [
+   885.2,
+   700.0
+  ],
+  "bz_r2": [
+   791.8,
+   950.0
+  ],
+  "bz_r3": [
+   741.2,
+   1100.0
+  ],
+  "bz_b1": [
+   430.0,
+   1021.8
+  ],
+  "bz_b2": [
+   500.0,
+   1060.5
+  ],
+  "bz_b3": [
+   600.0,
+   1114.0
+  ],
+  "bz_tl": {
+   "intersect": [
+    "bz_top",
+    "bz_left"
+   ]
+  },
+  "bz_tr": {
+   "intersect": [
+    "bz_top",
+    "bz_right"
+   ]
+  },
+  "bz_br": {
+   "intersect": [
+    "bz_bottom",
+    "bz_right"
+   ]
+  },
+  "bz_bl": {
+   "intersect": [
+    "bz_bottom",
+    "bz_left"
+   ]
+  },
+  "hood_t1": [
+   650.0,
+   247.8
+  ],
+  "hood_t2": [
+   750.0,
+   252.2
+  ],
+  "hood_t3": [
+   900.0,
+   260.2
+  ],
+  "col_1": [
+   893.0,
+   60.0,
+   1.5
+  ],
+  "col_2": [
+   893.0,
+   190.0,
+   1.5
+  ],
+  "post_1": [
+   299.0,
+   60.0,
+   1.5
+  ],
+  "post_2": [
+   297.0,
+   430.0,
+   1.5
+  ],
+  "e_brow_top": [
+   760.0,
+   257.0,
+   1.5
+  ],
+  "e_strip_top": [
+   760.0,
+   284.0,
+   1.5
+  ],
+  "e_strip_bot": [
+   760.0,
+   319.5,
+   1.5
+  ],
+  "e_logo_top": [
+   760.0,
+   351.0
+  ],
+  "e_logo_bot": [
+   760.0,
+   447.5
+  ],
+  "e_bezel_top": [
+   760.0,
+   511.5
+  ],
+  "e_podR_l": [
+   826.0,
+   430.0,
+   1.5
+  ],
+  "e_podR_r": [
+   926.0,
+   430.0,
+   1.5
+  ],
+  "e_podR_t": [
+   880.0,
+   372.0,
+   1.5
+  ],
+  "e_podR_b": [
+   880.0,
+   497.0,
+   2.0
+  ],
+  "deck_front_mid": [
+   283.0,
+   1351.0,
+   3.0
+  ],
+  "hood_top_mid": [
+   768.0,
+   253.0,
+   3.0
+  ]
+ },
+ "regions": {
+  "deck-front": [
+   120,
+   1150,
+   420,
+   1400
+  ],
+  "hood": [
+   520,
+   225,
+   1180,
+   570
+  ],
+  "cheek-foot": [
+   640,
+   1100,
+   960,
+   1400
+  ],
+  "rail": [
+   760,
+   600,
+   1000,
+   1000
+  ]
+ },
+ "probes": {
+  "deck-1": {
+   "from": [
+    230.8,
+    1206.2
+   ],
+   "to": [
+    171.5,
+    1292.9
+   ],
+   "width": 9,
+   "region": "deck-front"
+  },
+  "deck-2": {
+   "from": [
+    290.8,
+    1247.2
+   ],
+   "to": [
+    231.5,
+    1333.9
+   ],
+   "width": 9,
+   "region": "deck-front"
+  },
+  "deck-3": {
+   "from": [
+    350.8,
+    1288.2
+   ],
+   "to": [
+    291.5,
+    1374.9
+   ],
+   "width": 9,
+   "region": "deck-front"
+  },
+  "hood-v1": {
+   "from": [
+    760,
+    225
+   ],
+   "to": [
+    760,
+    565
+   ],
+   "width": 5,
+   "region": "hood"
+  },
+  "hood-v2": {
+   "from": [
+    595,
+    225
+   ],
+   "to": [
+    595,
+    565
+   ],
+   "width": 5,
+   "region": "hood"
+  },
+  "hood-v3": {
+   "from": [
+    880,
+    225
+   ],
+   "to": [
+    880,
+    565
+   ],
+   "width": 5,
+   "region": "hood"
+  },
+  "hood-h1": {
+   "from": [
+    525,
+    300
+   ],
+   "to": [
+    1175,
+    300
+   ],
+   "width": 3,
+   "region": "hood"
+  },
+  "hood-h2": {
+   "from": [
+    525,
+    430
+   ],
+   "to": [
+    1175,
+    430
+   ],
+   "width": 3,
+   "region": "hood"
+  },
+  "foot-1": {
+   "from": [
+    650,
+    1150
+   ],
+   "to": [
+    950,
+    1150
+   ],
+   "width": 3,
+   "region": "cheek-foot"
+  },
+  "foot-2": {
+   "from": [
+    650,
+    1220
+   ],
+   "to": [
+    950,
+    1220
+   ],
+   "width": 3,
+   "region": "cheek-foot"
+  },
+  "foot-3": {
+   "from": [
+    650,
+    1280
+   ],
+   "to": [
+    950,
+    1280
+   ],
+   "width": 3,
+   "region": "cheek-foot"
+  },
+  "foot-4": {
+   "from": [
+    650,
+    1320
+   ],
+   "to": [
+    950,
+    1320
+   ],
+   "width": 3,
+   "region": "cheek-foot"
+  },
+  "rail-1": {
+   "from": [
+    776.0,
+    700
+   ],
+   "to": [
+    1000,
+    700
+   ],
+   "width": 3,
+   "region": "rail"
+  },
+  "rail-2": {
+   "from": [
+    743.0,
+    800
+   ],
+   "to": [
+    1000,
+    800
+   ],
+   "width": 3,
+   "region": "rail"
+  },
+  "rail-3": {
+   "from": [
+    710.0,
+    900
+   ],
+   "to": [
+    1000,
+    900
+   ],
+   "width": 3,
+   "region": "rail"
+  }
+ },
+ "lines": {
+  "bz_top": [
+   "bz_t1",
+   "bz_t2"
+  ],
+  "bz_left": [
+   "bz_l1",
+   "bz_l2"
+  ],
+  "bz_right": [
+   "bz_r1",
+   "bz_r2",
+   "bz_r3"
+  ],
+  "bz_bottom": [
+   "bz_b1",
+   "bz_b2",
+   "bz_b3"
+  ],
+  "hood_top": [
+   "hood_t1",
+   "hood_t2",
+   "hood_t3"
+  ],
+  "deck_bottom": [
+   "deck_b1",
+   "deck_b2",
+   "deck_b3"
+  ],
+  "col": [
+   "col_1",
+   "col_2"
+  ],
+  "post": [
+   "post_1",
+   "post_2"
+  ]
+ },
+ "vanishing": {
+  "x": [
+   "bz_top",
+   "bz_bottom",
+   "hood_top",
+   "deck_bottom"
+  ],
+  "z": [
+   "col",
+   "post"
+  ]
+ },
+ "camera": {
+  "f_px": 2268,
+  "c_px": [
+   660.0,
+   129.0
+  ]
+ },
+ "planes": {
+  "bezel": {
+   "rect": [
+    "bz_tl",
+    "bz_tr",
+    "bz_br",
+    "bz_bl"
+   ],
+   "aspect": 1.049
+  },
+  "front": {
+   "vanishing": [
+    "x",
+    "z"
+   ],
+   "show": [
+    "e_brow_top",
+    "e_bezel_top",
+    "e_podR_l",
+    "e_podR_r",
+    "e_podR_t",
+    "e_podR_b",
+    "e_logo_top",
+    "e_logo_bot",
+    "e_strip_top",
+    "e_strip_bot"
+   ]
+  }
+ },
+ "measures": [
+  {
+   "name": "f",
+   "kind": "f"
+  },
+  {
+   "name": "angle_x_z",
+   "kind": "angle3d",
+   "of": [
+    "x",
+    "z"
+   ]
+  },
+  {
+   "name": "recline_bezel",
+   "kind": "tilt",
+   "plane": "bezel",
+   "direction": "z"
+  },
+  {
+   "name": "podR_w",
+   "kind": "du",
+   "plane": "front",
+   "points": [
+    "e_podR_l",
+    "e_podR_r"
+   ]
+  },
+  {
+   "name": "brow_h",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_brow_top",
+    "e_strip_top"
+   ]
+  },
+  {
+   "name": "brow_h/podw",
+   "kind": "ratio",
+   "of": [
+    "brow_h",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "strip_h",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_strip_top",
+    "e_strip_bot"
+   ]
+  },
+  {
+   "name": "strip_h/podw",
+   "kind": "ratio",
+   "of": [
+    "strip_h",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "band_above_logo",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_strip_bot",
+    "e_logo_top"
+   ]
+  },
+  {
+   "name": "band_above_logo/podw",
+   "kind": "ratio",
+   "of": [
+    "band_above_logo",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "logo_h",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_logo_top",
+    "e_logo_bot"
+   ]
+  },
+  {
+   "name": "logo_h/podw",
+   "kind": "ratio",
+   "of": [
+    "logo_h",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "below_logo_to_bezel",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_logo_bot",
+    "e_bezel_top"
+   ]
+  },
+  {
+   "name": "below_logo_to_bezel/podw",
+   "kind": "ratio",
+   "of": [
+    "below_logo_to_bezel",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "brow_top_to_bezel",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_brow_top",
+    "e_bezel_top"
+   ]
+  },
+  {
+   "name": "brow_top_to_bezel/podw",
+   "kind": "ratio",
+   "of": [
+    "brow_top_to_bezel",
+    "podR_w"
+   ]
+  },
+  {
+   "name": "podR_h",
+   "kind": "dv",
+   "plane": "front",
+   "points": [
+    "e_podR_t",
+    "e_podR_b"
+   ]
+  },
+  {
+   "name": "podR_h/podw",
+   "kind": "ratio",
+   "of": [
+    "podR_h",
+    "podR_w"
+   ]
+  }
+ ],
+ "overlay": {
+  "model": "cad/vendor/mini-new-astro-city/assembled",
+  "anchors": {
+   "bz_tl": [
+    -119.45,
+    233.19,
+    240.75
+   ],
+   "bz_tr": [
+    119.45,
+    233.19,
+    240.75
+   ],
+   "bz_br": [
+    119.45,
+    121.13,
+    64.86
+   ],
+   "bz_bl": [
+    -119.45,
+    121.13,
+    64.86
+   ],
+   "deck_front_mid": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hood_top_mid": [
+    0.0,
+    261.5,
+    306.8
+   ]
+  },
+  "plane": [
+   "bz_tl",
+   "bz_tr",
+   "bz_br",
+   "bz_bl"
+  ],
+  "f_px": 2268
+ }
+}

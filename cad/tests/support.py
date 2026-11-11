@@ -114,5 +114,11 @@ def width_at(shape: Part.Shape, z: float) -> float:
     return Part.makeCompound(shape.slice(App.Vector(0, 0, 1), z)).BoundBox.XLength
 
 
+def width_across(shape: Part.Shape, y: float, z: float) -> float:
+    """The extent along x of the shape on one line across the cabinet, at depth `y` and height `z`."""
+    across = Part.makeLine(App.Vector(-2000, y, z), App.Vector(2000, y, z))
+    return shape.common(across).BoundBox.XLength
+
+
 def fail_rows(report: check.Report, *rules: str) -> set[tuple[str, str]]:
     return {(row.rule, row.subject) for row in report.rows if row.level == check.FAIL and (not rules or row.rule in rules)}

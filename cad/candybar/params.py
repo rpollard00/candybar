@@ -96,15 +96,18 @@ def write_sheet(doc: App.Document, rows: Sequence[Param]) -> App.DocumentObject:
     sheet = doc.addObject("Spreadsheet::Sheet", SHEET)
     for letter, heading in zip(_LETTERS, _HEADINGS, strict=True):
         _set_text(sheet, f"{letter}1", heading)
+    # Every alias exists before any formula is written. FreeCAD records what a formula depends on
+    # when it is written: a formula that names a parameter from a later row would otherwise keep
+    # a stale value when that parameter changes.
     for number, param in enumerate(rows, start=_FIRST_ROW):
-        cell = f"{_VALUE_COLUMN}{number}"
-        sheet.set(cell, param.cell_text)
         try:
-            sheet.setAlias(cell, param.name)
+            sheet.setAlias(f"{_VALUE_COLUMN}{number}", param.name)
         except ValueError as error:
             raise ParamError(
                 f"{param.origin}: FreeCAD rejects this name as an alias (unit and constant names are reserved)"
             ) from error
+    for number, param in enumerate(rows, start=_FIRST_ROW):
+        sheet.set(f"{_VALUE_COLUMN}{number}", param.cell_text)
         texts = (param.name, None, param.unit, param.status, param.measure, param.source, param.note, param.file)
         for letter, text in zip(_LETTERS, texts, strict=True):
             if text:

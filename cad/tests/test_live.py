@@ -48,8 +48,8 @@ class LiveParametricsTest(unittest.TestCase):
         self.assertAlmostEqual(self.shape("Deck_Lever", "own").BoundBox.XLength, lever_before + 15, places=4)
         self.assertAlmostEqual(self.shape("Deck_Buttons", "own").BoundBox.XLength, buttons_before - 15, places=4)
 
-    def test_psu_depth_grows_forward_from_the_rear_wall(self) -> None:
-        depth = self.value("psu_d") + 15
+    def test_psu_depth_is_measured_forward_from_the_rear_wall(self) -> None:
+        depth = self.value("psu_d") - 15
         self.edit(psu_d=depth)
         body = self.shape("PSU_Body").BoundBox
         self.assertAlmostEqual(body.YLength, depth, places=4)

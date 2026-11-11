@@ -1,0 +1,79 @@
+{
+ "photo": "cad/vendor/reddit-mgs-mini-astro/photo-g-video-arc-toward-hood.png",
+ "sha256": "2b121446e98d6e7d41532b6137adc61c9f0c94de8e253380215c9e0c25471e84",
+ "note": "Maker's mini, front, camera above and close, looking down; a frame of a video. Silhouette and bezel edges by brightness step on each row (cad/out/shell-d/reconstruction/curves/trace.py), +-2 px on the left, +-3 px on the right (white on white). The lower left bezel corner is behind the glove: estimated by symmetry. The focal length is an assumption (1500 px).",
+ "sigma_px": 2.0,
+ "points": {
+  "bz_tl": [
+   186.0,
+   860.0,
+   3.0
+  ],
+  "bz_tr": [
+   762.0,
+   864.0,
+   3.0
+  ],
+  "bz_br": [
+   756.0,
+   1388.0,
+   4.0
+  ],
+  "bz_bl": [
+   192.0,
+   1388.0,
+   8.0
+  ],
+  "sil_l_855": [
+   139.5,
+   855.0
+  ],
+  "sil_l_980": [
+   144.5,
+   980.0
+  ],
+  "sil_l_1105": [
+   156.5,
+   1105.0
+  ],
+  "sil_l_1305": [
+   169.5,
+   1305.0
+  ],
+  "sil_r_855": [
+   798.5,
+   855.0
+  ],
+  "sil_r_1105": [
+   791.5,
+   1105.0
+  ],
+  "sil_r_1305": [
+   783.5,
+   1305.0
+  ],
+  "body_corner_l": [
+   144.0,
+   822.0,
+   3.0
+  ],
+  "hood_foot_l": [
+   140.0,
+   800.0,
+   3.0
+  ]
+ },
+ "camera": {
+  "f_px": 1500.0
+ },
+ "bezel_aspect": 1.049,
+ "readings": {
+  "left_edge_rms_from_a_line_px": 1.87,
+  "left_edge_bulge_from_chord_px": 3.5,
+  "right_edge_bulge_from_chord_px": 1.0,
+  "body_width_px_at_top": 659.0,
+  "tuck_ratio_W": 0.01,
+  "tuck_ratio_sigma": 0.006,
+  "body_top_corner_radius_px": 10.0
+ }
+}

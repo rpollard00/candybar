@@ -1,12 +1,15 @@
-"""The view step refuses to change FreeCAD user settings that are not its own to change."""
+"""The view step refuses to change FreeCAD user settings that are not its own, or the model."""
 from __future__ import annotations
 
 import os
+import shutil
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from candybar import decorate
+import FreeCAD as App
+
+from candybar import decorate, params, style
 
 from . import support
 
@@ -30,3 +33,19 @@ class SettingsGuardTest(unittest.TestCase):
     def test_inside_the_throwaway_directory_it_goes_on_to_ask_for_the_gui(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "GUI binary"):
             decorate.decorate(self.saved())
+
+
+class GeometryGuardTest(unittest.TestCase):
+    def test_refuses_to_save_when_styling_changes_the_model(self) -> None:
+        out, _ = support.baseline()
+        saved = support.temp_dir() / "candybar.FCStd"
+        shutil.copy(out / "candybar.FCStd", saved)
+        before = saved.read_bytes()
+
+        def spoil(doc: App.Document) -> None:
+            support.edit(doc, mon_h=params.value(doc, "mon_h") - 30)
+
+        with mock.patch.object(App, "GuiUp", 1), mock.patch.object(style, "apply", spoil), mock.patch.object(style, "frame"):
+            with self.assertRaisesRegex(RuntimeError, "changed the model"):
+                decorate.decorate(saved)
+        self.assertEqual(saved.read_bytes(), before)

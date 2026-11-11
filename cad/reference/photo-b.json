@@ -1,0 +1,683 @@
+{
+ "photo": "cad/vendor/reddit-mgs-mini-astro/photo-b.png",
+ "sha256": "817fe1f227e12ea32de07f5d90cd518a8f90c39097fcd2bd6d95086fccf41bfe",
+ "note": "Reference cabinet (left) beside the builder's Neo Geo bartop. The camera is about 13 degrees to the right of the reference cabinet and looks down about 27 degrees, so the reclined screen face is nearly square to the view and vertical faces are foreshortened. The lit image is an 8 inch 4:3 LCD (162.56 x 121.92 mm). Use this photo for widths along the screen face; take heights from photo-e.",
+ "sigma_px": 1.0,
+ "points": {
+  "scr_t1": [
+   150.0,
+   994.5
+  ],
+  "scr_t2": [
+   280.0,
+   994.0
+  ],
+  "scr_b1": [
+   150.0,
+   1150.0
+  ],
+  "scr_b2": [
+   280.0,
+   1149.5
+  ],
+  "scr_l1": [
+   111.2,
+   1020.0
+  ],
+  "scr_l2": [
+   110.4,
+   1120.0
+  ],
+  "scr_r1": [
+   317.5,
+   1020.0
+  ],
+  "scr_r2": [
+   317.0,
+   1120.0
+  ],
+  "scr_tl": {
+   "intersect": [
+    [
+     "scr_t1",
+     "scr_t2"
+    ],
+    [
+     "scr_l1",
+     "scr_l2"
+    ]
+   ]
+  },
+  "scr_tr": {
+   "intersect": [
+    [
+     "scr_t1",
+     "scr_t2"
+    ],
+    [
+     "scr_r1",
+     "scr_r2"
+    ]
+   ]
+  },
+  "scr_br": {
+   "intersect": [
+    [
+     "scr_b1",
+     "scr_b2"
+    ],
+    [
+     "scr_r1",
+     "scr_r2"
+    ]
+   ]
+  },
+  "scr_bl": {
+   "intersect": [
+    [
+     "scr_b1",
+     "scr_b2"
+    ],
+    [
+     "scr_l1",
+     "scr_l2"
+    ]
+   ]
+  },
+  "bz_t1": [
+   150.0,
+   944.5,
+   1.5
+  ],
+  "bz_t2": [
+   300.0,
+   943.5,
+   1.5
+  ],
+  "bz_b1": [
+   200.0,
+   1202.5,
+   1.5
+  ],
+  "bz_b2": [
+   300.0,
+   1202.5,
+   1.5
+  ],
+  "bz_l1": [
+   76.5,
+   1000.0,
+   1.5
+  ],
+  "bz_l2": [
+   76.5,
+   1100.0,
+   1.5
+  ],
+  "bz_r1": [
+   345.0,
+   1000.0,
+   1.5
+  ],
+  "bz_r2": [
+   345.0,
+   1100.0,
+   1.5
+  ],
+  "bz_tl": {
+   "intersect": [
+    [
+     "bz_t1",
+     "bz_t2"
+    ],
+    [
+     "bz_l1",
+     "bz_l2"
+    ]
+   ]
+  },
+  "bz_tr": {
+   "intersect": [
+    [
+     "bz_t1",
+     "bz_t2"
+    ],
+    [
+     "bz_r1",
+     "bz_r2"
+    ]
+   ]
+  },
+  "bz_br": {
+   "intersect": [
+    [
+     "bz_b1",
+     "bz_b2"
+    ],
+    [
+     "bz_r1",
+     "bz_r2"
+    ]
+   ]
+  },
+  "bz_bl": {
+   "intersect": [
+    [
+     "bz_b1",
+     "bz_b2"
+    ],
+    [
+     "bz_l1",
+     "bz_l2"
+    ]
+   ]
+  },
+  "body_l": [
+   61.5,
+   1050.0,
+   1.5
+  ],
+  "body_r": [
+   375.0,
+   1050.0,
+   2.0
+  ],
+  "hood_seam_l": [
+   72.0,
+   923.0,
+   1.5
+  ],
+  "hood_top": [
+   222.0,
+   821.0
+  ],
+  "podL_l": [
+   101.0,
+   880.0
+  ],
+  "podL_r": [
+   156.0,
+   880.0
+  ],
+  "podR_l": [
+   282.0,
+   880.0
+  ],
+  "podR_r": [
+   336.5,
+   880.0
+  ],
+  "logo_l": [
+   162.0,
+   895.0
+  ],
+  "logo_r": [
+   277.5,
+   895.0
+  ],
+  "strip_l": [
+   88.0,
+   852.0,
+   2.0
+  ],
+  "strip_r": [
+   345.0,
+   852.0,
+   2.0
+  ],
+  "deck_top_1": [
+   120.0,
+   1279.0,
+   2.0
+  ],
+  "deck_bot_1": [
+   120.0,
+   1339.5
+  ],
+  "deck_top_2": [
+   200.0,
+   1279.0,
+   2.0
+  ],
+  "deck_bot_2": [
+   200.0,
+   1339.0
+  ],
+  "deck_top_3": [
+   280.0,
+   1277.5,
+   2.0
+  ],
+  "deck_bot_3": [
+   280.0,
+   1337.5
+  ],
+  "deckf_l": [
+   30.0,
+   1318.0,
+   3.0
+  ],
+  "deckf_bend_l": [
+   88.0,
+   1318.0,
+   3.0
+  ],
+  "deckf_bend_r": [
+   269.0,
+   1318.0,
+   3.0
+  ],
+  "deckf_r": [
+   352.0,
+   1318.0,
+   3.0
+  ],
+  "hc_1": [
+   118.0,
+   821.5,
+   1.5
+  ],
+  "hc_2": [
+   101.4,
+   833.4
+  ],
+  "hc_3": [
+   88.6,
+   846.6
+  ],
+  "hc_4": [
+   82.0,
+   862.0
+  ],
+  "hc_5": [
+   77.0,
+   880.0
+  ],
+  "legL_out": [
+   75.5,
+   895.0,
+   1.5
+  ],
+  "legL_in": [
+   84.5,
+   895.0,
+   2.0
+  ]
+ },
+ "planes": {
+  "screen": {
+   "rect": [
+    "scr_tl",
+    "scr_tr",
+    "scr_br",
+    "scr_bl"
+   ],
+   "size_mm": [
+    162.56,
+    121.92
+   ],
+   "show": [
+    "bz_tl",
+    "bz_tr",
+    "bz_br",
+    "bz_bl",
+    "body_l",
+    "body_r"
+   ]
+  }
+ },
+ "measures": [
+  {
+   "name": "W_body_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "body_l",
+    "body_r"
+   ]
+  },
+  {
+   "name": "bezel_w_mm",
+   "kind": "distance",
+   "plane": "screen",
+   "points": [
+    "bz_tl",
+    "bz_tr"
+   ]
+  },
+  {
+   "name": "bezel_h_mm",
+   "kind": "distance",
+   "plane": "screen",
+   "points": [
+    "bz_tl",
+    "bz_bl"
+   ]
+  },
+  {
+   "name": "bezel_aspect",
+   "kind": "ratio",
+   "of": [
+    "bezel_w_mm",
+    "bezel_h_mm"
+   ]
+  },
+  {
+   "name": "bezel_w/W",
+   "kind": "ratio",
+   "of": [
+    "bezel_w_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "cheek_left_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "body_l",
+    "bz_l1"
+   ]
+  },
+  {
+   "name": "cheek_right_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "bz_r1",
+    "body_r"
+   ]
+  },
+  {
+   "name": "hood_half_seam_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "hood_seam_l",
+    "hood_top"
+   ]
+  },
+  {
+   "name": "body_half_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "body_l",
+    "hood_top"
+   ]
+  },
+  {
+   "name": "podL_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "podL_l",
+    "podL_r"
+   ]
+  },
+  {
+   "name": "podR_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "podR_l",
+    "podR_r"
+   ]
+  },
+  {
+   "name": "pod_centres_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "podL_l",
+    "podR_r"
+   ]
+  },
+  {
+   "name": "logo_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "logo_l",
+    "logo_r"
+   ]
+  },
+  {
+   "name": "strip_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "strip_l",
+    "strip_r"
+   ]
+  },
+  {
+   "name": "pod_w/W",
+   "kind": "ratio",
+   "of": [
+    "podL_w_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "pod_outer_span/W",
+   "kind": "ratio",
+   "of": [
+    "pod_centres_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "logo_w/W",
+   "kind": "ratio",
+   "of": [
+    "logo_w_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "strip_w/W",
+   "kind": "ratio",
+   "of": [
+    "strip_w_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "screen_px_per_mm_check",
+   "kind": "distance",
+   "plane": "screen",
+   "points": [
+    "scr_tl",
+    "scr_tr"
+   ]
+  },
+  {
+   "name": "deck_front_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "deckf_l",
+    "deckf_r"
+   ]
+  },
+  {
+   "name": "deck_centre_face_w_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "deckf_bend_l",
+    "deckf_bend_r"
+   ]
+  },
+  {
+   "name": "deck_left_flank_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "deckf_l",
+    "deckf_bend_l"
+   ]
+  },
+  {
+   "name": "deck_right_flank_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "deckf_bend_r",
+    "deckf_r"
+   ]
+  },
+  {
+   "name": "deck_centre/deck_w",
+   "kind": "ratio",
+   "of": [
+    "deck_centre_face_w_mm",
+    "deck_front_w_mm"
+   ]
+  },
+  {
+   "name": "deck_w/W",
+   "kind": "ratio",
+   "of": [
+    "deck_front_w_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "hood_corner_r_mm",
+   "kind": "radius",
+   "plane": "screen",
+   "points": [
+    "hc_1",
+    "hc_2",
+    "hc_3",
+    "hc_4",
+    "hc_5"
+   ]
+  },
+  {
+   "name": "hood_corner_r/W",
+   "kind": "ratio",
+   "of": [
+    "hood_corner_r_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "leg_front_mm",
+   "kind": "du",
+   "plane": "screen",
+   "points": [
+    "legL_out",
+    "legL_in"
+   ]
+  },
+  {
+   "name": "leg_front/W",
+   "kind": "ratio",
+   "of": [
+    "leg_front_mm",
+    "W_body_mm"
+   ]
+  },
+  {
+   "name": "hood_seam/W",
+   "kind": "ratio",
+   "of": [
+    "hood_half_seam_mm",
+    "body_half_mm"
+   ]
+  }
+ ],
+ "regions": {
+  "deck-front": [
+   60,
+   1255,
+   340,
+   1355
+  ],
+  "deck-plan": [
+   20,
+   1250,
+   400,
+   1360
+  ]
+ },
+ "probes": {
+  "deck-1": {
+   "from": [
+    120,
+    1268
+   ],
+   "to": [
+    120,
+    1350
+   ],
+   "width": 9,
+   "region": "deck-front",
+   "span": [
+    "deck_top_1",
+    "deck_bot_1"
+   ]
+  },
+  "deck-2": {
+   "from": [
+    200,
+    1268
+   ],
+   "to": [
+    200,
+    1350
+   ],
+   "width": 9,
+   "region": "deck-front",
+   "span": [
+    "deck_top_2",
+    "deck_bot_2"
+   ]
+  },
+  "deck-3": {
+   "from": [
+    280,
+    1268
+   ],
+   "to": [
+    280,
+    1350
+   ],
+   "width": 9,
+   "region": "deck-front",
+   "span": [
+    "deck_top_3",
+    "deck_bot_3"
+   ]
+  },
+  "deck-h1": {
+   "from": [
+    25,
+    1318
+   ],
+   "to": [
+    395,
+    1318
+   ],
+   "width": 5,
+   "region": "deck-plan",
+   "smooth_px": 3.0
+  },
+  "deck-h2": {
+   "from": [
+    25,
+    1290
+   ],
+   "to": [
+    395,
+    1290
+   ],
+   "width": 3,
+   "region": "deck-plan",
+   "smooth_px": 3.0
+  }
+ }
+}
