@@ -8,7 +8,10 @@ meshes, or the box given with --frame, so that two models framed by the same box
 Each view writes <out>/<view>.png on a light-grey background. Each orthographic view also writes
 <view>-mask.png (the object mask) and every view writes its projection to <out>/views.json, so that
 silhouette_iou.py and compose_sheet.py can work in millimetres. A model directory with focus.json adds
-close-up views to the standard set. An entry {view: [x, y, z, radius]} is one of the three fixed close-ups
+close-up views to the standard set. A model directory with edges.json ({part: [polyline of [x, y, z], ...]}: every
+BREP edge, as candybar.shell.rear_study writes it) draws all face boundaries over the render, as the FreeCAD GUI does:
+each point of an edge is tested for visibility by a ray cast against the meshes, and the visible runs are drawn; the
+image-space feature edges are then reduced to the outline. An entry {view: [x, y, z, radius]} is one of the three fixed close-ups
 (closeup-cheek-foot, closeup-hood-corner, closeup-deck-front). An entry {view: {"target": [x, y, z],
 "radius": r, "az": deg, "el": deg, "aspect": height / width}} is a camera of its own: radius is half the
 width of the view at the target, az turns from the front toward the player's right, el lifts the camera.
@@ -266,7 +269,9 @@ def run_cli(argv: list[str]) -> None:
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
     cams = [make_camera(v, lo, hi, a.size, focus) for v in views]
-    job = {"out": out, "meshes": meshes, "cameras": [asdict(c) for c in cams], "frame": [lo, hi],
+    brep_edges = [os.path.abspath(os.path.join(spec, "edges.json")) for spec in a.meshes
+                  if os.path.isdir(spec) and os.path.exists(os.path.join(spec, "edges.json"))]
+    job = {"out": out, "meshes": meshes, "cameras": [asdict(c) for c in cams], "frame": [lo, hi], "brep_edges": brep_edges,
            "samples": a.samples, "edges": not a.no_edges, "background": BACKGROUND, "finishes": FINISHES}
     order = list(ENGINES) if a.engine == "auto" else [a.engine]
     t0 = time.time()
@@ -452,7 +457,84 @@ def run_blender(job_path: str) -> None:
         img.save()
         bpy.data.images.remove(img)
 
-    def edges(aux: np.ndarray, alpha: np.ndarray, kind: str, mm_per_px: float) -> np.ndarray:
+    polylines = []
+    for path in job.get("brep_edges", []):
+        with open(path) as fh:
+            for lines in json.load(fh).values():
+                polylines += [np.asarray(q, dtype=np.float64) for q in lines if len(q) > 1]
+    bvh = None
+    if polylines:
+        from mathutils.bvhtree import BVHTree
+        meshes_ob = [ob for ob in scene.objects if ob.type == "MESH"]
+        verts, polys = [], []
+        for ob in meshes_ob:
+            me = ob.data
+            co = np.empty(len(me.vertices) * 3)
+            me.vertices.foreach_get("co", co)
+            co = co.reshape(-1, 3)
+            mw = np.array(ob.matrix_world)
+            co = co @ mw[:3, :3].T + mw[:3, 3]
+            me.calc_loop_triangles()
+            tri = np.empty(len(me.loop_triangles) * 3, dtype=np.int64)
+            me.loop_triangles.foreach_get("vertices", tri)
+            off = len(verts)
+            verts += co.tolist()
+            polys += (tri.reshape(-1, 3) + off).tolist()
+        bvh = BVHTree.FromPolygons(verts, polys, all_triangles=True)
+        del verts, polys
+
+    def draw_brep(rgb: np.ndarray, c: dict) -> np.ndarray:
+        from mathutils import Vector
+        f, r, u = (np.array(c[k]) for k in ("forward", "right", "up"))
+        loc = np.array(c["location"])
+        w, h = c["res"]
+        ink = np.zeros((h, w), dtype=np.float64)
+        ortho = c["kind"] == "ortho"
+        k = None if ortho else max(w, h) * c["lens_mm"] / c["sensor_mm"]
+        fv = Vector(f.tolist())
+        for q in polylines:
+            if ortho:
+                px = (q @ r - c["center_ru"][0]) / c["mm_per_px"] + w / 2
+                py = h / 2 - (q @ u - c["center_ru"][1]) / c["mm_per_px"]
+                tol = 0.4 + 1.5 * c["mm_per_px"]
+            else:
+                d = q - loc
+                depth = d @ f
+                if (depth <= 1.0).any():
+                    continue
+                px = k * (d @ r) / depth + w / 2
+                py = h / 2 - k * (d @ u) / depth
+                tol = 0.4 + 1.5 * float(depth.mean()) / k
+            if (px.max() < -2) or (px.min() > w + 2) or (py.max() < -2) or (py.min() > h + 2):
+                continue
+            vis = np.zeros(len(q), dtype=bool)
+            for i, p in enumerate(q):
+                if ortho:
+                    o = Vector((p - f * 3000.0).tolist())
+                    hit = bvh.ray_cast(o, fv, 3000.0 - tol)
+                else:
+                    dv = p - loc
+                    dist = float(np.linalg.norm(dv))
+                    hit = bvh.ray_cast(Vector(loc.tolist()), Vector((dv / dist).tolist()), dist - tol)
+                vis[i] = hit[0] is None
+            seg = vis[:-1] & vis[1:]
+            if not seg.any():
+                continue
+            x0, y0, x1, y1 = px[:-1][seg], py[:-1][seg], px[1:][seg], py[1:][seg]
+            n = np.maximum(1, np.ceil(np.hypot(x1 - x0, y1 - y0) / 0.4).astype(int))
+            t = np.concatenate([np.arange(m) / m for m in n])
+            xs = np.repeat(x0, n) + np.repeat(x1 - x0, n) * t
+            ys = np.repeat(y0, n) + np.repeat(y1 - y0, n) * t
+            ix, iy = np.floor(xs).astype(int), np.floor(ys).astype(int)
+            fx, fy = xs - ix, ys - iy
+            for dx, dy, wt in ((0, 0, (1 - fx) * (1 - fy)), (1, 0, fx * (1 - fy)), (0, 1, (1 - fx) * fy), (1, 1, fx * fy)):
+                jx, jy = ix + dx, iy + dy
+                ok = (jx >= 0) & (jx < w) & (jy >= 0) & (jy < h)
+                np.add.at(ink, (jy[ok], jx[ok]), wt[ok])
+        a = 1 - np.exp(-1.6 * ink)
+        return rgb * (1 - 0.88 * a[..., None]) + 0.06 * 0.88 * a[..., None]
+
+    def edges(aux: np.ndarray, alpha: np.ndarray, kind: str, mm_per_px: float, outline_only: bool = False) -> np.ndarray:
         n = aux[..., :2]
         z = aux[..., 2]
         cover = alpha > 0.5
@@ -466,6 +548,14 @@ def run_blender(job_path: str) -> None:
             both = cover & c0
             e = np.maximum(e, np.where(both & (cosang < math.cos(math.radians(22))), 1.0, 0.0))
             e = np.maximum(e, np.where(cover != c0, 1.0, 0.0))
+        if outline_only:
+            e = np.zeros(alpha.shape, dtype=np.float32)
+            for ax in (0, 1):
+                e = np.maximum(e, np.where(cover != np.roll(cover, 1, axis=ax), 1.0, 0.0))
+            k = np.array([0.25, 0.5, 0.25], dtype=np.float32)
+            for ax in (0, 1):
+                e = k[0] * np.roll(e, 1, axis=ax) + k[1] * e + k[2] * np.roll(e, -1, axis=ax)
+            return np.clip(e * 1.6, 0, 1)
         if kind == "perspective":
             q = np.where(cover, 1.0 / np.maximum(z, 1e-6), 0.0)
             scale = np.median(q[cover]) if cover.any() else 1.0
@@ -523,8 +613,10 @@ def run_blender(job_path: str) -> None:
             render.engine, scene.view_layers[0].material_override, render.image_settings.file_format = saved
             render.image_settings.color_depth = "8"
             scene.eevee.taa_render_samples = taa
-            e = edges(aux, px[..., 3], c["kind"], c["mm_per_px"])[..., None]
+            e = edges(aux, px[..., 3], c["kind"], c["mm_per_px"], bvh is not None)[..., None]
             rgb = rgb * (1 - 0.72 * e) + 0.12 * 0.72 * e
+        if bvh is not None:
+            rgb = draw_brep(rgb, c)
         save_pixels(os.path.join(job["out"], f"{c['view']}.png"), np.clip(rgb, 0, 1))
         if c["kind"] == "ortho":
             save_pixels(os.path.join(job["out"], f"{c['view']}-mask.png"), np.repeat(alpha, 3, axis=2))
