@@ -51,6 +51,10 @@ CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.structu
 cad/.venv-tools/bin/python cad/tools/draw_split.py proposal
 cad/.venv-tools/bin/python cad/tools/draw_split.py render       # renders of the chosen layout (Blender)
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
+# the detail pass (revision 6): the rear corner round for three radii, the renders before and after, the open small questions
+cad/.venv-tools/bin/python cad/tools/draw_detail.py rear-options
+cad/.venv-tools/bin/python cad/tools/draw_detail.py before-after
+cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options
 # the joint coupon: printable parts, checks and README.md in cad/out/coupon; then its drawing and renders
 CANDYBAR_OUT=cad/out/coupon cad/candybar/freecad-run.sh candybar.shell.coupon
 cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupon

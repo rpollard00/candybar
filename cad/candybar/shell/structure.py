@@ -53,17 +53,19 @@ HARDWARE = (
     ("bezel plate, printed", 0.76, "measured from the solid", "split/measurements.json: two halves, solid"),
     ("ribs, flanges, splice plates, inserts, screws", 0.0, "estimated", "25 % of the skin; set in total_mass"),
 )
-# the printed floor (the owner, 2026-11-11: "we just print a rigid piece of petg with more infill"): a sandwich 7 mm
-# thick, two skins of 1.2 mm on a gyroid core of 40 %; it fills the 4 mm floor of the skin and the 3 mm that the power
-# supply stands above it, so the hardware keeps its height (ESTIMATED density: 1.27 x (2.4 + 0.4 x 4.6) / 7)
-FLOOR_T = 7.0
+# the printed floor (the owner, 2026-11-11: "we just print a rigid piece of petg with more infill"): a sandwich 10 mm
+# thick, two skins of 1.2 mm on a gyroid core of 40 %. The cabinet stands on it on the table, on thin non-slip pads
+# (the owner: "I think floor on table, I can add non slip adhesive feet"); no feet and no ribs under it. The power
+# supply, the BC-250 and the hub stand 3 mm higher than on the 7 mm floor of the study (fit.Layout.floor_t)
+FLOOR_T = 10.0
+PAD_T = (2.0, 3.0)  # the non-slip pads under the floor (ESTIMATED: thin adhesive pads)
 FLOOR_SKIN = 1.2
 FLOOR_INFILL = 0.40
 FLOOR_KG_DM2 = 1.27 * (2 * FLOOR_SKIN + FLOOR_INFILL * (FLOOR_T - 2 * FLOOR_SKIN)) / 100  # g/cm3 x mm -> kg/dm2
 
 
 def total_mass(skin_kg: float, floor_area_dm2: float, frame_kg: float = 0.0) -> dict:
-    """skin_kg: the shell pieces without the floor tiles; the floor is the 7 mm sandwich."""
+    """skin_kg: the shell pieces without the floor tiles; the floor is the FLOOR_T sandwich."""
     hw = sum(m for _, m, _, _ in HARDWARE)
     extras = 0.25 * skin_kg
     floor = FLOOR_KG_DM2 * floor_area_dm2
@@ -197,16 +199,62 @@ def frame_c(d: Blueprint) -> list[Member]:
                note="behind the deck front, under the panel's front ledge, on two posts"),
         Member("deck post", "frame", box=(110.0, 130.0, 8.0, 28.0, d.wall_t, 40.0), mirror=True),
         Member("floor", "floor", box=(-243.3, 243.3, 4.0, 536.0, 0.0, FLOOR_T),
-               note="printed PETG sandwich, 7 mm, nine tiles; the frame's feet bolt through it"),
+               note=f"printed PETG sandwich, {FLOOR_T:g} mm, nine tiles; the frame's feet bolt through it"),
     ]
+
+
+def door_half(d: Blueprint, land: float = 4.0) -> float:
+    """Half the width of the rear door opening: a flat land of `land` (fit.Layout.door_land) beside it before the round
+    of the rear corner starts."""
+    return d.rear_w / 2 - d.rear_corner_r - land
+
+
+# the hand-holds: a pocket 100 wide, its outer end in line with the side of the door; it opens down through the rear
+# slope (z 310 to 350, 45 degrees) 6 in from each crease, and goes 30 up into the overhang behind the slope
+GRIP_W, GRIP_DEEP = 100.0, 30.0
+
+
+def grip_box(d: Blueprint) -> tuple[float, ...]:
+    x1 = door_half(d)
+    z0, z1 = d.rear_step_z0 + 6.0, d.rear_step_z1 - 6.0
+    y0 = d.body_d + (z0 - d.rear_step_z0)
+    return (x1 - GRIP_W, x1, y0, d.depth - d.wall_t, z0, z1 + GRIP_DEEP)
+
+
+# the make-up air inlet: a slot grille in the rear lower wall, right of the centre line, below the door (z 116) and
+# clear of the stowed cables (x up to 90) and of the corner round (from x 217); far from the power supply's grille at the left
+INLET = (95.0, 205.0, 536.0, 540.0, 15.0, 108.0)
+INLET_OPEN = 0.55  # ESTIMATED: the open share of a printed slot grille (slots 3 wide, bars 2.5)
+
+
+def makeup_air() -> dict:
+    """The air that the power supply's fan draws from the cabinet, and the inlet area it needs. The BC-250 draws its
+    own air through the door straight into its shroud, so only the supply needs make-up air."""
+    heat_w, dt = 25.0, 10.0          # ESTIMATED: 20 to 25 W of supply loss at 200 W (bc250-cooling-and-psu.md), 10 K rise
+    q = heat_w / (1.2 * 1005 * dt)   # m3/s
+    design = 3.0 * q                 # a margin of 3 for the fan, which moves more than the heat needs when it turns
+    need = {v: design / v * 1e4 for v in (1.0, 1.5)}  # cm2 of free area at a face speed of 1.0 and 1.5 m/s
+    perimeter = 2 * (494.7 + 540.0)  # mm, the edge of the floor
+    gap = {}
+    for h in PAD_T:
+        area = perimeter * h / 100   # cm2 at the edge
+        v = design / (area * 1e-4)
+        dp = 12 * 1.8e-5 * 0.25 * v / (h / 1000) ** 2   # Pa, laminar flow 250 mm under the floor (plates h apart)
+        gap[h] = {"area_cm2": area, "speed_m_s": v, "dp_Pa": dp}
+    x0, x1, _, _, z0, z1 = INLET
+    gross = (x1 - x0) * (z1 - z0) / 100
+    return {"heat_W": heat_w, "dT_K": dt, "flow_m3h": q * 3600, "design_m3h": design * 3600, "need_cm2": need, "gap": gap,
+            "inlet_gross_cm2": gross, "inlet_free_cm2": gross * INLET_OPEN, "inlet": INLET}
 
 
 def skin_members(d: Blueprint, key: str) -> list[Member]:
     """The stressed skin of A and B: the printed floor, the ring frames that the seam flanges make, the cross-members."""
     x = d.width / 2
+    door_x = door_half(d)
     out = [
         Member("floor", "floor", box=(-243.3, 243.3, 4.0, 536.0, 0.0, FLOOR_T),
-               note="printed PETG sandwich 7 mm, nine tiles with half-lap joints: the datum that the lower pieces bolt to"),
+               note=f"printed PETG sandwich {FLOOR_T:g} mm, nine tiles with half-lap joints: the datum that the lower pieces bolt "
+                    "to; it stands on the table on thin non-slip pads"),
         Member("ring L1", "ring", box=(-x, x, 194.0, 540.0, 130.0, 138.0), note="flanges of L1, round sides and rear"),
         Member("ring B1", "ring", box=(-x, x, 250.0, 580.0, 306.0, 314.0), note="flanges of B1, the rear in the slope crease"),
         Member("top ring", "ring", box=(-x, x, 420.0, 580.0, d.body_top - 8.0, d.body_top),
@@ -215,21 +263,20 @@ def skin_members(d: Blueprint, key: str) -> list[Member]:
         Member("monitor cradle", "cross", p=(300.0, 125.0), q=(450.0, 380.0), x0=-211.0, sx=422.0, sn=20.0,
                note="the fixed frame between the two middle pieces, screwed to their inner flanges at the rails; it "
                     "holds the magnets for the bezel plate; the monitor's carrier slides out of it to the front"),
-        Member("door opening frame", "ring", box=(-231.0, 231.0, 524.0, 536.0, 100.0, 310.0),
+        Member("door opening frame", "ring", box=(-door_x - 8.0, door_x + 8.0, 524.0, 536.0, 100.0, 310.0),
                note="flanges round the door opening (rear lower and upper rear pieces); the door screws to it and closes the ring"),
-        Member("BC-250 carrier", "cross", box=(-185.0, 155.0, 455.0, 470.0, 112.0, 268.0),
+        Member("BC-250 carrier", "cross", box=(-174.0, 166.0, 455.0, 470.0, 115.0, 271.0),
                note="two uprights and two edge rails round the board; right foot on the floor, left on the door sill"),
         Member("panel frame", "cross", box=(-199.0, 199.0, 26.0, 202.0, 58.0, 65.0), note="the ledge under the control panel and its latch"),
         Member("side ribs", "rib", box=(x - 12.0, x - 4.0, 210.0, 520.0, 20.0, 400.0), mirror=True,
                note="ribs 8 high, 3 thick, at most 110 apart on the side band and the rear side"),
     ]
     if key == "chosen":
-        out += [Member("rear grip", "mount", box=(165.0, 225.0, 545.0, 578.0, 312.0, 336.0), mirror=True,
-                       note="a pocket up into the overhang of the upper rear, near each rear corner, open downward"),
-                Member("front grip", "mount", box=(-110.0, 110.0, 0.0, 30.0, -18.0, 0.0),
-                       note="under the deck nose, in the 18 mm that the feet give"),
-                Member("floor ribs", "rib", box=(-230.0, 230.0, 20.0, 520.0, -12.0, 0.0),
-                       note="ribs 12 deep, 2.4 thick, every 50, under the floor; a rib splice across each tile joint")]
+        out += [Member("rear grip", "mount", box=grip_box(d), mirror=True,
+                       note="a pocket up into the overhang of the upper rear, near each rear corner, open downward through "
+                            "the rear slope; its outer end in line with the side of the door, on the flat beside the corner round"),
+                Member("make-up air inlet", "mount", box=INLET, note="a slot grille in the rear lower wall, right of the "
+                       "centre line and below the door: the air that the power supply's fan draws in")]
     else:
         out.append(Member("hand-hold", "mount", box=(x - 30.0, x - 4.0, 470.0, 530.0, 270.0, 305.0), mirror=True,
                           note="a recess under the B1 flange on each rear side, near the centre of mass in depth"))
@@ -264,12 +311,13 @@ def mounts(key: str) -> list[Mount]:
               "flanges at the legs; the controller beside it.", "hood"),
         Mount("encoder", "On the control panel frame under the panel, so that it leaves with the panel (one encoder for each "
               "panel).", "control panel"),
-        Mount("USB hub", "On the 7 mm floor behind the USB row (fit study), in a printed clip.", "floor"),
+        Mount("USB hub", f"On the {FLOOR_T:g} mm floor behind the USB row (fit study), in a printed clip.", "floor"),
         Mount("USB socket plate", "Screwed from inside into a frame of inserts round its opening in the deck side.", "deck side R"),
         Mount("control panel frame and latch", "The ledge under the plate takes the load; two pins at the front, a latch at "
               f"the back into {'the frame' if frame else 'the deck frame D1/D2'}.", "deck"),
         Mount("hood", "Two pins at the front, two M4 screws through the foot of the rear wall into the top ring.", "body top"),
-        Mount("feet", "Four rubber feet screwed through the floor into the wall feet.", carrier),
+        Mount("non-slip pads", f"Thin adhesive non-slip pads ({PAD_T[0]:g} to {PAD_T[1]:g} mm) under the floor tiles; the floor "
+              "stands on the table. No feet.", carrier),
     ]
 
 
@@ -315,8 +363,10 @@ AIR = (
     ("power supply fan", "power supply (its top face)", "Draws cabinet air; off below about 200 W (sister unit data)."),
     ("power supply grille", "rear lower wall: rear lower L and centre (A, the seam R2 L crosses it), rear lower L (B, C)",
      "The power supply's own exhaust out of its rear face."),
-    ("make-up air inlet", "floor tile under the deck (the feet give 18 mm)", "Replaces the air that the power supply and leaks take out. "
-     "The owner wants no side vents, so the inlet is in the floor."),
+    ("make-up air inlet", "rear lower wall, right of the centre line below the door: rear lower R (B, chosen)",
+     "Replaces the air that the power supply's fan takes out. The owner wants all vents in the rear; the 2 to 3 mm "
+     "under the floor is too thin (see the air path). It is 150 mm right of the supply's grille, so warm air is not "
+     "drawn back in."),
 )
 
 
@@ -468,27 +518,28 @@ def floor_options(mass_kg: float) -> dict:
     sandwich = lambda t: [(width, s, s / 2), (width, s, t - s / 2)]
     rib_h, rib_t, rib_pitch = 12.0, 2.4, 50.0
     ribs = [(rib_t, rib_h, -rib_h / 2)] * int(width / rib_pitch)
-    lap = [(width, FLOOR_T, FLOOR_T / 2)]  # the bonded half-lap of a tile joint: solid 7 mm over 20 mm
-    rows = {"sandwich 7 mm": ei(sandwich(FLOOR_T)), "sandwich 7 mm with ribs 12 x 2.4 every 50 under it": ei(sandwich(FLOOR_T) + ribs),
+    lap = [(width, FLOOR_T, FLOOR_T / 2)]  # the bonded half-lap of a tile joint: solid over 20 mm
+    rows = {"sandwich 7 mm": ei(sandwich(7.0)), "sandwich 7 mm with ribs 12 x 2.4 every 50 under it": ei(sandwich(7.0) + ribs),
             "sandwich 10 mm (the supply 3 mm higher)": ei(sandwich(10.0))}
     out = {k: {"EI": v, "sag_mm": p * a ** 2 * b ** 2 / (3 * v * span)} for k, v in rows.items()}
-    out["joint, solid 7 mm lap"] = {"EI": ei(lap), "sag_mm": p * a ** 2 * b ** 2 / (3 * ei(lap) * span)}
+    out[f"joint, solid {FLOOR_T:g} mm lap"] = {"EI": ei(lap), "sag_mm": p * a ** 2 * b ** 2 / (3 * ei(lap) * span)}
     out["joint, lap with a rib splice"] = {"EI": ei(lap + ribs), "sag_mm": p * a ** 2 * b ** 2 / (3 * ei(lap + ribs) * span)}
     out["load_N"] = p
     out["rib_h"], out["foot_h"] = rib_h, rib_h + 6.0
     return out
 
 
-def hand_holds(total_kg: float, com_y: float) -> dict:
-    """Where the cabinet's weight goes for three ways to lift it. Rear grips under the overhang of the upper rear at
-    y 560; a second grip under the deck nose at y 20; the side recesses at the centre of mass."""
+def hand_holds(total_kg: float, com_y: float, d: Blueprint) -> dict:
+    """The lift that the owner chose (2026-11-11): one person lifts the back by the two rear grips, and the cabinet
+    pivots on the front bottom edge of the deck (y 0, on the table). Moments about that edge: the grips carry
+    W com_y / y_grip, the edge the rest. A factor of 2 for a jerk gives the design load in each pocket."""
     w = total_kg * G
-    rear, front = 560.0, 20.0
-    k = (com_y - front) / (rear - front)
-    return {"weight_N": w, "com_y": com_y, "com_to_rear": 580.0 - com_y,
-            "rear_only": "it tips nose down onto the deck front: the rear grips carry the cabinet only while its front "
-                         "rests on the table",
-            "rear_share": k, "front_share": 1 - k, "rear_N_each": w * k / 2, "front_N": w * (1 - k)}
+    x0, x1, y0, y1, z0, z1 = grip_box(d)
+    grip_y = (y0 + y1) / 2
+    lift = w * com_y / grip_y
+    return {"weight_N": w, "com_y": com_y, "grip_y": grip_y, "pivot": "the front bottom edge of the deck, y 0, on the table",
+            "lift_N": lift, "each_N": lift / 2, "each_design_N": lift, "edge_N": w - lift,
+            "flange_shear_MPa": lift / (GRIP_W * d.wall_t), "grip": (x0, x1, y0, y1, z0, z1)}
 
 
 # seam, the joint, what locates it, the directions it fixes (n: square to the seam; t: across the wall, so that the

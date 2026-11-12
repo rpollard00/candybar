@@ -179,6 +179,15 @@ def halfspace(point: FreeCAD.Vector, normal: FreeCAD.Vector) -> Part.Shape:
     return box
 
 
+def unsplit(shape: Part.Shape) -> Part.Shape:
+    """The shape with the faces that a fuse split merged again; the shape as it is when that fails (it can on the
+    round of the step's run-out, which the front and the rear body share)."""
+    try:
+        return shape.removeSplitter()
+    except Part.OCCError:
+        return shape
+
+
 def both(shape: Part.Shape) -> Part.Shape:
     """A cutter on the right side, and its mirror image on the left."""
     return shape.fuse(shape.mirror(V(0, 0, 0), V(1, 0, 0)))
@@ -390,6 +399,65 @@ def step_cutter(d: Blueprint) -> Part.Shape:
     return leaning.extrude(V(-s, s, 0)).fuse(leaning.translated(V(-s, s, 0)).extrude(V(0, BIG, 0)))
 
 
+def round_section(rd: pr.Round, z: float, out: float = OVER) -> Part.Wire:
+    """What a round in plan takes off at height z: the region outside its arc, between the radii at its two ends,
+    as a wire that starts at the start of the arc (the same five edges at every height, for a loft). The arc stands
+    OFF_LAND out toward both faces that it rounds, so that it crosses them at a small angle and does not lie on
+    their tangent (a boolean with a tangent face fails)."""
+    a0, a1 = rd.a0, rd.a1
+    n0, n1 = (math.cos(a0), math.sin(a0)), (math.cos(a1), math.sin(a1))
+    rd = pr.Round((rd.c[0] + OFF_LAND * (n0[0] + n1[0]), rd.c[1] + OFF_LAND * (n0[1] + n1[1])), rd.r, a0, a1)
+    p0, p1 = rd.at(a0), rd.at(a1)
+    q0 = (p0[0] + out * n0[0], p0[1] + out * n0[1])
+    q1 = (p1[0] + out * n1[0], p1[1] + out * n1[1])
+    k = (rd.r + out) / math.cos((a1 - a0) / 2)
+    f = (rd.c[0] + k * math.cos((a0 + a1) / 2), rd.c[1] + k * math.sin((a0 + a1) / 2))
+    v = lambda p: V(p[0], p[1], z)
+    arc = Part.Arc(v(p1), v(rd.at((a0 + a1) / 2)), v(p0)).toBSpline().toShape()
+    return Part.Wire([Part.makeLine(v(p0), v(q0)), Part.makeLine(v(q0), v(f)), Part.makeLine(v(f), v(q1)), Part.makeLine(v(q1), v(p1)), arc])
+
+
+def round_cutter(sections: list[tuple[float, pr.Round]], ruled: bool = False, below: float = 0.0, above: float = 0.0) -> Part.Shape:
+    """A loft through the sections of a round at rising heights; the first and the last section carried straight
+    down by `below` and up by `above`."""
+    wires = [round_section(rd, z) for z, rd in sections]
+    pieces = [Part.makeLoft(wires, True, ruled)]
+    if below:
+        pieces.append(Part.Face(wires[0]).extrude(V(0, 0, -below)))
+    if above:
+        pieces.append(Part.Face(wires[-1]).extrude(V(0, 0, above)))
+    return pieces[0].fuse(pieces[1:]).removeSplitter() if len(pieces) > 1 else pieces[0]
+
+
+def corner_cutter(d: Blueprint) -> Part.Shape:
+    """What the rounds of the right rear corner take off the body (profiles.body_rounds): the corner round from the
+    floor up, on the lower rear wall, the slope and the upper rear wall (a loft in each, as the rear wall turns at the
+    slope's creases), and the round of the step's outer edge from where it starts. Both are carried straight up
+    from the height where the step has run out; the seam bevel takes off what lies above it."""
+    z1, zm = d.runout_z
+    corner = lambda z: pr.body_rounds(d, z)[1]
+    lo, mid = d.rear_step_z0, d.rear_step_z1
+    lower = [(z, corner(z)) for z in (0.0, d.tuck_z0, (d.tuck_z0 + lo) / 2, lo)]
+    slope = [(lo + (mid - lo) * k / 8, corner(lo + (mid - lo) * k / 8)) for k in range(9)]
+    n = 36
+    upper = [(mid + (zm - mid) * k / n, corner(mid + (zm - mid) * k / n)) for k in range(n + 1)]
+    pieces = [round_cutter(lower, True, below=OVER), round_cutter(slope, True), round_cutter(upper, above=OVER)]
+    start = z1 + (zm - z1) / 200
+    edge = [(start + (zm - start) * k / 24, pr.body_rounds(d, start + (zm - start) * k / 24)[0]) for k in range(25)]
+    pieces.append(round_cutter(edge, above=OVER))
+    return pieces[0].fuse(pieces[1:]).removeSplitter()
+
+
+def hood_corner_cutter(d: Blueprint, h: pr.Hood) -> Part.Shape:
+    """What the round of the right rear corner takes off the cap (profiles.hood_round), in the cabinet frame: a loft
+    through its sections from the foot to the roof, with the sections closer together toward the roof, where the
+    rear arc and the side blend turn level."""
+    back = pr.hood_back(d, h)
+    zs = [h.height * (1 - (1 - k / 48) ** 2) for k in range(49)]
+    oz = h.origin[2]
+    return round_cutter([(oz + z, pr.hood_round(d, h, back, z)) for z in zs], below=OVER, above=OVER)
+
+
 def chord_frame(fr: pr.Front) -> tuple[FreeCAD.Vector, FreeCAD.Vector]:
     """Up the chord of the rail arc, and square to it into the body."""
     r = math.radians(fr.recline)
@@ -442,7 +510,7 @@ def body(d: Blueprint, fr: pr.Front) -> tuple[Part.Shape, Part.Shape]:
     bw = d.bezel_w / 2
     plate = bezel_box(d, fr, -bw, bw).cut(behind_screen(d, d.mon_setback))
     reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(d, fr))
-    cutters = [both(rail_cutter(d, fr)), both(step_cutter(d)), plate, both(reveal), screen(d)]
+    cutters = [both(rail_cutter(d, fr)), both(step_cutter(d)), both(corner_cutter(d)), plate, both(reveal), screen(d)]
     solid = solid.cut(cutters).removeSplitter()
     g = d.seam_groove
     solid = solid.cut(ring_bevel(outline_at(solid, d.body_top - g), d.body_top - g, d.body_top, g))
@@ -540,8 +608,7 @@ def hood(d: Blueprint) -> dict[str, Part.Shape]:
     side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
     side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
     cap = shell.common(across(side_view))
-    (cx, cy, _), (nx, ny, _) = pr.hood_rear_corner(d)
-    cap = cap.cut([halfspace(V(cx, cy - h.origin[1], 0), V(nx, ny, 0)), halfspace(V(-cx, cy - h.origin[1], 0), V(-nx, ny, 0))])
+    cap = cap.cut(both(hood_corner_cutter(d, h)).translated(V(0, -h.origin[1], -h.origin[2])))
     g = d.seam_groove
     cap = cap.cut(ring_bevel(outline_at(cap, g), g, 0.0, g))
     opening = prism(both_sides(opening_path(d, h)), xz(-OVER), V(0, BIG / 4, 0))
@@ -602,6 +669,9 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-seam-corner-left": cam((-(d.side_x(d.body_top) - 8), d.seam_y + 6, d.body_top), 35, -42, 6),
             "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12),
             "closeup-seam-rear-corner": cam((d.side_x(d.body_top) - 8, d.depth - 8, d.body_top), 45, 140, 14),
+            "closeup-step-runout": cam((d.side_x(415.0) - 8, d.step_y(415.0) + 4, 410.0), 40, 125, 14),
+            "closeup-rear-corner-slope": cam((d.rear_w / 2 - 6, d.body_d + 14, d.rear_step_z0 + 14), 55, 140, 12),
+            "closeup-hood-rear-top": cam((h.half_top - 4, d.depth - 30, h.origin[2] + h.height - 12), 60, 135, 28),
             "closeup-hood-band": cam((d.logo_w / 2 + d.logo_gap + 40, h.origin[1] + 20, h.origin[2] + (h.z_sill + h.z_rail_top) / 2), 100, 40, 10)}
 
 

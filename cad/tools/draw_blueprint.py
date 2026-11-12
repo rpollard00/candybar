@@ -133,7 +133,15 @@ def paint(ax: Axes, faces: dict[str, pr.Face], view: View, fill: str, only: set[
             ax.add_collection(LineCollection(data, colors=INK, linewidths=lw, zorder=z))
     spots: dict[str, tuple[float, float]] = {}
     covers = [(key, MplPath(xy)) for key, kind, _, xy in items if kind == 0]
+    cover_depth = np.array([k for k, _ in covers])
+    cover_box = np.array([[*xy.min(axis=0), *xy.max(axis=0)] for key, kind, _, xy in items if kind == 0]).reshape(-1, 4)
     probes = np.array([[0.0, 0.0], [0.4, 0.3], [-0.3, 0.4], [0.3, -0.4]])
+
+    def covered(c: np.ndarray, k: float) -> bool:
+        """Whether a nearer polygon covers the point c: only those whose box holds it are tested."""
+        near = np.nonzero((cover_depth > k + 0.5) & (cover_box[:, 0] <= c[0] + 0.5) & (cover_box[:, 2] >= c[0] - 0.5)
+                          & (cover_box[:, 1] <= c[1] + 0.5) & (cover_box[:, 3] >= c[1] - 0.5))[0]
+        return any(covers[i][1].contains_points(c + probes).any() for i in near)
     for face in faces.values():
         if only is not None and face.id not in only:
             continue
@@ -144,7 +152,7 @@ def paint(ax: Axes, faces: dict[str, pr.Face], view: View, fill: str, only: set[
                 continue
             xy, depth = project(pts, view)
             area, c, k = abs(_area(xy)), xy.mean(axis=0), float(depth.mean())
-            if area > 4.0 and not any(kk > k + 0.5 and path.contains_points(c + probes).any() for kk, path in covers):
+            if area > 4.0 and not covered(c, k):
                 seen.append((area, c, MplPath(xy)))
         if not seen:
             continue

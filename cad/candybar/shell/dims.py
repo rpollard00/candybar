@@ -199,6 +199,11 @@ class Blueprint(Dims):
     rear_proud: float = 40.0
     rear_step_z0: float = 310.0
     rear_step_z1: float = 350.0
+    # the vertical corners of the back (lower rear, upper rear, hood) are one round of this radius in plan. Two limits
+    # from the step: the rear body side is 18.2 long at the foot of the rear slope, and the step must run out into
+    # the round inside the seam bevel (16.4 to 19.1), so that the foot of the hood keeps the outline of the body top.
+    # Near the body top the outer edge of the step gets a round of its own that grows from nothing to this radius.
+    rear_corner_r: float = 18.0
     # curves of the body
     rail_sagitta_ratio: float = 0.035
     body_tuck_ratio: float = 0.023
@@ -266,6 +271,32 @@ class Blueprint(Dims):
     @property
     def depth(self) -> float:
         return self.body_d + self.rear_proud
+
+    @property
+    def step_in(self) -> float:
+        """How far the rear body side stands in from the side band."""
+        return self.width / 2 - self.rear_w / 2
+
+    def step_y(self, z: float) -> float:
+        """Y of the outer edge of the step at height z (it leans back)."""
+        return self.step_y0 + z * math.tan(math.radians(self.step_lean))
+
+    def rear_y(self, z: float) -> float:
+        """Y of the rear wall at height z: the lower rear wall, the slope, the upper rear wall."""
+        if z <= self.rear_step_z0:
+            return self.body_d
+        return min(self.depth, self.body_d + (z - self.rear_step_z0) * (self.depth - self.body_d) / (self.rear_step_z1 - self.rear_step_z0))
+
+    @property
+    def runout_z(self) -> tuple[float, float]:
+        """Where the step meets the rear corner round: from the first height, where the round reaches the inner
+        crease of the step, the outer edge of the step gets a round that grows to rear_corner_r at the second
+        height, where the step line touches the round of the full width and runs out into it."""
+        t = math.tan(math.radians(self.step_lean))
+        r = self.rear_corner_r
+        z1 = (self.depth - r - self.step_in - self.step_y0) / t
+        zm = (self.depth - (2 - math.sqrt(2)) * r - self.step_y0) / t
+        return z1, zm
 
     @property
     def tuck(self) -> float:

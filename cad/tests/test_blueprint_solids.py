@@ -67,6 +67,37 @@ class BlueprintSolidsTest(unittest.TestCase):
         self.assertFalse(changed["ok"])
         self.assertIn("Z panel pocket", failing(changed))
 
+    def test_check_notices_a_sharper_rear_corner(self) -> None:
+        self.assert_check_notices(rear_corner_r=self.d.rear_corner_r - 8.0)
+
+    def corner_reach(self, part: str, z: float, centre: tuple[float, float], angle: float) -> float:
+        """How far the plan section of a part at height z reaches from a centre, along the ray at an angle (right side)."""
+        wire = max(self.parts[part].slice(App.Vector(0, 0, 1), z), key=lambda w: w.BoundBox.DiagonalLength)
+        u = (math.cos(angle), math.sin(angle))
+        best = (math.inf, 0.0)
+        for e in wire.Edges:
+            for p in e.discretize(Distance=0.05):
+                dx, dy = p.x - centre[0], p.y - centre[1]
+                along = dx * u[0] + dy * u[1]
+                if along > 0:
+                    best = min(best, (abs(dx * u[1] - dy * u[0]), along))
+        return best[1]
+
+    def test_rear_corners_are_rounds_of_one_radius(self) -> None:
+        """At the lower rear, the upper rear and up the hood, the plan section turns round the corner on an arc of
+        rear_corner_r: neither a sharp corner (it would reach 1.41 R along the middle of the round) nor a flat face
+        at 45 degrees (about 1.08 R for the turn of 90 degrees)."""
+        d = self.d
+        h = pr.hood(d)
+        back = pr.hood_back(d, h)
+        cases = [("rear_body", z, pr.body_rounds(d, z)[1]) for z in (150.0, 380.0, 400.0)]
+        cases += [("hood", h.origin[2] + z, pr.hood_round(d, h, back, z)) for z in (20.0, 80.0, 140.0)]
+        for part, z, rd in cases:
+            with self.subTest(part=part, z=z):
+                self.assertAlmostEqual(rd.r, d.rear_corner_r)
+                reach = self.corner_reach(part, z, rd.c, (rd.a0 + rd.a1) / 2)
+                self.assertAlmostEqual(reach, d.rear_corner_r, delta=0.1)
+
     def assert_same_points(self, found: list[tuple[float, float]], expected: list[tuple[float, float]]) -> None:
         self.assertEqual(len(found), len(expected), found)
         for p in expected:

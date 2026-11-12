@@ -102,8 +102,10 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
                  "with 7.3 to spare on each side.",
                  "Seams: B with the hood of A (the chosen layout, `chosen.png`).",
                  "Hood: keyed on the body top; the same parts take bolts or adhesive (joint 7). The owner may bolt or bond it.",
-                 "Floor: printed PETG, made stiffer than the 7 mm sandwich: see \"Floor\".",
-                 "Hand-holds: at the back corners: see \"Hand-holds\".",
+                 "Floor: printed PETG, a 10 mm sandwich that stands on the table on thin non-slip pads (2 to 3 mm). "
+                 "No feet and no ribs under it: see \"Floor\".",
+                 "Hand-holds: only at the rear: a pocket up into the overhang of the upper rear near each back corner. "
+                 "No grip under the deck nose: see \"Hand-holds\".",
                  "Material: open (PETG on the A1, or ABS on an enclosed printer): see \"Material\"."):
         w(f"- {line}")
     w("")
@@ -251,8 +253,8 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("")
     w("**Trapped pieces.** None, if the order above is kept. Two pieces need the order: the fixed monitor cradle "
       "(422 wide) goes in from the top before the upper pieces, or later through the bezel opening (434.7 wide with no "
-      "side ledge); the power supply (86 tall) goes in through the door opening (186 tall) and is lifted over the "
-      "112 mm sill before the BC-250 carrier is in.")
+      f"side ledge); the power supply (86 tall) goes in through the door opening ({fit['door']['h']:.0f} tall) and is "
+      f"lifted over the {fit['door']['z0']:.0f} mm sill before the BC-250 carrier is in.")
     w("")
     w("**A thread-forming screw driven again into the same hole.** The dry pass drives each screw once, the bonding "
       "pass a second time. How many times a thread-forming screw holds in printed PETG (or ABS) is **unknown**: no "
@@ -266,9 +268,10 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     fl = st.floor_options(0.0)
     w("## Floor")
     w("")
-    w(f"The 7 mm sandwich was chosen for room, not for stiffness. Compared here: the floor under the power supply when "
-      f"the cabinet is lifted ({fl['load_N']:.0f} N: the supply with a factor of 2), as a strip 150 wide from the deck's "
-      "back frame to the rear wall (329 span), and at a tile joint:")
+    w(f"Decided by the owner (2026-11-11): the floor stands on the table, on thin non-slip pads ({st.PAD_T[0]:g} to "
+      f"{st.PAD_T[1]:g} mm). No feet and no ribs under it. The floor is the {st.FLOOR_T:g} mm sandwich. Compared here: the "
+      f"floor under the power supply when the cabinet is lifted ({fl['load_N']:.0f} N: the supply with a factor of 2), as a "
+      "strip 150 wide from the deck's back frame to the rear wall (329 span), and at a tile joint:")
     w("")
     w("| Section | Sag under the supply (mm) |")
     w("| --- | --- |")
@@ -276,34 +279,32 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
         if isinstance(v, dict):
             w(f"| {k} | {v['sag_mm']:.2f} |")
     w("")
-    w(f"Recommendation: **the 7 mm sandwich with ribs under it** ({fl['rib_h']:.0f} deep, 2.4 thick, every 50, a rib "
-      "splice bonded across each tile joint). It is the stiffest, it keeps the power supply where it is (z 7), and "
-      f"the ribs use room that is free: the cabinet stands on feet **{fl['foot_h']:.0f} mm high**, which also give the "
-      "make-up air its inlet under the floor and room for fingers at the front grip. The 10 mm sandwich would raise "
-      "the power supply and the BC-250 by 3 mm. At a tile joint the bonded lap alone is weaker than the ribbed tile, "
-      "so the rib splice carries the ribs across it.")
+    fm = fit["anchors"]
+    w(f"The {st.FLOOR_T:g} mm sandwich sags {fl['sandwich 10 mm (the supply 3 mm higher)']['sag_mm']:.2f} mm (the 7 mm one "
+      f"{fl['sandwich 7 mm']['sag_mm']:.2f}). Everything that stands on the floor is 3 mm higher than on the 7 mm floor: "
+      f"the power supply (z {fm['psu_z0']:.0f}), the stowed cables, the BC-250 and its carrier (its lower edge at z "
+      f"{fm['bc_top_z'] - 144:.0f}), the door sill (z {fit['door']['z0']:.0f}) and the hub (z {fm['fit_hub_z0']:.1f}). "
+      f"Result of the fit study: **{fit['result']}**. The ribs of 12 under the floor, the feet of 18 and the front grip "
+      "are dropped.")
     w("")
-    hh = st.hand_holds(st.total_mass(skin_kg(meas["options"][sp.CHOSEN]["pieces"]), FLOOR_DM2)["total"], 396.0)
+    hh = st.hand_holds(st.total_mass(skin_kg(meas["options"][sp.CHOSEN]["pieces"]), FLOOR_DM2)["total"],
+                       centre_of_mass(meas["options"]["A"]["pieces"], st.total_mass(skin_kg(meas["options"]["A"]["pieces"]), FLOOR_DM2))[0], d)
+    x0, x1, y0, y1, z0, z1 = hh["grip"]
     w("## Hand-holds")
     w("")
-    w(f"The centre of mass is about y {hh['com_y']:.0f}, {hh['com_to_rear']:.0f} in front of the rear plane (estimated). "
-      "Three places, compared:")
+    w("Decided by the owner (2026-11-11): only the rear grips (\"I don't think it will be moved around a ton\"). Each is a "
+      f"pocket up into the overhang of the upper rear: x {x0:.1f} to {x1:.1f} (100 wide), open downward through the rear "
+      f"slope between z {z0:.0f} and {z0 + 28:.0f}, {st.GRIP_DEEP:.0f} up into the overhang (`structure.grip_box`). Its outer "
+      f"end is in line with the side of the rear door, on the flat 4 mm before the rear corner round (R {d.rear_corner_r:g}) "
+      "starts, so the pocket and the round do not meet.")
     w("")
-    w("| Grip | Balance | Load path | Sanding reach | Seen from the seat |")
-    w("| --- | --- | --- | --- | --- |")
-    w(f"| pockets up into the overhang of the upper rear (40 proud), near each rear corner | {hh['rear_only']}; with a "
-      f"second grip under the deck nose the rear grips take {hh['rear_N_each']:.0f} N each and the front {hh['front_N']:.0f} N "
-      f"({hh['rear_share']:.0%} / {hh['front_share']:.0%}) | into the slope and the B1 ring in the slope crease, in shear "
-      "and tension (no peel at the bond) | yes: open downward, 100 x 25 deep | no |")
-    w("| recesses in the rear corner faces | as above | into the corner of the side and rear walls, across the L1 and B1 "
-      "rings | finger only: three inside corners | no (seen from the side) |")
-    w("| recesses in the side band under B1 (the earlier proposal) | balanced: they bracket the centre of mass, so one "
-      "person lifts it level | into the B1 ring | yes | partly, from the side |")
-    w("")
-    w("Recommendation: **the pockets under the overhang at the back corners, with a front grip under the deck nose** "
-      "(in the 18 mm that the feet give). Lifted at the back alone the cabinet tips onto its deck front, so a carry "
-      "uses both grips: two people, or one who lifts the back and slides a hand under the nose. If the owner wants "
-      "one person to carry it level, the side recesses are the grip for that.")
+    w(f"**The lift.** One person lifts the back; the cabinet pivots on {hh['pivot']}. The centre of mass is about y "
+      f"{hh['com_y']:.0f} (estimated), the grips at y {hh['grip_y']:.0f}. Moments about the edge: the grips carry "
+      f"{hh['lift_N']:.0f} N together ({hh['each_N']:.0f} N in each pocket), the deck's front edge {hh['edge_N']:.0f} N, of a "
+      f"weight of {hh['weight_N']:.0f} N. With a factor of 2 for a jerk: {hh['each_design_N']:.0f} N in each pocket. Into "
+      f"100 mm of the slope and the B1 ring of a 4 mm wall that is {hh['flange_shear_MPa']:.2f} MPa in shear, far below the "
+      "strength of PETG. The pocket pulls the slope in shear and tension, not in peel. The deck's front edge takes "
+      "the rest on the table: put two of the non-slip pads under the deck front.")
     w("")
 
     # ---------- structure ----------
@@ -343,7 +344,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       "at its foot. The tuck stops the rails at z 350; a short post goes on to the top beam, and it still nicks the "
       "skin by 0.2 cm3 at the tuck (trim its corner by 3 mm). The two monitor beams sit 1.2 and 2.9 mm from the room "
       "for any 16:10 monitor. The floor row lists the hub if this check ran while the hub stood on the 4 mm floor; the "
-      "fit study now stands the hub on the 7 mm floor (see \"Floor\").")
+      f"fit study now stands the hub on the {st.FLOOR_T:g} mm floor (see \"Floor\").")
     w("")
     w(f"Cost of the frame of C: {struct['frame_length_m']:.1f} m of 2020 extrusion, {struct['frame_kg']:.1f} kg (ESTIMATED at "
       f"{st.EXTRUSION_KG_M} kg/m), about 16 corner brackets, 60 T-nuts and screws, a saw and a drill or a cutting "
@@ -369,7 +370,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     ll = est["lift"]
     w(f"- **Lifted by the hand-holds** with all hardware: {ll['weight_N']:.0f} N. Two holds with a factor of 2 for a jerk: "
       f"{ll['per_hold_N']:.0f} N each. Path (chosen): the grips are pockets in the overhang of the upper rear at the back "
-      f"corners, with a front grip under the deck nose (see \"Hand-holds\"); the load goes into the B1 ring in the "
+      f"corners, and the cabinet pivots on the deck's front edge (see \"Hand-holds\"); the load goes into the B1 ring in the "
       f"slope crease and down the walls to the floor, which carries the power supply (3.3 kg). Shear in 100 mm of flange in a 4 mm wall: "
       f"{ll['flange_shear_MPa']:.2f} MPa, far below the strength of PETG. Path (C): the hold is a printed handle "
       "screwed to the side rail; the skin carries nothing.")
@@ -384,7 +385,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       "the floor. The hood's pins and screws take the shear at the groove; the top ring carries it into the body. In "
       "the body the front portal (rails, apron, brow round the bezel) and the rear portal (round the door) resist it; "
       f"a portal of two rails 300 tall sways about {rk['portal_mm']:.2f} mm (ESTIMATED section). The rear portal is the "
-      "weak one: the rear wall leaves strips of only 12 mm beside the door. The door, screwed shut all round, closes "
+      "weak one: the rear wall leaves strips of only 22 mm beside the door (4 flat, then the corner round R 18). The door, screwed shut all round, closes "
       "it. In C the frame takes it.")
     w(f"- **20 N with a finger on the largest spans** (4 mm skin, simply supported, centre load):")
     for k, v in est["finger"].items():
@@ -403,7 +404,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("")
     w("**Weak points, honestly.** (1) The three large openings: the bezel opening (422.7 x 293.4) leaves the rails as "
       "the only members up the front; the control panel opening leaves a 25 mm nose and two arms of 48 mm; the door "
-      "opening leaves 12 mm strips at the rear corners. Each opening needs its plate or door screwed shut to be "
+      "opening leaves strips of 22 mm at the rear corners (4 flat, then the corner round). Each opening needs its plate or door screwed shut to be "
       "stiff, so the bezel plate (on magnets) adds nothing, and the rails and the monitor cradle's fixed frame between "
       "them must do the work. (2) The rail land beside the bezel's top corners is 9 mm wide and in the upper pieces; "
       "keep it out of any seam (it is: L1 and B1 cross the land where it is 16 wide) and stiffen it with the top "
@@ -449,13 +450,15 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
         w(f"| {lv} | {subj} | {det} |")
     w("")
     w(f"Result of the fit study: **{fit['result']}**. The fix: the BC-250 stands 1 mm higher (`Layout.bc_above_psu` 2 to "
-      "3), so its duct no longer reaches into the 25 mm over the supply's fan; the hub stands on the 7 mm floor "
+      "3), so its duct no longer reaches into the 25 mm over the supply's fan; the hub stands on the floor "
       "(`Layout.floor_t`). The duct's keep-out zone stays 70 deep: the rigid duct (65) and the 5 mm seal to the door.")
     w("")
     w("Reach: lift the door off (four thumb screws). The fan and the shroud face are then in the opening; the board's "
       "I/O end (DisplayPort, LAN, USB) is at the left end, behind the duct: two screws take the duct off. The power "
       "plug and the fan header are at the top right of the board, 0 to 20 mm above the top edge of the opening, and "
-      "a hand reaches them from below. The board comes out through the opening (446.7 x 186) on its carrier rails.")
+      f"a hand reaches them from below. The board comes out through the opening ({fit['door']['w']:.1f} x {fit['door']['h']:.0f}) on its "
+      "carrier rails. The opening is narrower than in the study (446.7) by the rear corner round of revision 6: the "
+      "fit study's rule \"door service\" checks that the board, the heatsink, the shroud and the duct lie inside it.")
     w("")
     pathm = struct["monitor_path"]
     free = max(m["out_mm"] for m in pathm if m["in_skin_mm3"] == 0)
@@ -481,9 +484,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
       f"Its stiffness is {est['floor']['sandwich_Nmm'] / est['floor']['solid4_Nmm']:.1f} times that of the 4 mm floor of "
       f"the skin; the power supply on one tile sags {est['floor']['psu_sag_mm']:.2f} mm (with a factor of 2). The tiles "
       "join with half-laps (joint 2): the ring flanges of the walls cross the tile joints, so that no joint is a "
-      "hinge. Room: the power supply stands 3 mm above the present 4 mm floor, so a 7 mm floor costs no room under it. "
-      "The fit study stands the hub on the 7 mm floor (`fit.Layout.floor_t`). Under the cabinet, "
-      "ribs could go down into the 10 mm that the feet give, if the floor must be stiffer.")
+      f"hinge. It stands on the table on thin non-slip pads; the fit study stands the hardware on it (`fit.Layout.floor_t`).")
     w("")
     w(f"**Control panel plate, printed PETG (the owner, for proving).** The outline (396 wide) is wider than the bed, "
       f"so the plate has one seam. It goes across at x = {seam['x']}, between the lever and the buttons: "
@@ -522,6 +523,22 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     for part, on, what in st.AIR:
         on = on.replace("door's inner frame", "the BC-250's carrier")
         w(f"| {part} | {on} | {what} |")
+    w("")
+    ma = st.makeup_air()
+    g2, g3 = ma["gap"][st.PAD_T[0]], ma["gap"][st.PAD_T[1]]
+    w(f"**Make-up air.** The BC-250 draws its air through the door straight into its shroud, so only the power supply "
+      f"needs air from the cabinet. Its loss is about {ma['heat_W']:.0f} W at 200 W (ESTIMATED, bc250-cooling-and-psu.md); at "
+      f"a rise of {ma['dT_K']:.0f} K that is {ma['flow_m3h']:.1f} m3/h, and with a margin of 3 for the fan "
+      f"{ma['design_m3h']:.0f} m3/h. At a face speed of 1.0 to 1.5 m/s the inlet needs {ma['need_cm2'][1.0]:.0f} to "
+      f"{ma['need_cm2'][1.5]:.0f} cm2 of free area. The gap under the floor on pads of {st.PAD_T[0]:g} to {st.PAD_T[1]:g} mm is "
+      f"{g2['area_cm2']:.0f} to {g3['area_cm2']:.0f} cm2 at the edge of the floor, but the air must then run about 250 mm "
+      f"under the floor in that gap: {g2['dp_Pa']:.0f} to {g3['dp_Pa']:.0f} Pa of loss (laminar flow between plates), more "
+      "than a slow supply fan gives, and a cloth or a soft mat closes it. So the inlet is not under the floor: it is a "
+      f"slot grille in the rear lower wall, right of the centre line and below the door (x {ma['inlet'][0]:.0f} to "
+      f"{ma['inlet'][1]:.0f}, z {ma['inlet'][4]:.0f} to {ma['inlet'][5]:.0f}): {ma['inlet_gross_cm2']:.0f} cm2 gross, about "
+      f"{ma['inlet_free_cm2']:.0f} cm2 free (ESTIMATED open share {st.INLET_OPEN:.0%}). It is about 150 mm right of the "
+      "supply's own grille (bottom left) and far from the door's slot vents (left end of the door), so warm air is not drawn back in. "
+      "All vents stay in the rear (the owner's rule).")
     w("")
     w("**A second fan in the exhaust duct (the owner's idea).** The duct of the fit study is 106.3 x 129 in section "
       "along the door and 70 deep. A 92 mm fan (92 x 92 x 25) fits in front of the slot vents with 7 mm round it; it "
@@ -736,9 +753,8 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("## Recommendation")
     w("")
     w("Decided by the owner: the chosen layout (B with the hood of A), +0 width, the hood keyed to bolt or to bond, "
-      "a floor that is stiffer than 7 mm. Proposed, and not decided: the ribs under the floor with feet of 18 mm "
-      "(the cabinet then stands 18 mm above the table), and the grips at the back corners with a front grip under "
-      "the deck nose.")
+      f"the floor on the table ({st.FLOOR_T:g} mm sandwich on thin non-slip pads), the grips at the rear only (a pocket "
+      "under the overhang at each back corner). Dropped: the ribs under the floor with feet of 18 mm, and the front grip.")
     w("")
     w("**An internal frame: no.** Build a stressed skin (B with the hood of A) with a printed floor, ring frames from "
       "the seam flanges, and three cross-members that carry the hardware: the fixed monitor cradle between the rails, "
@@ -765,15 +781,13 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("")
     for q in (
         "Hood: bolt it (recommended), or bond it? The parts allow both.",
-        "Grips: the pockets under the overhang at the back corners with a front grip under the deck nose (recommended), "
-        "or the side recesses for a one-person level carry?",
         "Monitor: does the unit have a magnetic sleep sensor near its edge (then the bezel plate's magnets move to a "
         "steel strip away from it)?",
         "The second fan in the duct: leave room and bosses only, and fit it after the closed-cabinet test?",
         "Control panel plate for proving: a 5 mm printed plate with thinned seats for snap-in buttons, or screw-in "
         "buttons?",
         "The marquee lip as a separate finish piece (two halves): accept?",
-        "Bottom corners of the hood opening: keep radius 6, or 10 for sanding?",
+        "Bottom corners of the hood opening: keep radius 6, or 10 for sanding (see `compare/detail-options.png`)?",
         "Material: PETG on the A1, or ABS on an enclosed printer? The coupons of both decide it.",
     ):
         w(f"1. {q}")
@@ -792,6 +806,7 @@ def write(meas: dict, opts: dict, d: Blueprint, face_cloud, crossed, near_hardwa
     w("- Hand estimates use plate and beam formulas with E = 2 GPa for printed PETG (ESTIMATED); they are first "
       "numbers, not a strength analysis.")
     w("- Not modelled: the joints, ribs, carriers, cradle and frame brackets; the warp of long pieces on the bed; slicer "
-      "times; the fillet of the rear corners of the detail pass.")
+      "times. The rear corner round (R 18) is in the skin, so the cut has it; the grip pockets and the make-up air "
+      "inlet are data only (`structure.py`).")
     w("")
     return "\n".join(L)

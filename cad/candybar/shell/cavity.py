@@ -33,6 +33,8 @@ SKIN = ("deck", "front_body", "rear_body", "hood", "marquee_lip")
 SAME = 1e-3
 # the fuzzy tolerance of a boolean that failed without it, mm
 FUZZY = 1e-3
+# a section whose offset fails is offset again as a polygon that stands at most this far off its edges, mm
+POLY_DEFLECTION = 0.02
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,11 @@ def section(skin: list[Part.Shape], x: float) -> Part.Shape | None:
     return faces[0].fuse(faces[1:]).removeSplitter() if len(faces) > 1 else faces[0]
 
 
+def closed_points(wire: Part.Wire) -> list[FreeCAD.Vector]:
+    pts = wire.discretize(Deflection=POLY_DEFLECTION)
+    return pts if (pts[0] - pts[-1]).Length < 1e-6 else pts + [pts[0]]
+
+
 def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
     """The section offset inward by w, moved into the plane x = 0."""
     if face is None:
@@ -90,7 +97,16 @@ def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
     for f in face.Faces:
         try:
             out.append(f.makeOffset2D(-w, 0, False, False, False))
-        except FreeCAD.Base.CADKernelError:  # the face is thinner than 2 w: nothing is left of it
+            continue
+        except (FreeCAD.Base.CADKernelError, ValueError):
+            pass
+        # the offset of a section through a lofted surface (the rear corner rounds) can fail on its spline edges:
+        # try again on the same outline as a polygon within POLY_DEFLECTION of it; when that fails too, the face is
+        # thinner than 2 w and nothing is left of it
+        try:
+            wires = [Part.makePolygon(closed_points(wi)) for wi in f.Wires]
+            out.append(Part.makeFace(wires, "Part::FaceMakerBullseye").makeOffset2D(-w, 0, False, False, False))
+        except (FreeCAD.Base.CADKernelError, ValueError, RuntimeError):
             continue
     out = [s for s in out if s.Faces and s.Area > SAME]
     if not out:

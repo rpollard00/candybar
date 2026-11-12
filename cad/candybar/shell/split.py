@@ -287,7 +287,7 @@ def base_seams(L: Lines) -> list[Seam]:
 
 
 def base_pieces() -> list[Piece]:
-    up, why = (0.0, 0.0, 1.0), ("Flat, on the bed: a sandwich of 7 mm, two skins of 1.2 mm and a gyroid core of 40 %. "
+    up, why = (0.0, 0.0, 1.0), ("Flat, on the bed: a sandwich of 10 mm, two skins of 1.2 mm and a gyroid core of 40 %. "
                                 "It is not seen.")
     return [Piece(f"floor {row} {col}", "base", (x, y, 2.0), up, why, mirror=x > 0, bed="flat")
             for row, y in (("front", 100.0), ("middle", 275.0), ("rear", 450.0)) for col, x in (("side", 175.0), ("centre", 0.0))]
@@ -296,7 +296,7 @@ def base_pieces() -> list[Piece]:
 def door_outline(L: Lines) -> Seam:
     x, z0, z1 = L.door
     return Seam("DR", "body", front([(-x, z0), (x, z0), (x, z1), (-x, z1), (-x, z0)], 520.0, 560.0), HIDDEN, "service",
-                "The rear door: its own gap (the fit study's opening, 446.7 x 186).")
+                f"The rear door: its own gap (the fit study's opening, {2 * x:.1f} x {z1 - z0:.0f}).")
 
 
 def trim_pieces() -> list[Piece]:
@@ -402,7 +402,7 @@ def option_a(d: Blueprint, L: Lines) -> Option:
         "and the slot vents in it and nothing wired to it. It lifts off; its own gap (DR) is the service joint.",
         "The hood (groove G), the rear door (DR), the control panel (pocket), the bezel plate (reveal; the monitor "
         "comes out behind it) and the USB plate. Every other seam is bonded for good, the floor tiles too.",
-        ("Bond and screw the nine floor tiles; put the feet on.",
+        ("Bond and screw the nine floor tiles; stick the non-slip pads under them.",
          "Bond the rear: rear lower centre and the two rear lower pieces, on the floor.",
          "Bond the deck: deck nose and deck sides; then the apron and the two lower pieces (D1, D2, P1, S1).",
          "Bond the two middle pieces (L1), then the brow, the two upper pieces and the upper rear (B1, W1, R1, R3).",
@@ -638,7 +638,7 @@ def door_of(d: Blueprint) -> dict:
     values = fit.anchors(d, lay, v, d.width / 2 - d.wall_t)
     z0 = values["bc_top_z"] - v("bc_pcb_w_pwr") - lay.door_overlap
     App.closeDocument(base.Name)
-    x = d.rear_w / 2 - lay.door_frame
+    x = d.rear_w / 2 - d.rear_corner_r - lay.door_land
     z1 = d.rear_step_z0 - lay.door_frame
     return {"x0": -x, "x1": x, "z0": z0, "z1": z1, "w": 2 * x, "h": z1 - z0}
 
@@ -663,8 +663,8 @@ def build_modules(d: Blueprint, log=print) -> Modules:
     key = fingerprint(d)
     cache = cache_dir()
     parts = so.build(d)
-    outer_body = parts["deck"].fuse([parts["front_body"], parts["rear_body"]]).removeSplitter()
-    outer_hood = parts["hood"].fuse(parts["marquee_lip"]).removeSplitter()
+    outer_body = so.unsplit(parts["deck"].fuse([parts["front_body"], parts["rear_body"]]))
+    outer_hood = so.unsplit(parts["hood"].fuse(parts["marquee_lip"]))
     files = {k: cache / f"{k}-{key}.brep" for k in ("body", "base", "hood")}
     skin = {}
     if all(f.exists() for f in files.values()):

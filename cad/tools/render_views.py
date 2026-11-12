@@ -34,7 +34,7 @@ import time
 from dataclasses import asdict, dataclass
 
 VIEWS = ("front", "side-right", "rear", "top",
-         "three-quarter-front-right", "three-quarter-front-left", "three-quarter-rear-left")
+         "three-quarter-front-right", "three-quarter-front-left", "three-quarter-rear-left", "three-quarter-rear-right")
 ORTHO_AXES = {
     "front": ((0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
     "side-right": ((-1.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
@@ -45,6 +45,7 @@ PERSPECTIVE = {
     "three-quarter-front-right": (42.0, 6.0),
     "three-quarter-front-left": (-42.0, 6.0),
     "three-quarter-rear-left": (-140.0, 18.0),
+    "three-quarter-rear-right": (140.0, 18.0),
 }
 CLOSEUP = {
     "closeup-cheek-foot": (42.0, 10.0),

@@ -68,18 +68,24 @@ FINISH = {"skin": "white", "plate": "black", "Monitor": "#3a4250", "Compute": "#
 @dataclass(frozen=True)
 class Layout:
     """Positions and gaps that nothing fixes yet."""
-    # power supply: its left face this far from the inner side wall of the rear body (as in the earlier layout)
+    # power supply: its left face this far from the inner side wall of the rear body (as in the earlier layout), and
+    # at least corner_clear inside the line where the round of the rear corner starts on the rear wall. 5, because
+    # in the round the slab cavity of this study is up to 4 narrower than a true offset (as behind the step); the
+    # duct then also stands 1 inside the door opening
     psu_side_gap: float = 8.0
+    corner_clear: float = 5.0
     # stowed cables: this far right of the power supply, against the rear wall (as in the earlier layout)
     bundle_gap: float = 6.0
     # BC-250: the DisplayPort plug space ends this far from the inner side wall (3 in the earlier layout; 4 here,
-    # because behind the step the cavity of this study is up to 3.4 narrower than a true offset)
+    # because behind the step the cavity of this study is up to 3.4 narrower than a true offset); its exhaust duct,
+    # which runs along the rear door, also keeps corner_clear inside the start of the rear corner's round
     bc_side_gap: float = 4.0
     # BC-250: its lower edge this far above the clear space over the supply's fan; 3 so that its exhaust duct, which
     # starts 3 below the board, stays out of that space (2 in the earlier layout gave 7.2 cm3 of overlap)
     bc_above_psu: float = 3.0
-    # the printed floor (split proposal: a 7 mm sandwich); the hub stands on it
-    floor_t: float = 7.0
+    # the printed floor: a 10 mm sandwich that stands on the table on thin non-slip pads (the owner, 2026-11-11);
+    # the power supply and the hub stand on it
+    floor_t: float = 10.0
     # monitor carrier: a flange on each side, outboard of the plug space, that holds the side of the bezel plate
     carrier_flange: float = 4.0
     carrier_flange_t: float = 4.0
@@ -101,8 +107,10 @@ class Layout:
     hub_back_gap: float = 10.0
     # speaker: the frame of the driver stays this far inside the outline of the speaker form
     speaker_frame_margin: float = 2.0
-    # rear door: the rear wall keeps a frame this wide round it; its lower edge this far below the board
+    # rear door: the rear wall keeps a frame this high above it; at its sides a flat land this wide between the door
+    # and the start of the rear corner's round; its lower edge this far below the board
     door_frame: float = 12.0
+    door_land: float = 4.0
     door_overlap: float = 8.0
     # monitor cables: the channels run back from the plug space at the height of the middle of the BC-250, to the
     # air space in front of its backplate
@@ -155,14 +163,15 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
     rear_y = d.body_d - w
     rear_x = d.rear_w / 2 - w
     bottom = so.on_screen(d, 0.0, d.image_s - v("mon_active_h") / 2 - v("mon_bezel_bottom"), d.mon_setback)
-    psu_z0 = w + v("psu_raise")
-    psu_x0 = -rear_x + lay.psu_side_gap
+    psu_z0 = max(w + v("psu_raise"), lay.floor_t)
+    flat_x = d.rear_w / 2 - d.rear_corner_r - lay.corner_clear  # the rear wall is flat inside this half width
+    psu_x0 = max(-rear_x + lay.psu_side_gap, -flat_x)
     bc_bottom = psu_z0 + v("psu_h") + v("psu_fan_clear") + lay.bc_above_psu
     open_x = d.panel_w / 2 - o.panel_ledge
     out = {"recline": d.recline, "mon_bottom_y": bottom.y, "mon_bottom_z": bottom.z,
            "psu_x0": psu_x0, "psu_y0": rear_y - v("psu_d_max"), "psu_z0": psu_z0,
            "bundle_x0": psu_x0 + v("psu_w") + lay.bundle_gap, "bundle_y0": rear_y - v("psu_bundle_d"),
-           "bc_x0": -rear_x + v("bc_dp_clear") + v("bc_io_overhang") + lay.bc_side_gap,
+           "bc_x0": max(-rear_x + lay.bc_side_gap, -flat_x) + v("bc_dp_clear") + v("bc_io_overhang"),
            "bc_top_z": bc_bottom + v("bc_pcb_w_pwr"), "bc_pcb_y": rear_y - SEAT - v("bc_gap_door") - v("bc_shroud_h"),
            "panel_y0": d.deck_nose + d.panel_gap, "cp_top_z": d.panel_top, "deck_t": d.panel_t, "panel_d": d.panel_d, "panel_w": d.panel_w,
            "stick_x": lay.stick_x, "stick_y": lay.stick_y_share * d.panel_d,
@@ -710,11 +719,32 @@ def rear_view(parts: dict[str, Part.Shape], found: list[Item], d: Blueprint, doo
 
 def door_outline(d: Blueprint, lay: Layout, v) -> dict:
     """A proposed opening in the lower rear wall for the rear door, which carries the BC-250: as wide as the rear wall
-    allows inside a frame of door_frame, from just below the board to door_frame below the slope of the upper rear."""
-    x = d.rear_w / 2 - lay.door_frame
+    allows: a flat land of door_land beside it before the round of the rear corner starts, from just below the board
+    to door_frame below the slope of the upper rear."""
+    x = d.rear_w / 2 - d.rear_corner_r - lay.door_land
     z0 = v("bc_top_z") - v("bc_pcb_w_pwr") - lay.door_overlap
     z1 = d.rear_step_z0 - lay.door_frame
     return {"x0": -x, "x1": x, "z0": z0, "z1": z1, "w": 2 * x, "h": z1 - z0}
+
+
+def door_service(found: list[Item], door: dict, d: Blueprint) -> list[tuple[str, str, str]]:
+    """The rear door serves the compute module: its board, heatsink, shroud and exhaust duct, seen from behind, lie
+    inside the door opening. The power supply's rear face stands below the door on the flat of the rear wall, where
+    its grille goes (the corner round starts rear_w / 2 - rear_corner_r from the centre line)."""
+    rows = []
+    flat = d.rear_w / 2 - d.rear_corner_r
+    for it in found:
+        for s in it.solids:
+            bb = s.world.BoundBox
+            if it.group == "Compute" and s.role == "hardware" or s.name in ("Compute_ExhaustDuct", "Compute_FanShroud"):
+                ok = door["x0"] <= bb.XMin and bb.XMax <= door["x1"] and door["z0"] <= bb.ZMin and bb.ZMax <= door["z1"]
+                rows.append((check.PASS if ok else check.FAIL, s.name, f"x {bb.XMin:.1f} to {bb.XMax:.1f}, z {bb.ZMin:.1f} to {bb.ZMax:.1f}; "
+                             f"door x {door['x0']:.1f} to {door['x1']:.1f}, z {door['z0']:.1f} to {door['z1']:.1f}"))
+            if s.name == "PSU_Body":
+                ok = -flat <= bb.XMin and bb.XMax <= flat and bb.ZMax <= door["z0"]
+                rows.append((check.PASS if ok else check.FAIL, s.name, f"rear face x {bb.XMin:.1f} to {bb.XMax:.1f}, z {bb.ZMin:.1f} to {bb.ZMax:.1f}: "
+                             f"on the flat of the rear wall (x within {flat:.1f}), below the door (z {door['z0']:.1f})"))
+    return rows
 
 
 # ---------- the cut-away ----------
@@ -814,6 +844,7 @@ def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[st
     wall = {"points": len(measured), "min": measured[0], "median": measured[len(measured) // 2], "max": measured[-1],
             "probes": {name: ray_wall(parts, cav, p, n) for name, p, n in wall_probes(d, h)}}
     door = door_outline(d, lay, pv)
+    rules["door service"] = door_service(found, door, d)
     margins = monitor_margins(doc, found, cav, d, pv)
     sight = sight_lines(d, parts, pv)
     failed = any(lv == check.FAIL for rows in rules.values() for lv, _, _ in rows)
