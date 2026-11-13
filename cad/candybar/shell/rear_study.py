@@ -136,6 +136,24 @@ class Band:
 
 
 @dataclass(frozen=True)
+class Shelf:
+    """R4: the band's run and the roll's underside are one shelf under the head, at one height at the rear corner.
+    The smile keeps R's curve up to `ease` before the point `flat` before the start of the corner round on the rear,
+    then a tangent arc takes it to level there; the band's run arrives level at the same height. Under the head the body is the lower body's
+    plan outline (corner R corner_r) tapered out at 45 degrees from that height: planes on the side and the rear, a
+    right cone on the corner. Rounds: the lower crease is one chain round the corner, R inner_side on the band to
+    R crease_lo on the roll; the upper edge is one chain, R outer_side on the band, R outer_corner where it passes the
+    head's corner (a convex round there must stay under the corner's R 25), R crease_hi on the middle of the roll. The
+    radius changes linearly along the corner and along the eased part of the smile."""
+    ease: float = 40.0
+    flat: float = 10.0
+    inner_side: float = 7.0
+    outer_side: float = 12.0
+    outer_corner: float = 24.0
+    constant: tuple[float, float] | None = (12.0, 20.0)   # (lower, upper): one radius per chain all round, in place of the laws
+
+
+@dataclass(frozen=True)
 class Variant:
     name: str
     title: str
@@ -155,6 +173,7 @@ class Variant:
     shoulder: Shoulder | None = None
     flare: Flare | None = None
     band: Band | None = None
+    shelf: Shelf | None = None
     note: str = ""
 
     @property
@@ -191,6 +210,8 @@ VARIANTS["R2Fb"] = replace(VARIANTS["R2"], name="R2Fb", title="R2Fb: R2, the ste
 VARIANTS["R3"] = replace(VARIANTS["R2"], name="R3", title="R3: the step as one band from the floor to the roll", shoulder=None, band=Band(),
                          note="one band of the step's section: stub 15 at the floor, S of R 80, lean, top arc R 80, run back to the roll; "
                               "its lower crease reaches the rear wall 28 below the roll's (as high, the three rounds meet in faces of 1 to 2)")
+VARIANTS["R4"] = replace(VARIANTS["R3"], name="R4", title="R4: one shelf under the head", band=replace(Band(), top_r=60.0, fall=0.0),
+                         shelf=Shelf(), note="the band's run and the roll's underside are one 45 degree shelf, level at the rear corner")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -238,12 +259,47 @@ def rear_path(d: Blueprint, v: Variant) -> pr.Path:
 
 
 def smile_z(v: Variant, x: float, half: float) -> float:
+    if v.shelf:
+        return eased_smile(v, x, half)
     return v.smile * (abs(x) / half) ** v.smile_power
+
+
+def shelf_x(v: Variant, half: float) -> tuple[float, float]:
+    """Where the smile's ease starts and where it is level: `flat` before the start of the lower corner round on the
+    rear, so that the swept roll ends on a plane of the taper and not on its cone."""
+    xe = half - v.corner_r - v.shelf.flat
+    return xe - v.shelf.ease, xe
+
+
+def ease_arc(v: Variant, half: float) -> tuple[float, float, float]:
+    """The tangent arc of the eased smile: centre x, centre z, radius (level at xe, tangent to R's smile at xt)."""
+    xt, xe = shelf_x(v, half)
+    zt = v.smile * (xt / half) ** v.smile_power
+    m = v.smile * v.smile_power * xt ** (v.smile_power - 1) / half ** v.smile_power
+    a = math.atan(m)
+    rho = (xe - xt) / math.sin(a)
+    ze = zt + rho * (1 - math.cos(a))
+    return xe, ze - rho, rho
+
+
+def eased_smile(v: Variant, x: float, half: float) -> float:
+    x = abs(x)
+    xt, xe = shelf_x(v, half)
+    if x <= xt:
+        return v.smile * (x / half) ** v.smile_power
+    cx, cz, rho = ease_arc(v, half)
+    if x >= xe:
+        return cz + rho
+    return cz + math.sqrt(rho * rho - (x - cx) ** 2)
 
 
 def rear_cutter(d: Blueprint, v: Variant) -> Part.Shape:
     """What the rear profile takes off the plain rear: the region behind the profile, across the width (A) or swept
-    along the smile with every section parallel (R)."""
+    along the smile with every section parallel (R). With a shelf (R4): the sharp profile (its creases are rounded
+    later, as chains round the corner), swept only between the starts of the two lower corner rounds, along a spine
+    of three edges (the eased ends and R's smile between), level at both ends; the shelf's taper takes the corners."""
+    if v.shelf:
+        return shelf_rear_cutter(d, v)
     path = rear_path(d, v)
     far = d.depth + 3 * OVER
     region = path + so.poly([so.ends(path[-1])[1], (far, -3 * OVER), (far, d.body_top + 3 * OVER)])[:-1]
@@ -262,6 +318,80 @@ def rear_cutter(d: Blueprint, v: Variant) -> Part.Shape:
     ps.build()
     ps.makeSolid()
     return ps.shape()
+
+
+def shelf_rear_cutter(d: Blueprint, v: Variant) -> Part.Shape:
+    lo, hi = v.crease_lo, v.crease_hi
+    path = rounded([(d.depth, d.body_top + 3 * OVER, 0.0), (hi[0], hi[1], 0.0), (lo[0], lo[1], 0.0), (d.body_d, -3 * OVER, 0.0)])
+    far = d.depth + 3 * OVER
+    region = path + so.poly([so.ends(path[-1])[1], (far, -3 * OVER), (far, d.body_top + 3 * OVER)])[:-1]
+    half = d.rear_w / 2
+    xt, xe = shelf_x(v, half)
+    cx, cz, rho = ease_arc(v, half)
+    at = lambda x: V(x, d.depth, eased_smile(v, x, half))
+    left = Part.Arc(at(-xe), at(-(xt + xe) / 2), at(-xt)).toShape()
+    right = Part.Arc(at(xt), at((xt + xe) / 2), at(xe)).toShape()
+    mid = Part.BSplineCurve()
+    t = right.tangentAt(right.FirstParameter)
+    mid.interpolate(Points=[at(x) for x in (-xt + 2 * xt * k / 40 for k in range(41))], InitialTangent=V(t.x, 0, -t.z), FinalTangent=t)
+    spine = Part.Wire([left, mid.toShape(), right])
+    prof = so.wire(so.closed(region), lambda p: V(-xe, p[0], p[1] + eased_smile(v, xe, half)))
+    ps = Part.BRepOffsetAPI.MakePipeShell(spine)
+    ps.setTrihedronMode(V(0, 0, 0), V(1, 0, 0))
+    ps.add(prof, False, False)
+    ps.build()
+    ps.makeSolid()
+    return ps.shape()
+
+
+def shelf_zc(d: Blueprint, v: Variant) -> float:
+    """Height of the shelf's lower crease (sharp) at the rear corner: the roll's, with the eased smile."""
+    return v.crease_lo[1] + eased_smile(v, d.rear_w / 2, d.rear_w / 2)
+
+
+def shelf_cutter(d: Blueprint, v: Variant) -> Part.Shape:
+    """What the shelf takes off the right rear corner, behind the start of the corner round on the rear (x > xe) and
+    behind the level part of the band (y > y_level): all that is outside the taper of the lower body's plan outline.
+    The taper is the outline (side x = rear_w/2, corner arc R corner_r, rear y = body_d) up to the crease height, and
+    above it the ruled loft to that outline moved out by its rise: planes and a right cone on the arc."""
+    a, r = d.rear_w / 2, v.corner_r
+    xt, xe = shelf_x(v, a)
+    zc = shelf_zc(d, v)
+    y_level = band_level_y(d, v)
+    c = (a - r, d.body_d - r)
+    x0, y0, rise = xe - OVER, y_level - OVER, d.body_top + 2 * OVER - zc
+
+    def outline(by: float, z: float, joined: bool) -> Part.Wire:
+        """The outline moved out by `by` at height z. joined: the side line from where the band's run is level, the
+        corner arc and the rear line to where the swept roll starts, as one exact rational B-spline: the seams of the
+        shelf then do not fall on the seams of the walls (where both meet the crease at one point, the round leaves a
+        filler face 0.1 wide), and each seam of the shelf is where its curvature changes (a plane cut in two would be a
+        split)."""
+        pts = lambda p: V(p[0], p[1], z)
+        m = math.sqrt(0.5)
+        p1, p2 = (a + by, y_level), (xe, d.body_d + by)
+        circle = Part.Arc(pts((a + by, c[1])), pts((c[0] + (r + by) * m, c[1] + (r + by) * m)), pts((c[0], d.body_d + by)))
+        if joined:
+            # side line, the quarter arc as one rational segment, rear line: the same knots at every offset, so that
+            # the ruled loft pairs points square to the outline (planes and an exact cone)
+            q0, q1, q2, q3 = p1, (a + by, c[1]), (c[0], d.body_d + by), p2
+            mid = lambda u, w: ((u[0] + w[0]) / 2, (u[1] + w[1]) / 2)
+            poles = [pts(q) for q in (q0, mid(q0, q1), q1, (a + by, d.body_d + by), q2, mid(q2, q3), q3)]
+            corner = Part.BSplineCurve()
+            corner.buildFromPolesMultsKnots(poles, [3, 2, 2, 3], [0.0, 1.0, 2.0, 3.0], False, 2, [1.0, 1.0, 1.0, m, 1.0, 1.0, 1.0])
+        else:
+            corner = circle
+            p1, p2 = (a + by, c[1]), (c[0], d.body_d + by)
+        ring = [(x0 - by, y0 - by), (a + by, y0 - by), p1, p2, (x0 - by, d.body_d + by)]
+        edges = [Part.LineSegment(pts(ring[0]), pts(ring[1])).toShape(), Part.LineSegment(pts(ring[1]), pts(ring[2])).toShape(), corner.toShape(),
+                 Part.LineSegment(pts(ring[3]), pts(ring[4])).toShape(), Part.LineSegment(pts(ring[4]), pts(ring[0])).toShape()]
+        return Part.Wire(edges)
+
+    below = Part.Face(outline(0.0, -3 * OVER, False)).extrude(V(0, 0, zc + 3 * OVER))
+    taper = Part.makeLoft([outline(0.0, zc, True), outline(rise, zc + rise, True)], True, True)
+    keep = below.fuse(taper).removeSplitter()
+    box = Part.makeBox(d.width / 2 + 2 * OVER - xe, d.depth + 3 * OVER - y_level, rise + zc + 3 * OVER, V(xe, y_level, -3 * OVER))
+    return box.cut(keep)
 
 
 # ---------- edge finding ----------
@@ -311,11 +441,16 @@ def sharp_body(d: Blueprint, v: Variant, rear: bool = True, right_only: bool = F
     rail_top = fr.rail.at(fr.rail.a1)
     profile = [pr.Line((ya, 0.0), (ya, d.deck_top)), fr.sweep, fr.rail] + so.poly([rail_top, (d.depth, d.body_top), (d.depth, 0.0), (ya, 0.0)])[:-1]
     solid = so.across(profile).common(so.along(so.both_sides(sides + [pr.Line(end, (0.0, end[1]))])))
+    if v.shelf:
+        # the head's rear corners first, as plan rounds from the floor to the body top; the cuts below take the lower part
+        solid = solid.makeFillet(v.corner_r, edges_where(solid, lambda p: abs(abs(p.x) - d.side_x(p.z)) < ON and abs(p.y - d.depth) < ON))
     xb = d.bezel_w / 2 + d.panel_gap
     bw = d.bezel_w / 2
     plate = so.bezel_box(d, fr, -bw, bw).cut(so.behind_screen(d, d.mon_setback))
     reveal = so.bezel_box(d, fr, bw, xb).cut(so.land_cylinder(d, fr))
     step = band_cutter(d, v) if v.band else recess_cutter(d, v) if v.shoulder else step_cutter(d)
+    if v.shelf:
+        step = step.fuse(shelf_cutter(d, v)).removeSplitter()
     cutters = [so.both(so.rail_cutter(d, fr)), step if right_only else so.both(step), plate, so.both(reveal), so.screen(d)]
     return solid.cut(cutters + ([rear_cutter(d, v)] if rear else [])).removeSplitter()
 
@@ -444,7 +579,8 @@ def band_path(d: Blueprint, v: Variant) -> pr.Path:
     r3 = b.top_r
     nl = (math.sin(lean), -math.cos(lean))
     nr = (math.sin(phi), -math.cos(phi))
-    q0 = (d.body_d - d.step_in * nr[0], shoulder_z0(d, v) + b.run_dz - d.step_in * nr[1])
+    z_inner = shelf_zc(d, v) if v.shelf else shoulder_z0(d, v) + b.run_dz
+    q0 = (d.body_d - d.step_in * nr[0], z_inner - d.step_in * nr[1])
     a1, a2 = (line_y(0.0) + r3 * nl[0], r3 * nl[1]), (q0[0] + r3 * nr[0], q0[1] + r3 * nr[1])
     u1, u2 = (math.cos(lean), math.sin(lean)), (math.cos(phi), math.sin(phi))
     det = -u1[0] * u2[1] + u1[1] * u2[0]
@@ -456,6 +592,11 @@ def band_path(d: Blueprint, v: Variant) -> pr.Path:
     p5 = (far, p4[1] + (far - p4[0]) * b.fall)
     return [pr.Line((yf, -OVER), (yf, ls)), pr.Arc(c1, r, 0.0, th), pr.Arc(c2, r, math.pi + th, lean + math.pi / 2),
             pr.Line(p2, p3), pr.Arc(c3, r3, lean + math.pi / 2, phi + math.pi / 2), pr.Line(p4, p5)]
+
+
+def band_level_y(d: Blueprint, v: Variant) -> float:
+    """Y where the band's run is level (the end of its top arc)."""
+    return band_path(d, v)[-1].p[0]
 
 
 def offset_path(path: pr.Path, by: float) -> pr.Path:
@@ -584,6 +725,168 @@ def shoulder_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     return s.makeFillet(v.corner_r, es)
 
 
+def shelf_face_kind(f: Part.Face, d: Blueprint, v: Variant) -> str:
+    """L: a wall of the lower body (recessed side, its corner round, the lower rear wall); U: a wall of the head (the
+    full-width side, its corner round, the upper rear wall); S: the band or the shelf (the faces between them); ""
+    for any other face. Mirrored to the right side. shelf_edges keeps only edges behind the old leaning step line."""
+    u0, u1, v0, v1 = f.ParameterRange
+    c = f.valueAt((u0 + u1) / 2, (v0 + v1) / 2)
+    n = f.normalAt((u0 + u1) / 2, (v0 + v1) / 2)
+    if c.x < 0:
+        c, n = V(-c.x, c.y, c.z), V(-n.x, n.y, n.z)
+    a, W, r = d.rear_w / 2, d.width / 2, v.corner_r
+    plane = isinstance(f.Surface, Part.Plane)
+    if (plane and abs(abs(n.x) - 1) < 1e-6 and abs(c.x - a) < 0.5) \
+            or (isinstance(f.Surface, Part.Cylinder) and abs(f.Surface.Radius - r) < 1e-6 and abs(f.Surface.Center.y - (d.body_d - r)) < 1e-3) \
+            or (plane and abs(abs(n.y) - 1) < 1e-6 and abs(c.y - d.body_d) < 1e-3):
+        return "L"
+    if (abs(n.x) > 0.95 and c.x > W - 6) or (plane and abs(abs(n.y) - 1) < 1e-6 and abs(c.y - d.depth) < 1e-3) \
+            or (isinstance(f.Surface, (Part.Cylinder, Part.Toroid)) and c.x > W - r - 1 and c.y > d.depth - r - 1):
+        return "U"
+    if a + 0.05 < c.x < W - 0.05 or (d.body_d + 1 < c.y < d.depth - 1) or isinstance(f.Surface, Part.Cone):
+        return "S"
+    return ""
+
+
+def shelf_radius(d: Blueprint, v: Variant, p: FreeCAD.Vector, upper: bool) -> float:
+    """The radius of a crease round at a point of its edge (right side; x mirrored)."""
+    sh, a, r = v.shelf, d.rear_w / 2, v.corner_r
+    x, y = abs(p.x), p.y
+    cx, cy = a - r, d.body_d - r
+    xt, xe = shelf_x(v, a)
+    if not upper:
+        # from the side's R round the corner arc and the flat before it to the roll's R, linear in length along the crease
+        arc, flat = r * math.pi / 2, cx - xe
+        if y <= cy + 1e-6 and x > cx:
+            along = 0.0
+        elif x >= cx - 1e-6 and y > cy:
+            along = r * math.atan2(y - cy, x - cx)
+        elif x >= xe - 1e-6:
+            along = arc + (cx - x)
+        else:
+            return v.crease_lo[2]
+        return sh.inner_side + (v.crease_lo[2] - sh.inner_side) * along / (arc + flat)
+    W, ch = d.width / 2, d.depth - r
+    hx = W - r                                  # where the head's corner round starts on the rear
+    if y <= cy + 1e-6 and x > a:
+        return sh.outer_side
+    if x > hx - 1e-6 and y < ch - 1e-6:
+        return sh.outer_side + (sh.outer_corner - sh.outer_side) * (y - cy) / (ch - cy)
+    if x >= hx - 1e-6:
+        return sh.outer_corner
+    if x >= xt:
+        return sh.outer_corner + (v.crease_hi[2] - sh.outer_corner) * (hx - x) / (hx - xt)
+    return v.crease_hi[2]
+
+
+def chain_order(edges: list[Part.Edge]) -> list[tuple[Part.Edge, FreeCAD.Vector, FreeCAD.Vector]]:
+    """The edges of one open chain in walking order from its end on the right side at the floor (largest x, then
+    lowest z), each with the vertex it is entered at and the one it is left at."""
+    key = lambda p: (round(p.x, 4), round(p.y, 4), round(p.z, 4))
+    ends: dict = {}
+    for e in edges:
+        for vx in (e.Vertexes[0], e.Vertexes[-1]):
+            ends.setdefault(key(vx.Point), []).append(e)
+    free = [k for k, es in ends.items() if len(es) == 1]
+    start = min(free, key=lambda k: (-(k[0] > 0), k[2], -k[0]))
+    out, at, used = [], start, set()
+    while True:
+        nxt = [e for e in ends.get(at, []) if e.hashCode() not in used]
+        if not nxt:
+            break
+        e = nxt[0]
+        used.add(e.hashCode())
+        p0, p1 = e.Vertexes[0].Point, e.Vertexes[-1].Point
+        a, b = (p0, p1) if key(p0) == at else (p1, p0)
+        out.append((e, a, b))
+        at = key(b)
+    return out
+
+
+def law_fillet(s: Part.Shape, edges: list[Part.Edge], radius, probes: list[tuple[FreeCAD.Vector, float]] = ()) -> Part.Shape:
+    """A round on one open chain whose radius runs linearly along each edge between radius() at its two ends (a
+    Part::Fillet feature: OpenCascade's linear law per edge). OpenCascade lays the two radii of an edge along the
+    chain's own direction, which is not known here, so the chain is walked from its end on the right floor and the
+    round is made both ways; the one whose radius at the probe points is nearest to what is wanted is kept."""
+    walk = chain_order(edges)
+    if len(walk) != len(edges):
+        raise ValueError(f"the edges are not one open chain ({len(walk)} of {len(edges)} walked)")
+    index = {}
+    for i, e in enumerate(s.Edges):
+        index.setdefault(e.hashCode(), i + 1)
+    made = []
+    for forward in (True, False):
+        doc = FreeCAD.newDocument("law_fillet")
+        try:
+            base = doc.addObject("Part::Feature", "base")
+            base.Shape = s
+            fl = doc.addObject("Part::Fillet", "fillet")
+            fl.Base = base
+            seq = walk if forward else [(e, b, a) for e, a, b in reversed(walk)]
+            fl.Edges = [(index[e.hashCode()], radius(a), radius(b)) for e, a, b in seq]
+            doc.recompute()
+            out = fl.Shape.copy()
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+        if out.isNull() or not out.isValid():
+            continue
+        miss = sum(abs(radius_at(out, p) - r) for p, r in probes)
+        made.append((miss, out))
+    if not made:
+        raise Part.OCCError("law fillet failed both ways")
+    return min(made, key=lambda m: m[0])[1]
+
+
+def crease_angle(faces: list[Part.Face], p: FreeCAD.Vector) -> float:
+    """Angle in degrees between the normals of two faces at a point of their common edge (0: tangent)."""
+    ns = [f.normalAt(*f.Surface.parameter(p)) for f in faces]
+    return math.degrees(math.acos(max(-1.0, min(1.0, abs(ns[0].dot(ns[1]))))))
+
+
+def shelf_edges(s: Part.Shape, d: Blueprint, v: Variant, wall: str) -> list[Part.Edge]:
+    out = []
+    for e in s.Edges:
+        fs = s.ancestorsOfType(e, Part.Face)
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        if len(fs) == 2 and not e.Degenerated and e.BoundBox.ZMax > 1e-3 and m.y > d.step_y(m.z) - 1:
+            ks = sorted(shelf_face_kind(f, d, v) for f in fs)
+            if ks == sorted([wall, "S"]) and crease_angle(fs, m) > 5.0:
+                out.append(e)
+    return out
+
+
+def shelf_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
+    """The body of a shelf variant with its rounds, up to the base chamfer: the sharp body (head corners and the lower
+    corner round already in it), then the lower crease (one chain round each corner) and the upper edge (one chain),
+    each with its radius law."""
+    s = sharp_body(d, v)
+    for k, (name, wall, upper) in enumerate((("lower crease", "L", False), ("upper edge", "U", True))):
+        es = shelf_edges(s, d, v, wall)
+        if v.shelf.constant:
+            log.append(f"{name}: {len(es)} edges, R {v.shelf.constant[k]:g}")
+            s = s.makeFillet(v.shelf.constant[k], es)
+        else:
+            log.append(f"{name}: {len(es)} edges, radius law")
+            rad = lambda p, u=upper: shelf_radius(d, v, p, u)
+            s = law_fillet(s, es, rad, shelf_probes(d, v, upper, rad))
+    return s
+
+
+def shelf_probes(d: Blueprint, v: Variant, upper: bool, rad) -> list[tuple[FreeCAD.Vector, float]]:
+    """Points just off the sharp crease where the round's radius changes, with the radius wanted there."""
+    a, r, W = d.rear_w / 2, v.corner_r, d.width / 2
+    cx, cy = a - r, d.body_d - r
+    xt, xe = shelf_x(v, a)
+    zc = shelf_zc(d, v)
+    if not upper:
+        q = V(cx + r * math.cos(math.pi / 4), cy + r * math.sin(math.pi / 4), zc)
+        x = (xt + xe) / 2
+        return [(q, rad(q)), (V(x, d.body_d, v.crease_lo[1] + eased_smile(v, x, a)), rad(V(x, d.body_d, 0)))]
+    x = (xt + W - r) / 2
+    p = V(x, d.depth, v.crease_hi[1] + eased_smile(v, x, a))
+    return [(p, rad(p))]
+
+
 def band_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     """The body of a band variant with its rounds, up to the base chamfer: as shoulder_body, with two chains on the
     right side (the recessed edge and the full-width edge of the band, each from the floor to the rear), the mirror,
@@ -667,7 +970,7 @@ def floor_edges(s: Part.Shape, y_front: float) -> list[Part.Edge]:
 
 
 def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
-    s = band_body(d, v, log) if v.band else shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
+    s = shelf_body(d, v, log) if v.shelf else band_body(d, v, log) if v.band else shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
     if v.step_r and not (v.shoulder or v.band):
         outer, inner = step_edges(d, s)
         log.append(f"step edges: {len(outer)} outer, {len(inner)} inner")

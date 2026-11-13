@@ -214,3 +214,61 @@ class CandidateR3Test(unittest.TestCase):
         low, high = band(self.v.chamfer + 1.0), band(self.v.band.stub - 1.0)
         self.assertTrue(low)
         self.assertLess(max(min(math.dist(p, q) for q in high) for p in low), 0.05)
+
+
+def corner_column(shape: Part.Shape, z: float, y_side: float = 512.5, x_rear: float = 205.0, tol: float = 0.05) -> tuple[float, float]:
+    """At height z, right rear corner: the y where the outline leaves the side line (as it is at y_side) and the x
+    where it leaves the rear line (as it is at x_rear)."""
+    pts = [(p.x, p.y) for w in shape.slice(V(0, 0, 1), z) for e in w.Edges for p in e.discretize(Distance=0.05) if p.x > 150 and p.y > 480]
+    xs = max(p[0] for p in pts if abs(p[1] - y_side) < 0.3)
+    yr = max(p[1] for p in pts if abs(p[0] - x_rear) < 0.3)
+    return max(p[1] for p in pts if abs(p[0] - xs) < tol), max(p[0] for p in pts if abs(p[1] - yr) < tol)
+
+
+class CandidateR4Test(unittest.TestCase):
+    """R4: the band's run and the roll's underside are one 45 degree shelf under the head, level at the rear corner,
+    a cone round the corner; the corner moves outward once from the lower body to the head."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R4"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_changed_zone_passes_the_face_check(self) -> None:
+        d = self.d
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0]
+        self.assertEqual(found, [])
+
+    def test_the_head_has_the_full_width(self) -> None:
+        d, v = self.d, self.v
+        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + v.crease_hi[1] + v.smile) / 2):
+            self.assertAlmostEqual(half_width(self.body, z, d.body_d), d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
+
+    def test_the_band_meets_the_floor_at_90_degrees(self) -> None:
+        y = rs.band_path(self.d, self.v)[0].p[0]
+
+        def band(z: float) -> list[tuple[float, float]]:
+            return [(p.x, p.y) for w in self.body.slice(V(0, 0, 1), z) for p in w.discretize(Distance=0.1)
+                    if p.x > self.d.rear_w / 2 - 1 and y - 25 < p.y < y + 25]
+
+        low, high = band(self.v.chamfer + 1.0), band(self.v.band.stub - 1.0)
+        self.assertTrue(low)
+        self.assertLess(max(min(math.dist(p, q) for q in high) for p in low), 0.05)
+
+    def test_the_corner_moves_outward_once(self) -> None:
+        """From z 280 to z 380 every 5 mm, the corner round leaves the side and the rear further out or as far as
+        before (the rear's x with the tuck of the side taken out): no step back and forth."""
+        d = self.d
+        rows = [(z, *corner_column(self.body, float(z))) for z in range(280, 385, 5)]
+        side = [y for _, y, _ in rows]
+        rear = [x + (d.width / 2 - d.side_x(z)) for z, _, x in rows]
+        for k in range(1, len(rows)):
+            self.assertGreaterEqual(side[k], side[k - 1] - 0.3, f"side at z {rows[k][0]}: {side}")
+            self.assertGreaterEqual(rear[k], rear[k - 1] - 0.3, f"rear at z {rows[k][0]}: {rear}")
+        self.assertGreater(side[-1] - side[0], 30.0)
+        self.assertGreater(rear[-1] - rear[0], 8.0)

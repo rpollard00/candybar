@@ -10,6 +10,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r2  # rear-rev7-r2-corner.png, rear-rev7-r2-flare.png
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r3  # R3 with R2's cameras
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r3   # rear-rev7-r3.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r4  # R4 with R3's cameras
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r4   # rear-rev7-r4.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -75,7 +77,9 @@ def layout(name: str) -> dict:
     v = variant(name)
     r = v["corner_r"]
     lo = v["crease_lo"]
-    roll_foot = lo[1] - lo[2] * TAN
+    shelf = v.get("shelf") or {}
+    lo_r = shelf["constant"][0] if shelf.get("constant") else lo[2]     # R4: the lower crease is one constant round
+    roll_foot = lo[1] - lo_r * TAN
     door_half = rear_x() - r - DOOR_LAND
     door = (-door_half, 116.0, door_half, roll_foot - DOOR_FRAME)
     round_start = rear_x() - r
@@ -546,10 +550,24 @@ def sheets_r2() -> None:
 R3_VIEWS = ("three-quarter-rear-right", "closeup-r2-corner", "closeup-turn", "flare-foot", "side-right", "rear", "three-quarter-rear-above")
 
 
-def render_r3() -> None:
-    model = os.path.join(STUDY, "R3")
-    subprocess.run([sys.executable, os.path.join(HERE, "render_views.py"), os.path.join(RENDERS, "R3"), model, "--views", ",".join(R3_VIEWS),
+def render_r3(name: str = "R3") -> None:
+    model = os.path.join(STUDY, name)
+    subprocess.run([sys.executable, os.path.join(HERE, "render_views.py"), os.path.join(RENDERS, name), model, "--views", ",".join(R3_VIEWS),
                     f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+
+
+def sheet_r4() -> None:
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "rear", "side-right"]
+    w = 470
+    rows = [[tile("R3", v, w) for v in views], [tile("R4", v, w) for v in views]]
+    notes = ["All BREP face edges drawn; same camera in each column. R4: the band's run and the roll's underside are one 45 degree shelf, level at the rear corner",
+             "(lower crease z 305.7), 12 deep on the side and 40 deep on the rear; round the corner it is the lower body's R 25 outline tapered out at 45 degrees",
+             "(planes, and a cone on the arc), cut by the head. R's smile is kept to x 160 and eased to level at x 200 (tangent arc R 313): 0.3 lower at x 170, 2.6 at 190,",
+             "4.9 at 200. The band's top arc is R 60 (R 80 does not reach level before the corner round). Rounds: one constant pair all round, R 12 at the lower crease",
+             "and R 20 at the upper edge, so the roll is crisper than R's R 25 / R 60. Radii that change along the corner built clean but OpenCascade did not follow",
+             "the radii set at the edges, and left lumps (not used). The corner moves outward once: no twist, no knuckle."]
+    sheet = grid(rows, ["R3", "R4: one shelf"], views, "Rear: R3 and R4 (one shelf under the head)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r4.png"))
 
 
 def sheet_r3() -> None:
@@ -575,4 +593,4 @@ def costs_md() -> None:
 
 if __name__ == "__main__":
     {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2, "render-r3": render_r3,
-     "sheet-r3": sheet_r3}[sys.argv[1]]()
+     "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4}[sys.argv[1]]()
