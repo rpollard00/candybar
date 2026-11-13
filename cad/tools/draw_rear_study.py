@@ -21,6 +21,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r8  # rear-rev7-r8.png, rear-rev7-r8-corners.png
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r9  # R9, and R8 at the top of its hip
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r9  # rear-rev7-r9.png, rear-rev7-r9-corners.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r10 # R10, and R9 with R10's close-ups
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r10  # rear-rev7-r10.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -733,6 +735,51 @@ def sheets_r9() -> None:
     grid(rows, ["R8", "R9"], views, "Rear: R8 and R9", notes).save(os.path.join(COMPARE, "rear-rev7-r9.png"))
 
 
+
+R10_CLOSE = ("closeup-cut-in-straight", "closeup-cut-in-corner", "closeup-hood-corner-above", "closeup-hood-corner-side", "closeup-hood-corner-rear",
+             "closeup-hood-roof-end")
+R9_CAMS = "R9-r10cams"
+
+
+def render_r10() -> None:
+    """R10 with its close-ups, and R9 with the same cameras (the cut-ins and the hood sit where they were)."""
+    script = os.path.join(HERE, "render_views.py")
+    model = os.path.join(STUDY, "R10")
+    views = ("three-quarter-rear-right", "rear", "side-right") + R10_CLOSE
+    subprocess.run([sys.executable, script, os.path.join(RENDERS, "R10"), model, "--views", ",".join(views), f"--frame={FRAME}", "--size", "1100",
+                    "--samples", "16"], check=True)
+    src, dst = os.path.join(STUDY, "R9"), os.path.join(STUDY, R9_CAMS)
+    os.makedirs(dst, exist_ok=True)
+    manifest = json.load(open(os.path.join(src, "manifest.json")))
+    for e in manifest.values():
+        e["file"], e["brep"] = os.path.join(src, e["file"]), os.path.join(src, e["brep"])
+    json.dump(manifest, open(os.path.join(dst, "manifest.json"), "w"), indent=1)
+    if not os.path.exists(os.path.join(dst, "edges.json")):
+        os.symlink(os.path.join(src, "edges.json"), os.path.join(dst, "edges.json"))
+    cams = json.load(open(os.path.join(model, "focus.json")))
+    json.dump({k: cams[k] for k in R10_CLOSE}, open(os.path.join(dst, "focus.json"), "w"), indent=1)
+    subprocess.run([sys.executable, script, os.path.join(RENDERS, R9_CAMS), dst, "--views", ",".join(R10_CLOSE), f"--frame={FRAME}", "--size", "1100",
+                    "--samples", "16"], check=True)
+
+
+def sheet_r10() -> None:
+    def r9(view: str, w: int) -> Image.Image:
+        return tile(R9_CAMS if view in R10_CLOSE else "R9", view, w)
+
+    views = ["closeup-cut-in-straight", "closeup-cut-in-corner", "closeup-hood-corner-above", "closeup-hood-roof-end", "three-quarter-rear-right"]
+    w = 400
+    rows = [[r9(v, w) for v in views], [tile("R10", v, w) for v in views]]
+    notes = R10_NOTES
+    grid(rows, ["R9", "R10"], views, "Rear: R9 and R10", notes).save(os.path.join(COMPARE, "rear-rev7-r10.png"))
+
+
+R10_NOTES = ["All BREP face edges drawn; same camera in each column. R10: the cut-ins' ball keeps one distance from the surface all round (its path the",
+             "offset of the plan outline, the corner's ellipse included): ball R 9.08, centre 7.58 outside, groove 1.5 deep, the lips level lines 5.0 above",
+             "and below the path on the legs and round the corner alike (R9 bulged at the corner). The hood's rear corners R 3 like the head's: the cap rounded",
+             "on the right in common with its mirror, so no face is split at x 0; the round runs on to the roof, where its width goes to nothing. Across the",
+             "seam the corner lines meet within 0.22. Left sharp: the hood's bevel corner at the foot of the round (no R 1 builds there)."]
+
+
 def stroke_options() -> dict[str, list[tuple[float, float]]]:
     """The outer edge of the band in side view (y, z) for each option of the foot and the top (R7)."""
     t = math.tan(math.radians(D.step_lean))
@@ -851,4 +898,5 @@ if __name__ == "__main__":
      "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4,
      "render-r5": render_r5, "sheet-r5": sheet_r5,
      "angles-r7": sheet_r7_angles, "render-r7": render_r7, "sheet-r7": sheet_r7,
-     "render-r8": render_r8, "sheets-r8": sheets_r8, "render-r9": render_r9, "sheets-r9": sheets_r9}[sys.argv[1]]()
+     "render-r8": render_r8, "sheets-r8": sheets_r8, "render-r9": render_r9, "sheets-r9": sheets_r9,
+     "render-r10": render_r10, "sheet-r10": sheet_r10}[sys.argv[1]]()

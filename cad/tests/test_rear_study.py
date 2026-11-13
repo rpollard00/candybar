@@ -553,3 +553,99 @@ class CandidateR9Test(unittest.TestCase):
             self.assertGreaterEqual(rows[k][1], rows[k - 1][1] - 0.05, msg=f"side, z {z}")
             if z != 340:
                 self.assertGreaterEqual(rear(rows[k]), rear(rows[k - 1]) - 0.05, msg=f"rear, z {z}")
+
+
+class CandidateR10Test(unittest.TestCase):
+    """R10: R9 with cut-ins whose ball keeps one distance from the surface all round (the lips level lines round the
+    corner) and the hood's rear corners R 3 like the head's."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R10"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+        cls.log = []
+        cls.hood = rs.hood(cls.d, cls.v, cls.log)["hood"]
+
+    def spots(self) -> list[tuple]:
+        """Plan points on the surface with the outward normal: two on each leg, five round the corner's ellipse."""
+        d = self.d
+        a, y0, r = d.rear_w / 2, d.body_d, self.v.planar.fillet
+        rr, k = r / math.sqrt(2), math.sqrt(0.5)
+        o = V(a - 2 * rr, y0 - 2 * rr, 0)
+        ell = Part.Ellipse(o + V(k, k, 0) * (math.sqrt(3) * r), o + V(-k, k, 0) * r, o)
+        u0, u1 = sorted((ell.parameter(V(a, y0 - rr, 0)), ell.parameter(V(a - rr, y0, 0))))
+        if u1 - u0 > math.pi:
+            u0, u1 = u1, u0 + 2 * math.pi
+        out = [(V(a - 12, y0, 0), V(0, 1, 0)), (V(a - 6, y0, 0), V(0, 1, 0)), (V(a, y0 - 6, 0), V(1, 0, 0)), (V(a, y0 - 12, 0), V(1, 0, 0))]
+        for t in (0.05, 0.25, 0.5, 0.75, 0.95):
+            u = u0 + (u1 - u0) * t
+            dv = ell.tangent(u)[0]
+            n = V(dv.y, -dv.x, 0)
+            out.append((ell.value(u), n if n.x + n.y > 0 else -n))
+        return out
+
+    def test_the_parts_are_one_valid_solid_each(self) -> None:
+        for s in (self.body, self.hood):
+            self.assertTrue(s.isValid())
+            self.assertEqual(len(s.Solids), 1)
+
+    def test_the_lips_are_level_and_the_slot_10_high_round_the_corner(self) -> None:
+        """At 0.002 inside the surface (the lip there is 0.003 nearer the middle than on the surface)."""
+        c = self.v.cut_ins
+        for i in range(c.count):
+            zm = c.z0 + i * c.pitch + c.height / 2
+            for q, n in self.spots():
+                pt = q - n * 0.002
+                seg = Part.LineSegment(V(pt.x, pt.y, zm - 9), V(pt.x, pt.y, zm + 9)).toShape().common(self.body)
+                zs = sorted(z for e in seg.Edges for z in (e.Vertexes[0].Point.z, e.Vertexes[-1].Point.z))
+                gaps = [(zs[j], zs[j + 1]) for j in range(1, len(zs) - 1, 2) if zs[j + 1] - zs[j] > 1]
+                self.assertEqual(len(gaps), 1, msg=f"slot {i} at ({q.x:.2f}, {q.y:.2f})")
+                lo, hi = gaps[0]
+                self.assertAlmostEqual(hi - zm, 5.0, delta=0.05)
+                self.assertAlmostEqual(zm - lo, 5.0, delta=0.05)
+                self.assertAlmostEqual(hi - lo, 10.0, delta=0.05)
+
+    def test_the_cut_ins_pass_the_face_check(self) -> None:
+        found = fc.failures(fc.check(self.body, "body", fc.default_reveals(), break_radius=self.v.planar.edge_break))
+        self.assertEqual([f for f in found if 110 < f.at[2] < 220 and abs(f.at[0]) > 190 and f.at[1] > 500], [])
+
+    def test_the_hood_has_r3_on_both_rear_corners(self) -> None:
+        def r3(f: Part.Face) -> bool:
+            u0, u1, v0, v1 = f.ParameterRange
+            try:
+                return abs(max(abs(k) for k in f.curvatureAt((u0 + u1) / 2, (v0 + v1) / 2)) - 1 / 3) < 0.02
+            except Exception:
+                return False
+        rounds = [f for f in self.hood.Faces if r3(f) and f.BoundBox.YMax > 500]
+        right = sum(f.Area for f in rounds if f.CenterOfMass.x > 0)
+        left = sum(f.Area for f in rounds if f.CenterOfMass.x < 0)
+        self.assertGreater(right, 500.0)
+        self.assertAlmostEqual(left, right, delta=0.01 * right)
+
+    def test_the_hood_has_no_split_at_x0_that_r9_had_not(self) -> None:
+        r9 = [(0.0, 460.1, 569.3), (0.0, 495.0, 573.4)]
+        x0 = [f.at for f in fc.failures(fc.check(self.hood, "hood")) if f.rule == "split" and abs(f.at[0]) < 1.0]
+        self.assertTrue(all(any(math.dist(a, q) < 2.0 for q in r9) for a in x0), msg=str(x0))
+
+    def test_the_corner_lines_meet_across_the_seam(self) -> None:
+        """Each corner read 0.05 and 10 from its side of the seam and carried to the seam's middle: the corner points
+        within 0.3 (0.22 measured, of which 0.26 across is the hood's side standing out of the head's side line)."""
+        d = self.d
+        zm = d.body_top + d.seam_gap / 2
+
+        def read(s: Part.Shape, z: float) -> tuple[float, float, float]:
+            pts = [q for w in s.slice(V(0, 0, 1), z) for q in w.discretize(Distance=0.01) if q.x > 150 and q.y > 520]
+            xs = max(q.x for q in pts if abs(q.y - 560) < 0.05)
+            yr = max(q.y for q in pts if abs(q.x - 215) < 0.05)
+            dg = max((q.x - xs) + (q.y - yr) for q in pts)
+            return xs + dg / 2, yr + dg / 2
+
+        def at_middle(s: Part.Shape, z0: float, z1: float) -> tuple[float, float]:
+            p0, p1 = read(s, z0), read(s, z1)
+            return tuple(p0[i] + (p0[i] - p1[i]) / (z0 - z1) * (zm - z0) for i in range(2))
+
+        g = d.seam_groove
+        body = at_middle(self.body, d.body_top - g - 0.05, d.body_top - g - 10)
+        hood = at_middle(self.hood, d.body_top + d.seam_gap + g + 0.05, d.body_top + d.seam_gap + g + 10)
+        self.assertLess(math.dist(body, hood), 0.3)

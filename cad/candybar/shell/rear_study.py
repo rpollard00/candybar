@@ -180,6 +180,8 @@ class Planar:
     grip_r: float = 0.0          # R8: the hand-holds' inside edges rounded on the cutter (the rim stays sharp)
     grip_roof_r: float = 0.0     # R9: the roof's chain (roof to back wall and round ends) on its own radius (0: grip_r)
     hood_whole: bool = False     # R8: the hood's corners rounded on both sides as one piece (no mirror line)
+    cut_in_depth: float = 0.0    # R10: cut-ins on the offset of the plan outline (even_cut_ins): the groove this deep, the slot cut_ins.height
+    hood_cutter: bool = False    # R10: the hood's rear corners R fillet, made on the right and cut from both sides as a body (planar_hood)
     edge_break: float = 0.0      # R9: the last step, a round of this radius on every convex edge of the back that turns more than 45 degrees and has no round (the hand-holds' rims)
     round_ends: bool = False
 
@@ -272,6 +274,10 @@ VARIANTS["R9"] = replace(VARIANTS["R8"], name="R9", title="R9: R8 with the shelf
                          planar=replace(VARIANTS["R8"].planar, ball_path_r=8.0, edge_break=1.0, grip_roof_r=3.0),
                          note="shelf 5 lower (the run's outer edge, the top mitre and the hip's top on the flat of the side); cut-ins with "
                               "an even slot (the ball's path R 8 round the corner); the hand-holds' roof chain R 3 (holds 45 degrees); a break of R 1 on every sharp convex edge of the back, the hand-holds' rims all round")
+VARIANTS["R10"] = replace(VARIANTS["R9"], name="R10", title="R10: R9 with level cut-in lips round the corner and round hood corners",
+                          planar=replace(VARIANTS["R9"].planar, cut_in_depth=1.5, hood_cutter=True),
+                          note="cut-ins on the offset of the plan outline (groove 1.5 deep, slot 10, the lips level all round); the hood's rear "
+                               "corners R 3 like the head's, made on the right and cut from both sides as one body (the hood never split at x 0)")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -1204,7 +1210,7 @@ def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
         log.append(f"head corners: {len(es)} edges, R {p.fillet:g}")
         s = s.makeFillet(p.fillet, es)
     if v.cut_ins:
-        s = s.cut(so.both(ball_cut_ins(d, v) if p.ball_cut_ins else planar_cut_ins(d, v)))
+        s = s.cut(so.both(even_cut_ins(d, v) if p.cut_in_depth else ball_cut_ins(d, v) if p.ball_cut_ins else planar_cut_ins(d, v)))
     if v.grips:
         s = s.cut(so.both(grip_cutter(d, v)))
     s = s.removeSplitter()
@@ -1342,9 +1348,28 @@ def radius_fillet(s: Part.Shape, edges: list[Part.Edge], radius) -> Part.Shape:
     return out
 
 
-def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shape]:
-    """The hood of solids.hood with sharp rear corners and the small round on them (R6), in place of the corner loft:
-    the cap's rear corner edges, from the foot over the rear arc to the roof, rounded with makeFillet."""
+def corner_chain(shape: Part.Shape, sign: int, depth: float) -> list[Part.Edge]:
+    """The hood's rear corner edges on one side (sign: +1 right, -1 left), in the hood's own frame (before
+    hood_frame): edges near the rear (y > depth - 60) between a face that faces the side and one that faces the rear,
+    meeting at more than 5 degrees."""
+    out = []
+    for e in shape.Edges:
+        b = e.BoundBox
+        if e.Degenerated or b.Center.x * sign < 100 or b.YMax < depth - 60:
+            continue
+        fs = shape.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2:
+            continue
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        ns = [f.normalAt(*f.Surface.parameter(m)) for f in fs]
+        if sorted(abs(n.y) > abs(n.x) for n in ns) == [False, True] and crease_angle(fs, m) > 5.0:
+            out.append(e)
+    return out
+
+
+def sharp_cap(d: Blueprint, v: Variant) -> tuple[Part.Shape, object, Part.Shape]:
+    """The planar variants' hood cap with sharp rear corners, the seam groove and the recess cut (in the hood's own
+    frame), its section h, and the opening prism (for the marquee lip)."""
     h = pr.hood(d)
     side, corner, top = pr.hood_outline(d, h.height, h.half_base)
     lean = side.a0 if isinstance(side, pr.Arc) else math.atan2(side.p[0] - side.q[0], side.q[1] - side.p[1])
@@ -1358,35 +1383,65 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
     side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
     side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
     cap = shell.common(so.across(side_view))
-    def corner_chain(shape: Part.Shape, sign: int) -> list[Part.Edge]:
-        out = []
-        for e in shape.Edges:
-            b = e.BoundBox
-            if e.Degenerated or b.Center.x * sign < 100 or b.YMax < h.depth - 60:
-                continue
-            fs = shape.ancestorsOfType(e, Part.Face)
-            if len(fs) != 2:
-                continue
-            m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
-            ns = [f.normalAt(*f.Surface.parameter(m)) for f in fs]
-            if sorted(abs(n.y) > abs(n.x) for n in ns) == [False, True] and crease_angle(fs, m) > 5.0:
-                out.append(e)
-        return out
-
     g = d.seam_groove
     cap = cap.cut(so.ring_bevel(so.outline_at(cap, g), g, 0.0, g))
     opening = so.prism(so.both_sides(so.opening_path(d, h)), so.xz(-OVER), V(0, BIG / 4, 0))
     recess = opening.common(so.across(so.poly(so.recess_profile(d, h))))
-    cap = cap.cut(recess).removeSplitter()
+    return cap.cut(recess).removeSplitter(), h, opening
+
+
+def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shape]:
+    """The hood of solids.hood with sharp rear corners and the small round on them (R6), in place of the corner loft:
+    the cap's rear corner edges, from the foot over the rear arc to the roof, rounded with makeFillet."""
+    cap, h, opening = sharp_cap(d, v)
+    chain = lambda shape, sign: corner_chain(shape, sign, h.depth)  # noqa: E731
     # the small round on the rear corners last, one side at a time (both in one call fails), kept only when both
     # sides come out valid and pass the boolean check. Rounded on the sharp cap, the round makes it unorientable and
     # the cuts of the seam groove and the recess fail; rounded last, the right side builds but the left (the same
     # chain, mirrored) does not, so both stay sharp rather than a hood that is not symmetric.
-    if v.planar.hood_whole:
+    if v.planar.hood_cutter:
+        # R10: the cap rounded on the right, in common with its mirror: the cap's faces that cross x 0 are kept whole
+        # (no split at x 0) and both sides are the same. (Cutting what the round takes off, and its mirror, from the
+        # sharp cap is the same in theory but fails more often: the thin cut piece lies on the cap's faces.) The round runs
+        # from the top of the seam bevel up the corner, over the rear arc and on to the roof, where the corner turns
+        # flat and the round's width goes to nothing (a run-out of its own). The bevel's corner is left out: with it,
+        # the round fails the boolean check (a corner patch at the foot). The left corner does not round by itself.
+        es0 = [e for e in chain(cap, 1) if e.BoundBox.ZMax >= d.seam_groove + 0.5]
+        # OpenCascade's round of this chain is not the same from one run to the next (nor for another order of its
+        # edges), and a plain cut of what it takes off fails on the faces that lie on the cap's own. What holds: the
+        # cap rounded on the right, in common with its own mirror, with a fuzzy value of 0.01, checked with the boolean
+        # check; the edges in two orders and two fuzzy values, the first that passes is taken
+        done, tried = None, []
+        for order, es in (("as found", es0), ("longest first", sorted(es0, key=lambda e: -e.Length))):
+            try:
+                right = cap.makeFillet(v.planar.fillet, es)
+            except Part.OCCError as ex:
+                tried.append(f"{order}: the round failed ({str(ex).splitlines()[0][:40]})")
+                continue
+            for fuzzy in (1e-2, 1e-3):
+                try:
+                    whole = right.common(right.mirror(V(0, 0, 0), V(1, 0, 0)), fuzzy).removeSplitter()
+                    whole.check(True)
+                    ok = whole.isValid() and len(whole.Solids) == 1
+                except (Part.OCCError, ValueError, RuntimeError):
+                    ok = False
+                tried.append(f"{order}, fuzzy {fuzzy:g}" + ("" if ok else ": failed"))
+                if ok:
+                    done = whole
+                    break
+            if done is not None:
+                break
+        if done is not None:
+            cap = done
+            log.append(f"hood rear corners: R {v.planar.fillet:g} ({len(es0)} edges a side), the cap rounded on the right in common with its mirror ({tried[-1]})")
+        else:
+            log.append("hood rear corners: no way passed the check (" + "; ".join(tried) + "); left sharp")
+        rounded_cap, notes = None, []
+    elif v.planar.hood_whole:
         # R8: round the right corner, mirror that cap and keep what both have: both corners round, every face crossing
         # the centre plane is the cap's own (no mirror line)
         try:
-            right = cap.makeFillet(v.planar.fillet, corner_chain(cap, 1))
+            right = cap.makeFillet(v.planar.fillet, chain(cap, 1))
             if not right.isValid():
                 right.fix(1e-7, 1e-7, 1e-7)
             whole = right.common(right.mirror(V(0, 0, 0), V(1, 0, 0))).removeSplitter()
@@ -1407,7 +1462,7 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
     elif v.planar.by_rule:
         # R7: round the right half and mirror it (the mirrored chain does not round)
         try:
-            right = cap.makeFillet(v.planar.fillet, corner_chain(cap, 1))
+            right = cap.makeFillet(v.planar.fillet, chain(cap, 1))
             if not right.isValid():
                 right.fix(1e-7, 1e-7, 1e-7)
             half = right.common(so.halfspace(V(0, 0, 0), V(1, 0, 0)))
@@ -1423,7 +1478,7 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
     else:
         rounded_cap, notes = cap, []
     for sign in ((1, -1) if rounded_cap is not None else ()):
-        es = corner_chain(rounded_cap, sign)
+        es = chain(rounded_cap, sign)
         name = "right" if sign > 0 else "left"
         try:
             trial = rounded_cap.makeFillet(v.planar.fillet, es)
@@ -1434,7 +1489,7 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
             notes.append(f"{name} failed ({str(ex).splitlines()[0][:50]})")
             rounded_cap = None
             break
-    if not (v.planar.by_rule or v.planar.hood_whole):
+    if not (v.planar.by_rule or v.planar.hood_whole or v.planar.hood_cutter):
         if rounded_cap is not None:
             cap = rounded_cap
         log.append("hood rear corners: " + "; ".join(notes) + ("" if rounded_cap is not None else "; both left sharp"))
@@ -1497,6 +1552,62 @@ def ball_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
         tube = path.makePipeShell([ring], True, True)
         tubes.append(tube.fuse([Part.makeSphere(rho, p0), Part.makeSphere(rho, p3)]).removeSplitter())
     return tubes[0].fuse(tubes[1:]).removeSplitter()
+
+
+def even_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
+    """R10: the right row of cut-ins, milled by a ball whose centre keeps one distance dc outside the surface all round:
+    its path is the offset of the body's plan outline at the groove's height (the rear line, the ellipse of the lower
+    corner's column, the side line). Then the lips are level lines at sqrt(R^2 - dc^2) = h / 2 above and below the path
+    on the legs and round the corner alike, and the floor is the outline moved in by the depth.
+
+    Built as a sweep of the groove's own section (the ball's arc inside the wall, closed by a chord 1 outside) along
+    the outline, the section kept upright (binormal z) and square to the outline: the outline sampled every 0.1 and
+    approximated by one B-spline (deviation under 0.002), so each groove is one face from end to end. A sweep of the
+    whole ball along a path twisted on the near-straight parts and crossed itself. The depth must stay under the
+    smallest radius of the outline (the ellipse's R / sqrt(3), 1.73 for R 3), else the floor would cross itself at
+    the corner; the floor turns on that radius minus the depth. A sphere at each end (round ends)."""
+    c, p = v.cut_ins, v.planar
+    a, y0, h = d.rear_w / 2, d.body_d, c.height
+    dep = p.cut_in_depth
+    dc = (h * h / 4 / dep - dep) / 2                    # the centre's distance outside the surface
+    rho = dc + dep                                      # the ball
+    big_r = p.hip if p.exact_r_hip else p.fillet
+    rr, k = big_r / math.sqrt(2), math.sqrt(0.5)
+    end = h / 2                                         # the slot reaches this far past the ball's last centre
+    out = []
+    for i in range(c.count):
+        z = c.z0 + i * c.pitch + h / 2
+        o = V(a - 2 * rr, y0 - 2 * rr, z)
+        ell = Part.Ellipse(o + V(k, k, 0) * (math.sqrt(3) * big_r), o + V(-k, k, 0) * big_r, o)
+        u0, u1 = sorted((ell.parameter(V(a, y0 - rr, z)), ell.parameter(V(a - rr, y0, z))))
+        if u1 - u0 > math.pi:
+            u0, u1 = u1, u0 + 2 * math.pi
+        arc = ell.toShape(u0, u1).discretize(Distance=0.05)
+        pr0, pr1 = V(a - p.cut_rear + end, y0, z), V(a - rr, y0, z)
+        ps0, ps1 = V(a, y0 - rr, z), V(a, y0 - p.cut_side + end, z)
+        if (arc[0] - pr1).Length > 1e-3:
+            arc = arc[::-1]
+        n0, n1 = int((pr1 - pr0).Length / 0.1), int((ps1 - ps0).Length / 0.1)
+        pts = [pr0 + (pr1 - pr0) * (j / n0) for j in range(n0)] + arc[:-1] + [ps0 + (ps1 - ps0) * (j / n1) for j in range(n1 + 1)]
+        sp = Part.BSplineCurve()
+        sp.approximate(Points=pts, DegMin=3, DegMax=5, Tolerance=0.002, Continuity="C2")
+        q0, q1 = sp.value(sp.FirstParameter), sp.value(sp.LastParameter)
+        t0 = sp.tangent(sp.FirstParameter)[0]
+        nrm = V(-t0.y, t0.x, 0)
+        if nrm.y < 0:
+            nrm = -nrm
+        at = lambda n_, dz: q0 + nrm * n_ + V(0, 0, dz)  # noqa: E731
+        cz = math.sqrt(rho * rho - (1 - dc) ** 2)
+        section = Part.Wire([Part.Arc(at(1, cz), at(-dep, 0), at(1, -cz)).toShape(), Part.LineSegment(at(1, -cz), at(1, cz)).toShape()])
+        mk = Part.BRepOffsetAPI.MakePipeShell(Part.Wire([sp.toShape()]))
+        mk.setBiNormalMode(V(0, 0, 1))
+        mk.add(section, False, False)
+        mk.build()
+        mk.makeSolid()
+        groove = mk.shape()
+        groove = groove if groove.ShapeType == "Solid" else groove.Solids[0]
+        out.append(groove.fuse([Part.makeSphere(rho, q0 + nrm * dc), Part.makeSphere(rho, q1 + V(dc, 0, 0))]).removeSplitter())
+    return out[0].fuse(out[1:]).removeSplitter()
 
 
 def round_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
@@ -1685,6 +1796,11 @@ def focus(d: Blueprint, v: Variant) -> dict[str, dict]:
         out["closeup-cut-in-corner"] = cam((a - 2, d.body_d - 2, v.cut_ins.z0 + 5), 22, 135, 6)
         out["closeup-hand-hold"] = cam((120.0, d.depth, (v.grips.z0 + v.grips.z0 + v.grips.height) / 2), 65, 165, 12)
         out["closeup-hood-roof-end"] = cam((182.0, 522.0, 572.0), 40, 135, 45)
+    if v.planar and (v.planar.cut_in_depth or v.planar.hood_cutter):
+        a, y0, c = d.rear_w / 2, d.body_d, v.cut_ins
+        out["closeup-cut-in-straight"] = cam((a - 1, y0 - 1, c.z0 + c.pitch + c.height / 2), 30, 135, 0)
+        out["closeup-hood-corner-side"] = cam((d.width / 2 - 12, d.depth - 12, d.body_top + 25), 90, 90, 5)
+        out["closeup-hood-corner-rear"] = cam((d.width / 2 - 12, d.depth - 12, d.body_top + 25), 90, 180, 5)
     if v.cut_ins:
         c = v.cut_ins
         out["closeup-cut-ins"] = cam((rear_side_x(d, 0) - v.corner_r / 2, d.body_d - v.corner_r / 2, c.z0 + c.pitch * (c.count - 1) / 2), 60, 145, 10)
