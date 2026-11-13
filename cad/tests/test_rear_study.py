@@ -467,3 +467,89 @@ class CandidateR8Test(unittest.TestCase):
         inside = [f for f in self.body.Faces if g.x0 < f.CenterOfMass.x < g.x1 and d.depth - g.depth - 1 < f.CenterOfMass.y < d.depth - 1
                   and g.z0 < f.CenterOfMass.z < g.z0 + g.height and isinstance(f.Surface, (Part.Cylinder, Part.Toroid, Part.Sphere, Part.BSplineSurface))]
         self.assertTrue(any(abs(getattr(f.Surface, "Radius", getattr(f.Surface, "MinorRadius", 0.0)) - self.v.planar.grip_r) < 0.01 for f in inside))
+
+
+class CandidateR9Test(unittest.TestCase):
+    """R9: R8 with the shelf 5 lower, the cut-ins' ball path on R 8 round the corner (an even slot), the hand-holds'
+    roof chain R 3 and a 1 mm break (R 1) on every sharp convex edge of the back, the hand-holds' rims all round."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R9"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+        cls.found = fc.check(cls.body, "body", fc.default_reveals(), break_radius=cls.v.planar.edge_break)
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_breaks_are_accepted_as_edge_breaks(self) -> None:
+        self.assertGreater(sum(1 for f in self.found if f.allowed == "edge break"), 0)
+
+    def test_the_top_mitre_and_the_foot_of_the_hip_pass_the_face_check(self) -> None:
+        d, a = self.d, self.d.rear_w / 2
+        mitre = rs.band_path(d, self.v)[-1].p
+        near = lambda at: (abs(abs(at[0]) - d.width / 2) < 4 and abs(at[1] - mitre[0]) < 8 and abs(at[2] - mitre[1]) < 8) or \
+            (abs(abs(at[0]) - a) < 8 and abs(at[1] - d.body_d) < 8 and at[2] < 12)
+        self.assertEqual([f for f in fc.failures(self.found) if near(f.at)], [])
+
+    def test_the_changed_zone_passes_the_face_check_but_for_two_corner_patches(self) -> None:
+        """Open: the top of the hip and the foot of the head's corner (OpenCascade's corner patches)."""
+        d = self.d
+        spots = [(246.3, 550.7, 304.9), (246.8, 549.7, 305.0), (245.5, 579.2, 334.1), (244.5, 579.4, 332.9)]
+        near = lambda at: any(math.dist((abs(at[0]), at[1], at[2]), q) < 3.0 for q in spots)
+        found = [f for f in fc.failures(self.found)
+                 if (abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0 or f.at[1] > d.body_d - 1) and not near(f.at)]
+        self.assertEqual(found, [])
+
+    def test_the_hand_hold_rim_is_broken_all_round(self) -> None:
+        """No sharp edge is left on the rear wall round the opening: each edge there joins the wall to a round of R 1."""
+        d, g = self.d, self.v.grips
+        rim = [e for e in self.body.Edges if abs(e.BoundBox.YMin - d.depth) < 1e-3 and abs(e.BoundBox.YMax - d.depth) < 1e-3
+               and g.x0 - 2 < abs(e.BoundBox.Center.x) < g.x1 + 2 and g.z0 - 2 < e.BoundBox.Center.z < g.z0 + g.height + 2]
+        self.assertTrue(rim)
+        for e in rim:
+            fs = self.body.ancestorsOfType(e, Part.Face)
+            self.assertLess(rs.crease_angle(fs, e.valueAt((e.FirstParameter + e.LastParameter) / 2)), 1.0)
+            self.assertTrue(any(fc.is_break(f, self.v.planar.edge_break) for f in fs if not isinstance(f.Surface, Part.Plane)))
+
+    def test_nothing_in_the_hand_holds_faces_down_flatter_than_45_degrees(self) -> None:
+        d, g = self.d, self.v.grips
+        worst = 90.0
+        for f in self.body.Faces:
+            b = f.BoundBox
+            if not (b.XMin > g.x0 - 2 and b.XMax < g.x1 + 2 and b.YMin > d.depth - g.depth - 2 and b.ZMin > g.z0 - 2 and b.ZMax < g.z0 + g.height + 2):
+                continue
+            u0, u1, v0, v1 = f.ParameterRange
+            for i in range(21):
+                for j in range(21):
+                    uv = (u0 + (u1 - u0) * i / 20, v0 + (v1 - v0) * j / 20)
+                    n = f.normalAt(*uv)
+                    if n.z < -1e-6 and f.isInside(f.valueAt(*uv), 1e-3, True):
+                        worst = min(worst, math.degrees(math.acos(min(1.0, -n.z))))
+        self.assertGreaterEqual(worst, 45.0 - 0.01)
+
+    def test_the_cut_in_slot_is_10_high_at_the_corner(self) -> None:
+        """On the corner's diagonal (as far from the side as from the rear), the lowest slot's opening is 10 high, as on
+        the walls."""
+        d, c = self.d, self.v.cut_ins
+        a, y0 = d.rear_w / 2, d.body_d
+        def recessed(z: float) -> bool:
+            return any(abs((a - p.x) - (y0 - p.y)) < 0.03 and (a - p.x) > 0.81 for w in self.body.slice(V(0, 0, 1), z) for e in w.Edges
+                       for p in e.discretize(Distance=0.02) if p.x > 200 and p.y > 500)
+        zs = [c.z0 + c.height / 2 + k * 0.1 for k in range(-80, 81)]
+        open_z = [z for z in zs if recessed(z)]
+        self.assertAlmostEqual(max(open_z) - min(open_z), 10.0, delta=0.35)
+
+    def test_the_corner_moves_outward_without_a_step_but_at_the_foot_of_the_head_corner(self) -> None:
+        """No step (0.05: the reading's own noise, the tuck's correction) from z 275 to 380, but for z 335 to 340: the
+        rear reading steps in 0.37 at the foot of the head's R 3 corner (the corner patch there, open)."""
+        d = self.d
+        rows = [(z, *corner_column(self.body, float(z))) for z in range(275, 385, 5)]
+        for k in range(1, len(rows)):
+            z = rows[k][0]
+            rear = lambda r: r[2] + d.width / 2 - d.side_x(r[0])
+            self.assertGreaterEqual(rows[k][1], rows[k - 1][1] - 0.05, msg=f"side, z {z}")
+            if z != 340:
+                self.assertGreaterEqual(rear(rows[k]), rear(rows[k - 1]) - 0.05, msg=f"rear, z {z}")

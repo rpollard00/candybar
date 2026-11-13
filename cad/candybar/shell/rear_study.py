@@ -174,10 +174,13 @@ class Planar:
     low_corner: float = 0.0      # R7: the lower body's vertical rear corner on this radius (0: the small round); the cut-ins' path runs on it
     top_mitre: bool = False      # R7: also round the band's top mitre (concave, 43 degrees): left sharp, the band's outer round ends there in a strip 1.1 wide
     exact_corner: bool = False   # R8: the lower rear corner, the hip and the chamfer's mitre there made by hand (see exact_corner_cutter)
+    exact_r_hip: bool = False    # R9: the hand-made corner takes the hip's radius (hip) in place of fillet
     ball_cut_ins: bool = False   # R8: cut-ins milled by a ball (ball_cut_ins)
     ball_path_r: float = 13.0    # the ball centre's turn round the corner
     grip_r: float = 0.0          # R8: the hand-holds' inside edges rounded on the cutter (the rim stays sharp)
+    grip_roof_r: float = 0.0     # R9: the roof's chain (roof to back wall and round ends) on its own radius (0: grip_r)
     hood_whole: bool = False     # R8: the hood's corners rounded on both sides as one piece (no mirror line)
+    edge_break: float = 0.0      # R9: the last step, a round of this radius on every convex edge of the back that turns more than 45 degrees and has no round (the hand-holds' rims)
     round_ends: bool = False
 
 
@@ -264,6 +267,11 @@ VARIANTS["R8"] = replace(VARIANTS["R7"], name="R8", title="R8: R7 with exact cor
                                         hood_whole=True),
                          note="the lower rear corner, the hip and the chamfer mitre made by hand to meet exactly; cut-ins milled by a ball "
                               "round the sharp corner; hand-holds round inside, sharp at the rim; the hood's corners rounded in one piece")
+VARIANTS["R9"] = replace(VARIANTS["R8"], name="R9", title="R9: R8 with the shelf 5 lower, even cut-ins, broken edges",
+                         crease_lo=(540.0, 293.0, 0.0), crease_hi=(580.0, 333.0, 0.0),
+                         planar=replace(VARIANTS["R8"].planar, ball_path_r=8.0, edge_break=1.0, grip_roof_r=3.0),
+                         note="shelf 5 lower (the run's outer edge, the top mitre and the hip's top on the flat of the side); cut-ins with "
+                              "an even slot (the ball's path R 8 round the corner); the hand-holds' roof chain R 3 (holds 45 degrees); a break of R 1 on every sharp convex edge of the back, the hand-holds' rims all round")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -1159,13 +1167,15 @@ def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     a, p = d.rear_w / 2, v.planar
     if p.exact_corner:
         s = s.cut(exact_corner_cutter(d, v))
-        log.append(f"lower rear corners by hand: hip and chamfer mitre R {p.fillet:g}, the column on their ellipse "
-                   f"({math.sqrt(3) * p.fillet:.2f} x {p.fillet:g}, tangent at {p.fillet / math.sqrt(2):.2f} from the corner)")
+        hr = p.hip if p.exact_r_hip else p.fillet
+        log.append(f"lower rear corners by hand: hip and chamfer mitre R {hr:g}, the column on their ellipse "
+                   f"({math.sqrt(3) * hr:.2f} x {hr:g}, tangent at {hr / math.sqrt(2):.2f} from the corner)")
     es = planar_edges(s, d)
     if p.exact_corner:
         zc, y0, W = v.crease_lo[1], d.body_d, d.width / 2
+        hip_r = p.hip if p.exact_r_hip else p.fillet
         hand = lambda m: (abs(abs(m.x) - a) < 4 and abs(m.y - y0) < 4 and m.z < zc + 4) or \
-            (abs((abs(m.x) - a) - (m.y - y0)) < 2.5 and zc - 1 < m.z < zc + d.step_in + 1 and abs(m.x) < W - 2)
+            (abs((abs(m.x) - a) - (m.y - y0)) < 2.5 * hip_r / 3 and zc - 1 < m.z < zc + d.step_in + 1 and abs(m.x) < W - 2)
         es = [e for e in es if not hand(e.valueAt((e.FirstParameter + e.LastParameter) / 2))]
     if p.by_rule:
         top = band_path(d, v)[-1].p                       # the band's top mitre, in (y, z) on the full-width side
@@ -1197,7 +1207,62 @@ def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
         s = s.cut(so.both(ball_cut_ins(d, v) if p.ball_cut_ins else planar_cut_ins(d, v)))
     if v.grips:
         s = s.cut(so.both(grip_cutter(d, v)))
-    return s.removeSplitter()
+    s = s.removeSplitter()
+    if p.edge_break:
+        listed = finish_list(s, d, v)
+        es = [e for e, _ in listed]
+        log.append(f"edge break: {len(es)} edges, R {p.edge_break:g} ({sum(1 for _, f in listed if f == 'rim')} on the hand-holds' rims, "
+                   f"{sum(1 for _, f in listed if f == 'beside a round')} beside a round, {sum(1 for _, f in listed if f == 'none')} others)")
+        if es:
+            s = s.makeFillet(p.edge_break, es)
+    return s
+
+
+def finish_list(s: Part.Shape, d: Blueprint, v: Variant) -> list[tuple[Part.Edge, str]]:
+    """Every convex edge of the body behind the step's stroke (or on the rear) that turns more than 45 degrees, with its
+    class: "beside a round" when one of its faces is a round of the design (the edge itself is still sharp: where a
+    cut-in's lip crosses the corner round, where the base chamfer meets the corner column), "rim" for the hand-holds'
+    rims (all their edges, whatever the turn), else "none". The edges that the design rounds (R 3) are faces now, not
+    in the list. Other edges that turn 45 degrees or less are left out (blunt, no finish). Every listed edge gets the
+    break (planar_body)."""
+    out = []
+    for e in s.Edges:
+        if e.Degenerated:
+            continue
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        if not (m.y > d.step_y(m.z) - 1 or m.y > d.body_d - 1) or abs(m.x) < 1e-3 and False:
+            continue
+        fs = s.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2:
+            continue
+        convex, turn = edge_turn(s, e)
+        if not convex or turn <= 45.5:
+            continue
+        # an edge that turns this much is sharp even where one of its faces is a round of the design (a cut-in's lip
+        # where the slot crosses the corner, the chamfer's top edge on the corner column): "beside a round"
+        rounded = any(not isinstance(f.Surface, Part.Plane) and _small_radius(f, 30.0) for f in fs)
+        out.append((e, "beside a round" if rounded else "none"))
+    if v.grips:
+        # the hand-holds' rims, all the way round: every edge of the opening on the rear wall (the top one turns only
+        # 45 degrees, at the roof, and those along the inside rounds border a round but are sharp themselves)
+        g = v.grips
+        seen = {e.hashCode() for e, _ in out if _ == "none"}
+        for e in s.Edges:
+            b = e.BoundBox
+            if abs(b.YMin - d.depth) < 1e-3 and abs(b.YMax - d.depth) < 1e-3 and g.x0 - 1 < abs(b.Center.x) < g.x1 + 1 \
+                    and g.z0 - 1 < b.Center.z < g.z0 + g.height + 1 and e.hashCode() not in seen:
+                out = [(x, f) for x, f in out if not x.isSame(e)] + [(e, "rim")]
+    return out
+
+
+def _small_radius(f: Part.Face, limit: float) -> bool:
+    """Whether a face is curved more tightly than `limit` somewhere in its middle (a round, not a wall)."""
+    u0, u1, v0, v1 = f.ParameterRange
+    try:
+        k = max(abs(c) for c in f.curvatureAt((u0 + u1) / 2, (v0 + v1) / 2))
+    except Exception:
+        return False
+    return k > 1.0 / limit
 
 
 def round_cutter(p0: FreeCAD.Vector, p1: FreeCAD.Vector, n1: FreeCAD.Vector, n2: FreeCAD.Vector, r: float, ext0: float = 0.0,
@@ -1232,7 +1297,7 @@ def exact_corner_cutter(d: Blueprint, v: Variant) -> Part.Shape:
     the creases at the same points but stands up to 0.035 r proud of the hip's round between them.)"""
     a, y0, zc, ch = d.rear_w / 2, d.body_d, v.crease_lo[1], v.chamfer
     big, k = 4000.0, math.sqrt(0.5)
-    big_r = v.planar.fillet
+    big_r = v.planar.hip if v.planar.exact_r_hip else v.planar.fillet
     rr = big_r / math.sqrt(2)
     level = lambda z0, z1: Part.makeBox(big, big, z1 - z0, V(-big / 2, -big / 2, z0))
     out = []
@@ -1529,7 +1594,16 @@ def grip_cutter(d: Blueprint, v: Variant) -> Part.Shape:
         # where the cutter passes through the rear wall are not touched, so the rim stays sharp
         es = [e for e in cutter.Edges if not e.Degenerated and e.BoundBox.YMax < d.depth - 0.5 and len(cutter.ancestorsOfType(e, Part.Face)) == 2
               and crease_angle(cutter.ancestorsOfType(e, Part.Face), e.valueAt((e.FirstParameter + e.LastParameter) / 2)) > 5.0]
-        cutter = cutter.makeFillet(v.planar.grip_r, es)
+        roof_r = v.planar.grip_roof_r or v.planar.grip_r
+        if roof_r == v.planar.grip_r:
+            return cutter.makeFillet(v.planar.grip_r, es)
+        # R9: the roof's chain on its own radius. With R 8 the blend of the 45 degree roof and the round end (a B-spline
+        # surface of OpenCascade) dips to 43.8 degrees; with R 3 it holds 45.0 (the exact rolling-ball blend never goes
+        # under the roof's slope)
+        def on_roof(e):
+            return any(isinstance(f.Surface, Part.Plane) and abs(f.normalAt(0, 0).z - math.sqrt(0.5)) < 1e-3
+                       for f in cutter.ancestorsOfType(e, Part.Face))
+        return radius_fillet(cutter, es, lambda e: roof_r if on_roof(e) else v.planar.grip_r)
     return cutter
 
 
@@ -1605,6 +1679,7 @@ def focus(d: Blueprint, v: Variant) -> dict[str, dict]:
     if v.planar and v.planar.exact_corner:
         a, W, zc = d.rear_w / 2, d.width / 2, v.crease_lo[1]
         out["closeup-hip-foot"] = cam((a - 1, d.body_d - 1, zc + 1), 18, 135, 8)
+        out["closeup-hip-top"] = cam((W - 2, d.body_d + 10, zc + 12), 18, 125, 15)
         out["closeup-head-foot"] = cam((W - 2, d.depth - 2, v.crease_hi[1] + 1), 18, 125, 15)
         out["closeup-top-mitre"] = cam((W - 2, band_path(d, v)[-1].p[0] + 2, band_path(d, v)[-1].p[1] - 2), 20, 100, 10)
         out["closeup-cut-in-corner"] = cam((a - 2, d.body_d - 2, v.cut_ins.z0 + 5), 22, 135, 6)
@@ -1650,7 +1725,9 @@ def export(out: str, parts: dict[str, Part.Shape], d: Blueprint, v: Variant, log
     found = []
     allow = face_check.default_reveals()
     for k, s in parts.items():
-        found += face_check.check(s, k, allow)
+        # R9: the 1 mm edge break of the body's sharp edges is its own allowance class ("edge break")
+        brk = v.planar.edge_break if (v.planar and k == "body") else 0.0
+        found += face_check.check(s, k, allow, break_radius=brk)
     mark_inherited(found, hood_allowed=not (v.planar and v.planar.hood_whole))
     json.dump({"summary": face_check.summary(found), "findings": [asdict(f) for f in found]}, open(os.path.join(out, "face-check.json"), "w"), indent=1)
     open(os.path.join(out, "face-check.md"), "w").write(face_check.report_md(found, f"candidate {v.name}"))

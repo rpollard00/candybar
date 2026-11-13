@@ -146,8 +146,26 @@ def normal_and_curvature(face: Part.Face, p):
     return n, k
 
 
-def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = ()) -> list[Finding]:
-    """The findings of the five rules on one solid."""
+def is_break(face: Part.Face, radius: float, tol: float = 0.02) -> bool:
+    """Whether a face is an edge break: a round of `radius` along an edge (its tighter principal radius is `radius`
+    all over and the other one is more than 1.5 times larger, which leaves out a ball-like patch at a vertex; a break
+    along an edge that bends round a small corner keeps a short other radius, down to about 1.8 for R 1)."""
+    if isinstance(face.Surface, Part.Plane):
+        return False
+    u0, u1, v0, v1 = face.ParameterRange
+    for su, sv in ((0.5, 0.5), (0.2, 0.5), (0.8, 0.5), (0.5, 0.2), (0.5, 0.8)):
+        try:
+            k = sorted(abs(c) for c in face.curvatureAt(u0 + (u1 - u0) * su, v0 + (v1 - v0) * sv))
+        except Exception:
+            return False
+        if abs(k[1] - 1.0 / radius) > tol / radius ** 2 or k[0] > 1.0 / (1.5 * radius):
+            return False
+    return True
+
+
+def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = (), break_radius: float = 0.0) -> list[Finding]:
+    """The findings of the five rules on one solid. break_radius: a narrow face that is a round of that radius along an
+    edge is listed as allowed ("edge break"); nothing else is."""
     found: list[Finding] = []
     faces = shape.Faces
     index = {f.hashCode(): i for i, f in enumerate(faces)}
@@ -161,6 +179,8 @@ def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = ()) -> list[F
         w = width(f)
         if w < MIN_WIDTH:
             add("sliver", f.CenterOfMass, f"{type(f.Surface).__name__} {w:.2f} wide, area {f.Area:.1f} mm2", [i + 1])
+            if break_radius and is_break(f, break_radius):
+                found[-1].allowed = "edge break"
         for a, v in corners(f):
             if a < NEEDLE_DEG:
                 add("needle", v.Point, f"{type(f.Surface).__name__}: two edges meet at {a:.1f} deg", [i + 1])
