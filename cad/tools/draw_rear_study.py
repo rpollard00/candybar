@@ -14,6 +14,9 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r4   # rear-rev7-r4.png
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r5  # R5a and R6 with R4's cameras (and R6's hood corner)
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r5   # rear-rev7-r5.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py angles-r7  # rear-rev7-r7-angles.png (2D options of the stroke)
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r7  # R7 with R6's cameras (foot, cut-ins, hood corner)
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r7   # rear-rev7-r7.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -83,7 +86,7 @@ def layout(name: str) -> dict:
     lo_r = shelf["constant"][0] if shelf.get("constant") else planar.get("fillet", lo[2])  # R4/R5a/R6: the crease's own round
     roll_foot = lo[1] - lo_r * TAN
     door_half = rear_x() - r - DOOR_LAND
-    if planar:                                       # R6: the cut-ins' rear legs bound the door, not the corner
+    if planar:                                       # R6, R7: the cut-ins' rear legs bound the door, not the corner
         door_half = rear_x() - planar["cut_rear"] - DOOR_LAND
     door = (-door_half, 116.0, door_half, roll_foot - DOOR_FRAME)
     round_start = rear_x() - r
@@ -613,6 +616,132 @@ def sheet_r5() -> None:
     sheet.save(os.path.join(COMPARE, "rear-rev7-r5.png"))
 
 
+def render_r7() -> None:
+    model = os.path.join(STUDY, "R7")
+    subprocess.run([sys.executable, os.path.join(HERE, "render_views.py"), os.path.join(RENDERS, "R7"), model, "--views",
+                    ",".join(R3_VIEWS + ("closeup-hood-corner-above", "closeup-cut-ins")), f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+
+
+def sheet_r7() -> None:
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "flare-foot", "closeup-cut-ins", "rear", "side-right"]
+    w = 400
+    rows = [[tile(n, v, w) for v in views] for n in ("R6", "R7")]
+    notes = ["All BREP face edges drawn; same camera in each column. R7: the band's stroke as straight lines: an upright stub 20 at the floor (80 behind",
+             "the lean), a kick 28 degrees to the rear of upright to the knee at z 85, the 28 degree lean, one mitre (62 degrees) into the level run at the shelf",
+             "(inner crease z 298). R 3 only on the convex edges that turn 40 degrees or more (the band's outer edge, the hip R 4, the slanted edge, the rear",
+             "facet's upper edge, the head's corner, now round too); concave creases and the blunt knee and ankle mitres sharp. The lower body's vertical",
+             "corner is R 8, the cut-ins run on it (floor R 5). Hand-holds centred on the head's rear wall (z 349 to 411, was 345 to 407). The hood's rear",
+             "corners R 3 (one half rounded and mirrored). Open: three small corner patches per side (top mitre, head corner foot, hip foot)."]
+    sheet = grid(rows, ["R6", "R7: straight\nstroke"], views, "Rear: R6 and R7 (planar, the stroke in straight lines)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r7.png"))
+
+
+def stroke_options() -> dict[str, list[tuple[float, float]]]:
+    """The outer edge of the band in side view (y, z) for each option of the foot and the top (R7)."""
+    t = math.tan(math.radians(D.step_lean))
+    y0 = 530.0 - D.body_top * t                     # the lean of R (the outer edge meets the seam at y 530)
+    lean = lambda z: y0 + z * t
+    zo = 298.0 + D.step_in                          # the level run's outer edge
+    yf = y0 + 80.0
+
+    def kick_foot(stub: float, deg: float) -> list[tuple[float, float]]:
+        k = math.tan(math.radians(deg))
+        zk = (yf + stub * k - y0) / (t + k)
+        return ([(yf, 0.0), (yf, stub)] if stub else [(yf, 0.0)]) + [(lean(zk), zk)]
+
+    feet = {"F1 leg from z 150": [(lean(150.0), 0.0), (lean(150.0), 150.0)],
+            "F2 stub 20, kick 28 (default)": kick_foot(20.0, 28.0),
+            "F2 stub 20, kick 45": kick_foot(20.0, 45.0),
+            "F3 kick 12 to the floor (mini)": kick_foot(0.0, 12.0)}
+    zr = (zo - (540.0 - y0) * math.tan(math.radians(20.0))) / (1 - t * math.tan(math.radians(20.0)))
+    a1 = math.radians(90 - D.step_lean - 31.0)       # T3: the middle facet turns half of the 62 degrees
+    e = 25.0
+    zm = zo - e * math.sin(a1)                      # its top end is where the level run starts
+    ym_end = lean(zo) + 15.0
+    tops = {"T1 one mitre to a level run (default)": [(lean(zo), zo), (600.0, zo)],
+            "T2 run rising 20 to the rear (mini)": [(lean(zr), zr), (540.0, zo), (600.0, zo)],
+            "T3 two steps of 31 with a 25 facet": None}
+    # T3: lean, a 25 long facet at 31 degrees from the lean, then level: solve where the lean ends
+    zl = zo - e * math.sin(a1)
+    yl_start = lean(zl)
+    tops["T3 two steps of 31 with a 25 facet"] = [(yl_start, zl), (yl_start + e * math.cos(a1), zo), (600.0, zo)]
+    return {"feet": feet, "tops": tops, "lean": lean, "zo": zo}
+
+
+def sheet_r7_angles() -> None:
+    """Side-view outlines (lines only) of the band's stroke options on the rear edge of the rail (R7)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    o = stroke_options()
+    lean, zo = o["lean"], o["zo"]
+    s_in = D.step_in
+
+    def inner(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        """The inner crease: the outer edge moved 12 to its right (toward the set-back), mitre joins."""
+        pts = np.array(points, float)
+        segs = []
+        for a, b in zip(pts, pts[1:]):
+            d = (b - a) / np.linalg.norm(b - a)
+            n = np.array([d[1], -d[0]])
+            segs.append((a + n * s_in, b + n * s_in))
+        out = [segs[0][0]]
+        for (a1, b1), (a2, b2) in zip(segs, segs[1:]):
+            d1, d2 = b1 - a1, b2 - a2
+            m = np.array([d1, -d2]).T
+            if abs(np.linalg.det(m)) < 1e-9:
+                out.append(b1)
+                continue
+            u = np.linalg.solve(m, a2 - a1)
+            out.append(a1 + d1 * u[0])
+        out.append(segs[-1][1])
+        return [tuple(p) for p in out]
+
+    fig, axs = plt.subplots(2, 4, figsize=(24, 14), dpi=90)
+    full_lean = lambda z0, z1: [(lean(z0), z0), (lean(z1), z1)]
+    for ax, (name, foot) in zip(axs[0], o["feet"].items()):
+        stroke = foot + [(lean(200.0), 200.0)]
+        ax.plot(*zip(*stroke), "k-", lw=2)
+        ax.plot(*zip(*inner(stroke)), "k-", lw=0.8)
+        ax.plot(*zip(*full_lean(0, 200)), color="#bbb", lw=0.8, ls="--")
+        ax.axhline(0, color="#888", lw=1)
+        for (y1, z1), (y2, z2), (y3, z3) in zip(stroke, stroke[1:], stroke[2:]):
+            a = math.degrees(math.atan2(z2 - z1, y2 - y1) - math.atan2(z3 - z2, y3 - y2))
+            ax.annotate(f"z {z2:.0f}\nturn {abs(a):.0f}", (y2, z2), xytext=(8, -4), textcoords="offset points", fontsize=9, color="#c82828")
+        y_f = stroke[0][0]
+        ax.annotate(f"foot y {y_f:.1f}\n{y_f - lean(0):.0f} behind the lean", (y_f, 0), xytext=(6, 8), textcoords="offset points", fontsize=9)
+        ax.set_title(name, fontsize=13)
+        ax.set_xlim(280, 470)
+        ax.set_ylim(-10, 210)
+        ax.set_aspect("equal")
+        ax.grid(True, lw=0.3)
+    for ax, (name, top) in zip(axs[1], o["tops"].items()):
+        stroke = [(lean(200.0), 200.0)] + top
+        ax.plot(*zip(*stroke), "k-", lw=2)
+        ax.plot(*zip(*inner(stroke)), "k-", lw=0.8)
+        ax.plot([540, 540, 580, 580], [250, 298, 338, 380], color="#888", lw=1)
+        ax.text(545, 300, "rear facet\n(40 deep)", fontsize=8, color="#666")
+        for (y1, z1), (y2, z2), (y3, z3) in zip(stroke, stroke[1:], stroke[2:]):
+            a = math.degrees(math.atan2(z2 - z1, y2 - y1) - math.atan2(z3 - z2, y3 - y2))
+            ax.annotate(f"z {z2:.0f}, y {y2:.0f}\nturn {abs(a):.0f}", (y2, z2), xytext=(-60, 10), textcoords="offset points", fontsize=9, color="#c82828")
+        ax.set_title(name, fontsize=13)
+        ax.set_xlim(400, 600)
+        ax.set_ylim(180, 360)
+        ax.set_aspect("equal")
+        ax.grid(True, lw=0.3)
+    axs[1][3].axis("off")
+    axs[1][3].text(0.0, 0.9, "Side view of the band on the rear edge of the rail (right side, front to the left).\n"
+                   "Thick: the outer edge (on the full-width side); thin: the inner crease, 12 in\n"
+                   "(the band is a 45 degree facet between them, one flat piece per line).\n"
+                   "Turns are the change of direction of the outer edge at each mitre.\n"
+                   "Dashed: the straight lean of R carried to the floor.\n\n"
+                   "Built: R7 = F2 (stub 20, kick 28) with T1 (one mitre to the level run).", fontsize=12, va="top")
+    fig.suptitle("R7: options for the foot and the top of the band, straight lines only (mm, degrees)", fontsize=16)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.savefig(os.path.join(COMPARE, "rear-rev7-r7-angles.png"), dpi=90)
+    plt.close(fig)
+
+
 def costs_md() -> None:
     for name in ("A", "A25", "R"):
         print(f"\n## {MODELS[name]}\n\n| Item | Estimate |\n| --- | --- |")
@@ -623,4 +752,5 @@ def costs_md() -> None:
 if __name__ == "__main__":
     {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2, "render-r3": render_r3,
      "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4,
-     "render-r5": render_r5, "sheet-r5": sheet_r5}[sys.argv[1]]()
+     "render-r5": render_r5, "sheet-r5": sheet_r5,
+     "angles-r7": sheet_r7_angles, "render-r7": render_r7, "sheet-r7": sheet_r7}[sys.argv[1]]()

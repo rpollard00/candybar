@@ -129,6 +129,8 @@ class Band:
     flare: float = 80.0
     foot_r: float = 80.0
     top_r: float = 80.0
+    poly: bool = False           # R7: the stroke as straight lines (stub, kick, lean, run) meeting on mitres, no arcs
+    kick: float = 28.0           # poly: the kick's lean to the rear of upright, degrees
     fall: float = 0.36
     run_dz: float = -28.0
     inner_r: float = 7.0
@@ -165,6 +167,13 @@ class Planar:
     hip: float = 4.0             # the hip line's round: at R 3 its top corner (with the slanted edge and the band's edge) leaves a strip 1.0 wide
     cut_side: float = 30.0
     cut_rear: float = 20.0
+    by_rule: bool = False        # R7: round only the edges that turn min_turn degrees or more (convex ones only, unless `concave`)
+    min_turn: float = 40.0
+    concave: bool = False
+    cut_in_r: float = 0.0        # R7: the cut-ins' floor turns round the corner on this inner radius; 0: mitred legs (R6)
+    low_corner: float = 0.0      # R7: the lower body's vertical rear corner on this radius (0: the small round); the cut-ins' path runs on it
+    top_mitre: bool = False      # R7: also round the band's top mitre (concave, 43 degrees): left sharp, the band's outer round ends there in a strip 1.1 wide
+    round_ends: bool = False
 
 
 @dataclass(frozen=True)
@@ -238,6 +247,13 @@ VARIANTS["R6"] = replace(VARIANTS["R3"], name="R6", title="R6: planar, the mini'
                          crease_lo=(540.0, 298.0, 0.0), crease_hi=(580.0, 338.0, 0.0), band=replace(Band(), top_r=65.0, fall=0.0, run_dz=0.0),
                          planar=Planar(), note="flat 45 degree facets meeting on a hip line at the rear corner, the rear straight "
                                                "across, sharp corners with R 3 on every edge of the back")
+VARIANTS["R7"] = replace(VARIANTS["R6"], name="R7", title="R7: planar, the stroke in straight lines",
+                         band=replace(VARIANTS["R6"].band, poly=True, stub=20.0, kick=28.0, flare=80.0),
+                         planar=replace(Planar(), hip=4.0, by_rule=True, min_turn=40.0, cut_in_r=5.0, low_corner=8.0),
+                         grips=replace(Grips(), z0=349.05),
+                         note="the band's stroke as straight lines (stub 20, kick 28 to the rear, the lean, one mitre into the level run); "
+                              "R 3 only on the convex edges that turn 40 degrees or more; hand-holds centred on the head's rear wall; "
+                              "cut-ins with a round floor turning on R 10 round the corner")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -587,6 +603,8 @@ def band_path(d: Blueprint, v: Variant) -> pr.Path:
     t = math.tan(math.radians(d.step_lean))
     lean = math.pi / 2 - math.radians(d.step_lean)            # direction of the lean, from +y toward +z
     line_y = lambda z: d.step_y0 + z * t
+    if b.poly:
+        return poly_stroke(d, v)
     yf, r, ls = line_y(0.0) + b.flare, b.foot_r, b.stub
 
     def s_curve(th: float) -> tuple[P2, P2, P2, P2]:
@@ -625,6 +643,21 @@ def band_path(d: Blueprint, v: Variant) -> pr.Path:
             pr.Line(p2, p3), pr.Arc(c3, r3, lean + math.pi / 2, phi + math.pi / 2), pr.Line(p4, p5)]
 
 
+def poly_stroke(d: Blueprint, v: Variant) -> pr.Path:
+    """R7: the outer edge of the band in side view as straight lines: an upright stub `flare` behind the leaning line
+    at the floor, a kick that leans `kick` degrees to the rear of upright, the lean, and a level run at the height of
+    the shelf, each meeting the next on a mitre."""
+    b = v.band
+    t, k = math.tan(math.radians(d.step_lean)), math.tan(math.radians(b.kick))
+    y0, yf, zs = d.step_y0, d.step_y0 + b.flare, b.stub
+    zk = (yf + zs * k - y0) / (t + k)                          # knee: the kick (y = yf - (z - zs) k) meets the lean
+    knee = (y0 + zk * t, zk)
+    zo = v.crease_lo[1] + d.step_in                            # the run's outer edge: the inner crease is level at the shelf
+    top = (y0 + zo * t, zo)
+    far = d.depth + 3 * OVER
+    return [pr.Line((yf, -OVER), (yf, zs)), pr.Line((yf, zs), knee), pr.Line(knee, top), pr.Line(top, (far, zo))]
+
+
 def band_level_y(d: Blueprint, v: Variant) -> float:
     """Y where the band's run is level (the end of its top arc)."""
     return band_path(d, v)[-1].p[0]
@@ -638,9 +671,23 @@ def small_rounds(v: Variant) -> bool:
 
 
 def offset_path(path: pr.Path, by: float) -> pr.Path:
-    """A tangent-continuous path of lines and arcs moved by `by` to its left (negative: right). Lines keep their
-    vector, so that a ruled loft between two offsets of one path gives planes on the lines and cones on the arcs."""
-    return [so.offset_seg(sg, by) for sg in path]
+    """A path of lines and arcs moved by `by` to its left (negative: right). Tangent-continuous: lines keep their
+    vector, so that a ruled loft between two offsets of one path gives planes on the lines and cones on the arcs. A
+    polyline (R7): each line moved, and neighbours cut where they cross (mitre joins)."""
+    moved = [so.offset_seg(sg, by) for sg in path]
+    if not all(isinstance(sg, pr.Line) for sg in path):
+        return moved
+
+    def cross(l1: pr.Line, l2: pr.Line) -> P2:
+        (x1, y1), (x2, y2), (x3, y3), (x4, y4) = l1.p, l1.q, l2.p, l2.q
+        den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(den) < 1e-12:
+            return l1.q
+        a, c = x1 * y2 - y1 * x2, x3 * y4 - y3 * x4
+        return ((a * (x3 - x4) - (x1 - x2) * c) / den, (a * (y3 - y4) - (y1 - y2) * c) / den)
+
+    pts = [moved[0].p] + [cross(moved[i], moved[i + 1]) for i in range(len(moved) - 1)] + [moved[-1].q]
+    return [pr.Line(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
 
 
 def band_cutter(d: Blueprint, v: Variant) -> Part.Shape:
@@ -656,7 +703,7 @@ def band_cutter(d: Blueprint, v: Variant) -> Part.Shape:
         start, end = so.ends(moved[0])[0], so.ends(moved[-1])[1]
         region = moved + [pr.Line(end, (end[0], -OVER)), pr.Line((end[0], -OVER), start)]
         w = so.wire(region, so.yz(x))
-        if not small_rounds(v):
+        if not small_rounds(v) or not isinstance(path[1], pr.Arc):
             return w
         # the two arcs of the S as one rational B-spline (the same knots in every section): with small rounds, a
         # face boundary at the S's inflection reads to the face check as one torus cut in two
@@ -1021,17 +1068,36 @@ def floor_edges(s: Part.Shape, y_front: float) -> list[Part.Edge]:
     return edges_where(s, lambda p: abs(p.z) < 1e-4 and p.y > y_front + 0.01, 3)
 
 
-def planar_edges(s: Part.Shape, d: Blueprint) -> list[Part.Edge]:
+def edge_turn(s: Part.Shape, e: Part.Edge) -> tuple[bool, float]:
+    """(convex, turn in degrees) of an edge between two faces of a solid, at its middle: convex when the first face,
+    followed away from the edge, falls behind the second face's outward normal."""
+    fs = s.ancestorsOfType(e, Part.Face)
+    m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+    t = e.tangentAt((e.FirstParameter + e.LastParameter) / 2)
+    n = []
+    for f in fs:
+        u, w = f.Surface.parameter(m)
+        n.append(f.normalAt(u, w))          # normalAt already follows the face's orientation
+    away = n[0].cross(t)
+    away.normalize()
+    if fs[0].distToShape(Part.Vertex(m + away * 0.3))[0] > fs[0].distToShape(Part.Vertex(m - away * 0.3))[0]:
+        away = -away
+    return away.dot(n[1]) < 0, crease_angle(fs, m)
+
+
+def planar_edges(s: Part.Shape, d: Blueprint, top_edges: bool = False) -> list[Part.Edge]:
     """Every sharp edge of the back (R6): behind the old leaning step line or on the rear, below the seam bevel, above
     the base chamfer. The rounds of the vertical corners end on the chamfer and its mitre stays sharp: run on down
-    the chamfer's hip edges, they meet the chamfer's sharp top edge in needles (0 degrees) and slivers of 0.3 and 1.7."""
+    the chamfer's hip edges, they meet the chamfer's sharp top edge in needles (0 degrees) and slivers of 0.3 and 1.7.
+    top_edges (R7): also the edges that run up to the body top (the head's vertical corner; R6 left it sharp), but not
+    those that lie at the top."""
     out = []
     for e in s.Edges:
         if e.Degenerated:
             continue
         m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
         b = e.BoundBox
-        if b.ZMax > d.body_top - d.seam_groove - 0.5 or b.ZMax < 5.01 + 1e-3:
+        if (b.ZMin if top_edges else b.ZMax) > d.body_top - d.seam_groove - 0.5 or b.ZMax < 5.01 + 1e-3:
             continue
         if not (m.y > d.step_y(m.z) - 1 or m.y > d.body_d - 1):
             continue
@@ -1080,13 +1146,18 @@ def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     es = floor_edges(s, d.foot_y - d.bend_t)
     log.append(f"floor edges: {len(es)}")
     s = s.makeChamfer(v.chamfer, es)
-    es = planar_edges(s, d)
     a, p = d.rear_w / 2, v.planar
+    es = planar_edges(s, d)
+    if p.by_rule:
+        top = band_path(d, v)[-1].p                       # the band's top mitre, in (y, z) on the full-width side
+        at_top = lambda e: abs(e.BoundBox.ZMax - top[1]) < 0.5 and e.BoundBox.ZLength > 5 and abs(e.BoundBox.YMax - top[0] - d.step_in * 0.0) < 15
+        es = [e for e in es if (lambda c: (c[0] or p.concave or (p.top_mitre and at_top(e))) and c[1] >= p.min_turn)(edge_turn(s, e))]
 
     def radius(e: Part.Edge) -> float:
         m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
         hip = abs((abs(m.x) - a) - (m.y - d.body_d)) < 1.0 and v.crease_lo[1] - 1 < m.z < v.crease_lo[1] + d.step_in + 2
-        return p.hip if hip else p.fillet
+        low = p.low_corner and abs(abs(m.x) - a) < 0.3 and abs(m.y - d.body_d) < 0.3 and e.BoundBox.ZLength > 50
+        return p.hip if hip else p.low_corner if low else p.fillet
 
     log.append(f"small rounds: {len(es)} edges, R {p.fillet:g}, the hip R {p.hip:g}")
     s = radius_fillet(s, es, radius)
@@ -1095,6 +1166,14 @@ def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     if not s.isValid():
         s.fix(1e-7, 1e-7, 1e-7)
         log.append(f"seam bevel: shape fixed (valid {s.isValid()})")
+    if p.by_rule:
+        # the head's vertical rear corners (R6 left them sharp): after the seam bevel, so that the bevel, lofted through
+        # points of the outline, does not have to follow a small round (it meets one at 2 degrees)
+        W, top = d.width / 2, d.body_top - g
+        es = [e for e in s.Edges if not e.Degenerated and e.BoundBox.ZLength > 20 and e.BoundBox.ZMin > v.crease_hi[1] - 1
+              and abs(e.BoundBox.Center.x) > W - 15 and e.BoundBox.YLength < 0.5 and abs(e.BoundBox.Center.y - d.depth) < 0.5]
+        log.append(f"head corners: {len(es)} edges, R {p.fillet:g}")
+        s = s.makeFillet(p.fillet, es)
     if v.cut_ins:
         s = s.cut(so.both(planar_cut_ins(d, v)))
     if v.grips:
@@ -1163,8 +1242,25 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
     # sides come out valid and pass the boolean check. Rounded on the sharp cap, the round makes it unorientable and
     # the cuts of the seam groove and the recess fail; rounded last, the right side builds but the left (the same
     # chain, mirrored) does not, so both stay sharp rather than a hood that is not symmetric.
-    rounded_cap, notes = cap, []
-    for sign in (1, -1):
+    if v.planar.by_rule:
+        # R7: round the right half and mirror it (the mirrored chain does not round)
+        try:
+            right = cap.makeFillet(v.planar.fillet, corner_chain(cap, 1))
+            if not right.isValid():
+                right.fix(1e-7, 1e-7, 1e-7)
+            half = right.common(so.halfspace(V(0, 0, 0), V(1, 0, 0)))
+            whole = half.fuse(half.mirror(V(0, 0, 0), V(1, 0, 0))).removeSplitter()
+            if whole.isValid() and len(whole.Solids) == 1:
+                cap = whole
+                log.append(f"hood rear corners: R {v.planar.fillet:g}, the right half rounded and mirrored")
+            else:
+                log.append(f"hood rear corners: the mirrored half is not one valid solid ({len(whole.Solids)} solids); left sharp")
+        except Part.OCCError as ex:
+            log.append(f"hood rear corners: the round of the right half failed ({str(ex).splitlines()[0][:50]}); left sharp")
+        rounded_cap, notes = None, []
+    else:
+        rounded_cap, notes = cap, []
+    for sign in ((1, -1) if rounded_cap is not None else ()):
         es = corner_chain(rounded_cap, sign)
         name = "right" if sign > 0 else "left"
         try:
@@ -1176,9 +1272,10 @@ def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shap
             notes.append(f"{name} failed ({str(ex).splitlines()[0][:50]})")
             rounded_cap = None
             break
-    if rounded_cap is not None:
-        cap = rounded_cap
-    log.append("hood rear corners: " + "; ".join(notes) + ("" if rounded_cap is not None else "; both left sharp"))
+    if not v.planar.by_rule:
+        if rounded_cap is not None:
+            cap = rounded_cap
+        log.append("hood rear corners: " + "; ".join(notes) + ("" if rounded_cap is not None else "; both left sharp"))
     xr = h.half_open(h.z_band_top, d) + OVER
     lip = Part.makeBox(2 * xr, d.hood_rail_proud, h.z_rail_top - h.z_band_top, V(-xr, h.y_band_top - d.hood_rail_proud, h.z_band_top)).common(opening)
     out = {"hood": cap, "marquee_lip": lip.removeSplitter()}
@@ -1194,6 +1291,8 @@ def planar_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
     a, y0 = d.rear_w / 2, d.body_d
     dp, h = c.depth, c.height
     mid = (dp * math.sin(math.pi / 4), dp * (1 - math.cos(math.pi / 4)))
+    if p.cut_in_r:
+        return round_cut_ins(d, v)
     out = []
     for k in range(c.count):
         z = c.z0 + k * c.pitch
@@ -1209,6 +1308,39 @@ def planar_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
         side = leg(V(a, y0 - p.cut_side, 0), V(-1, 0, 0), V(0, 1, 0), p.cut_side + 2 * OVER)
         mitre = so.halfspace(V(a, y0, 0), V(1, -1, 0))          # the side of the corner's bisector toward the side
         out.append(rear.cut(mitre).fuse(side.common(mitre)).removeSplitter())
+    return out[0].fuse(out[1:]).removeSplitter()
+
+
+def round_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
+    """R7: the right row of cut-ins round the sharp lower rear corner, round inside as a contrast to the planar back.
+    Each groove is R's section (round floor of radius depth, back wall, 45 degree roof) swept along a path on the wall
+    that turns round the corner on the lower corner's round (low_corner), so that the lips meet the wall all the way
+    and the floor turns on low_corner - depth. The ends are planes square to the groove: round ends (the section
+    turned half round about the wall's normal) left strips 0.7 wide where they met the groove."""
+    c, p = v.cut_ins, v.planar
+    a, y0 = d.rear_w / 2, d.body_d
+    dp, h = c.depth, c.height
+    rp = p.cut_in_r + dp
+    if p.low_corner:
+        rp = p.low_corner                  # the path on the corner's round: the lips meet the wall all the way round
+    cx, cy = a - rp, y0 - rp
+    mid = (dp * math.sin(math.pi / 4), dp * (1 - math.cos(math.pi / 4)))
+    out = []
+    for k in range(c.count):
+        z = c.z0 + k * c.pitch
+        p0, p1 = V(a - p.cut_rear, y0, z), V(cx, y0, z)
+        p2, p3 = V(a, cy, z), V(a, y0 - p.cut_side, z)
+        m = math.sqrt(0.5)
+        path = Part.Wire([Part.LineSegment(p0, p1).toShape(), Part.Arc(p1, V(cx + rp * m, cy + rp * m, z), p2).toShape(),
+                          Part.LineSegment(p2, p3).toShape()])
+
+        def section(origin: FreeCAD.Vector, inward: FreeCAD.Vector) -> Part.Wire:
+            at = lambda q: origin + inward * q[0] + V(0, 0, q[1])
+            return Part.Wire([Part.Arc(at((0.0, 0.0)), at(mid), at((dp, dp))).toShape(), Part.LineSegment(at((dp, dp)), at((dp, h - dp))).toShape(),
+                              Part.LineSegment(at((dp, h - dp)), at((0.0, h))).toShape(), Part.LineSegment(at((0.0, h)), at((-OVER, h))).toShape(),
+                              Part.LineSegment(at((-OVER, h)), at((-OVER, 0.0))).toShape(), Part.LineSegment(at((-OVER, 0.0)), at((0.0, 0.0))).toShape()])
+
+        out.append(path.makePipeShell([section(p0, V(0, -1, 0))], True, True))
     return out[0].fuse(out[1:]).removeSplitter()
 
 
