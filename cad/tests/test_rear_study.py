@@ -2,6 +2,7 @@
 repaired rear of candidate A; the study leaves Blueprint() at revision 6."""
 from __future__ import annotations
 
+import math
 import unittest
 from dataclasses import replace
 
@@ -174,3 +175,42 @@ class FlareTest(unittest.TestCase):
         self.assertEqual(len(body.Solids), 1)
         found = [f for f in fc.failures(fc.check(body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0]
         self.assertEqual(found, [])
+
+
+class CandidateR3Test(unittest.TestCase):
+    """R3: the step as one band of one section from the floor to the roll: an upright stub at the floor, an S, the
+    lean, a top arc and a run back; the head at full width above it."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R3"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_changed_zone_passes_the_face_check(self) -> None:
+        d = self.d
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0]
+        self.assertEqual(found, [])
+
+    def test_the_head_has_the_full_width(self) -> None:
+        d, v = self.d, self.v
+        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + v.crease_hi[1] + v.smile) / 2):
+            self.assertAlmostEqual(half_width(self.body, z, d.body_d), d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
+
+    def test_the_band_meets_the_floor_at_90_degrees(self) -> None:
+        """On the stub, above the base chamfer, the band's level sections are the same at two heights."""
+        foot = rs.band_path(self.d, self.v)[0]
+        self.assertEqual(foot.p[0], foot.q[0])
+        y = foot.p[0]
+
+        def band(z: float) -> list[tuple[float, float]]:
+            return [(p.x, p.y) for w in self.body.slice(V(0, 0, 1), z) for p in w.discretize(Distance=0.1)
+                    if p.x > self.d.rear_w / 2 - 1 and y - 25 < p.y < y + 25]
+
+        low, high = band(self.v.chamfer + 1.0), band(self.v.band.stub - 1.0)
+        self.assertTrue(low)
+        self.assertLess(max(min(math.dist(p, q) for q in high) for p in low), 0.05)

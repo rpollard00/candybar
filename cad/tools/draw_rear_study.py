@@ -8,6 +8,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py costs      # the numbers of the cost list (Markdown)
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r2  # R2 and its flares, and R with R2's cameras
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r2  # rear-rev7-r2-corner.png, rear-rev7-r2-flare.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r3  # R3 with R2's cameras
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r3   # rear-rev7-r3.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -541,6 +543,29 @@ def sheets_r2() -> None:
     sheet_r2_flare()
 
 
+R3_VIEWS = ("three-quarter-rear-right", "closeup-r2-corner", "closeup-turn", "flare-foot", "side-right", "rear", "three-quarter-rear-above")
+
+
+def render_r3() -> None:
+    model = os.path.join(STUDY, "R3")
+    subprocess.run([sys.executable, os.path.join(HERE, "render_views.py"), os.path.join(RENDERS, "R3"), model, "--views", ",".join(R3_VIEWS),
+                    f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+
+
+def sheet_r3() -> None:
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "flare-foot", "side-right"]
+    w = 470
+    rows = [[tile("R2Fa", v, w) for v in views], [tile("R3", v, w) for v in views]]
+    notes = ["All BREP face edges drawn; same camera in each column. R3: the step is one band of one section from the floor to the roll: 12 deep, a 45 degree facet,",
+             "outer round R 26, inner round R 7, the same on the stub, the S, the lean, the top arc and the run (planes and cones, ruled square to the stroke).",
+             "Stroke of the outer edge: upright stub 15 (meets the floor at 90 degrees; the base chamfer crosses it square), S of two arcs R 80 (29 degrees forward, then 57 degrees back to the lean;",
+             "the foot is 80 behind the straight lean), the 28 degree lean from z 130 to z 247, a top arc R 80 (42 degrees), a run back to the roll rising 0.36.",
+             "The band's lower crease reaches the rear wall at z 294, 28 below the roll's (322): level with it, three rounds meet there in faces of 1 to 2 mm.",
+             "No surface between band and roll morphs: they meet in the R 25 corner, which runs from the floor to the seam. Roll, smile, grips, cut-ins, door as R2."]
+    sheet = grid(rows, ["R2Fa", "R3: one band,\nstub, S, run back"], views, "Rear: R2Fa and R3 (the step as one band)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r3.png"))
+
+
 def costs_md() -> None:
     for name in ("A", "A25", "R"):
         print(f"\n## {MODELS[name]}\n\n| Item | Estimate |\n| --- | --- |")
@@ -549,4 +574,5 @@ def costs_md() -> None:
 
 
 if __name__ == "__main__":
-    {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2}[sys.argv[1]]()
+    {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2, "render-r3": render_r3,
+     "sheet-r3": sheet_r3}[sys.argv[1]]()

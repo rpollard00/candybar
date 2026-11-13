@@ -117,6 +117,25 @@ class Flare:
 
 
 @dataclass(frozen=True)
+class Band:
+    """R3: the step as one band of one section from the floor to the rear. In side view its outer edge (on the
+    full-width side) is one stroke of lines and arcs: an upright stub at the floor, an S (two arcs of foot_r) that
+    leaves the floor `flare` behind the straight leaning line and joins it, the lean, a top arc of top_r, and a run
+    back to the roll that falls toward the front at `fall`. The inner edge (on the recessed side) is that stroke offset
+    by the step (12) toward the recess; the band between them is ruled square to the stroke: planes on the lines,
+    cones on the arcs, so its section (45 degrees, 12 deep) is the same everywhere. The run's inner edge reaches the
+    rear wall of the lower body (y body_d) run_dz above the roll's sharp lower crease there."""
+    stub: float = 15.0
+    flare: float = 80.0
+    foot_r: float = 80.0
+    top_r: float = 80.0
+    fall: float = 0.36
+    run_dz: float = -28.0
+    inner_r: float = 7.0
+    outer_r: float = 26.0
+
+
+@dataclass(frozen=True)
 class Variant:
     name: str
     title: str
@@ -135,6 +154,7 @@ class Variant:
     cut_ins: CutIns | None = None
     shoulder: Shoulder | None = None
     flare: Flare | None = None
+    band: Band | None = None
     note: str = ""
 
     @property
@@ -142,7 +162,7 @@ class Variant:
         """The hood keeps the full width. Without a shoulder its round in plan is the body's round plus the step, so
         that both rounds leave the rear wall on the same line and the soffit grows from nothing at the rear to the step
         at the side. With a shoulder the head has the full width, and the head and the hood share one corner round."""
-        return self.corner_r if self.shoulder else self.corner_r + Blueprint().step_in
+        return self.corner_r if self.shoulder or self.band else self.corner_r + Blueprint().step_in
 
 
 VARIANTS: dict[str, Variant] = {
@@ -168,6 +188,9 @@ VARIANTS["R2Fb"] = replace(VARIANTS["R2"], name="R2Fb", title="R2Fb: R2, the ste
                            note="inner crease curves back from z 130 to 80 behind at the floor; the outer edge keeps its lean and one R 22 "
                                 "round to the floor; the recessed round grows from R 7 at z 130 to R 18 at the floor, where the ramp "
                                 "turns only 7 degrees from the recessed side (R 7 there is 0.9 wide)")
+VARIANTS["R3"] = replace(VARIANTS["R2"], name="R3", title="R3: the step as one band from the floor to the roll", shoulder=None, band=Band(),
+                         note="one band of the step's section: stub 15 at the floor, S of R 80, lean, top arc R 80, run back to the roll; "
+                              "its lower crease reaches the rear wall 28 below the roll's (as high, the three rounds meet in faces of 1 to 2)")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -292,7 +315,7 @@ def sharp_body(d: Blueprint, v: Variant, rear: bool = True, right_only: bool = F
     bw = d.bezel_w / 2
     plate = so.bezel_box(d, fr, -bw, bw).cut(so.behind_screen(d, d.mon_setback))
     reveal = so.bezel_box(d, fr, bw, xb).cut(so.land_cylinder(d, fr))
-    step = recess_cutter(d, v) if v.shoulder else step_cutter(d)
+    step = band_cutter(d, v) if v.band else recess_cutter(d, v) if v.shoulder else step_cutter(d)
     cutters = [so.both(so.rail_cutter(d, fr)), step if right_only else so.both(step), plate, so.both(reveal), so.screen(d)]
     return solid.cut(cutters + ([rear_cutter(d, v)] if rear else [])).removeSplitter()
 
@@ -389,6 +412,76 @@ def behind_step(d: Blueprint, v: Variant) -> Part.Shape:
     return above.fuse(flared).removeSplitter()
 
 
+# ---------- the band (R3) ----------
+
+def band_path(d: Blueprint, v: Variant) -> pr.Path:
+    """The outer edge of the band in side view, (y, z) on the full-width side, from below the floor to past the rear:
+    stub, S (CCW arc then CW arc, both foot_r), lean (the step's outer edge line), top arc (CW, top_r), run."""
+    b = v.band
+    t = math.tan(math.radians(d.step_lean))
+    lean = math.pi / 2 - math.radians(d.step_lean)            # direction of the lean, from +y toward +z
+    line_y = lambda z: d.step_y0 + z * t
+    yf, r, ls = line_y(0.0) + b.flare, b.foot_r, b.stub
+
+    def s_curve(th: float) -> tuple[P2, P2, P2, P2]:
+        c1 = (yf - r, ls)
+        p1 = (c1[0] + r * math.cos(th), c1[1] + r * math.sin(th))
+        c2 = (p1[0] + r * math.cos(th), p1[1] + r * math.sin(th))
+        p2 = (c2[0] + r * math.cos(lean + math.pi / 2), c2[1] + r * math.sin(lean + math.pi / 2))
+        return c1, p1, c2, p2
+
+    off = lambda th: s_curve(th)[3][0] - line_y(s_curve(th)[3][1])
+    lo, hi = 1e-6, math.radians(89.0)
+    if off(lo) * off(hi) > 0:
+        raise ValueError("no S curve joins the lean with these values")
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if off(lo) * off(mid) > 0 else (lo, mid)
+    th = lo
+    c1, p1, c2, p2 = s_curve(th)
+    # top arc: tangent to the lean and to the run; the run's inner edge passes the rear wall at shoulder_z0
+    phi = math.atan(b.fall)
+    r3 = b.top_r
+    nl = (math.sin(lean), -math.cos(lean))
+    nr = (math.sin(phi), -math.cos(phi))
+    q0 = (d.body_d - d.step_in * nr[0], shoulder_z0(d, v) + b.run_dz - d.step_in * nr[1])
+    a1, a2 = (line_y(0.0) + r3 * nl[0], r3 * nl[1]), (q0[0] + r3 * nr[0], q0[1] + r3 * nr[1])
+    u1, u2 = (math.cos(lean), math.sin(lean)), (math.cos(phi), math.sin(phi))
+    det = -u1[0] * u2[1] + u1[1] * u2[0]
+    k = (-(a2[0] - a1[0]) * u2[1] + (a2[1] - a1[1]) * u2[0]) / det
+    c3 = (a1[0] + k * u1[0], a1[1] + k * u1[1])
+    p3 = (c3[0] - r3 * nl[0], c3[1] - r3 * nl[1])
+    p4 = (c3[0] - r3 * nr[0], c3[1] - r3 * nr[1])
+    far = d.depth + 3 * OVER
+    p5 = (far, p4[1] + (far - p4[0]) * b.fall)
+    return [pr.Line((yf, -OVER), (yf, ls)), pr.Arc(c1, r, 0.0, th), pr.Arc(c2, r, math.pi + th, lean + math.pi / 2),
+            pr.Line(p2, p3), pr.Arc(c3, r3, lean + math.pi / 2, phi + math.pi / 2), pr.Line(p4, p5)]
+
+
+def offset_path(path: pr.Path, by: float) -> pr.Path:
+    """A tangent-continuous path of lines and arcs moved by `by` to its left (negative: right). Lines keep their
+    vector, so that a ruled loft between two offsets of one path gives planes on the lines and cones on the arcs."""
+    return [so.offset_seg(sg, by) for sg in path]
+
+
+def band_cutter(d: Blueprint, v: Variant) -> Part.Shape:
+    """What the band takes off the right side: the region outside the recessed side (x > rear_w / 2) and on the recess
+    side of the band. That region is ruled between its sections at x = W + e and x = rear_w/2 - e: the region to the
+    right of the stroke, moved by the stroke's offset at that x (the band runs in by one for each one it runs back
+    or down, square to the stroke), so the loft gives planes and cones."""
+    path = band_path(d, v)
+    W, a, e = d.width / 2, d.rear_w / 2, OVER / 10
+
+    def section(x: float) -> Part.Wire:
+        moved = offset_path(path, -(W - x))
+        start, end = so.ends(moved[0])[0], so.ends(moved[-1])[1]
+        region = moved + [pr.Line(end, (end[0], -OVER)), pr.Line((end[0], -OVER), start)]
+        return so.wire(region, so.yz(x))
+
+    behind = Part.makeLoft([section(W + e), section(a - e)], True, True)
+    return so.halfspace(V(a, 0, 0), V(1, 0, 0)).common(behind)
+
+
 def recess_cutter(d: Blueprint, v: Variant) -> Part.Shape:
     """What the step and the shoulder take off the right side: the region outside the recessed side (a plane at
     rear_w / 2: below the shoulder the tuck would move it by 0.2 at most), behind the step facet (45 degrees in plan,
@@ -410,6 +503,14 @@ def face_kind(f: Part.Face, d: Blueprint, v: Variant) -> str:
     n = f.normalAt((u0 + u1) / 2, (v0 + v1) / 2)
     if c.x < 0:
         c, n = V(-c.x, c.y, c.z), V(-n.x, n.y, n.z)
+    if v.band:
+        if d.rear_w / 2 + 0.05 < c.x < d.width / 2 - 0.05 and isinstance(f.Surface, (Part.Plane, Part.Cone)) and abs(n.x) < 0.99:
+            return "B"
+        if isinstance(f.Surface, Part.Plane) and abs(abs(n.x) - 1) < 1e-6 and abs(c.x - d.rear_w / 2) < 0.5:
+            return "X"
+        if abs(n.x) > 0.95 and c.x > d.width / 2 - 6:
+            return "W"
+        return ""
     if abs(abs(n.dot(step_normal(d))) - 1) < 1e-6 and abs(c.x - d.width / 2 + d.step_in / 2) < d.step_in / 2:
         return "F"
     if v.flare and c.z < v.flare.z0 + 1 and d.rear_w / 2 + 0.05 < c.x < d.width / 2 - 0.05 and not isinstance(f.Surface, (Part.Plane, Part.Cylinder)):
@@ -483,6 +584,24 @@ def shoulder_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     return s.makeFillet(v.corner_r, es)
 
 
+def band_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
+    """The body of a band variant with its rounds, up to the base chamfer: as shoulder_body, with two chains on the
+    right side (the recessed edge and the full-width edge of the band, each from the floor to the rear), the mirror,
+    the rear cut and the corner."""
+    b = v.band
+    s = sharp_body(d, v, rear=False, right_only=True)
+    for name, side, r in (("recessed edge", "X", b.inner_r), ("full-width edge", "W", b.outer_r)):
+        es = [e for e in kind_edges(s, d, v, side, ("B",)) if e.BoundBox.Center.x > 0]
+        log.append(f"{name}: {len(es)} edges, R {r:g}")
+        s = s.makeFillet(r, es)
+    half = s.common(so.halfspace(V(0, 0, 0), V(1, 0, 0)))
+    s = half.fuse(half.mirror(V(0, 0, 0), V(1, 0, 0))).removeSplitter()
+    s = s.cut(rear_cutter(d, v)).removeSplitter()
+    es = rear_corner_chain(s, d)
+    log.append(f"corner: {len(es)} edges, R {v.corner_r:g}")
+    return s.makeFillet(v.corner_r, es)
+
+
 def band_y(d: Blueprint, v: Variant, u: float, z: float) -> float:
     """Y of the sharp step band at height z, u in from the full-width side (0 the outer edge, step_in the inner crease)."""
     t = math.tan(math.radians(d.step_lean))
@@ -548,12 +667,12 @@ def floor_edges(s: Part.Shape, y_front: float) -> list[Part.Edge]:
 
 
 def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
-    s = shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
-    if v.step_r and not v.shoulder:
+    s = band_body(d, v, log) if v.band else shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
+    if v.step_r and not (v.shoulder or v.band):
         outer, inner = step_edges(d, s)
         log.append(f"step edges: {len(outer)} outer, {len(inner)} inner")
         s = s.makeFillet(v.step_r, outer).makeFillet(v.step_crease_r, step_edges(d, s.makeFillet(v.step_r, outer))[1]) if inner else s
-    if not v.shoulder:
+    if not (v.shoulder or v.band):
         es = corner_edges(d, s)
         log.append(f"corner edges: {len(es)}")
         s = s.makeFillet(v.corner_r, es)
@@ -691,8 +810,8 @@ def focus(d: Blueprint, v: Variant) -> dict[str, dict]:
            "closeup-roll-corner": cam((rear_side_x(d, zs) - 6, d.body_d + 10, zs), 60, 140, 12),
            "closeup-base-corner": cam((rear_side_x(d, 0) - 10, d.body_d - 10, 10.0), 45, 135, 20),
            "closeup-deck-front-low": cam((d.width / 2 - 60, 0.0, 6.0), 70, -20, 4)}
-    if v.shoulder:
-        turn = turn_point(d, v)
+    if v.shoulder or v.band:
+        turn = turn_point(d, v if v.shoulder else VARIANTS["R2"])   # R3 keeps R2's cameras, for the comparison
         out["closeup-r2-corner"] = cam((d.width / 2 - 20, d.body_d + 5, 375.0), 95, 128, 14)
         out["closeup-turn"] = cam((d.width / 2 - 4, turn[0] + 6, turn[1] + 14), 48, 105, 8)
         out["three-quarter-rear-above"] = cam((110.0, 450.0, 450.0), 330, 140, 34)
