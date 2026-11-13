@@ -17,6 +17,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py angles-r7  # rear-rev7-r7-angles.png (2D options of the stroke)
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r7  # R7 with R6's cameras (foot, cut-ins, hood corner)
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r7   # rear-rev7-r7.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r8  # R8, and R7 with R8's close-ups
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r8  # rear-rev7-r8.png, rear-rev7-r8-corners.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -636,6 +638,50 @@ def sheet_r7() -> None:
     sheet.save(os.path.join(COMPARE, "rear-rev7-r7.png"))
 
 
+R8_CLOSE = ("closeup-hip-foot", "closeup-head-foot", "closeup-top-mitre", "closeup-cut-in-corner", "closeup-hand-hold", "closeup-hood-roof-end")
+R7_CAMS = "R7-r8cams"
+
+
+def render_r8() -> None:
+    script = os.path.join(HERE, "render_views.py")
+    model = os.path.join(STUDY, "R8")
+    views = R3_VIEWS + ("closeup-hood-corner-above", "closeup-cut-ins") + R8_CLOSE
+    subprocess.run([sys.executable, script, os.path.join(RENDERS, "R8"), model, "--views", ",".join(views), f"--frame={FRAME}", "--size", "1100",
+                    "--samples", "16"], check=True)
+    src, dst = os.path.join(STUDY, "R7"), os.path.join(STUDY, R7_CAMS)
+    os.makedirs(dst, exist_ok=True)
+    manifest = json.load(open(os.path.join(src, "manifest.json")))
+    for e in manifest.values():
+        e["file"], e["brep"] = os.path.join(src, e["file"]), os.path.join(src, e["brep"])
+    json.dump(manifest, open(os.path.join(dst, "manifest.json"), "w"), indent=1)
+    if not os.path.exists(os.path.join(dst, "edges.json")):
+        os.symlink(os.path.join(src, "edges.json"), os.path.join(dst, "edges.json"))
+    cams = json.load(open(os.path.join(model, "focus.json")))
+    json.dump({k: cams[k] for k in R8_CLOSE}, open(os.path.join(dst, "focus.json"), "w"), indent=1)
+    subprocess.run([sys.executable, script, os.path.join(RENDERS, R7_CAMS), dst, "--views", ",".join(R8_CLOSE), f"--frame={FRAME}", "--size", "1100",
+                    "--samples", "16"], check=True)
+
+
+def sheets_r8() -> None:
+    def r7(view: str, w: int) -> Image.Image:
+        return tile(R7_CAMS if view in R8_CLOSE else "R7", view, w)
+
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "closeup-cut-in-corner", "closeup-hand-hold", "closeup-hood-corner-above", "rear"]
+    w = 400
+    rows = [[r7(v, w) for v in views], [tile("R8", v, w) for v in views]]
+    notes = ["All BREP face edges drawn; same camera in each column. R8: the lower rear corner, the hip and the chamfer's mitre made by hand: the hip and",
+             "the mitre R 3, the vertical corner the ellipse where both cut the level planes (5.20 x 3, tangent 2.12 from the corner), so they meet exactly.",
+             "Cut-ins milled by a ball (R 7.07, centre 5 outside the wall: slot 10, groove 2.07 deep, roof 45 degrees at the edge) turning the corner on R 13",
+             "(floor R 5.9, 4.6 deep at the corner), round ends. Hand-holds round inside (R 8 on the cutter), rim sharp; their roof now reaches the rim (the",
+             "cutter of R to R7 stopped level at z 400). Hood corners sharp: no clean round without the mirror line."]
+    grid(rows, ["R7", "R8"], views, "Rear: R7 and R8", notes).save(os.path.join(COMPARE, "rear-rev7-r8.png"))
+    close = ["closeup-hip-foot", "closeup-head-foot", "closeup-top-mitre"]
+    rows = [[r7(v, 520) for v in close], [tile("R8", v, 520) for v in close]]
+    notes = ["The three corners where small rounds meet, R7 above and R8 below. Foot of the hip: clean in R8 (made by hand). Foot of the head's corner and the",
+             "band's top mitre: still OpenCascade's corner patches in R8 (1.6 / 0.9 and 1.1 wide), as in R7."]
+    grid(rows, ["R7", "R8"], close, "Rear corners: R7 and R8", notes).save(os.path.join(COMPARE, "rear-rev7-r8-corners.png"))
+
+
 def stroke_options() -> dict[str, list[tuple[float, float]]]:
     """The outer edge of the band in side view (y, z) for each option of the foot and the top (R7)."""
     t = math.tan(math.radians(D.step_lean))
@@ -753,4 +799,5 @@ if __name__ == "__main__":
     {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2, "render-r3": render_r3,
      "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4,
      "render-r5": render_r5, "sheet-r5": sheet_r5,
-     "angles-r7": sheet_r7_angles, "render-r7": render_r7, "sheet-r7": sheet_r7}[sys.argv[1]]()
+     "angles-r7": sheet_r7_angles, "render-r7": render_r7, "sheet-r7": sheet_r7,
+     "render-r8": render_r8, "sheets-r8": sheets_r8}[sys.argv[1]]()

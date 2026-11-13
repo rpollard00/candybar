@@ -412,3 +412,58 @@ class CandidateR7Test(unittest.TestCase):
         for k in range(1, len(rows)):
             self.assertGreaterEqual(rows[k][1], rows[k - 1][1] - 0.5)
             self.assertGreaterEqual(rows[k][2] + d.width / 2 - d.side_x(rows[k][0]), rows[k - 1][2] + d.width / 2 - d.side_x(rows[k - 1][0]) - 0.5)
+
+
+class CandidateR8Test(unittest.TestCase):
+    """R8: R7 with the lower rear corner, the hip and the chamfer's mitre made by hand, cut-ins milled by a ball and
+    hand-holds round inside."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R8"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_stroke_is_that_of_r7(self) -> None:
+        a, b = rs.band_path(self.d, self.v), rs.band_path(rs.blueprint(rs.VARIANTS["R7"]), rs.VARIANTS["R7"])
+        self.assertEqual([(sg.p, sg.q) for sg in a], [(sg.p, sg.q) for sg in b])
+
+    def test_the_foot_of_the_hip_and_the_base_corner_pass_the_face_check(self) -> None:
+        d, a = self.d, self.d.rear_w / 2
+        near = lambda at: abs(abs(at[0]) - a) < 8 and abs(at[1] - d.body_d) < 8 and (at[2] < 12 or abs(at[2] - self.v.crease_lo[1]) < 8)
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals())) if near(f.at)]
+        self.assertEqual(found, [])
+
+    def test_the_changed_zone_passes_the_face_check_but_for_three_corner_patches(self) -> None:
+        """Open: the top of the hip, the band's top mitre and the foot of the head's corner (OpenCascade's corner
+        patches where rounds made with makeFillet meet)."""
+        d = self.d
+        spots = [(246.6, 550.0, 310.0), (247.2, 469.3, 310.3), (245.2, 579.2, 339.1), (244.2, 579.5, 337.9)]
+        near = lambda at: any(math.dist((abs(at[0]), at[1], at[2]), q) < 3.0 for q in spots)
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals()))
+                 if (abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0 or f.at[1] > d.body_d - 1) and not near(f.at)]
+        self.assertEqual(found, [])
+
+    def test_the_cut_ins_have_round_ends(self) -> None:
+        """On the rear wall, the outline of the lowest slot at its end is curved: no straight upright piece."""
+        d, v = self.d, self.v
+        a, c = d.rear_w / 2, v.cut_ins
+        x_end = a - v.planar.cut_rear
+        edges = [e for w in self.body.slice(V(0, 1, 0), d.body_d - 0.05) for e in w.Edges
+                 if e.BoundBox.XMin < x_end + 6 and e.BoundBox.XMax > x_end - 1 and c.z0 - 1 < e.BoundBox.Center.z < c.z0 + c.height + 1]
+        self.assertTrue(edges)
+        self.assertFalse(any(isinstance(e.Curve, Part.Line) and e.BoundBox.ZLength > 1.0 and e.BoundBox.XLength < 0.01 for e in edges))
+
+    def test_the_hand_holds_are_round_inside_and_sharp_at_the_rim(self) -> None:
+        d, g = self.d, self.v.grips
+        rim = [e for e in self.body.Edges if abs(e.BoundBox.YMin - d.depth) < 1e-3 and abs(e.BoundBox.YMax - d.depth) < 1e-3
+               and g.x0 - 1 < e.BoundBox.Center.x < g.x1 + 1 and g.z0 - 1 < e.BoundBox.Center.z < g.z0 + g.height + 1]
+        self.assertTrue(rim)
+        self.assertTrue(all(rs.crease_angle(self.body.ancestorsOfType(e, Part.Face), e.valueAt((e.FirstParameter + e.LastParameter) / 2)) > 40 for e in rim))
+        inside = [f for f in self.body.Faces if g.x0 < f.CenterOfMass.x < g.x1 and d.depth - g.depth - 1 < f.CenterOfMass.y < d.depth - 1
+                  and g.z0 < f.CenterOfMass.z < g.z0 + g.height and isinstance(f.Surface, (Part.Cylinder, Part.Toroid, Part.Sphere, Part.BSplineSurface))]
+        self.assertTrue(any(abs(getattr(f.Surface, "Radius", getattr(f.Surface, "MinorRadius", 0.0)) - self.v.planar.grip_r) < 0.01 for f in inside))
