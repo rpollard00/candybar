@@ -12,6 +12,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r3   # rear-rev7-r3.png
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r4  # R4 with R3's cameras
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r4   # rear-rev7-r4.png
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r5  # R5a and R6 with R4's cameras (and R6's hood corner)
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheet-r5   # rear-rev7-r5.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -77,10 +79,12 @@ def layout(name: str) -> dict:
     v = variant(name)
     r = v["corner_r"]
     lo = v["crease_lo"]
-    shelf = v.get("shelf") or {}
-    lo_r = shelf["constant"][0] if shelf.get("constant") else lo[2]     # R4: the lower crease is one constant round
+    shelf, planar = v.get("shelf") or {}, v.get("planar") or {}
+    lo_r = shelf["constant"][0] if shelf.get("constant") else planar.get("fillet", lo[2])  # R4/R5a/R6: the crease's own round
     roll_foot = lo[1] - lo_r * TAN
     door_half = rear_x() - r - DOOR_LAND
+    if planar:                                       # R6: the cut-ins' rear legs bound the door, not the corner
+        door_half = rear_x() - planar["cut_rear"] - DOOR_LAND
     door = (-door_half, 116.0, door_half, roll_foot - DOOR_FRAME)
     round_start = rear_x() - r
     psu_x0 = max(PSU["x0"], -round_start + CORNER_CLEAR)
@@ -584,6 +588,31 @@ def sheet_r3() -> None:
     sheet.save(os.path.join(COMPARE, "rear-rev7-r3.png"))
 
 
+def render_r5() -> None:
+    render_r3("R5a")
+    model = os.path.join(STUDY, "R6")
+    subprocess.run([sys.executable, os.path.join(HERE, "render_views.py"), os.path.join(RENDERS, "R6"), model, "--views",
+                    ",".join(R3_VIEWS + ("closeup-hood-corner-above", "closeup-cut-ins")), f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+
+
+def sheet_r5() -> None:
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "rear", "side-right"]
+    w = 470
+    names = ["R4", "R5a", "R6"]
+    rows = [[tile(n, v, w) for v in views] for n in names]
+    hood = tile("R6", "closeup-hood-corner-above", w)
+    blank = Image.new("RGB", (w, 10), (255, 255, 255))
+    rows.append([hood, blank, blank, blank])
+    notes = ["All BREP face edges drawn; same camera in each column. R4: one 45 degree shelf (12 deep on the side, 40 on the rear) with the smile eased level at",
+             "the corner, a cone round the R 25 corner, rounds R 12 / R 20. R5a: R4 with the rear straight across (no smile, crease level at z 298), the band's top arc",
+             "R 65, the creases R 3 (flat facets, round corners). R6: the mini's way: two flat 45 degree facets meeting on a hip line at a sharp corner, the rear facet's end",
+             "showing on the side as a slanted edge, R 3 on every edge of the back (the hip R 4), the base chamfer mitred, the cut-ins round the sharp corner on a mitre",
+             "(30 on the side, 20 on the rear). Last row: R6 from above the rear right corner: the hood's rear corners stay sharp (their R 3 does not build on both",
+             "sides), the head's is R 3, so the corner lines across the seam differ by the round (3). R5b (one 12 deep section all round) was not built."]
+    sheet = grid(rows, ["R4", "R5a: straight,\nR 3 creases", "R6: planar", "R6: hood corner\nand seam"], views, "Rear: R4, R5a, R6 (planar)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r5.png"))
+
+
 def costs_md() -> None:
     for name in ("A", "A25", "R"):
         print(f"\n## {MODELS[name]}\n\n| Item | Estimate |\n| --- | --- |")
@@ -593,4 +622,5 @@ def costs_md() -> None:
 
 if __name__ == "__main__":
     {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2, "render-r3": render_r3,
-     "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4}[sys.argv[1]]()
+     "sheet-r3": sheet_r3, "render-r4": lambda: render_r3("R4"), "sheet-r4": sheet_r4,
+     "render-r5": render_r5, "sheet-r5": sheet_r5}[sys.argv[1]]()

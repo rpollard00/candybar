@@ -272,3 +272,80 @@ class CandidateR4Test(unittest.TestCase):
             self.assertGreaterEqual(rear[k], rear[k - 1] - 0.3, f"rear at z {rows[k][0]}: {rear}")
         self.assertGreater(side[-1] - side[0], 30.0)
         self.assertGreater(rear[-1] - rear[0], 8.0)
+
+
+class CandidateR5aTest(unittest.TestCase):
+    """R5a: R4 with the rear straight across (no smile), the creases R 3: flat facets, the R 25 corners and the cone."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R5a"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_changed_zone_passes_the_face_check(self) -> None:
+        d = self.d
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0 or f.at[1] > d.body_d - 1]
+        self.assertEqual(found, [])
+
+    def test_the_head_has_the_full_width(self) -> None:
+        d = self.d
+        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + 340.0) / 2):
+            self.assertAlmostEqual(half_width(self.body, z, d.body_d), d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
+
+    def test_the_corner_moves_outward_once(self) -> None:
+        d = self.d
+        rows = [(z, *corner_column(self.body, float(z))) for z in range(280, 385, 5)]
+        for k in range(1, len(rows)):
+            self.assertGreaterEqual(rows[k][1], rows[k - 1][1] - 0.3)
+            self.assertGreaterEqual(rows[k][2] + d.width / 2 - d.side_x(rows[k][0]), rows[k - 1][2] + d.width / 2 - d.side_x(rows[k - 1][0]) - 0.3)
+
+
+class CandidateR6Test(unittest.TestCase):
+    """R6, planar: two flat 45 degree facets (the band's on the side, the roll's on the rear) meeting on a hip line at a
+    sharp corner, R 3 on the edges of the back."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R6"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_changed_zone_passes_the_face_check_but_for_the_foot_of_the_hip(self) -> None:
+        """The one open item: where the hip, the two lower creases and the lower vertical corner meet (two convex and
+        two concave rounds), OpenCascade's corner patch is 1.7 wide and meets its neighbours at 1.3 degrees."""
+        d, a = self.d, self.d.rear_w / 2
+        foot = lambda at: abs(abs(at[0]) - a) < 3.0 and abs(at[1] - d.body_d) < 3.0 and abs(at[2] - self.v.crease_lo[1]) < 3.0
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals()))
+                 if (abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0 or f.at[1] > d.body_d - 1) and not foot(f.at)]
+        self.assertEqual(found, [])
+
+    def test_the_head_has_the_full_width(self) -> None:
+        d = self.d
+        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + 340.0) / 2):
+            self.assertAlmostEqual(half_width(self.body, z, d.body_d), d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
+
+    def test_the_side_facet_and_the_rear_facet_are_planes(self) -> None:
+        """Behind the band's level run, the side facet is the plane x - rear_w/2 = z - 298 and the rear facet the
+        plane y - body_d = z - 298, each a face of its own."""
+        d, a, z0 = self.d, self.d.rear_w / 2, self.v.crease_lo[1]
+        for point, normal in ((V(a + 6, d.body_d - 20, z0 + 6), V(1, 0, -1)), (V(0, d.body_d + 20, z0 + 20), V(0, 1, -1))):
+            normal.normalize()
+            near = [f for f in self.body.Faces if f.distToShape(Part.Vertex(point))[0] < 0.01]
+            self.assertTrue(near, f"no face at {point}")
+            self.assertTrue(any(isinstance(f.Surface, Part.Plane) and abs(abs(f.Surface.Axis.dot(normal)) - 1) < 1e-6 for f in near))
+
+    def test_the_corner_moves_outward_once(self) -> None:
+        d = self.d
+        rows = [(z, *corner_column(self.body, float(z))) for z in range(280, 385, 5)]
+        for k in range(1, len(rows)):
+            self.assertGreaterEqual(rows[k][1], rows[k - 1][1] - 0.3)
+            self.assertGreaterEqual(rows[k][2] + d.width / 2 - d.side_x(rows[k][0]), rows[k - 1][2] + d.width / 2 - d.side_x(rows[k - 1][0]) - 0.3)

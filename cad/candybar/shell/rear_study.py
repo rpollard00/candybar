@@ -151,6 +151,20 @@ class Shelf:
     outer_side: float = 12.0
     outer_corner: float = 24.0
     constant: tuple[float, float] | None = (12.0, 20.0)   # (lower, upper): one radius per chain all round, in place of the laws
+    joined: bool = True          # the shelf's corner as one B-spline from the band's level run to the swept roll (see shelf_cutter)
+
+
+@dataclass(frozen=True)
+class Planar:
+    """R6, the mini's way: flat facets that meet on mitres, and one small round on every edge of the back (R `fillet`,
+    against thin paint on a sharp edge). The shelf is the band's 45 degree facet on the side (12 deep) and the roll's
+    45 degree facet on the rear (40 deep, the rear straight across), meeting on a hip line at the corner; above the
+    band the rear facet runs on to the full-width side, where its end shows as a slanted edge. The cut-ins wrap the
+    sharp corner on a mitre: `cut_side` along the side and `cut_rear` along the rear."""
+    fillet: float = 3.0
+    hip: float = 4.0             # the hip line's round: at R 3 its top corner (with the slanted edge and the band's edge) leaves a strip 1.0 wide
+    cut_side: float = 30.0
+    cut_rear: float = 20.0
 
 
 @dataclass(frozen=True)
@@ -174,6 +188,7 @@ class Variant:
     flare: Flare | None = None
     band: Band | None = None
     shelf: Shelf | None = None
+    planar: Planar | None = None
     note: str = ""
 
     @property
@@ -181,6 +196,8 @@ class Variant:
         """The hood keeps the full width. Without a shoulder its round in plan is the body's round plus the step, so
         that both rounds leave the rear wall on the same line and the soffit grows from nothing at the rear to the step
         at the side. With a shoulder the head has the full width, and the head and the hood share one corner round."""
+        if self.planar:
+            return self.planar.fillet
         return self.corner_r if self.shoulder or self.band else self.corner_r + Blueprint().step_in
 
 
@@ -212,6 +229,15 @@ VARIANTS["R3"] = replace(VARIANTS["R2"], name="R3", title="R3: the step as one b
                               "its lower crease reaches the rear wall 28 below the roll's (as high, the three rounds meet in faces of 1 to 2)")
 VARIANTS["R4"] = replace(VARIANTS["R3"], name="R4", title="R4: one shelf under the head", band=replace(Band(), top_r=60.0, fall=0.0),
                          shelf=Shelf(), note="the band's run and the roll's underside are one 45 degree shelf, level at the rear corner")
+VARIANTS["R5a"] = replace(VARIANTS["R4"], name="R5a", title="R5a: R4 with the rear straight across", smile=0.0,
+                          band=replace(VARIANTS["R4"].band, top_r=65.0), shelf=replace(VARIANTS["R4"].shelf, constant=(3.0, 3.0), flat=0.0, joined=False),
+                          note="no smile: the lower crease level at z 298 across the rear, round the corners and along the band's run; "
+                               "band top arc R 65 (R 80 reaches level only after the corner round starts); the creases R 3 "
+                               "(flat facets, round corners); the shelf is planes and a cone (no smile, so the rear planes merge)")
+VARIANTS["R6"] = replace(VARIANTS["R3"], name="R6", title="R6: planar, the mini's way", smile=0.0, corner_r=3.0,
+                         crease_lo=(540.0, 298.0, 0.0), crease_hi=(580.0, 338.0, 0.0), band=replace(Band(), top_r=65.0, fall=0.0, run_dz=0.0),
+                         planar=Planar(), note="flat 45 degree facets meeting on a hip line at the rear corner, the rear straight "
+                                               "across, sharp corners with R 3 on every edge of the back")
 VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
                            note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
 VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
@@ -283,6 +309,8 @@ def ease_arc(v: Variant, half: float) -> tuple[float, float, float]:
 
 
 def eased_smile(v: Variant, x: float, half: float) -> float:
+    if not v.smile:
+        return 0.0
     x = abs(x)
     xt, xe = shelf_x(v, half)
     if x <= xt:
@@ -327,6 +355,9 @@ def shelf_rear_cutter(d: Blueprint, v: Variant) -> Part.Shape:
     region = path + so.poly([so.ends(path[-1])[1], (far, -3 * OVER), (far, d.body_top + 3 * OVER)])[:-1]
     half = d.rear_w / 2
     xt, xe = shelf_x(v, half)
+    if not v.smile:
+        # the rear straight across (R5a): the sharp profile extruded between the starts of the corner rounds
+        return so.prism(so.closed(region), so.yz(-xe), V(2 * xe, 0, 0))
     cx, cz, rho = ease_arc(v, half)
     at = lambda x: V(x, d.depth, eased_smile(v, x, half))
     left = Part.Arc(at(-xe), at(-(xt + xe) / 2), at(-xt)).toShape()
@@ -388,7 +419,7 @@ def shelf_cutter(d: Blueprint, v: Variant) -> Part.Shape:
         return Part.Wire(edges)
 
     below = Part.Face(outline(0.0, -3 * OVER, False)).extrude(V(0, 0, zc + 3 * OVER))
-    taper = Part.makeLoft([outline(0.0, zc, True), outline(rise, zc + rise, True)], True, True)
+    taper = Part.makeLoft([outline(0.0, zc, v.shelf.joined), outline(rise, zc + rise, v.shelf.joined)], True, True)
     keep = below.fuse(taper).removeSplitter()
     box = Part.makeBox(d.width / 2 + 2 * OVER - xe, d.depth + 3 * OVER - y_level, rise + zc + 3 * OVER, V(xe, y_level, -3 * OVER))
     return box.cut(keep)
@@ -599,6 +630,13 @@ def band_level_y(d: Blueprint, v: Variant) -> float:
     return band_path(d, v)[-1].p[0]
 
 
+def small_rounds(v: Variant) -> bool:
+    """Whether the back's rounds are small (R6, R5a): smaller than the base chamfer + 3, so the chamfer is made first
+    and the rounds end on it, and the S of the band is one face (a face boundary at its inflection with small rounds
+    reads to the face check as one torus cut in two)."""
+    return bool(v.planar or (v.shelf and v.shelf.constant and max(v.shelf.constant) < v.chamfer + 3))
+
+
 def offset_path(path: pr.Path, by: float) -> pr.Path:
     """A tangent-continuous path of lines and arcs moved by `by` to its left (negative: right). Lines keep their
     vector, so that a ruled loft between two offsets of one path gives planes on the lines and cones on the arcs."""
@@ -617,7 +655,15 @@ def band_cutter(d: Blueprint, v: Variant) -> Part.Shape:
         moved = offset_path(path, -(W - x))
         start, end = so.ends(moved[0])[0], so.ends(moved[-1])[1]
         region = moved + [pr.Line(end, (end[0], -OVER)), pr.Line((end[0], -OVER), start)]
-        return so.wire(region, so.yz(x))
+        w = so.wire(region, so.yz(x))
+        if not small_rounds(v):
+            return w
+        # the two arcs of the S as one rational B-spline (the same knots in every section): with small rounds, a
+        # face boundary at the S's inflection reads to the face check as one torus cut in two
+        es = w.Edges
+        s_curve = es[1].Curve.toBSpline(es[1].FirstParameter, es[1].LastParameter)
+        s_curve.join(es[2].Curve.toBSpline(es[2].FirstParameter, es[2].LastParameter))
+        return Part.Wire([es[0], s_curve.toShape()] + es[3:])
 
     behind = Part.makeLoft([section(W + e), section(a - e)], True, True)
     return so.halfspace(V(a, 0, 0), V(1, 0, 0)).common(behind)
@@ -860,8 +906,14 @@ def shelf_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     corner round already in it), then the lower crease (one chain round each corner) and the upper edge (one chain),
     each with its radius law."""
     s = sharp_body(d, v)
+    if small_rounds(v):
+        es = floor_edges(s, d.foot_y - d.bend_t)
+        log.append(f"floor edges: {len(es)} (before the small rounds)")
+        s = s.makeChamfer(v.chamfer, es)
     for k, (name, wall, upper) in enumerate((("lower crease", "L", False), ("upper edge", "U", True))):
         es = shelf_edges(s, d, v, wall)
+        if small_rounds(v):
+            es = [e for e in es if e.BoundBox.ZMax > v.chamfer + 0.01]
         if v.shelf.constant:
             log.append(f"{name}: {len(es)} edges, R {v.shelf.constant[k]:g}")
             s = s.makeFillet(v.shelf.constant[k], es)
@@ -969,7 +1021,29 @@ def floor_edges(s: Part.Shape, y_front: float) -> list[Part.Edge]:
     return edges_where(s, lambda p: abs(p.z) < 1e-4 and p.y > y_front + 0.01, 3)
 
 
+def planar_edges(s: Part.Shape, d: Blueprint) -> list[Part.Edge]:
+    """Every sharp edge of the back (R6): behind the old leaning step line or on the rear, below the seam bevel, above
+    the base chamfer. The rounds of the vertical corners end on the chamfer and its mitre stays sharp: run on down
+    the chamfer's hip edges, they meet the chamfer's sharp top edge in needles (0 degrees) and slivers of 0.3 and 1.7."""
+    out = []
+    for e in s.Edges:
+        if e.Degenerated:
+            continue
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        b = e.BoundBox
+        if b.ZMax > d.body_top - d.seam_groove - 0.5 or b.ZMax < 5.01 + 1e-3:
+            continue
+        if not (m.y > d.step_y(m.z) - 1 or m.y > d.body_d - 1):
+            continue
+        fs = s.ancestorsOfType(e, Part.Face)
+        if len(fs) == 2 and crease_angle(fs, m) > 5.0:
+            out.append(e)
+    return out
+
+
 def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
+    if v.planar:
+        return planar_body(d, v, log)
     s = shelf_body(d, v, log) if v.shelf else band_body(d, v, log) if v.band else shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
     if v.step_r and not (v.shoulder or v.band):
         outer, inner = step_edges(d, s)
@@ -979,7 +1053,7 @@ def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
         es = corner_edges(d, s)
         log.append(f"corner edges: {len(es)}")
         s = s.makeFillet(v.corner_r, es)
-    if v.chamfer:
+    if v.chamfer and not small_rounds(v):
         es = floor_edges(s, d.foot_y - d.bend_t)
         log.append(f"floor edges: {len(es)}")
         s = s.makeChamfer(v.chamfer, es)
@@ -996,6 +1070,146 @@ def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
     if v.grips:
         s = s.cut(so.both(grip_cutter(d, v)))
     return s.removeSplitter()
+
+
+def planar_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
+    """R6: the sharp body of planes (the band, the rear profile straight across, sharp vertical corners), the base
+    chamfer on the sharp corners (it mitres), then one small round on every edge of the back, the chamfer's hip
+    edges at the corners with it; then the seam bevel, the cut-ins and the grips as for the others."""
+    s = sharp_body(d, v)
+    es = floor_edges(s, d.foot_y - d.bend_t)
+    log.append(f"floor edges: {len(es)}")
+    s = s.makeChamfer(v.chamfer, es)
+    es = planar_edges(s, d)
+    a, p = d.rear_w / 2, v.planar
+
+    def radius(e: Part.Edge) -> float:
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        hip = abs((abs(m.x) - a) - (m.y - d.body_d)) < 1.0 and v.crease_lo[1] - 1 < m.z < v.crease_lo[1] + d.step_in + 2
+        return p.hip if hip else p.fillet
+
+    log.append(f"small rounds: {len(es)} edges, R {p.fillet:g}, the hip R {p.hip:g}")
+    s = radius_fillet(s, es, radius)
+    g = d.seam_groove
+    s = s.cut(so.ring_bevel(so.outline_at(s, d.body_top - g), d.body_top - g, d.body_top, g))
+    if not s.isValid():
+        s.fix(1e-7, 1e-7, 1e-7)
+        log.append(f"seam bevel: shape fixed (valid {s.isValid()})")
+    if v.cut_ins:
+        s = s.cut(so.both(planar_cut_ins(d, v)))
+    if v.grips:
+        s = s.cut(so.both(grip_cutter(d, v)))
+    return s.removeSplitter()
+
+
+def radius_fillet(s: Part.Shape, edges: list[Part.Edge], radius) -> Part.Shape:
+    """Rounds of a constant radius on each edge, radius(edge), in one builder (a Part::Fillet feature)."""
+    index = {}
+    for i, e in enumerate(s.Edges):
+        index.setdefault(e.hashCode(), i + 1)
+    doc = FreeCAD.newDocument("radius_fillet")
+    try:
+        base = doc.addObject("Part::Feature", "base")
+        base.Shape = s
+        fl = doc.addObject("Part::Fillet", "fillet")
+        fl.Base = base
+        fl.Edges = [(index[e.hashCode()], radius(e), radius(e)) for e in edges]
+        doc.recompute()
+        out = fl.Shape.copy()
+    finally:
+        FreeCAD.closeDocument(doc.Name)
+    if out.isNull() or not out.isValid():
+        raise Part.OCCError("rounds failed")
+    return out
+
+
+def planar_hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shape]:
+    """The hood of solids.hood with sharp rear corners and the small round on them (R6), in place of the corner loft:
+    the cap's rear corner edges, from the foot over the rear arc to the roof, rounded with makeFillet."""
+    h = pr.hood(d)
+    side, corner, top = pr.hood_outline(d, h.height, h.half_base)
+    lean = side.a0 if isinstance(side, pr.Arc) else math.atan2(side.p[0] - side.q[0], side.q[1] - side.p[1])
+    drop = OVER * 2
+    foot = (h.half_base + drop * math.tan(lean), -drop)
+    outline = so.both_sides([pr.Line(foot, (h.half_base, 0.0)), side, corner, top])
+    profile = [pr.Conic((d.hood_edge_in, 0.0), (0.0, 0.0), (0.0, d.hood_edge_back)), pr.Line((0.0, d.hood_edge_back), (0.0, h.depth + OVER))]
+    shell = so.evolved(outline, profile)
+    turn = FreeCAD.Matrix(-1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0)
+    shell = so.leaning(shell.transformed(turn), h, d)
+    side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
+    side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
+    cap = shell.common(so.across(side_view))
+    def corner_chain(shape: Part.Shape, sign: int) -> list[Part.Edge]:
+        out = []
+        for e in shape.Edges:
+            b = e.BoundBox
+            if e.Degenerated or b.Center.x * sign < 100 or b.YMax < h.depth - 60:
+                continue
+            fs = shape.ancestorsOfType(e, Part.Face)
+            if len(fs) != 2:
+                continue
+            m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+            ns = [f.normalAt(*f.Surface.parameter(m)) for f in fs]
+            if sorted(abs(n.y) > abs(n.x) for n in ns) == [False, True] and crease_angle(fs, m) > 5.0:
+                out.append(e)
+        return out
+
+    g = d.seam_groove
+    cap = cap.cut(so.ring_bevel(so.outline_at(cap, g), g, 0.0, g))
+    opening = so.prism(so.both_sides(so.opening_path(d, h)), so.xz(-OVER), V(0, BIG / 4, 0))
+    recess = opening.common(so.across(so.poly(so.recess_profile(d, h))))
+    cap = cap.cut(recess).removeSplitter()
+    # the small round on the rear corners last, one side at a time (both in one call fails), kept only when both
+    # sides come out valid and pass the boolean check. Rounded on the sharp cap, the round makes it unorientable and
+    # the cuts of the seam groove and the recess fail; rounded last, the right side builds but the left (the same
+    # chain, mirrored) does not, so both stay sharp rather than a hood that is not symmetric.
+    rounded_cap, notes = cap, []
+    for sign in (1, -1):
+        es = corner_chain(rounded_cap, sign)
+        name = "right" if sign > 0 else "left"
+        try:
+            trial = rounded_cap.makeFillet(v.planar.fillet, es)
+            trial.check(True)
+            rounded_cap = trial
+            notes.append(f"{name} R {v.planar.fillet:g} ({len(es)} edges)")
+        except (Part.OCCError, ValueError, RuntimeError) as ex:
+            notes.append(f"{name} failed ({str(ex).splitlines()[0][:50]})")
+            rounded_cap = None
+            break
+    if rounded_cap is not None:
+        cap = rounded_cap
+    log.append("hood rear corners: " + "; ".join(notes) + ("" if rounded_cap is not None else "; both left sharp"))
+    xr = h.half_open(h.z_band_top, d) + OVER
+    lip = Part.makeBox(2 * xr, d.hood_rail_proud, h.z_rail_top - h.z_band_top, V(-xr, h.y_band_top - d.hood_rail_proud, h.z_band_top)).common(opening)
+    out = {"hood": cap, "marquee_lip": lip.removeSplitter()}
+    out.update(so.band_forms(d, h))
+    return {k: so.hood_frame(h)(sh) for k, sh in out.items()}
+
+
+def planar_cut_ins(d: Blueprint, v: Variant) -> Part.Shape:
+    """The right row of cut-ins round the sharp lower rear corner (R6): each groove is two straight legs, one along the
+    rear and one along the side, with the section of cut_in_cutter (round floor, back wall, 45 degree roof), joined on
+    the corner's mitre plane. The legs end on planes square to them."""
+    c, p = v.cut_ins, v.planar
+    a, y0 = d.rear_w / 2, d.body_d
+    dp, h = c.depth, c.height
+    mid = (dp * math.sin(math.pi / 4), dp * (1 - math.cos(math.pi / 4)))
+    out = []
+    for k in range(c.count):
+        z = c.z0 + k * c.pitch
+
+        def leg(origin: FreeCAD.Vector, inward: FreeCAD.Vector, along: FreeCAD.Vector, length: float) -> Part.Shape:
+            at = lambda q: origin + inward * q[0] + V(0, 0, z + q[1])
+            sec = Part.Wire([Part.Arc(at((0.0, 0.0)), at(mid), at((dp, dp))).toShape(), Part.LineSegment(at((dp, dp)), at((dp, h - dp))).toShape(),
+                             Part.LineSegment(at((dp, h - dp)), at((0.0, h))).toShape(), Part.LineSegment(at((0.0, h)), at((-OVER, h))).toShape(),
+                             Part.LineSegment(at((-OVER, h)), at((-OVER, 0.0))).toShape(), Part.LineSegment(at((-OVER, 0.0)), at((0.0, 0.0))).toShape()])
+            return Part.Face(sec).extrude(along * length)
+
+        rear = leg(V(a - p.cut_rear, y0, 0), V(0, -1, 0), V(1, 0, 0), p.cut_rear + 2 * OVER)
+        side = leg(V(a, y0 - p.cut_side, 0), V(-1, 0, 0), V(0, 1, 0), p.cut_side + 2 * OVER)
+        mitre = so.halfspace(V(a, y0, 0), V(1, -1, 0))          # the side of the corner's bisector toward the side
+        out.append(rear.cut(mitre).fuse(side.common(mitre)).removeSplitter())
+    return out[0].fuse(out[1:]).removeSplitter()
 
 
 # ---------- the recesses ----------
@@ -1070,6 +1284,8 @@ def hood(d: Blueprint, v: Variant, log: list[str]) -> dict[str, Part.Shape]:
     the corner chain runs up the rear arc and over the top corner to the roof, where the side and the rear arc turn
     tangent, so that a round of one radius must vanish there. A clean hood corner needs a new construction of the
     hood's rear (stage 2); the face check lists what this one leaves."""
+    if v.planar:
+        return planar_hood(d, v, log)
     log.append(f"hood corner R {d.rear_corner_r:g} (revision 6 construction)")
     return so.hood(d)
 
@@ -1119,6 +1335,8 @@ def focus(d: Blueprint, v: Variant) -> dict[str, dict]:
         out["closeup-turn"] = cam((d.width / 2 - 4, turn[0] + 6, turn[1] + 14), 48, 105, 8)
         out["three-quarter-rear-above"] = cam((110.0, 450.0, 450.0), 330, 140, 34)
         out["flare-foot"] = cam((d.width / 2 - 30, 420.0, 140.0), 210, 140, 14)
+    if v.planar:
+        out["closeup-hood-corner-above"] = cam((d.width / 2 - 18, d.depth - 18, d.body_top + 8), 75, 135, 38)
     if v.cut_ins:
         c = v.cut_ins
         out["closeup-cut-ins"] = cam((rear_side_x(d, 0) - v.corner_r / 2, d.body_d - v.corner_r / 2, c.z0 + c.pitch * (c.count - 1) / 2), 60, 145, 10)
