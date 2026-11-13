@@ -6,6 +6,8 @@ draws all BREP face boundaries (edges.json of each model, see render_views.py). 
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render     # Blender, one model at a time
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets     # the five sheets
     cad/.venv-tools/bin/python cad/tools/draw_rear_study.py costs      # the numbers of the cost list (Markdown)
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py render-r2  # R2 and its flares, and R with R2's cameras
+    cad/.venv-tools/bin/python cad/tools/draw_rear_study.py sheets-r2  # rear-rev7-r2-corner.png, rear-rev7-r2-flare.png
 
 Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -38,6 +40,11 @@ MODELS = {"rev6": "Revision 6", "A": "A: present rear, repaired", "R": "R: roll,
           "A-cut": "A with cut-ins (R 18)", "A-e3": "A, creases R 3 / R 20", "A-e8": "A, creases R 8 / R 20", "A-e15": "A, creases R 15 / R 20",
           "A-ch3": "A, base chamfer 3",
           "A-ch8": "A, base chamfer 8"}
+R2_MODELS = {"R2": "R2: head at full width", "R2Fb": "R2Fb: inner crease flares", "R2Fa": "R2Fa: whole band flares",
+             "R2Fm": "R2Fm: mix (outer 30, inner 80)"}
+R2_VIEWS = ("three-quarter-rear-right", "side-right", "rear", "closeup-r2-corner", "closeup-turn", "three-quarter-rear-above", "flare-foot",
+            "closeup-roll-corner", "closeup-step-top", "closeup-seam-corner", "closeup-base-corner", "closeup-cut-ins")
+R_CAMS = "R-r2cams"
 RECOMMEND = "R"
 INK, MUTED, ACCENT, HW = (30, 30, 34), (110, 110, 118), (200, 40, 40), (40, 90, 200)
 D = Blueprint()
@@ -468,6 +475,72 @@ def sheets() -> None:
     sheet_costs()
 
 
+def render_r2() -> None:
+    """R2 and the flare variants with their cameras, and R with R2's cameras (from a model folder that points at R's
+    files: R's own folders are not written)."""
+    script = os.path.join(HERE, "render_views.py")
+    for name in R2_MODELS:
+        model = os.path.join(STUDY, name)
+        if not os.path.isdir(model):
+            print("missing", model)
+            continue
+        focus = json.load(open(os.path.join(model, "focus.json")))
+        views = ",".join(v for v in R2_VIEWS if v in MAIN or v in focus)
+        subprocess.run([sys.executable, script, os.path.join(RENDERS, name), model, "--views", views, f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+    src, dst = os.path.join(STUDY, "R"), os.path.join(STUDY, R_CAMS)
+    os.makedirs(dst, exist_ok=True)
+    manifest = json.load(open(os.path.join(src, "manifest.json")))
+    for e in manifest.values():
+        e["file"], e["brep"] = os.path.join(src, e["file"]), os.path.join(src, e["brep"])
+    json.dump(manifest, open(os.path.join(dst, "manifest.json"), "w"), indent=1)
+    if not os.path.exists(os.path.join(dst, "edges.json")):
+        os.symlink(os.path.join(src, "edges.json"), os.path.join(dst, "edges.json"))
+    cams = json.load(open(os.path.join(STUDY, "R2", "focus.json")))
+    json.dump({k: cams[k] for k in ("closeup-r2-corner", "closeup-turn", "three-quarter-rear-above", "flare-foot")}, open(os.path.join(dst, "focus.json"), "w"), indent=1)
+    subprocess.run([sys.executable, script, os.path.join(RENDERS, R_CAMS), dst, "--views", "three-quarter-rear-right,side-right,closeup-r2-corner,closeup-turn,three-quarter-rear-above",
+                    f"--frame={FRAME}", "--size", "1100", "--samples", "16"], check=True)
+
+
+def r2_numbers(name: str) -> dict:
+    return json.load(open(os.path.join(STUDY, name, "report.json")))
+
+
+def sheet_r2_corner() -> None:
+    views = ["three-quarter-rear-right", "closeup-r2-corner", "side-right"]
+    w = 560
+    rows = [[tile(R_CAMS, v, w) for v in views], [tile("R2", v, w) for v in views]]
+    notes = ["All BREP face edges drawn. Same cameras in each column. R: the step runs up to the seam, so the rear body is 12 narrower than the hood on each side;",
+             "the hood overhangs it with a soffit, the body corner is R 25 under a hood corner of R 37, and the roll wraps the narrow corner under the overhang.",
+             "R2: the head is full width from the roll up to the seam; the set-back below is closed by a shoulder (12 out, 40 up, 73 degrees) that falls toward the",
+             "front at 0.36 (20 degrees) from the rear corner (sharp lower crease z 322) to the turn (y 475.5, z 298.8), where the step's inner crease runs into it",
+             "through a round of R 30. One corner round R 25 from the floor to the seam, and the hood's corner R 25 on the same line (the corner lines meet",
+             "within 0.5 on the side and 1.0 on the rear across the seam; the hood corner is still the revision 6 loft, stage 2). Roll, smile, door, grips: as R.",
+             "Rounds of the band: recessed edge R 7, full-width edge R 22 (R 16 at the floor, growing up the step), turn R 30, corner R 25."]
+    sheet = grid(rows, ["R (revision 7\ncandidate)", "R2: head at\nfull width"], views, "Rear corner: R and R2 (owner markup 06)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r2-corner.png"))
+
+
+def sheet_r2_flare() -> None:
+    names = [n for n in ("R2", "R2Fb", "R2Fa", "R2Fm") if os.path.isdir(os.path.join(RENDERS, n))]
+    views = ["flare-foot", "side-right"]
+    w = 470
+    rows = [[tile(n, v, w) for n in names] for v in views]
+    notes = ["All BREP face edges drawn; same camera in each row (top: the owner's sketch view, rear right, low; bottom: side). Flare from z 130, tangent to the",
+             "leaning line (no kink), 80 behind the straight line at the floor. R2Fb (the owner's reading): only the inner crease curves back; the outer edge keeps its",
+             "lean and one R 22 round to the floor; the facet widens into a ruled ramp (level rulings, exact), tangent to the plane facet at z 130. The recessed round",
+             "grows from R 7 at z 130 to R 18 at the floor, as the ramp there turns only 7 degrees from the recessed side (R 7 would be 0.9 wide). R2Fa: the whole band",
+             "curves back (same 45 degree section, R 7 / R 16-22). R2Fm: mix, outer edge 30 back, inner crease 80 back. Full-width floor edge gained per side",
+             "(at the top of the base chamfer): R2Fb +6, R2Fa +73, R2Fm +34; footprint gained per side 450 / 880 / 610 mm2. All pass the face check; cut-ins untouched."]
+    sheet = grid(rows, ["owner's view\n(rear right, low)", "side"], [R2_MODELS[n] for n in names], "Foot of the step: flare (owner markup 07)", notes)
+    sheet.save(os.path.join(COMPARE, "rear-rev7-r2-flare.png"))
+
+
+def sheets_r2() -> None:
+    os.makedirs(COMPARE, exist_ok=True)
+    sheet_r2_corner()
+    sheet_r2_flare()
+
+
 def costs_md() -> None:
     for name in ("A", "A25", "R"):
         print(f"\n## {MODELS[name]}\n\n| Item | Estimate |\n| --- | --- |")
@@ -476,4 +549,4 @@ def costs_md() -> None:
 
 
 if __name__ == "__main__":
-    {"render": render, "sheets": sheets, "costs": costs_md}[sys.argv[1]]()
+    {"render": render, "sheets": sheets, "costs": costs_md, "render-r2": render_r2, "sheets-r2": sheets_r2}[sys.argv[1]]()

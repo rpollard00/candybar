@@ -8,6 +8,15 @@ with the true dimensions of the shell (the tuck, the hood's rear outline, the se
       the step's edges get a small radius.
   R   the rear of the maker's mini inside the same envelope: the 40 mm overhang as a soft roll whose foot line is a
       smile, a larger corner round, two hand-hold recesses in the head, the cut-ins at the lower rear corners.
+  R2  R with the head at full width back to the rear corner (as the mini): the set-back behind the step is closed at
+      the top by a shoulder plane that falls toward the front and turns into the step through a round; the lower body,
+      the head and the hood share one corner R 25. R2Fb, R2Fa, R2Fm: R2 with the foot of the step flaring back toward
+      the rear near the floor (inner crease only, the whole band, or a mix).
+
+R2's method differs (shoulder_body): the step facet, the recessed side and the shoulder are three half-spaces, so the
+recess has only concave edges; its rounds are made on the right side of the body before the rear cut (the turn, then
+the recessed edge as one chain, then the full-width edge as one chain), that half is mirrored, the rear is cut, and
+the corner is rounded from the floor to the seam in one call on both sides.
 
 Method. The body is first built with sharp edges: the side profile with a plain rear wall, the front outline with the
 tuck, the rail, the step and the bezel cuts of solids.py, and a cut by the rear profile. The rear profile is a path
@@ -75,6 +84,39 @@ class Grips:
 
 
 @dataclass(frozen=True)
+class Shoulder:
+    """The head at full width (R2): the set-back behind the step is closed at the top by a shoulder, a plane that
+    rises `rise` while it runs out by the step (the side of the band under the roll), and falls toward the front at
+    `fall` (tangent) from the rear corner, where its lower crease meets the roll's lower crease, to the turn, where the
+    step's inner crease runs into it. The rounds, in this order: the turn (the concave mitre of the step facet and the
+    shoulder), the recessed edge (the step's inner crease, round the turn, the shoulder's lower crease: one chain), the
+    full-width edge (the step's outer edge, round the turn, the shoulder's upper crease: one chain), then the corner
+    from the floor to the seam. The full-width edge must be about R 22 or more where the corner passes it, or the R 25
+    corner fails or leaves a needle there; at the floor that round leaves only 3 of flat on the step facet, and the
+    base chamfer makes a sliver of it. So the full-width round grows along its edge, linearly, from outer_r_floor at
+    the floor to outer_r at the rear corner. The recessed round must be R 7 or more: the shoulder turns only 16.7
+    degrees from the recessed side, and a smaller round is narrower than 2."""
+    rise: float = 40.0
+    fall: float = 0.36
+    turn_r: float = 30.0
+    inner_r: float = 7.0
+    outer_r: float = 22.0
+    outer_r_floor: float = 16.0
+    inner_r_floor: float = 7.0
+
+
+@dataclass(frozen=True)
+class Flare:
+    """The foot of the step curves back toward the rear near the floor. In side view each edge of the step band leaves
+    its leaning line at z0 on a tangent arc and reaches the floor `inner_back` (the inner crease, on the recessed side)
+    or `outer_back` (the outer edge, on the full-width side) behind the straight line. The band between them is ruled
+    with level rulings; every level section of it is an affine image of the inner arc, so it is exact."""
+    z0: float = 130.0
+    inner_back: float = 80.0
+    outer_back: float = 0.0
+
+
+@dataclass(frozen=True)
 class Variant:
     name: str
     title: str
@@ -91,13 +133,16 @@ class Variant:
     chamfer: float = 5.0
     grips: Grips | None = None
     cut_ins: CutIns | None = None
+    shoulder: Shoulder | None = None
+    flare: Flare | None = None
     note: str = ""
 
     @property
     def hood_r(self) -> float:
-        """The hood keeps the full width; its round in plan is the body's round plus the step, so that both rounds
-        leave the rear wall on the same line and the soffit grows from nothing at the rear to the step at the side."""
-        return self.corner_r + Blueprint().step_in
+        """The hood keeps the full width. Without a shoulder its round in plan is the body's round plus the step, so
+        that both rounds leave the rear wall on the same line and the soffit grows from nothing at the rear to the step
+        at the side. With a shoulder the head has the full width, and the head and the hood share one corner round."""
+        return self.corner_r if self.shoulder else self.corner_r + Blueprint().step_in
 
 
 VARIANTS: dict[str, Variant] = {
@@ -115,6 +160,18 @@ VARIANTS: dict[str, Variant] = {
                  crease_hi=(580.0, 338.0, 60.0), smile=24.0, grips=Grips(), cut_ins=CutIns(),
                  note="roll crease z 298 at the centre (the lowest that keeps the BC-250 board inside the door), smile 24; corner R 25"),
 }
+VARIANTS["R2"] = replace(VARIANTS["R"], name="R2", title="R2: R with the head at full width", shoulder=Shoulder(),
+                         note="head at full width to the rear corner; set-back closed by a shoulder that falls toward the front; "
+                              "head, band and hood share one corner R 25")
+VARIANTS["R2Fb"] = replace(VARIANTS["R2"], name="R2Fb", title="R2Fb: R2, the step's inner crease flares back at the floor", flare=Flare(),
+                           shoulder=replace(VARIANTS["R2"].shoulder, inner_r_floor=18.0, outer_r_floor=22.0),
+                           note="inner crease curves back from z 130 to 80 behind at the floor; the outer edge keeps its lean and one R 22 "
+                                "round to the floor; the recessed round grows from R 7 at z 130 to R 18 at the floor, where the ramp "
+                                "turns only 7 degrees from the recessed side (R 7 there is 0.9 wide)")
+VARIANTS["R2Fm"] = replace(VARIANTS["R2Fb"], name="R2Fm", title="R2Fm: R2Fb with the outer edge flaring a little", flare=Flare(outer_back=30.0),
+                           note="inner crease 80 behind at the floor, outer edge 30 behind; outer round R 22, recessed round R 7 to R 18")
+VARIANTS["R2Fa"] = replace(VARIANTS["R2"], name="R2Fa", title="R2Fa: R2, the whole step band flares back at the floor",
+                           flare=Flare(outer_back=80.0), note="both edges of the step curve back from z 130 to 80 behind at the floor")
 
 
 def blueprint(v: Variant) -> Blueprint:
@@ -220,8 +277,9 @@ def step_cutter(d: Blueprint) -> Part.Shape:
     return notch.fuse(slab.common(behind)).removeSplitter()
 
 
-def sharp_body(d: Blueprint, v: Variant) -> Part.Shape:
-    """The body as one solid with the sharp rear: as solids.body, without the corner cutter, with the rear profile."""
+def sharp_body(d: Blueprint, v: Variant, rear: bool = True, right_only: bool = False) -> Part.Shape:
+    """The body as one solid with the sharp rear: as solids.body, without the corner cutter, with the rear profile
+    (rear=False: without it; right_only: the step or the recess on the right side only)."""
     fr = pr.front(d)
     top = d.body_top + OVER
     sides = so.side_path(d, top)
@@ -234,8 +292,240 @@ def sharp_body(d: Blueprint, v: Variant) -> Part.Shape:
     bw = d.bezel_w / 2
     plate = so.bezel_box(d, fr, -bw, bw).cut(so.behind_screen(d, d.mon_setback))
     reveal = so.bezel_box(d, fr, bw, xb).cut(so.land_cylinder(d, fr))
-    cutters = [so.both(so.rail_cutter(d, fr)), so.both(step_cutter(d)), plate, so.both(reveal), so.screen(d), rear_cutter(d, v)]
-    return solid.cut(cutters).removeSplitter()
+    step = recess_cutter(d, v) if v.shoulder else step_cutter(d)
+    cutters = [so.both(so.rail_cutter(d, fr)), step if right_only else so.both(step), plate, so.both(reveal), so.screen(d)]
+    return solid.cut(cutters + ([rear_cutter(d, v)] if rear else [])).removeSplitter()
+
+
+# ---------- the shoulder (R2) ----------
+
+def shoulder_z0(d: Blueprint, v: Variant) -> float:
+    """Height of the shoulder's lower crease (sharp) at the rear wall: the roll's lower crease at the recessed side."""
+    return v.crease_lo[1] + smile_z(v, d.rear_w / 2, d.rear_w / 2)
+
+
+def shoulder_normal(d: Blueprint, v: Variant) -> FreeCAD.Vector:
+    """The outward normal of the shoulder plane (down, out, and back: it falls toward the front)."""
+    n = V(v.shoulder.rise / d.step_in, v.shoulder.fall, -1.0)
+    n.normalize()
+    return n
+
+
+def step_normal(d: Blueprint) -> FreeCAD.Vector:
+    n = V(1.0, 1.0, -math.tan(math.radians(d.step_lean)))
+    n.normalize()
+    return n
+
+
+def turn_point(d: Blueprint, v: Variant) -> tuple[float, float]:
+    """(y, z) where the step's inner crease meets the shoulder's lower crease on the recessed side (sharp lines)."""
+    t = math.tan(math.radians(d.step_lean))
+    z0, f = shoulder_z0(d, v), v.shoulder.fall
+    # y = step_y0 + step_in + z t ; z = z0 + (y - body_d) f
+    z = (z0 + (d.step_y0 + d.step_in - d.body_d) * f) / (1 - t * f)
+    return d.step_y0 + d.step_in + z * t, z
+
+
+def flare_arc(d: Blueprint, f: Flare) -> tuple[tuple[float, float], float, tuple[float, float]]:
+    """The arc of the inner crease in side view (y, z): centre, radius and its point on the floor. It is tangent to the
+    leaning line at z0 and reaches the floor inner_back behind it."""
+    t = math.tan(math.radians(d.step_lean))
+    k = math.hypot(1.0, t)
+    yi = lambda z: d.step_y0 + d.step_in + z * t
+    pf = (yi(f.z0), f.z0)
+
+    def floor_y(r: float) -> float:
+        c = (pf[0] + r / k, pf[1] - r * t / k)
+        return c[0] - math.sqrt(max(r * r - c[1] ** 2, 0.0))
+
+    lo, hi = 1.0, 1e5
+    for _ in range(200):
+        mid = math.sqrt(lo * hi)
+        lo, hi = (mid, hi) if floor_y(mid) - yi(0.0) > f.inner_back else (lo, mid)
+    r = math.sqrt(lo * hi)
+    c = (pf[0] + r / k, pf[1] - r * t / k)
+    return c, r, (floor_y(r), 0.0)
+
+
+def behind_step(d: Blueprint, v: Variant) -> Part.Shape:
+    """The region behind the step band: the half-space behind the step facet, and with a flare, below z0, the ruled
+    solid behind the flared band instead. That solid is a ruled loft between two level-ruled sections at
+    x = W + OVER/10 and x = rear_w/2 - OVER/10; each section is the flare arc of the inner crease (and its tangent
+    below the floor) moved by an affine map that keeps z, closed far behind. Above z0 the facet stays a plane, and the
+    band is tangent to it along the ruling at z0."""
+    facet = so.halfspace(V(d.width / 2, d.step_y0, 0), step_normal(d))
+    f = v.flare
+    if not f:
+        return facet
+    t = math.tan(math.radians(d.step_lean))
+    W, s_in = d.width / 2, d.step_in
+    yi = lambda z: d.step_y0 + s_in + z * t
+    c, r, pb = flare_arc(d, f)
+    pf = (yi(f.z0), f.z0)
+    a0 = math.atan2(pf[1] - c[1], pf[0] - c[0])
+    a1 = math.atan2(pb[1] - c[1], pb[0] - c[0])
+    if a1 < a0:
+        a1 += 2 * math.pi                          # the arc runs counter-clockwise (in y, z) from the line to the floor
+    tan_b = (-math.sin(a1), math.cos(a1))          # its direction at the floor: down and back
+    below = (pb[0] + tan_b[0] * OVER / -tan_b[1], -OVER)
+    yz = lambda p: V(0.0, p[0], p[1])
+    am = (a0 + a1) / 2
+    path = [Part.Arc(yz(pf), yz((c[0] + r * math.cos(am), c[1] + r * math.sin(am))), yz(pb)).toShape(), Part.LineSegment(yz(pb), yz(below)).toShape()]
+    far = d.depth + 2 * OVER
+
+    def section(x: float) -> Part.Wire:
+        u = W - x
+        k = (f.outer_back + (f.inner_back - f.outer_back) * u / s_in) / f.inner_back
+        m = FreeCAD.Matrix()
+        m.A22, m.A23, m.A24 = k, (1 - k) * t, (1 - k) * d.step_y0 + u - k * s_in
+        m.A14 = x
+        edges = [e.transformGeometry(m) for e in path]
+        top, bottom = edges[0].Vertexes[0].Point, edges[-1].Vertexes[-1].Point
+        close = Part.makePolygon([bottom, V(x, far, -OVER), V(x, far, f.z0), top])
+        return Part.Wire(edges + close.Edges)
+
+    flared = Part.makeLoft([section(W + OVER / 10), section(d.rear_w / 2 - OVER / 10)], True, True)
+    above = facet.common(so.halfspace(V(0, 0, f.z0), V(0, 0, 1)))
+    return above.fuse(flared).removeSplitter()
+
+
+def recess_cutter(d: Blueprint, v: Variant) -> Part.Shape:
+    """What the step and the shoulder take off the right side: the region outside the recessed side (a plane at
+    rear_w / 2: below the shoulder the tuck would move it by 0.2 at most), behind the step facet (45 degrees in plan,
+    leaning back), and below the shoulder plane. Three half-spaces: all its edges are concave on the body."""
+    a = d.rear_w / 2
+    outside = so.halfspace(V(a, 0, 0), V(1, 0, 0))
+    behind = behind_step(d, v) if v.flare else so.halfspace(V(d.width / 2, d.step_y0, 0), step_normal(d))
+    below = so.halfspace(V(a, d.body_d, shoulder_z0(d, v)), shoulder_normal(d, v))
+    return outside.common(behind).common(below)
+
+
+def face_kind(f: Part.Face, d: Blueprint, v: Variant) -> str:
+    """Name of a face of the right side behind the front body: W (full-width side), X (recessed side), F (step facet),
+    S (shoulder), T (the round of the turn), or "" for any other face."""
+    u0, u1, v0, v1 = f.ParameterRange
+    c = f.valueAt((u0 + u1) / 2, (v0 + v1) / 2)
+    if abs(c.x) < 150 or c.y < d.step_y0 - 1:
+        return ""
+    n = f.normalAt((u0 + u1) / 2, (v0 + v1) / 2)
+    if c.x < 0:
+        c, n = V(-c.x, c.y, c.z), V(-n.x, n.y, n.z)
+    if abs(abs(n.dot(step_normal(d))) - 1) < 1e-6 and abs(c.x - d.width / 2 + d.step_in / 2) < d.step_in / 2:
+        return "F"
+    if v.flare and c.z < v.flare.z0 + 1 and d.rear_w / 2 + 0.05 < c.x < d.width / 2 - 0.05 and not isinstance(f.Surface, (Part.Plane, Part.Cylinder)):
+        return "R"
+    if isinstance(f.Surface, Part.Plane):
+        if abs(abs(n.dot(shoulder_normal(d, v))) - 1) < 1e-6:
+            return "S"
+        if abs(abs(n.x) - 1) < 1e-6 and abs(c.x - d.rear_w / 2) < 0.5:
+            return "X"
+    if isinstance(f.Surface, Part.Cylinder) and abs(f.Surface.Radius - v.shoulder.turn_r) < 1e-6 and c.y < d.body_d - 20:
+        return "T"
+    if abs(n.x) > 0.95 and c.x > d.width / 2 - 6:
+        return "W"
+    return ""
+
+
+def kind_edges(s: Part.Shape, d: Blueprint, v: Variant, side: str, others: tuple[str, ...]) -> list[Part.Edge]:
+    out = []
+    for e in s.Edges:
+        fs = s.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2 or e.Degenerated:
+            continue
+        ks = [face_kind(f, d, v) for f in fs]
+        if side in ks and any(k in others for k in ks if k != side) and ks[0] != ks[1]:
+            out.append(e)
+    return out
+
+
+def rear_corner_chain(s: Part.Shape, d: Blueprint) -> list[Part.Edge]:
+    """The edges between the side surfaces and the rear surfaces at the right rear corner, from the floor to the body
+    top: each joins a face that faces mostly sideways to one that faces mostly back."""
+    out = []
+    for e in s.Edges:
+        b = e.BoundBox
+        if e.Degenerated or min(abs(b.XMin), abs(b.XMax)) < d.rear_w / 2 - 10 or b.XMin * b.XMax < 0 or b.YMin < d.body_d - 10:
+            continue
+        fs = s.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2:
+            continue
+        ns = []
+        for f in fs:
+            u0, u1, v0, v1 = f.ParameterRange
+            ns.append(f.normalAt((u0 + u1) / 2, (v0 + v1) / 2))
+        if sorted(abs(n.y) > abs(n.x) for n in ns) == [False, True]:
+            out.append(e)
+    return out
+
+
+def shoulder_body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
+    """The body of a shoulder variant with its rounds, up to the base chamfer. The rounds of the step and the shoulder
+    are made on the right side of a body without the rear cut, and that half is mirrored: OpenCascade lays the growing
+    round along each edge in the edge's own direction, which the mirror reverses, so the same call on the left side
+    gives another law. Only planes and cylinders cross the centre plane before the rear cut, so the two halves join
+    into whole faces again. Then the rear cut and the corner, from the floor to the seam, on both sides."""
+    sh = v.shoulder
+    s = sharp_body(d, v, rear=False, right_only=True)
+    es = kind_edges(s, d, v, "F", ("S",))
+    log.append(f"turn: {len(es)} edges, R {sh.turn_r:g}")
+    s = s.makeFillet(sh.turn_r, es)
+    es = [e for e in kind_edges(s, d, v, "X", ("F", "T", "S", "R")) if e.BoundBox.Center.x > 0]
+    s = growing_round(s, es, sh.inner_r_floor, sh.inner_r, V(d.rear_w / 2, band_y(d, v, d.step_in, 3.0), 3.0))
+    log.append(f"recessed edge: {len(es)} edges, R {sh.inner_r_floor:g} at the floor, R {sh.inner_r:g} above")
+    es = [e for e in kind_edges(s, d, v, "W", ("F", "T", "S", "R")) if e.BoundBox.Center.x > 0]
+    s = growing_round(s, es, sh.outer_r_floor, sh.outer_r, V(d.width / 2, band_y(d, v, 0.0, 3.0), 3.0))
+    log.append(f"full-width edge: {len(es)} edges, R {sh.outer_r_floor:g} at the floor growing to R {sh.outer_r:g}")
+    half = s.common(so.halfspace(V(0, 0, 0), V(1, 0, 0)))
+    s = half.fuse(half.mirror(V(0, 0, 0), V(1, 0, 0))).removeSplitter()
+    s = s.cut(rear_cutter(d, v)).removeSplitter()
+    es = rear_corner_chain(s, d)
+    log.append(f"corner: {len(es)} edges, R {v.corner_r:g}")
+    return s.makeFillet(v.corner_r, es)
+
+
+def band_y(d: Blueprint, v: Variant, u: float, z: float) -> float:
+    """Y of the sharp step band at height z, u in from the full-width side (0 the outer edge, step_in the inner crease)."""
+    t = math.tan(math.radians(d.step_lean))
+    y = d.step_y0 + z * t + u
+    f = v.flare
+    if not f or z >= f.z0:
+        return y
+    c, r, _ = flare_arc(d, f)
+    delta = c[0] - math.sqrt(r * r - (z - c[1]) ** 2) - (d.step_y0 + d.step_in + z * t)
+    return y + (f.outer_back + (f.inner_back - f.outer_back) * u / d.step_in) / f.inner_back * delta
+
+
+def radius_at(s: Part.Shape, p: FreeCAD.Vector) -> float:
+    """Radius (the smaller principal one) of the curved face of s nearest to p."""
+    best = (math.inf, math.inf)
+    for f in s.Faces:
+        if isinstance(f.Surface, Part.Plane):
+            continue
+        dist, pts, _ = f.distToShape(Part.Vertex(p))
+        if dist < best[0]:
+            u, w = f.Surface.parameter(pts[0][0])
+            k = max(abs(c) for c in f.curvatureAt(u, w))
+            best = (dist, 1 / k if k > 1e-12 else math.inf)
+    return best[1]
+
+
+def growing_round(s: Part.Shape, edges: list[Part.Edge], r_floor: float, r_top: float, near_floor: FreeCAD.Vector) -> Part.Shape:
+    """A round on one tangent chain whose radius runs linearly from r_floor at its floor end along the chain's lowest
+    edge, and is r_top beyond. OpenCascade takes the two radii in the direction of that edge, which this code does not
+    know, so both orders are made and the one with r_floor at near_floor (a point on the sharp edge near the floor)
+    is kept."""
+    if abs(r_floor - r_top) < 1e-9:
+        return s.makeFillet(r_top, edges)
+    made = []
+    for r1, r2 in ((r_top, r_floor), (r_floor, r_top)):
+        try:
+            m = s.makeFillet(r1, r2, edges)
+        except Part.OCCError:
+            continue
+        made.append((abs(radius_at(m, near_floor) - r_floor), m))
+    if not made:
+        raise Part.OCCError(f"no growing round R {r_floor:g} to R {r_top:g}")
+    return min(made, key=lambda x: x[0])[1]
 
 
 def step_edges(d: Blueprint, s: Part.Shape) -> tuple[list[Part.Edge], list[Part.Edge]]:
@@ -258,20 +548,27 @@ def floor_edges(s: Part.Shape, y_front: float) -> list[Part.Edge]:
 
 
 def body(d: Blueprint, v: Variant, log: list[str]) -> Part.Shape:
-    s = sharp_body(d, v)
-    if v.step_r:
+    s = shoulder_body(d, v, log) if v.shoulder else sharp_body(d, v)
+    if v.step_r and not v.shoulder:
         outer, inner = step_edges(d, s)
         log.append(f"step edges: {len(outer)} outer, {len(inner)} inner")
         s = s.makeFillet(v.step_r, outer).makeFillet(v.step_crease_r, step_edges(d, s.makeFillet(v.step_r, outer))[1]) if inner else s
-    es = corner_edges(d, s)
-    log.append(f"corner edges: {len(es)}")
-    s = s.makeFillet(v.corner_r, es)
+    if not v.shoulder:
+        es = corner_edges(d, s)
+        log.append(f"corner edges: {len(es)}")
+        s = s.makeFillet(v.corner_r, es)
     if v.chamfer:
         es = floor_edges(s, d.foot_y - d.bend_t)
         log.append(f"floor edges: {len(es)}")
         s = s.makeChamfer(v.chamfer, es)
     g = d.seam_groove
     s = s.cut(so.ring_bevel(so.outline_at(s, d.body_top - g), d.body_top - g, d.body_top, g))
+    if not s.isValid():
+        # R2: the cut of the seam bevel past the full-width corner comes out with a face of the wrong orientation
+        # ("unorientable shape"); ShapeFix turns it round and changes no face and no volume
+        faces, volume = len(s.Faces), s.Volume
+        s.fix(1e-7, 1e-7, 1e-7)
+        log.append(f"seam bevel: shape fixed (valid {s.isValid()}, faces {faces} -> {len(s.Faces)}, volume change {abs(s.Volume - volume):.2g} mm3)")
     if v.cut_ins:
         s = s.cut(so.both(cut_in_cutter(d, v)))
     if v.grips:
@@ -394,6 +691,12 @@ def focus(d: Blueprint, v: Variant) -> dict[str, dict]:
            "closeup-roll-corner": cam((rear_side_x(d, zs) - 6, d.body_d + 10, zs), 60, 140, 12),
            "closeup-base-corner": cam((rear_side_x(d, 0) - 10, d.body_d - 10, 10.0), 45, 135, 20),
            "closeup-deck-front-low": cam((d.width / 2 - 60, 0.0, 6.0), 70, -20, 4)}
+    if v.shoulder:
+        turn = turn_point(d, v)
+        out["closeup-r2-corner"] = cam((d.width / 2 - 20, d.body_d + 5, 375.0), 95, 128, 14)
+        out["closeup-turn"] = cam((d.width / 2 - 4, turn[0] + 6, turn[1] + 14), 48, 105, 8)
+        out["three-quarter-rear-above"] = cam((110.0, 450.0, 450.0), 330, 140, 34)
+        out["flare-foot"] = cam((d.width / 2 - 30, 420.0, 140.0), 210, 140, 14)
     if v.cut_ins:
         c = v.cut_ins
         out["closeup-cut-ins"] = cam((rear_side_x(d, 0) - v.corner_r / 2, d.body_d - v.corner_r / 2, c.z0 + c.pitch * (c.count - 1) / 2), 60, 145, 10)

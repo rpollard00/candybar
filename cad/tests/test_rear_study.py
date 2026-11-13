@@ -100,3 +100,77 @@ class BlueprintUnchangedTest(unittest.TestCase):
         b = Blueprint()
         rs.blueprint(rs.VARIANTS["R"])
         self.assertEqual((b.step_y0, b.step_lean, b.rear_corner_r, b.rear_step_z0, b.rear_step_z1), (345.0, 28.0, 18.0, 310.0, 350.0))
+
+
+def half_width(shape: Part.Shape, z: float, y_min: float) -> float:
+    """Half the width of a level section of a solid, over the part of it behind y_min."""
+    return max(abs(p.x) for w in shape.slice(V(0, 0, 1), z) for p in w.discretize(Distance=0.2) if p.y >= y_min)
+
+
+def corner_line(shape: Part.Shape, z: float, y_min: float) -> tuple[float, float, float]:
+    """In the level section at z, right rear corner: the side's x, the y where the round leaves the side, and the
+    x where it leaves the rear wall (the face edges that the corner round draws)."""
+    pts = [(p.x, p.y) for w in shape.slice(V(0, 0, 1), z) for p in w.discretize(Distance=0.05) if p.x > 150 and p.y > y_min]
+    xm, ym = max(p[0] for p in pts), max(p[1] for p in pts)
+    return xm, max(p[1] for p in pts if p[0] > xm - 0.002), max(p[0] for p in pts if p[1] > ym - 0.002)
+
+
+class CandidateR2Test(unittest.TestCase):
+    """R2: the head at full width back to the rear corner, the set-back closed by a shoulder, one corner R 25 for the
+    lower body, the head and the hood."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v = rs.VARIANTS["R2"]
+        cls.d = rs.blueprint(cls.v)
+        cls.body = rs.body(cls.d, cls.v, [])
+        cls.hood = rs.hood(cls.d, cls.v, [])["hood"]
+
+    def test_the_body_is_one_valid_solid(self) -> None:
+        self.assertTrue(self.body.isValid())
+        self.assertEqual(len(self.body.Solids), 1)
+
+    def test_the_head_has_the_full_width_at_the_seam_and_at_mid_head(self) -> None:
+        d, v = self.d, self.v
+        seam = d.body_top - d.seam_groove - 0.5
+        mid = (d.body_top + v.crease_hi[1] + v.smile) / 2
+        for z in (seam, mid):
+            self.assertAlmostEqual(half_width(self.body, z, d.body_d), d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
+
+    def test_the_head_and_the_hood_share_the_corner(self) -> None:
+        d = self.d
+        hz = d.body_top + d.seam_gap
+        top, foot = d.body_top - d.seam_groove - 0.05, hz + d.seam_groove + 0.05
+        for shape, z in ((self.body, top), (self.hood, foot)):
+            pts = [p for w in shape.slice(V(0, 0, 1), z) for p in w.discretize(Distance=0.2) if p.x > 150 and p.y > d.body_d]
+            p = max(pts, key=lambda q: q.x + q.y)
+            self.assertAlmostEqual(rs.radius_at(shape, p), self.v.corner_r, delta=0.5, msg=f"corner radius at z {z:.1f}")
+        body, hood = corner_line(self.body, top, d.body_d), corner_line(self.hood, foot, d.body_d)
+        self.assertLess(abs(body[1] - hood[1]), 1.0, "the round leaves the side at the same y above and below the seam")
+        self.assertLess(abs((body[0] - body[2]) - (hood[0] - hood[2])), 1.5, "the round is as wide on the rear above and below the seam")
+
+    def test_the_changed_zone_passes_the_face_check(self) -> None:
+        d = self.d
+        found = [f for f in fc.failures(fc.check(self.body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0]
+        self.assertEqual(found, [])
+
+    def test_the_door_opening_is_that_of_r(self) -> None:
+        wall = max((f for f in self.body.Faces if isinstance(f.Surface, Part.Plane) and abs(f.Surface.Axis.y) > 0.999
+                    and abs(f.CenterOfMass.y - self.d.body_d) < 1e-3), key=lambda f: f.Area)
+        pts = wall.OuterWire.discretize(Distance=0.5)
+        xs = [p.x for p in pts if abs(p.z - 200) < 0.6]
+        self.assertAlmostEqual(max(xs) - min(xs) - 8.0, 412.7, delta=0.1)
+        self.assertAlmostEqual(max(p.z for p in pts if abs(p.x) < 1.0) - 12.0 - 116.0, 159.6, delta=0.1)
+
+
+class FlareTest(unittest.TestCase):
+    """R2Fb: the step's inner crease curves back toward the rear at the floor. Build and face check only."""
+
+    def test_r2fb_builds_and_its_flared_zone_passes_the_face_check(self) -> None:
+        v = rs.VARIANTS["R2Fb"]
+        d = rs.blueprint(v)
+        body = rs.body(d, v, [])
+        self.assertTrue(body.isValid())
+        self.assertEqual(len(body.Solids), 1)
+        found = [f for f in fc.failures(fc.check(body, "body", fc.default_reveals())) if abs(f.at[0]) > 150 and f.at[1] > d.step_y(f.at[2]) - 1.0]
+        self.assertEqual(found, [])
