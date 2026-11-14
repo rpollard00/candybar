@@ -825,7 +825,9 @@ def plan_screws(pair: Pair, pieces: dict, outer, obstacles: list, j: Joint, b: B
         for sc in cand:
             fail = screw_fits(sc, h, p, pieces, outer, j, b)
             if not fail:
-                free = free_length(sc, h.cf.into, obstacles, j, b)
+                # the flange of the head side is in the way too, where the outer line turns: all of it but the head pocket
+                own = h.solid.cut(screw_tools(sc, h.cf.into, j)["pocket"])
+                free = free_length(sc, h.cf.into, obstacles + [own], j, b)
                 if free < b.driver_len:
                     fail = f"the screwdriver has {free:.0f} mm"
                 else:
@@ -884,7 +886,7 @@ def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD):
             gaps_groove.append(box_along(q, t, up, j.key_end_margin - c, j.flange_h, -2.0, 4.0))
     key = key.cut(gaps_key)
     groove = groove.cut(gaps_groove)
-    least = j.key_w * j.key_proj * 8.0
+    least = j.key_w * j.key_proj * 5.0   # a key shorter than 5 mm is left out
     keys = [s for s in key.Solids if s.Volume > least]
     grooves = [s for s in groove.Solids if s.Volume > least]
     if not keys:
@@ -919,7 +921,7 @@ def vee(side: Side, j: Joint):
 # what the whole set is known to leave out (tests/test_pieces.py holds the generator to these lists):
 # (seam, piece) with no flange, and seams with a run for screws but no screw
 NO_FLANGE: tuple = ()
-NO_SCREW: tuple = ()
+NO_SCREW: tuple = ("F2",)   # the deck is 72 high: no screwdriver gets behind a screw in the flank break
 SKIP = {"DR": "the outline of the rear door: the door and the frame of its opening are another package",
         "R4": "the centre seam of the rear door: the door is another package"}
 
@@ -1020,9 +1022,11 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
     if with_ribs:
         res.ribs = rib_sides(d, pl, names, items, res.hits, {}, log, b)
     res.pairs = pair_up(res.sides, b)
-    obstacles = list(pl.shapes.values())
+    # what a screwdriver must pass: the plain pieces and every flange, foot and rib but the two of its own seam
+    made = [sd for sd in res.sides + res.feet + res.ribs if sd.solid is not None]
     for pair in res.pairs:
         outer = pl.outer[module[pair.a.cf.piece]]
+        obstacles = list(pl.shapes.values()) + [sd.solid for sd in made if sd is not pair.a and sd is not pair.b]
         plan_screws(pair, pl.shapes, outer, obstacles, j, b, heads.get(seam_of[pair.a.cf.seam].label, ""))
         log(f"pieces: {pair.name}: head in {pair.head.cf.piece}, {len(pair.screws)} screws {pair.notes} [{time.time() - t0:.0f} s]")
     add: dict[str, list] = {}
@@ -1344,6 +1348,9 @@ def feet(pl: Plain, names: list[str] | None, items: list, hits: list, log=print,
     section = Part.makeCompound(outer.slice(App.Vector(0, 0, 1), TABLE)).translated(App.Vector(0, 0, -TABLE))
     kerfs = [grown_kerf(poly, b.seam_reach) for s in pl.seams if s.module == "body" for poly in s.polys]
     profile = [(b.skin_lap, 0.0), (fl.foot_w, 0.0), (fl.foot_w, fl.foot_thick), (b.skin_lap, fl.foot_thick)]
+    outline, _ = floor_plan(outer, fl)
+    inner = Part.makeFace(outline.makeOffset2D(-fl.foot_w, join=2).Wires, "Part::FaceMakerBullseye")
+    band = outline.cut(inner).translated(App.Vector(0, 0, -1.0)).extrude(App.Vector(0, 0, fl.foot_thick + 2.0))
     out = []
     for name, shape in pl.shapes.items():
         if module[name] != "body" or (names is not None and name not in names):
@@ -1355,6 +1362,11 @@ def feet(pl: Plain, names: list[str] | None, items: list, hits: list, log=print,
         if not side.lines:
             continue
         flange(side, shape, outer, kerfs, JOINT, b, section=lambda seg: profile)
+        if side.solid is not None:
+            # only the band along the outline: where the outline turns at the end of a piece (the foot of the band),
+            # the line goes on straight and would reach into the plan of the floor
+            kept = [sd for sd in side.solid.common(band).Solids if sd.Volume > b.debris_mm3 and sd.common(shape).Volume > 0.5]
+            side.solid = _fuse_all(kept) if kept else None
         cut_back(side, shape, items, hits, b)
         out.append(side)
         log(f"pieces: foot of {name}: {0 if side.solid is None else side.solid.Volume / 1000:.1f} cm3, lines {[round(sk.length) for sk in side.lines]} {side.notes}")
@@ -1452,6 +1464,29 @@ def edge_polylines(shape, step: float = EDGE_STEP) -> list:
     return out
 
 
+def write_brep(shape, path: Path):
+    """A BREP file that reads as a valid shape; returns the shape as the file holds it. The text file keeps 15 digits, and some narrow step faces of the
+    skin are not valid when they come back from it; ShapeFix repairs them with no change of volume, and the repaired
+    shape stays valid in the file."""
+    import Part  # noqa: PLC0415
+
+    shape.exportBrep(str(path))
+    back = Part.Shape()
+    back.read(str(path))
+    if back.isValid():
+        return back
+    volume = back.Volume
+    back.fix(1e-7, 1e-7, 1e-2)
+    if not back.isValid() or abs(back.Volume - volume) > 0.5 or len(back.Solids) != len(shape.Solids):
+        raise RuntimeError(f"pieces: {path.name} does not read as a valid shape, and the repair did not help")
+    back.exportBrep(str(path))
+    again = Part.Shape()
+    again.read(str(path))
+    if not again.isValid():
+        raise RuntimeError(f"pieces: {path.name} is not valid after the repair was written")
+    return again
+
+
 def write_parts(folder: Path, shapes: dict, tint: dict | None = None, moved: dict | None = None) -> None:
     """One BREP and one STL for each piece, manifest.json and edges.json (every BREP edge, for the renders). moved
     gives a shift for each piece in the meshes and the edges only (an exploded view); the BREP stays in place."""
@@ -1463,7 +1498,9 @@ def write_parts(folder: Path, shapes: dict, tint: dict | None = None, moved: dic
     manifest, edges = {}, {}
     for name, shape in shapes.items():
         stem = name.replace(" ", "_")
-        shape.exportBrep(str(folder / f"{stem}.brep"))
+        # the mesh and the edges come from the shape as the file holds it: the mesh of a shape in memory had a
+        # triangle at the origin (hood side), and the file did not
+        shape = write_brep(shape, folder / f"{stem}.brep")
         shown = shape.translated(App.Vector(*moved[name])) if moved and name in moved else shape
         MeshPart.meshFromShape(Shape=shown, LinearDeflection=0.2, AngularDeflection=0.15).write(str(folder / f"{stem}.stl"))
         manifest[stem] = {"file": f"{stem}.stl", "brep": f"{stem}.brep", "finish": tint[name]}
@@ -1663,7 +1700,8 @@ def build_all(out: Path, log=print) -> int:
     write_parts(out / "joints", res.added, {n: "#9ec5e8" for n in res.added})
     rep = seam_report(res)
     (out / "seams.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
-    chk = check_set(d, pl, res.pieces, rep, items, log)
+    # the checks are on the pieces as the files hold them
+    chk = check_set(d, pl, read_parts(out)[0], rep, items, log)
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 

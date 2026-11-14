@@ -21,6 +21,8 @@ from candybar.shell import pieces, split
 from candybar.shell.dims import Blueprint
 from candybar.shell.joints import JOINT
 
+from . import support
+
 V = App.Vector
 WALL = JOINT.wall_t
 
@@ -328,7 +330,11 @@ class WholeSetTest(unittest.TestCase):
         cls.items = pieces.hardware()
         cls.res = pieces.generate(cls.d, cls.pl, None, None, cls.items, quiet)
         cls.rep = pieces.seam_report(cls.res)
-        cls.chk = pieces.check_set(cls.d, cls.pl, cls.res.pieces, cls.rep, cls.items, quiet)
+        # as the build does it: the pieces go through their BREP files, and the checks are on what the files hold
+        folder = support.temp_dir()
+        pieces.write_parts(folder, cls.res.pieces)
+        cls.made = pieces.read_parts(folder)[0]
+        cls.chk = pieces.check_set(cls.d, cls.pl, cls.made, cls.rep, cls.items, quiet)
 
     def test_there_are_32_pieces(self) -> None:
         self.assertEqual(len(self.res.pieces), 32)
@@ -347,8 +353,11 @@ class WholeSetTest(unittest.TestCase):
         self.assertEqual(more, [])
 
     def test_a_right_piece_and_its_left_twin_differ_only_where_the_hardware_differs(self) -> None:
-        cut = {h["piece"][:-2] for h in self.rep["hits"]}
-        odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut and not t["piece"].startswith("floor")]
+        twin = lambda n: n[:-2] if n.endswith((" R", " L")) else n
+        cut = {twin(h["piece"]) for h in self.rep["hits"]}
+        # the two pieces of a seam on the centre line: one has the key and the pilot holes, its twin the groove and the pockets
+        centre = {twin(p["head"]) for p in self.rep["pairs"] if twin(p["head"]) == twin(p["pilot"])}
+        odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut | centre and not t["piece"].startswith("floor")]
         self.assertEqual(odd, [])
 
     def test_a_screwdriver_reaches_every_screw(self) -> None:
@@ -361,6 +370,7 @@ class WholeSetTest(unittest.TestCase):
 
     def test_every_seam_longer_than_a_screw_run_has_screws(self) -> None:
         bare = sorted({p["seam"].split()[0] for p in self.rep["pairs"] if p["run_mm"] >= 2 * pieces.BUILD.run_screw and not p["screws"]})
+        # a seam of this list has a flange and a key on both pieces; clamps hold it while the bond sets
         self.assertEqual(bare, sorted(pieces.NO_SCREW))
 
     def test_the_mass_of_the_joints_is_less_than_the_budget_of_the_structure_study(self) -> None:
