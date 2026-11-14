@@ -14,3 +14,5 @@ The owner chose on 2026-11-11:
 ## Consequences
 
 Each seam is a joint and a rib. A joint must be rigid, because filler and paint crack over a joint that moves. The pieces must locate each other, so that a dry assembly with screws only holds its shape. A coupon proves the joint, its clearance and the adhesive before the parts are printed. The material is open: PETG on the A1, or ABS on an enclosed printer. The split and the joints must work for both.
+
+The material is now set: ABS on a Qidi Q2, with welded seams (decision record 0008, 2026-11-14).

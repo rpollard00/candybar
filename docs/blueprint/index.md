@@ -419,7 +419,7 @@ Decided by the owner (2026-11-11):
 - The hood has keys, so that it bolts on easily. The owner will look at both a bolted and a bonded hood.
 - The floor stands on the table (2026-11-11). It is the 10 mm sandwich of the study, on thin non-slip pads (2 to 3 mm). There are no feet and no ribs under it.
 - Hand-holds: only at the rear (2026-11-11). Since revision 7 each is a recess in the rear wall of the head, a part of the shell. There is no grip under the deck nose. One person lifts the back, and the cabinet pivots on the front bottom edge of the deck.
-- The material is open: PETG on the A1, or ABS on an enclosed printer. The coupons decide.
+- The material is ABS, printed on a Qidi Q2 (decision record 0008, 2026-11-14). The seams can be solvent welded.
 
 Dropped: the ribs under the floor on feet of 18 mm, and the front grip under the deck nose.
 
@@ -437,7 +437,7 @@ The cut is the 4 mm skin with the rear on it (`rear.finish_pieces`). The two doo
 
 ### Pieces
 
-23 printed pieces and 9 floor tiles. All fit the usable volume of the A1 (240 x 240 x 245). The largest is rear lower R (229.4 x 228.1 x 116.0): it is 10.6 less than the limit. A right piece and its left twin have the same box, the same mass and the same areas.
+23 printed pieces and 9 floor tiles. All fit the usable volume of the A1 (240 x 240 x 245). The printer is now the Qidi Q2, with a piece limit of 248 x 248 x 250 (decision record 0008). The largest is rear lower R (229.4 x 228.1 x 116.0): it is 10.6 less than the limit. A right piece and its left twin have the same box, the same mass and the same areas.
 
 | # | Piece | Print box (mm) | On the bed | Seen face over 45 deg (cm2) | Seen face at 45 deg (cm2) |
 | --- | --- | --- | --- | --- | --- |
@@ -523,11 +523,11 @@ A closing piece goes in last, from above, into two seams at once. Those two seam
 
 Sheet 11 draws the joints. `cad/candybar/shell/joints.py` is the one source of their values: `Joint` for joint 1, `OtherJoints` for joints 2 to 7 and the cones. The sheet and the report of the split (`cad/out/shell-rev7/split/report.md`) read them, and `cad/tests/test_joints.py` fails when a joint value is set in a second place. Each bonded joint works in two steps: a key, a cone or a pin sets the place in a dry assembly held by screws; then adhesive, the same screws, and filler in the V-groove. The values are proposed. The coupon sets the clearances and the pilot hole.
 
-1. **Skin to skin** (all bonded seams of the walls). An inside flange 6 x 12 on each piece, with a 45 degree gusset, so that it prints with no support. A key 1.5 x 4 on the flange of the piece below, in a groove of the piece above (+0.2 each side). Thread-forming screws 3.0 x 16 for plastics, every 60. The pilot hole is open: 2.25 (the value for PET) or 2.4 (the value for ABS); the coupon decides. A V-groove 1.0 wide and 0.8 deep on the outside takes the filler. This joint is modelled: the coupon (`cad/out/coupon/README.md`, built by `candybar.shell.coupon`) has three pairs on a wall of radius 300, with grooves of +0.1, +0.2 and +0.3, and one pilot of each candidate in each lower half.
+1. **Skin to skin** (all bonded seams of the walls). An inside flange 6 x 12 on each piece, with a 45 degree gusset, so that it prints with no support. A key 1.5 x 4 on the flange of the piece below, in a groove of the piece above (+0.2 each side). Thread-forming screws 3.0 x 16 for plastics, every 60. The pilot hole is 2.4 (the value for ABS) as the first candidate, and 2.25 (the value for PET) is the second; the coupon decides. A V-groove 1.0 wide and 0.8 deep on the outside takes the filler. This joint is modelled: the coupon (`cad/out/coupon/README.md`, built by `candybar.shell.coupon`) has three pairs on a wall of radius 300, with grooves of +0.1, +0.2 and +0.3, and one pilot of each candidate in each lower half.
 2. **Floor tile to floor tile.** A half-lap 20 wide; a cone 8 x 3 in the lower lap; thread-forming screws 3.5 x 12 from below, every 50.
 3. **Wall foot to floor.** The foot flange (12 x 4) of each lower piece lies on the floor, with a key 3 x 2.5 under it in a slot of the floor. Thread-forming screws 3.5 x 16 up from below, every 80.
 4. **Node** (three pieces meet). A plate 24 x 24 x 4 bonded inside over the three flanges, with a cone in each flange.
-5. **Service seam.** M4 heat-set inserts (hole 5.6, 8 deep) in the fixed part, M4 screws every 80 to 100, two pins of 4 (+0.1), a chamfer of 0.5 on both edges. Never bonded or filled.
+5. **Service seam.** M4 heat-set inserts (hole 5.6, 9.5 deep, in a boss of 13) in the fixed part, M4 screws every 80 to 100, two pins of 4 (+0.1), a chamfer of 0.5 on both edges. Never bonded or filled.
 6. **The coupon pair** for joint 1 (above).
 7. **Hood on the body top.** A top ring of 14 on the body, cones 8 x 3 on the ring (two at the front, two at the rear corners), sockets in the foot flange of the hood. Bolted: M4 into inserts in the ring. Bonded: the same faces take adhesive.
 
