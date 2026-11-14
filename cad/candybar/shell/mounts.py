@@ -55,7 +55,7 @@ ZONES = {"dock_r": (185.0, 255.0, 405.0, 470.0, 105.0, 195.0), "dock_l": (-255.0
          "floor_mid": (-250.0, 250.0, 195.0, 370.0, -5.0, 45.0)}
 # a boss keeps this far from a bonded seam and from the flange of a seam
 SEAM_CLEAR = 6.0
-FINISH = {"compute": "#d98030", "psu": "#3c8f8f", "hub": "#9a6fd0", "ties": "#c8b030", "boss": "#e8e6e0"}
+FINISH = {"compute": "#d98030", "psu": "#3c8f8f", "hub": "#9a6fd0", "ties": "#c8b030", "boss": "#e8e6e0", "places": "#58a8e0"}
 OWNER = "Mount_"
 # the pairs that the fit rules report and that the design accepts: a tray has two posts through the air zone behind
 # the backplate, because the standoffs of the board are there
@@ -143,13 +143,30 @@ class Mounts:
     lead_tie_y: float = 36.0        # the leads to the control panel: behind the seam BA2
     lead_tie_x: tuple[float, ...] = (-150.0, -50.0, 50.0, 150.0)
     power_tie: tuple[float, float] = (75.0, 397.0)
+    # ---- the places of the small items (the owner, 2026-11-14). Each size is an estimate: no part is chosen
+    # the DisplayPort to HDMI adapter: its body stands on the rear face of the left dock, the HDMI socket up
+    dp_size: tuple[float, float, float] = (22.0, 12.0, 55.0)
+    dp_at: tuple[float, float] = (6.35, 2.0)          # outside the left upright, above the lower edge of the dock
+    # the 12 V to USB-C power delivery board of the monitor: on the rear face of the right dock, below its screws
+    pd_size: tuple[float, float, float] = (50.0, 15.0, 30.0)
+    pd_at: tuple[float, float] = (5.05, 6.0)          # outside the right upright, above the lower edge of the dock
+    # the adapter of the power button, in its case on the 24-pin lead: on the floor in front of the stowed cables
+    button_size: tuple[float, float, float] = (60.0, 25.0, 20.0)
+    button_at: tuple[float, float] = (11.35, 18.9)    # right of the power supply, in front of the bundle
+    button_tie: float = 6.0                           # its staple in front of it
+    deck_tie: tuple[float, float] = (190.0, 170.0)    # the lead of the button on its way to the USB socket plate
+    # the audio amplifier: on the floor beside the hub, toward the centre
+    amp_size: tuple[float, float, float] = (50.0, 40.0, 20.0)
+    amp_at: tuple[float, float] = (14.35, 20.4)       # inside the inner rail of the hub, behind the front of the hub
+    amp_tie: float = 10.0                             # its staples in front of it and behind it
+    place_slot: float = 7.0                           # the tie slots of a place on a dock: above its lower edge
 
 
 @dataclass
 class Solid:
     name: str
     group: str            # compute, psu, hub, ties
-    kind: str             # printed, boss
+    kind: str             # printed, boss, place (the room that is kept for an item with no part chosen)
     shape: Part.Shape
     on: str               # the piece of the split that carries a boss; what a printed part is fastened to
     up: P3 = (0.0, 0.0, 1.0)   # the direction in the cabinet that points up on the printer
@@ -384,6 +401,9 @@ def dock(s: Site, m: Mounts, side: float) -> Solid:
     for dx in m.slot_x:
         xs = outer + side * dx
         cuts.append(bx(xs, xs + side * m.slot_w, f["yd0"] - 1, f["y0"] + 1, top - 5.0 - m.slot_h, top - 5.0))
+    b = place_boxes(s, m)["PlacePdBoard" if side > 0 else "PlaceDpAdapter"][0]
+    z0 = f["zd0"] + (m.place_slot - 3.0 if side > 0 else 20.0)
+    cuts += [bx(b[0] - m.slot_w, b[0], f["yd0"] - 1, f["y0"] + 1, z0, z0 + m.slot_h), bx(b[1], b[1] + m.slot_w, f["yd0"] - 1, f["y0"] + 1, z0, z0 + m.slot_h)]
     name = "DockR" if side > 0 else "DockL"
     return Solid(name, "compute", "printed", less(plate, cuts), "the boss " + name[-1] + " (two M3 screws)", (0.0, 1.0, 0.0),
                  "its front face (toward the boss)")
@@ -516,6 +536,13 @@ def ties(s: Site, m: Mounts, x_bay: float) -> tuple[list[Solid], list[dict]]:
         on = "floor middle centre" if abs(x) < x_bay else "floor middle side " + ("R" if x > 0 else "L")
         spots.append((f"TieLead{i + 1}", (x, 194.0 + m.lead_tie_y, s.floor), (0, 0, 1), (1, 0, 0), False, on, "the leads from the control panel to the hub"))
     spots.append(("TiePower", (*m.power_tie, s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear centre", "the 12 V lead to the BC-250 and the 5 V lead to the hub"))
+    pb = place_boxes(s, m)
+    button, amp = pb["PlaceButtonAdapter"][0], pb["PlaceAmplifier"][0]
+    spots.append(("TieButton", ((button[0] + button[1]) / 2, button[2] - m.button_tie, s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear centre",
+                  "the strap of the power button's adapter, with TieBundleFrontL behind it"))
+    spots.append(("TieDeck", (*m.deck_tie, s.floor), (0, 0, 1), (0, 1, 0), False, "floor front side R", "the lead of the power button, on its way to the USB socket plate"))
+    for tag, y in (("Front", amp[2] - m.amp_tie), ("Rear", amp[3] + m.amp_tie)):
+        spots.append((f"TieAmp{tag}", ((amp[0] + amp[1]) / 2, y, s.floor), (0, 0, 1), (1, 0, 0), False, "floor middle side R", "the strap of the amplifier"))
     out, rows = [], []
     for name, at, n, b, wall, on, use in spots:
         shape, root = staple(m, at, n, b, wall)
@@ -528,7 +555,36 @@ def ties(s: Site, m: Mounts, x_bay: float) -> tuple[list[Solid], list[dict]]:
         outer = f["x1"] if side > 0 else f["x0"]
         rows.append({"name": f"tie slots of the dock {tag}", "at": [round(outer + side * (sum(m.slot_x) + m.slot_w) / 2, 2), f["y0"], round(f["zd1"] - 5.0 - m.slot_h / 2, 2)],
                      "on": "Dock" + tag, "for": use})
+    for key, tag, use in (("PlaceDpAdapter", "L", "the body of the DisplayPort to HDMI adapter, so that it does not hang on the socket"),
+                          ("PlacePdBoard", "R", "the power delivery board of the monitor")):
+        b = pb[key][0]
+        rows.append({"name": f"tie slots of the dock {tag}, at the place", "at": [round((b[0] + b[1]) / 2, 2), b[2], round((b[4] + b[5]) / 2, 2)], "on": "Dock" + tag, "for": use})
     return out, rows
+
+
+def place_boxes(s: Site, m: Mounts) -> dict[str, tuple[tuple[float, ...], str, str]]:
+    """The room kept for each small item: its box (x0, x1, y0, y1, z0, z1), what it is on, and what it is."""
+    fl, fr = tray_frame(s, m, -1.0), tray_frame(s, m, 1.0)
+    w, t, h = m.dp_size
+    dx = fl["x0"] - m.dp_at[0]
+    dp = (dx - w, dx, fl["y0"], fl["y0"] + t, fl["zd0"] + m.dp_at[1], fl["zd0"] + m.dp_at[1] + h)
+    w, t, h = m.pd_size
+    px = fr["x1"] + m.pd_at[0]
+    pd = (px, px + w, fr["y0"], fr["y0"] + t, fr["zd0"] + m.pd_at[1], fr["zd0"] + m.pd_at[1] + h)
+    w, t, h = m.button_size
+    bx0, by1 = s.psu[1] + m.button_at[0], s.bundle[2] - m.button_at[1]
+    button = (bx0, bx0 + w, by1 - t, by1, s.floor, s.floor + h)
+    w, t, h = m.amp_size
+    ax1, ay0 = s.hub[0] - m.amp_at[0], s.hub[2] + m.amp_at[1]
+    amp = (ax1 - w, ax1, ay0, ay0 + t, s.floor, s.floor + h)
+    return {"PlaceDpAdapter": (dp, "DockL (a cable tie through two slots)", "the DisplayPort to HDMI adapter: its body, with the HDMI socket up"),
+            "PlacePdBoard": (pd, "DockR (a cable tie through two slots)", "the 12 V to USB-C power delivery board of the monitor"),
+            "PlaceButtonAdapter": (button, "the floor tile rear centre (a strap from TieButton to TieBundleFrontL)", "the adapter of the power button, in its case on the 24-pin lead"),
+            "PlaceAmplifier": (amp, "the floor tile middle side R (a strap from TieAmpFront to TieAmpRear)", "the audio amplifier board")}
+
+
+def places(s: Site, m: Mounts) -> list[Solid]:
+    return [Solid(k, "places", "place", bx(*b), on, note=what) for k, (b, on, what) in place_boxes(s, m).items()]
 
 
 def build(d: Blueprint, lay: fit.Layout, m: Mounts, v, skin: dict[str, Part.Shape]) -> Design:
@@ -537,7 +593,7 @@ def build(d: Blueprint, lay: fit.Layout, m: Mounts, v, skin: dict[str, Part.Shap
     solids, screws, points = compute(s, m)
     fence, holes = psu(s, m, x_bay)
     staples, rows = ties(s, m, x_bay)
-    return Design(s, solids + fence + hub(s, m) + staples, screws, points, holes, rows)
+    return Design(s, solids + fence + hub(s, m) + staples + places(s, m), screws, points, holes, rows)
 
 
 # ---------- the checks ----------
@@ -577,7 +633,7 @@ def stand_in(parts: dict[str, Part.Shape], skin: dict[str, Part.Shape], d: Bluep
     return cavity.Cavity([parts[k] for k in cavity.SKIN] + [cavity.seam_filler(parts, d)], list(skin.values()), [])
 
 
-def room_values(d: Blueprint, lay: fit.Layout, v, shell_out: Path) -> dict[str, float]:
+def room_values(shell_out: Path) -> dict[str, float]:
     """The values that the fit study measures on the whole cavity (the room of the speakers and the marquee, and the
     inner face of the deck side at the USB row), from the report of the fit study of the default build."""
     report = shell_out / fit.FIT / "report.json"
@@ -711,7 +767,7 @@ def psu_path(design: Design, m: Mounts, hw: dict[str, tuple[str, str, Part.Shape
     up = door["z0"] + 2.0 - z0
     moves = [("up", (0.0, 0.0, lift)), ("forward", (0.0, -20.0, 0.0)), ("right", (right, 0.0, 0.0)), ("up", (0.0, 0.0, up - lift)),
              ("back", (0.0, d.body_d + 20.0 - y1 + 20.0, 0.0))]
-    fixed = [(q.name, q.shape) for q in design.solids if not q.name.startswith("Tray")] + [("Hub_Body", hw["Hub_Body"][2])]
+    fixed = [(q.name, q.shape) for q in design.solids if not q.name.startswith("Tray") and q.name != "PlaceButtonAdapter"] + [("Hub_Body", hw["Hub_Body"][2])]
     at, hits, steps = [x0, y0, z0], [], []
     for word, (dx, dy, dz) in moves:
         to = [at[0] + dx, at[1] + dy, at[2] + dz]
@@ -801,7 +857,8 @@ def loads(design: Design, m: Mounts, v) -> list[dict]:
     per = f / len(m.standoffs)
     z_weak = m.arm_h * m.arm_t ** 2 / 6
     row("compute module", f"the longest arm of a tray ({far:.0f} mm), load along the cabinet", per, "arm, upright, hanging screw, dock, boss",
-        f"{per:.1f} N at {far:.0f}: M / Z, Z = {m.arm_h:g} x {m.arm_t:g}2 / 6", per * far / z_weak, per * far / LIFT_FACTOR / z_weak)
+        f"{per:.1f} N at {far:.0f}: M / Z, Z = {m.arm_h:g} x {m.arm_t:g}2 / 6; the weight alone bends the arm the strong way, Z = {m.arm_t:g} x {m.arm_h:g}2 / 6",
+        per * far / z_weak, per * far / LIFT_FACTOR / (m.arm_t * m.arm_h ** 2 / 6))
     bear = m.web * 3.0
     row("compute module", "the web of a keyhole on the shank of the hanging screw", f / 2, "tray, hanging screw (M3 steel), insert in the dock",
         f"bearing on {m.web:g} x 3", f / 2 / bear, w / 2 / bear)
@@ -842,7 +899,8 @@ def face_findings(design: Design) -> list[str]:
 
     out = []
     for s in design.solids:
-        out += [f"{s.name}: {f.rule} at {f.at}: {f.detail}" for f in face_check.failures(face_check.check(s.shape, s.name))]
+        if s.kind != "place":
+            out += [f"{s.name}: {f.rule} at {f.at}: {f.detail}" for f in face_check.failures(face_check.check(s.shape, s.name))]
     return out
 
 
@@ -873,8 +931,10 @@ class Run:
         return self.report["failures"]
 
 
-def run(d: Blueprint, lay: fit.Layout, m: Mounts, params_dir: Path, shell_out: Path, log=print, baseline: bool = True) -> Run:
-    """The mounts and every check on them."""
+def run(d: Blueprint, lay: fit.Layout, m: Mounts, params_dir: Path, shell_out: Path, log=print, baseline: bool = True,
+        parts: dict[str, Part.Shape] | None = None, room: dict[str, float] | None = None) -> Run:
+    """The mounts and every check on them. The parts of the shell and the room values come from the output of the
+    default build (shell_out) when they are not given."""
     skin = zones(d, log)
     base = fit.sheet(params.load(params_dir), "MountsBase")
     try:
@@ -883,9 +943,9 @@ def run(d: Blueprint, lay: fit.Layout, m: Mounts, params_dir: Path, shell_out: P
         load_rows = loads(design, m, v)
     finally:
         App.closeDocument(base.Name)
-    parts = shell_parts(d, shell_out, log)
+    parts = parts or shell_parts(d, shell_out, log)
     cav = stand_in(parts, skin, d)
-    room = room_values(d, lay, None, shell_out)
+    room = room or room_values(shell_out)
     hw = hardware_shapes(d, lay, params_dir, room)
     before = fit_rules(d, lay, params_dir, parts, cav, room, None) if baseline else {}
     rules = fit_rules(d, lay, params_dir, parts, cav, room, design)
@@ -898,6 +958,7 @@ def run(d: Blueprint, lay: fit.Layout, m: Mounts, params_dir: Path, shell_out: P
            "screws": [asdict(sc) for sc in design.screws], "shroud_points": [[round(c, 2) for c in p] for p in design.shroud_points],
            "psu_holes": [[round(c, 2) for c in p] for p in design.psu_holes], "ties": design.ties,
            "bosses": [{"name": s.name, "on": s.on, "box": box_of(s.whole), "cm3": round(s.whole.Volume / 1000, 2), "note": s.note} for s in design.solids if s.kind == "boss"],
+           "places": [{"name": s.name, "box": box_of(s.shape), "on": s.on, "for": s.note} for s in design.solids if s.kind == "place"],
            "site": {k: x for k, x in asdict(design.site).items() if k != "a"}}
     fails = [f"skin: {r['solid']} has {r['in_skin_mm3']} mm3 in the skin" for r in rep["skin"] if not r["ok"]]
     fails += [f"own solids: {a} / {b}: {vol:.1f} mm3 in common" for a, b, vol in rep["own_pairs"]]
@@ -946,6 +1007,8 @@ def markdown(rep: dict) -> str:
     out += [f"| {r['name']} | {r['on']} | {r['box']} | {r['cm3']} | {r['note']} |" for r in rep["bosses"]]
     out += ["", "## Tie points", "", "| Name | At (x, y, z) | On | For |", "| --- | --- | --- | --- |"]
     out += [f"| {r['name']} | {r['at']} | {r['on']} | {r['for']} |" for r in rep["ties"]]
+    out += ["", "## Places", "", "| Place | Box (x0, x1, y0, y1, z0, z1) | Held on | For |", "| --- | --- | --- | --- |"]
+    out += [f"| {r['name']} | {r['box']} | {r['on']} | {r['for']} |" for r in rep["places"]]
     out += ["", f"Face check: {len(rep['faces'])} findings."] + [f"- {t}" for t in rep["faces"]]
     return "\n".join(out) + "\n"
 
