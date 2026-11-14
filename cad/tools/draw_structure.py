@@ -384,7 +384,7 @@ def joint_service(ax) -> None:
          f"{O.insert} screw every {g(O.service_pitch_min)} to {g(O.service_pitch_max)}", (xc, w + O.insert_l))
     note(ax, (-40, 32), f"two pins {g(O.pin_d)} dia, +{g(O.pin_clearance)}, for the place; chamfer {g(O.service_chamfer)} "
          "on both edges; never glued or filled", (0, 2))
-    note(ax, (-40, -10), "door: 4 thumb screws into inserts", None)
+    note(ax, (-40, -10), "rear door: a lip and two quarter-turn fasteners (rear.py)", None)
     note(ax, (-40, -14), f"hood: 2 pins at the front, 2 {O.insert} at the rear", None)
     note(ax, (-40, -18), "bezel plate: magnets on the fixed cradle, 2 pins, a finger notch: no tool", None)
     ax.set_title("5  service seam (opens again)", fontsize=9)

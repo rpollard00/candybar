@@ -382,7 +382,8 @@ WHY = {
     "upper rear": ("upright", "Upright: the rear facet of the rear shelf and the roof of the hand-hold are 45 degrees, at the limit; "
                   "the upper rear wall is a wall. The hand-hold is whole in this piece."),
     "rear lower": ("upright", "Upright: rear wall and side are walls; the base facet is 45 degrees."),
-    "door": ("outer face on the bed", "Outer face on the bed: the door is a flat cover, so this gives the smoothest face and the best strength in its plane."),
+    "door": ("outer face on the bed", "Outer face on the bed: the door is a flat cover, so this gives the smoothest face and the best strength in its plane. "
+             "Its step, its ribs and its cone stand up from the plate; the foot's hook is a 45 degree face."),
     "hood centre": ("on a cut face", "On its cut face: inside the top flat the hood is a straight extrusion, so every face prints as a wall "
                    "and the rear arc and the front lean are smooth. No support, no layer steps."),
     "hood side": ("upright", "Upright: the side and the leg are near-upright walls; the top corner steps near the roof and the "
@@ -425,16 +426,18 @@ def layout(d: Blueprint) -> Layout:
         "hood, the door's edges, and on the back the centre line and the lines of the door's sides. The hand-holds "
         "and the cut-ins are whole in one piece each.",
         tuple(seams), tuple(pieces),
-        "Two halves on the centre line, bonded into one cover with the fan vent and the slot vents in it and nothing "
-        "wired to it. It lifts off; its own gap (DR) is the service joint. The seam runs into the left end of the "
-        "fan vent, between two of its bars.",
+        "Two halves on the centre line, bonded into one cover with nothing wired to it (candybar.shell.rear). The fan "
+        "vent is whole in the right half and the vent for the hot air is whole in the left half. The door lifts off: "
+        "its foot hooks behind the lip on the sill and two quarter-turn fasteners hold its head. Its own gap (DR) is "
+        "the service joint.",
         "The hood (groove G), the rear door (DR), the control panel (pocket), the bezel plate (reveal; the monitor "
         "comes out behind it) and the USB plate. Every other seam is bonded for good, the floor tiles too.",
         ("Bond and screw the nine floor tiles; stick the non-slip pads under them.",
          "Bond the rear: the two rear lower pieces, on the floor (R2).",
          "Bond the deck: deck nose and deck sides; then the apron and the two lower pieces (D1, D2, P1, S1).",
          "Bond the two middle pieces (L1), then the brow, the two upper pieces and the two upper rear pieces (B1, W1, R1, R3, R5).",
-         "Bond the two door halves into one cover; bond the three hood pieces and the lip.",
+         "Bond the two door halves into one cover on a flat table, with their two dowel pins; bond the two head rails "
+         "behind the strip above the door opening; bond the three hood pieces and the lip.",
          "Dry assembly with all hardware: power supply and hub on the floor, compute module on its "
          "carrier through the door opening, monitor on its carrier from the front through the bezel opening.",
          "Take the hardware out, fill and paint the permanent seams, and assemble again."))
@@ -831,14 +834,23 @@ def tints(shapes: dict) -> dict:
     return {n: colour[pair(n)] for n in names}
 
 
+# the pieces whose right and left twins differ by design (candybar.shell.rear): the openings for the power supply
+# are in the left rear lower piece and the inlet is in the right one; the fan vent is in the right door half and the
+# vent for the hot air is in the left one. Their print boxes are still alike
+HANDED = ("rear lower", "door half")
+TWIN_BOX = (("x", 1.0), ("y", 1.0), ("z", 1.0))
+TWIN_REST = (("mass_g", 2.0), ("seen", 1.0), ("overhang_seen", 1.0), ("limit_seen", 1.0), ("terrace_seen", 1.0))
+
+
 def mirror_gaps(rows: dict) -> list[dict]:
-    """Where a right piece and its left twin are not alike: the print box and the mass, and with detail the areas."""
+    """Where a right piece and its left twin are not alike: the print box and the mass, and with detail the areas.
+    A piece of HANDED is compared by its print box only."""
     out = []
     for name, r in rows.items():
         if not name.endswith(" R") or name[:-1] + "L" not in rows:
             continue
         left = rows[name[:-1] + "L"]
-        for k, tol in (("x", 1.0), ("y", 1.0), ("z", 1.0), ("mass_g", 2.0), ("seen", 1.0), ("overhang_seen", 1.0), ("limit_seen", 1.0), ("terrace_seen", 1.0)):
+        for k, tol in TWIN_BOX + (() if name[:-2] in HANDED else TWIN_REST):
             if k in r and abs(r[k] - left[k]) > tol:
                 out.append({"problem": "mirrored pieces differ", "piece": name[:-2], "value": k, "right": r[k], "left": left[k]})
     return out
@@ -859,6 +871,10 @@ def run(out: Path | None = None, mods: Modules | None = None, lim: Printer | Non
     for opt in (layout(d),) + ((BEZEL,) if bezel else ()):
         seams, pieces = expanded(opt)
         shapes, problems = cut(seams, pieces, mods)
+        if opt.key == SHELL:
+            from . import rear  # noqa: PLC0415
+
+            shapes = rear.finish_pieces(shapes, d, log=log)
         rows = {}
         for p in pieces:
             if p.full not in shapes:

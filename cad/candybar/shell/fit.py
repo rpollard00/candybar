@@ -81,8 +81,10 @@ class Layout:
     bundle_gap: float = 6.0
     # BC-250: its exhaust duct runs along the rear door, at the height of the cut-ins. The duct's outer end (the end
     # of the DisplayPort plug space) stands cut_in_reach inside the ends of the cut-ins; and at least duct_in_door
-    # inside the side of the door opening and bc_side_gap from the inner face of the side
-    duct_in_door: float = 1.0
+    # inside the side of the door opening and bc_side_gap from the inner face of the side. The land of the door
+    # stands 6 inside the opening on each side (rear.Rear.land), and the duct keeps 1 from it, so that the duct and
+    # the board pass the clear opening
+    duct_in_door: float = 7.0
     bc_side_gap: float = 4.0
 
     def cut_in_reach(self, d: Blueprint) -> float:
@@ -875,7 +877,8 @@ class Fitted:
 
 def place(d: Blueprint, lay: Layout, params_dir: Path, parts: dict[str, Part.Shape], cav: cavity.Cavity) -> Fitted:
     """The hardware at its anchors in the cavity of the built parts, and every rule of the study checked on it: R1,
-    R2, R5, containment in the cavity, the air zones and the door service. It writes no file."""
+    R2, R5, containment in the cavity, the air zones, the door service and the rear parts (the real door, shroud and
+    duct in place of the boxes, candybar.shell.rear). It writes no file."""
     h = pr.hood(d)
     base = sheet(params.load(params_dir), "FitBase")
     v = lambda name: params.value(base, name)
@@ -891,6 +894,9 @@ def place(d: Blueprint, lay: Layout, params_dir: Path, parts: dict[str, Part.Sha
     rules = run_checks(doc, found, cav, parts["bezel"], parts["control_panel"])
     door = door_outline(d)
     rules["door service"] = door_service(found, door, d, lay)
+    from . import rear  # noqa: PLC0415 - rear reads the anchors of this module
+
+    rules["rear parts"] = rear.fit_rows(d, lay, found, cav.walls)
     return Fitted(doc, base, found, values, rules, door, marquee, speaker)
 
 

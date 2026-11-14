@@ -147,7 +147,8 @@ class SplitTest(unittest.TestCase):
                 with self.subTest(cut=key, piece=name):
                     self.assertAlmostEqual(max(r["x"], r["y"]), max(left["x"], left["y"]), delta=1.0)
                     self.assertAlmostEqual(r["z"], left["z"], delta=1.0)
-                    self.assertAlmostEqual(r["mass_g"], left["mass_g"], delta=2.0)
+                    if name[:-2] not in split.HANDED:
+                        self.assertAlmostEqual(r["mass_g"], left["mass_g"], delta=2.0)
 
     def test_each_hand_hold_is_whole_in_one_piece(self) -> None:
         """Each upper rear piece holds the recess of its side with its walls: the box of its mesh (the box of the

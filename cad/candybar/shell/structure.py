@@ -207,9 +207,10 @@ def grip_box(d: Blueprint) -> tuple[float, ...]:
 
 # the make-up air inlet: a slot grille in the lower rear wall, right of the centre line, below the door sill (z 116)
 # and the cut-ins (from z 126, x 215), and right of the stowed cables (x up to 73); far from the power supply's grille
-# at the left
-INLET = (95.0, 205.0, 536.0, 540.0, 15.0, 108.0)
-INLET_OPEN = 0.55  # ESTIMATED: the open share of a printed slot grille (slots 3 wide, bars 2.5)
+# at the left. It is the inlet of candybar.shell.rear (13 slots of 8 with bars of 2.5: the mirror of the field of the
+# supply's openings), copied here because this module has no FreeCAD at import; tests/test_rear.py holds the two equal
+INLET = (80.35, 214.35, 536.0, 540.0, 20.5, 85.5)
+INLET_OPEN = 0.756  # the open share of the field: 65.8 cm2 of slots in 87.1 cm2
 
 
 def makeup_air() -> dict:
@@ -255,7 +256,9 @@ def members(d: Blueprint, board: tuple[float, float] | None = None) -> list[Memb
                note="the fixed frame between the two middle pieces, screwed to their inner flanges at the rails; it "
                     "holds the magnets for the bezel plate; the monitor's carrier slides out of it to the front"),
         Member("door opening frame", "ring", box=(-door_x - 8.0, door_x + 8.0, d.body_d - 16.0, d.body_d - d.wall_t, d.door_z0 - 8.0, d.door_z1 + 8.0),
-               note="flanges round the door opening (rear lower, middle and upper rear pieces); the door screws to it and closes the ring"),
+               note="the land of the rear door (candybar.shell.rear): the lip on the sill, a tongue and a post on each side, the head "
+                    "rail bonded behind the strip above the opening; the door's foot hooks behind the lip and two quarter-turn "
+                    "fasteners pull its head onto the land"),
         Member("panel frame", "cross", box=(-199.0, 199.0, 26.0, 202.0, 58.0, 65.0), note="the ledge under the control panel and its latch"),
         Member("side ribs", "rib", box=(x - 12.0, x - 4.0, 210.0, 520.0, 20.0, 400.0), mirror=True,
                note="ribs 8 high, 3 thick, at most 110 apart on the side band and the side of the lower body"),
@@ -285,8 +288,10 @@ def mounts() -> list[Mount]:
         Mount("BC-250", "On its long edge in a printed carrier: two uprights and two rails that hold the board's edges. "
               "Right upright on the floor, left upright on the door sill and the flanges round the door opening.",
               "floor and door sill"),
-        Mount("fan shroud and exhaust duct", "Printed, screwed to the BC-250's carrier; they end 5 mm short of the door, "
-              "and a foam seal closes the gap, so that the door lifts off free.", "BC-250 carrier"),
+        Mount("fan shroud and exhaust duct", "Printed (candybar.shell.rear): a shroud base and a shroud top that the four fan "
+              "screws hold together, a duct body and its back wall. Four ears of the shroud take screws into the carrier. The "
+              "fan's face stands 7 mm and the duct's rim 5 mm short of the door, and foam closes the gaps, so that the door "
+              "lifts off free.", "BC-250 carrier"),
         Mount("optional duct fan, 92 mm", "Four screws into bosses on the duct, in front of the slot vents.", "exhaust duct"),
         Mount("monitor", "A removable carrier with clamps on the top and bottom edges of the monitor and slots for 8 mm of "
               "adjustment each way, set from the front with the bezel plate off; it slides out forward through the opening. "
@@ -317,11 +322,11 @@ class Route:
 
 ROUTES = (
     Route("mains", "#000000", ((-150.0, 600.0, 50.0), (-150.0, 541.0, 50.0)),
-          "Wall to the power supply's own inlet (IEC C14), through its grille in the rear lower wall. No seam."),
+          "Wall to the power supply's own inlet (IEC C14), through the opening for the socket in the rear lower wall. No seam."),
     Route("12 V to the BC-250", "#d62728", ((-120.0, 380.0, 40.0), (150.0, 380.0, 60.0), (150.0, 440.0, 80.0), (150.0, 440.0, 300.0),
                                            (58.0, 470.0, 320.0)),
           "PCIe 6+2 lead from the power supply's front, along the floor, up right of the compute module to its plug. "
-          "The door opens: unplug at the board, and a 150 mm loop lets the door swing down first."),
+          "The rear door has no cable on it (decision record 0005): it lifts off free."),
     Route("5 V to the hub", "#ff7f0e", ((-120.0, 380.0, 30.0), (190.0, 370.0, 14.0)),
           "SATA lead along the floor to the hub. No service joint."),
     Route("video and power to the monitor", "#9467bd", ((-158.0, 470.0, 200.0), (-200.0, 450.0, 192.0), (-200.0, 337.0, 192.0),
@@ -340,14 +345,15 @@ ROUTES = (
 )
 
 AIR = (
-    ("fan vent (intake)", "rear door: door half R, and its left end in door half L; a foam seal to the shroud", "Outside air in through the vent over the fan."),
+    ("fan vent (intake)", "rear door: whole in door half R; a foam seal to the collar of the shroud", "Outside air in through the vent over the fan."),
     ("fan, ARCTIC P12 Pro", "on the fins, under the shroud", "Blows down into the opened fin tops."),
-    ("shroud", "door's inner frame", "Seals the fan to the fins."),
+    ("shroud", "on the fins, screwed to the BC-250's carrier", "Seals the fan to the fins."),
     ("fins of the heatsink", "BC-250", "Air leaves the fins at the I/O end."),
-    ("exhaust duct", "door's inner frame", "Turns the hot air along the door to the slot vents."),
+    ("exhaust duct", "over the I/O end of the board; a foam seal to the door", "Turns the hot air to the slot vents in the door."),
     ("slot vents (exhaust)", "rear door, left: door half L", "Hot air out, about 15 K above the intake."),
     ("power supply fan", "power supply (its top face)", "Draws cabinet air; off below about 200 W (sister unit data)."),
-    ("power supply grille", "lower rear wall, left, below the cut-ins: rear lower L", "The power supply's own exhaust out of its rear face."),
+    ("power supply grille", "lower rear wall, left, below the cut-ins: rear lower L, with the openings for the socket and the switches",
+     "The power supply's own exhaust out of its rear face."),
     ("make-up air inlet", "lower rear wall, right of the centre line below the door: rear lower R",
      "Replaces the air that the power supply's fan takes out. The owner wants all vents in the rear; the 2 to 3 mm "
      "under the floor is too thin (see the air path). It is 150 mm right of the supply's grille, so warm air is not "
