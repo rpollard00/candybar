@@ -115,6 +115,21 @@ class StraightSeamTest(unittest.TestCase):
     def test_the_pieces_do_not_share_volume(self) -> None:
         self.assertLess(overlap(self.res), 1.0)
 
+    def test_the_key_moves_to_the_other_piece_when_its_face_lies_on_the_bed(self) -> None:
+        j = pieces.joint()
+        # the same pair, but the lower piece prints upside down: its seam face is on the bed
+        pair = self.res.pairs[0]
+        fresh = pieces.Pair(pair.a, pair.b, pair.mate, head=pair.head, pilot=pair.pilot, screws=pair.screws, runs=pair.runs)
+        key, groove = pieces.key_and_groove(fresh, j, ups={"low": (0.0, 0.0, -1.0), "high": (0.0, 0.0, -1.0)})
+        self.assertEqual(fresh.key.cf.piece, "high")
+        self.assertIsNotNone(key)
+        # the key now stands down from the upper piece: below the seam plane
+        self.assertLess(key.BoundBox.ZMin, SEAM_Z - 1.0)
+        self.assertGreater(key.BoundBox.ZMax, SEAM_Z)
+        fresh = pieces.Pair(pair.a, pair.b, pair.mate, head=pair.head, pilot=pair.pilot, screws=pair.screws, runs=pair.runs)
+        pieces.key_and_groove(fresh, j, ups={"low": (0.0, 0.0, 1.0), "high": (0.0, 0.0, 1.0)})
+        self.assertEqual(fresh.key.cf.piece, "low")
+
     def test_there_is_one_pair_with_screws_on_every_wall(self) -> None:
         self.assertEqual(len(self.res.pairs), 1)
         pair = self.res.pairs[0]
@@ -372,6 +387,12 @@ class WholeSetTest(unittest.TestCase):
         bare = sorted({p["seam"].split()[0] for p in self.rep["pairs"] if p["run_mm"] >= 2 * pieces.BUILD.run_screw and not p["screws"]})
         # a seam of this list has a flange and a key on both pieces; clamps hold it while the bond sets
         self.assertEqual(bare, sorted(pieces.NO_SCREW))
+
+    def test_no_key_stands_on_a_face_that_lies_on_the_printer_bed(self) -> None:
+        where = {(sd["seam"], sd["k"], sd["piece"]): sd["in_print"] for sd in self.rep["sides"]}
+        bad = [(p["seam"], p["key"]) for p in self.rep["pairs"] if p["key"] and where[(p["seam"], p["k"], p["key"])] == "on the bed"]
+        self.assertEqual(bad, [])
+        self.assertGreater(len([p for p in self.rep["pairs"] if p["key"]]), 20)
 
     def test_the_mass_of_the_joints_is_less_than_the_budget_of_the_structure_study(self) -> None:
         m = self.chk["mass"]

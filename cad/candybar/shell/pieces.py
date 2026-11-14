@@ -698,8 +698,10 @@ class Pair:
     a: Side
     b: Side
     mate: object                  # where the two flange faces lie on each other
-    head: Side = None             # the side with the clearance holes, the head pockets and the groove
-    pilot: Side = None            # the side with the pilot holes and the key
+    head: Side = None             # the side with the clearance holes and the head pockets
+    pilot: Side = None            # the side with the pilot holes
+    key: Side = None              # the side with the key: the pilot side, unless its seam face lies on the printer bed
+    groove: Side = None
     screws: list[Screw] = field(default_factory=list)
     runs: list[tuple] = field(default_factory=list)   # (length, first point, tangent out of the run, last point, tangent out)
     notes: list[str] = field(default_factory=list)
@@ -856,18 +858,30 @@ def box_along(at, tangent, n, half_len: float, half_w: float, z0: float, z1: flo
     return Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(n * (z1 - z0))
 
 
-def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD):
-    """The key on the pilot side and the groove in the head side: the sections of joints.py carried along the outer
-    line. The key lies on the mating face only; it stops key_gap each side of a screw and key_end_margin from the
-    ends of each run. The groove is the key with the clearance on every side."""
+def on_bed(side: Side, up) -> bool:
+    """Whether the seam face of this side lies on the printer bed: the piece prints with `up` pointing up."""
+    n = math.sqrt(sum(v * v for v in up))
+    return (side.cf.into.x * up[0] + side.cf.into.y * up[1] + side.cf.into.z * up[2]) / n > 0.7
+
+
+def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = None):
+    """The key and the groove: the sections of joints.py carried along the outer line. The key is on the pilot
+    side, as joints.py has it. But a key must not stand on the face that lies on the printer bed (ups: piece ->
+    its up direction): then the key goes on the other piece. The key lies on the mating face only; it stops key_gap
+    each side of a screw and key_end_margin from the ends of each run. The groove is the key with the clearance on
+    every side."""
     from . import joints  # noqa: PLC0415
 
+    pair.key, pair.groove = pair.pilot, pair.head
+    if ups and on_bed(pair.pilot, ups[pair.pilot.cf.piece]) and not on_bed(pair.head, ups[pair.head.cf.piece]):
+        pair.key, pair.groove = pair.head, pair.pilot
+        pair.notes.append(f"the key is on {pair.head.cf.piece}: the seam face of {pair.pilot.cf.piece} lies on the printer bed")
     if not pair.runs or sum(r[-1][0] - r[0][0] for r in pair.runs) < b.run_key:
         pair.notes.append("no key: the run is shorter than %g mm" % b.run_key)
         return None, None
     h = split.KERF / 2
-    up = pair.head.cf.into
-    sk = max(pair.pilot.lines, key=lambda s: s.length)
+    up = pair.groove.cf.into
+    sk = max(pair.key.lines, key=lambda s: s.length)
     c = j.groove_clearance
     key = carry(sk, joints.key_profile(j), up, -h, corners=False)
     groove = carry(sk, joints.groove_profile(j, c), up, h, corners=False)
@@ -1041,12 +1055,13 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
                 r = vee(side, j)
                 if r is not None:
                     cut.setdefault(side.cf.piece, []).append(r)
+    ups = {p.full: p.up for p in pl.pieces}
     for pair in res.pairs:
-        key, groove = key_and_groove(pair, j, b)
+        key, groove = key_and_groove(pair, j, b, ups)
         hp, pp = pair.head.cf.piece, pair.pilot.cf.piece
         if key is not None:
-            add.setdefault(pp, []).append(key)
-            cut.setdefault(hp, []).append(groove)
+            add.setdefault(pair.key.cf.piece, []).append(key)
+            cut.setdefault(pair.groove.cf.piece, []).append(groove)
         for sc in pair.screws:
             tools = screw_tools(sc, pair.head.cf.into, j)
             cut.setdefault(pp, []).extend([tools["pilot"], tools["counterbore"]])
@@ -1548,7 +1563,8 @@ def seam_report(res: Result) -> dict:
                            "longest_straight_mm": round(max((seg.length for sk in sd.lines for seg in sk.segs if seg.c is None), default=0.0), 1),
                            "flange_cm3": round(sd.solid.Volume / 1000, 1) if sd.solid is not None else 0.0,
                            "line_mm": round(sum(sk.length for sk in sd.lines), 1), "lean_out": sd.lean_out, "gusset": sd.gusset, "notes": sd.notes}
-    pairs = [{"seam": p.a.cf.seam, "k": p.a.cf.k, "head": p.head.cf.piece, "pilot": p.pilot.cf.piece, "mate_cm2": round(p.mate.Area / 100, 1),
+    pairs = [{"seam": p.a.cf.seam, "k": p.a.cf.k, "head": p.head.cf.piece, "pilot": p.pilot.cf.piece,
+              "key": p.key.cf.piece if p.key is not None and not any(n.startswith("no key") for n in p.notes) else None, "mate_cm2": round(p.mate.Area / 100, 1),
               "run_mm": round(sum(r[-1][0] - r[0][0] for r in p.runs), 1), "normal": vec(p.head.cf.into),
               "screws": [{"at": vec(sc.at), "along": [round(v, 4) for v in sc.tangent], "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
     return {"sides": [side_row(sd) for sd in res.sides], "feet": [side_row(sd) for sd in res.feet], "ribs": [side_row(sd) for sd in res.ribs],
