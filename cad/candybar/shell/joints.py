@@ -128,9 +128,16 @@ class OtherJoints:
     insert: str = "M4"
     insert_l: float = 8.0
     insert_hole_d: float = 5.6
+    # The hole is deeper than the insert (8.1 long): two makers' tables for heat-set inserts in printed parts give
+    # 9.1 to 9.5, so that the melted plastic has room under the insert. One maker's best boss diameter starts at
+    # 12.6. Both are ASSUMPTIONS that the coupon must prove. A printed hole comes out about 0.25 small, so the coupon
+    # carries holes of 5.6, 5.7 and 5.8 (insert_hole_trials).
+    insert_hole_depth: float = 9.5
+    insert_hole_trials: tuple[float, ...] = (5.6, 5.7, 5.8)
+    insert_floor: float = 1.0        # the boss keeps this much under the hole; the skin is behind it
     service_pitch_min: float = 80.0
     service_pitch_max: float = 100.0
-    service_boss: float = 12.0
+    service_boss: float = 13.0
     pin_d: float = 4.0
     pin_clearance: float = 0.1
     service_chamfer: float = 0.5
