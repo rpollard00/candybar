@@ -235,8 +235,11 @@ def coupon_set(out: str, renders: bool = True) -> int:
     tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "render_views.py")
     if renders:
         names = ",".join(p["part"] for p in parts)
+        m, side = data["printer"]["bed_margin"] + 12.0, data["printer"]["xy"]
+        xs, ys = [pl["origin"][0] for pl in data["plates"]], [pl["origin"][1] for pl in data["plates"]]
+        frame = f"{min(xs) - m},{min(ys) - m},0,{max(xs) + side + m},{max(ys) + side + m + 10},{max(p['box_mm'][2] for p in parts)}"
         for cmd in ([sys.executable, tool, os.path.join(out, "sheet", "renders"), os.path.join(out, "sheet"), "--views", names, "--size", "900"],
-                    [sys.executable, tool, os.path.join(out, "plates"), out, "--views", "top", "--size", "3000"]):
+                    [sys.executable, tool, os.path.join(out, "plates"), out, "--views", "top", "--size", "3000", f"--frame={frame}"]):
             proc = subprocess.run(cmd, capture_output=True, text=True)
             sys.stdout.write(proc.stdout[-300:])
             if proc.returncode:
