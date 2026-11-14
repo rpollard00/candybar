@@ -94,14 +94,14 @@ def section_sheet() -> str | None:
         ax.grid(True, lw=0.3, color="#bbb")
         ax.set_xlabel("mm across the flange, from the screw axis")
         ax.set_ylabel("mm across the seam, from the seam plane")
-        ax.set_title(f"Seam {seam}: {sec['head']} (blue, screw head) on {sec['pilot']} (tan, pilot hole and key)", fontsize=12, loc="left")
+        ax.set_title(f"Seam {seam}: {sec['head']} (blue, screw head) and {sec['pilot']} (tan, pilot hole)", fontsize=12, loc="left")
     text = (f"joints.Joint: skin {j.wall_t:g}; flange {j.flange_h:g} x {j.flange_t:g}; gusset {j.gusset_angle:g} deg; "
-            f"key {j.key_w:g} x {j.key_proj:g}, groove +{j.groove_clearance:g} each side and {j.groove_extra_depth:g} deeper; "
+            f"key {j.key_w:g} x {j.key_proj:g}, groove +{j.groove_clearance:g} each side and {j.groove_extra_depth:g} deeper;\n"
             f"screw {j.screw_d:g} x {j.screw_l:g} at {j.screw_u:g} from the outside, pitch {j.screw_pitch:g}; pilot {j.pilot():g} x {j.pilot_depth:g}; "
-            f"clearance {j.clearance_d:g}; head pocket {j.head_pocket_d:g}; rebate for the filler {j.vgroove_d:g} deep, "
+            f"clearance {j.clearance_d:g}; head pocket {j.head_pocket_d:g};\nV for the filler {j.vgroove_d:g} deep, "
             f"{j.vgroove_w:g} wide over the two pieces; bond line {pieces.split.KERF:g}")
     fig.suptitle("Section through a screw of each pilot seam, square to the seam\n" + text, fontsize=12, x=0.01, ha="left")
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.tight_layout(rect=(0, 0, 1, 0.88))
     os.makedirs(os.path.join(OUT, "sheets"), exist_ok=True)
     path = os.path.join(OUT, "sheets", "section.png")
     fig.savefig(path, dpi=120)
