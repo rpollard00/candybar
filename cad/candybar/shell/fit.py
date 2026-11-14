@@ -10,6 +10,7 @@ candybar/hardware.py and candybar/panel.py; only their anchors change. The ancho
 choices that nothing fixes yet are the named values of Layout. The checks are rules R1 (interference), R2 (keep-out)
 and R5 (button spacing) of candybar/check.py, run on these solids, and containment: the test of R3 with the cavity in
 place of the outline shell. It writes into <out>/fit:
+  warnings.md              the ergonomic targets of the control panel, and the parameters that are still to measure
   report.md, report.json   the clearance table, the findings, the wall, the air path, the room for the speakers and
                            the marquee, and the print table
   sections.json            the sections and the rear view for sheet 09 (tools/draw_blueprint.py fit)
@@ -369,12 +370,20 @@ def speaker_room(d: Blueprint, lay: Layout, h: pr.Hood, walls: list[Part.Shape],
 # ---------- the document of the items ----------
 
 def build_items(rows: list[params.Param]) -> App.Document:
+    """The document of the items: the sheet, and every envelope and keep-out zone bound to it. An item that does not
+    recompute or is not one valid solid stops the study (rule R0): placed() would leave it out of every check."""
     doc = sheet(rows, "Fit")
     m = model.Model(doc, [r.name for r in rows])
-    count = int(params.value(doc, "btn_count"))
+    count = params.value(doc, "btn_count")
+    if count not in panel.BUTTON_COUNTS:
+        raise params.ParamError(f"btn_count must be one of {panel.BUTTON_COUNTS}, not {count:g}")
+    count = int(count)
     for spec in (hardware.MONITOR, MONITOR_ANY, MONITOR_CABLES, hardware.COMPUTE, hardware.PSU, hardware.CABLE_BUNDLE, control_panel(count), usb_row(), HUB, *speakers(), MARQUEE):
         m.assembly(spec)
     doc.recompute()
+    broken = model.errors(doc)
+    if broken:
+        raise ValueError("fit: " + "; ".join(f"{name}: {reason}" for name, reason in broken))
     return doc
 
 
@@ -841,6 +850,33 @@ def markdown(rep: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+WARNINGS = "warnings.md"
+# the targets of rule R6 that no other check of the study has (fit.sight_lines has the sight line and the eye distance)
+TARGETS = ("panel top above the desk", "palm rest: cabinet front edge to the nearest button centre")
+
+
+def warnings(doc: App.Document) -> str:
+    """What the older report gave as warnings and the study's own report does not have: the ergonomic targets of the
+    control panel (R6), the count of the parameters by status (R7) and the list of what is still to measure."""
+    scene = check.Scene(doc, tuple(model.placed(doc)), tuple(params.table(doc)))
+    targets = [(subject, level, detail) for level, subject, detail in check._ergonomics(scene) if subject in TARGETS]
+    counts = [(status, str(count)) for status, count in check._status_counts(scene).items()]
+    todo = [(r["name"], r["value"], r["status"], r["file"], r["measure"]) for r in scene.table
+            if r["measure"] and r["status"] not in ("measured", "derived")]
+    return "\n\n".join([
+        "# Fit study: warnings",
+        "These items do not fail the study. `report.md` has the rules that do.",
+        "## Ergonomic targets of the control panel",
+        check._md_table(("Value", "Level", "Detail"), targets),
+        "## Parameters by status",
+        "A row that the fit study sets from the blueprint is `derived`.",
+        check._md_table(("Status", "Count"), counts),
+        "## Still to measure",
+        "Rows that name a measurement and are not yet marked `measured`.",
+        check._md_table(("Parameter", "Value now", "Status", "File", "What to measure"), todo),
+    ]) + "\n"
+
+
 def main() -> int:
     root = Path(os.environ.get("CANDYBAR_ROOT", Path(__file__).resolve().parents[2]))
     params_dir = Path(os.environ.get("CANDYBAR_PARAMS") or root / "params")
@@ -935,6 +971,7 @@ def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[st
            "seat": {"desk_h": DESK_H, "chair_h": CHAIR_H, "slump": SLUMP}}
     (out / "report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     (out / "report.md").write_text(markdown(rep), encoding="utf-8")
+    (out / WARNINGS).write_text(warnings(doc), encoding="utf-8")
     z = lambda name: pv(name)
     planes = {"side, centre line": (0, 0.0), "side, through the lever": (0, lay.stick_x),
               "plan, power supply": (2, z("psu_z0") + z("psu_h") / 2), "plan, deck": (2, values["fit_usb_z"]),

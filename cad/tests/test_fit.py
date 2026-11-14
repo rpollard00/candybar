@@ -1,12 +1,13 @@
 """The checks of the fit study: they notice an item that leaves the cavity, and the speaker search finds the circle."""
 from __future__ import annotations
 
+import math
 import unittest
 
 import FreeCAD as App
 import Part
 
-from candybar import check, params
+from candybar import check, model, panel, params
 from candybar.shell import cavity, fit
 from candybar.shell import solids as so
 from candybar.shell import profiles as pr
@@ -87,6 +88,155 @@ class FitChecksTest(unittest.TestCase):
         for name in ("Monitor", "Compute", "PSU", "CableBundle", "Lever", "Encoder", "Hub", "SpeakerR", "SpeakerL", "Marquee"):
             self.assertIn(name, names)
         self.assertEqual(len([n for n in names if n.startswith("USB_")]), len(fit.USB_ORDER))
+
+
+def placed_with(name: str, **changes: float) -> App.Document:
+    """The document of the items at the anchors of the default layout, with some values of the sheet changed."""
+    d, lay = Blueprint(), fit.Layout()
+    base = fit.sheet(params.load(support.PARAMS), f"{name}Base")
+    try:
+        v = lambda key: params.value(base, key)
+        values = fit.anchors(d, lay, v, d.width / 2 - d.wall_t) | ROOM
+        for key, change in changes.items():
+            values[key] = change(values[key] if key in values else v(key)) if callable(change) else change
+    finally:
+        App.closeDocument(base.Name)
+    return fit.build_items(fit.sheet_rows(support.PARAMS, values))
+
+
+class ItemRulesTest(unittest.TestCase):
+    """Rules R1, R2 and R5 and the state rule on the items of the fit study. The older generator had these tests on
+    its own document."""
+
+    def failed(self, **changes: float) -> set[tuple[str, str]]:
+        doc = placed_with("FitRules", **changes)
+        try:
+            scene = check.Scene(doc, tuple(model.placed(doc)), ())
+            rules = {"R1": check._interference(scene), "R2": check._keepout(scene), "R5": check._button_spacing(scene)}
+        finally:
+            App.closeDocument(doc.Name)
+        return {(rule, subject) for rule, rows in rules.items() for level, subject, _ in rows if level == check.FAIL}
+
+    def test_the_default_layout_has_no_fail(self) -> None:
+        self.assertEqual(self.failed(), set())
+
+    def test_encoder_under_a_button_fails_interference_between_two_purchased_parts(self) -> None:
+        doc = placed_with("FitRulesAt")
+        try:
+            at = next(s.world.BoundBox.Center for s in model.placed(doc) if s.name == "Btn2_Body")
+            origin = doc.getObject("ControlPanel").Placement.Base
+        finally:
+            App.closeDocument(doc.Name)
+        under_button_2 = {"enc_x": at.x - origin.x, "enc_y": at.y - origin.y}
+        self.assertIn(("R1", "Btn2_Body / Encoder_Board"), self.failed(**under_button_2))
+
+    def test_cable_bundle_in_the_plug_zone_fails_the_keepout_rule(self) -> None:
+        doc = placed_with("FitRulesAt")
+        try:
+            plugs = next(s.world.BoundBox for s in model.placed(doc) if s.name == "PSU_Plugs")
+        finally:
+            App.closeDocument(doc.Name)
+        self.assertIn(("R2", "PSU_Plugs / CableBundle_Body"), self.failed(bundle_x0=plugs.XMin, bundle_y0=plugs.YMin))
+
+    def test_wider_nut_fails_button_spacing(self) -> None:
+        self.assertIn("R5", {rule for rule, _ in self.failed(btn_nut_d=38.0)})
+
+    def test_item_with_no_height_stops_the_study(self) -> None:
+        try:
+            with self.assertRaisesRegex(ValueError, "Encoder_Board"):
+                placed_with("FitRulesFlat", enc_h=0.0)
+        finally:
+            App.closeDocument("Fit")
+
+
+class EnvelopeTest(unittest.TestCase):
+    """The envelopes of the purchased parts follow the parameter sheets. The older generator had these tests on its
+    own document."""
+
+    def boxes(self, **changes: float) -> tuple[dict[str, App.BoundBox], dict[str, float]]:
+        doc = placed_with("FitEnvelope", **changes)
+        try:
+            names = ("bc_top_z", "bc_pcb_w_pwr", "bc_pcb_w_io", "bc_fin_y0", "mon_h", "mon_t", "recline", "psu_d", "psu_d_max",
+                     "psu_y0", "stick_x", "btn1_dx")
+            return {s.name: s.world.BoundBox for s in model.placed(doc)}, {n: params.value(doc, n) for n in names}
+        finally:
+            App.closeDocument(doc.Name)
+
+    def test_board_stands_on_its_straight_edge_with_the_power_connector_on_top(self) -> None:
+        box, v = self.boxes()
+        bottom, top = v["bc_top_z"] - v["bc_pcb_w_pwr"], v["bc_top_z"]
+        self.assertAlmostEqual(box["Compute_PCB_IO"].ZMin, bottom, places=6)
+        self.assertAlmostEqual(box["Compute_PCB_IO"].ZMax, bottom + v["bc_pcb_w_io"], places=6)
+        self.assertAlmostEqual(box["Compute_Heatsink"].ZMin, bottom + v["bc_fin_y0"], places=6)
+        self.assertAlmostEqual(box["Compute_PowerPlug"].ZMin, top, places=6)
+
+    def test_monitor_leans_back_by_the_recline(self) -> None:
+        box, v = self.boxes()
+        tilt = math.radians(v["recline"])
+        self.assertAlmostEqual(v["recline"], Blueprint().recline)
+        self.assertAlmostEqual(box["Monitor_Body"].YLength, v["mon_h"] * math.sin(tilt) + v["mon_t"] * math.cos(tilt), places=4)
+        self.assertAlmostEqual(box["Monitor_Body"].ZLength, v["mon_h"] * math.cos(tilt) + v["mon_t"] * math.sin(tilt), places=4)
+
+    def test_psu_depth_is_measured_forward_from_the_rear_of_its_bay(self) -> None:
+        box, v = self.boxes(psu_d=lambda depth: depth - 15.0)
+        self.assertAlmostEqual(box["PSU_Body"].YLength, v["psu_d"], places=4)
+        self.assertAlmostEqual(box["PSU_Body"].YMax, v["psu_y0"] + v["psu_d_max"], places=4)
+        self.assertAlmostEqual(box["PSU_Body"].YMax, box["PSU_Bay"].YMax, places=4)
+
+    def test_psu_as_deep_as_its_bay_fills_it(self) -> None:
+        _, v = self.boxes()
+        box, _ = self.boxes(psu_d=v["psu_d_max"])
+        self.assertAlmostEqual(box["PSU_Body"].YLength, v["psu_d_max"], places=4)
+        self.assertAlmostEqual(box["PSU_Body"].YMin, box["PSU_Bay"].YMin, places=4)
+
+    def test_button_follows_its_offset_from_the_lever(self) -> None:
+        before, _ = self.boxes()
+        after, _ = self.boxes(btn1_dx=lambda dx: dx + 2.0)
+        self.assertAlmostEqual(after["Btn1_Body"].Center.x, before["Btn1_Body"].Center.x + 2.0, places=4)
+        self.assertAlmostEqual(after["Btn1_Body"].Center.y, before["Btn1_Body"].Center.y, places=4)
+        self.assertAlmostEqual(after["Btn2_Body"].Center.x, before["Btn2_Body"].Center.x, places=4)
+
+    def test_six_buttons_build_six_action_buttons(self) -> None:
+        for count in panel.BUTTON_COUNTS:
+            bodies = [p.name for p in fit.control_panel(count).prims if p.name.startswith("Btn") and p.name.endswith("_Body")]
+            self.assertEqual(len(bodies), count)
+
+    def test_button_count_that_has_no_layout_is_rejected(self) -> None:
+        try:
+            with self.assertRaisesRegex(params.ParamError, "btn_count must be one of"):
+                fit.build_items(params.load(support.params_copy({"btn_count": "7"})))
+        finally:
+            App.closeDocument("Fit")
+
+
+class WarningsTest(unittest.TestCase):
+    """The file of warnings has what the older report gave and the study's report does not: rules R6 and R7."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        doc = placed_with("FitWarnings")
+        try:
+            cls.text = fit.warnings(doc)
+        finally:
+            App.closeDocument(doc.Name)
+
+    def row(self, start: str) -> str:
+        return next(line for line in self.text.splitlines() if line.startswith(f"| {start}"))
+
+    def test_panel_top_and_palm_rest_have_their_targets(self) -> None:
+        self.assertIn(f"{Blueprint().panel_top:.1f} mm; target", self.row("panel top above the desk"))
+        self.assertRegex(self.row("palm rest"), r"\| (PASS|WARN) \| \d+\.\d mm; target \d+ to \d+ mm")
+
+    def test_a_row_to_measure_is_listed_with_its_file_and_instruction(self) -> None:
+        row = next(r for r in params.load(support.PARAMS) if r.measure and r.file == "hardware.csv")
+        line = self.row(row.name)
+        self.assertIn("hardware.csv", line)
+        self.assertIn(row.measure.replace("|", "\\|"), line)
+
+    def test_a_value_that_the_study_sets_is_not_listed_to_measure(self) -> None:
+        listed = self.text.split("## Still to measure")[1]
+        self.assertNotIn("| recline |", listed)
+        self.assertNotIn("shell/fit.py", listed)
 
 
 class FitOnTheRealCavityTest(unittest.TestCase):
