@@ -9,7 +9,8 @@ and what changes in the design when it fails. This module makes the parts and th
 
 The parts, each in its print orientation (z up, on the bed):
   shrink-x, shrink-y    two bars with three stops (0, half, full length), along X and along Y of the bed
-  warp-wall             a tall wall of the skin on its foot flange
+  warp-wall, flat-strip a tall wall of the skin on its foot flange, and a long flat strip of the floor
+  weld-lower, weld-upper   the section of joint 1 on a short straight seam, to weld with solvent and then break
   insert                M4 heat-set insert holes of three diameters, upright and level, in a flange on a wall
   holes-*               the button holes, the lever's mount, the hole of a 16 mm power button, the USB cut-outs
   cone-gauge, cone-plug the cone that locates a seam, in sockets of three clearances
@@ -43,7 +44,7 @@ from pathlib import Path
 
 from . import coupon as c1
 from .dims import Blueprint
-from .joints import JOINT, OTHER_JOINTS, Line, key_runs, screw_stations
+from .joints import JOINT, OTHER_JOINTS, Line, foot_profile, key_runs, screw_stations, seam_edge, skin_profile
 
 CAD = Path(__file__).resolve().parents[2]
 P3 = tuple[float, float, float]
@@ -87,11 +88,24 @@ CUT_IN_BOX = (200.0, 250.0, 496.0, 600.0, 138.0, 168.0)
 HAND_HOLD_BOX = (135.0, 185.0, 500.0, 600.0, 372.0, 430.0)
 TILE = "floor middle side R"
 
-DENSITY = 1.27              # g/cm3, PETG
+DENSITY = 1.05              # g/cm3, ABS (the owner chose ABS on 2026-11-14)
+# the printer: a Qidi Q2. The owner gives its build volume as 256 x 256 x 270 (to be confirmed from the maker; the ABS
+# note has 270 x 270 x 256). The plates keep BED_MARGIN free at each side of the bed, for a brim or brim ears and the
+# purge line, and TOP_MARGIN under the top. The set fits both readings: no part is higher than 100.
+BED = (256.0, 256.0, 270.0)
+BED_MARGIN = 8.0
+TOP_MARGIN = 10.0
+FLAT = (240.0, 40.0)        # the long flat strip of the floor: as long as the plate allows
+WELD_L, WELD_HALF = 40.0, 30.0   # the weld pair: along the seam, from the seam to the free edge
 RATE_CM3_H = 21.6           # 6 mm3/s on average, travel and small features included
 PLATE_SETUP_H = 0.1
 GAP = 5.0                   # between parts on a plate
 MESH = (0.02, 0.1)
+
+
+def bed() -> c1.Printer:
+    """The part of the build volume that the plates use: the bed less its margins."""
+    return c1.Printer(min(BED[0], BED[1]) - 2 * BED_MARGIN, BED[2] - TOP_MARGIN)
 
 
 def floor_fill() -> float:
@@ -235,6 +249,33 @@ def wall_on_foot(length: float, height: float):
 
 def warp_wall():
     return wall_on_foot(*WARP)
+
+
+def flat_strip():
+    """A strip of the floor (the sandwich of structure.FLOOR_T), flat on the bed, with sharp corners as the floor
+    tiles have: the corners show the lift."""
+    from . import structure as st
+    return box(0, FLAT[0], 0, FLAT[1], 0, st.FLOOR_T)
+
+
+# ---------- the weld pair: the section of joint 1 on a short straight seam ----------
+
+def weld_path() -> Line:
+    return Line(-WELD_L / 2, WELD_L / 2)
+
+
+def weld_lower():
+    """The piece below the seam: flange, gusset, key, one pilot hole of the ABS value, on the foot flange."""
+    j, p = JOINT, weld_path()
+    add, tool = seam_edge(j, p, "below", [0.0], pilots=[j.pilot_d_abs])
+    return cut(fuse([p.sweep(skin_profile(j, "below", WELD_HALF)), add, p.sweep(foot_profile(j, WELD_HALF))]), [tool])
+
+
+def weld_upper():
+    """The piece above the seam: flange, gusset, groove (the clearance of the joint), one clearance hole."""
+    j, p = JOINT, weld_path()
+    add, tool = seam_edge(j, p, "above", [0.0])
+    return cut(fuse([p.sweep(skin_profile(j, "above", WELD_HALF)), add]), [tool])
 
 
 # ---------- inserts and holes ----------
@@ -600,9 +641,10 @@ class Item:
     real: bool = False        # cut from the real skin: its inner faces are those of the cavity
 
 
-PLATES = (("1", "shrink and warp"), ("2", "holes, inserts and the cone"), ("3", "joint 1: the fit"),
-          ("4", "joints 2, 3 and 5"), ("5", "the form: facets, edges, cut-in, hand-hold"), ("6", "the floor tile"),
-          ("7", "the finish: four pairs"), ("8", "the finish: four plaques"))
+PLATES = (("1", "shrink"), ("2", "warp: two walls and the flat strip"), ("3", "holes, inserts and the cone"),
+          ("4", "joint 1: the fit"), ("5", "the weld pairs and joints 2, 3 and 5"),
+          ("6", "the form: facets, edges, cut-in, hand-hold"), ("7", "the floor tile"),
+          ("8", "the finish: four pairs"), ("9", "the finish: four plaques"))
 
 
 def _joint1_stated(part: str) -> tuple:
@@ -624,56 +666,61 @@ def items() -> list[Item]:
     out = [
         Item("shrink-x", "shrink", "1", lambda: shrink_bar(1), "flat, along X of the bed"),
         Item("shrink-y", "shrink", "1", lambda: turned(shrink_bar(2), (0, 0, 1), 90), "flat, along Y of the bed"),
-        Item("warp-wall", "warp", "1", warp_wall, upright + ", on its foot flange", view=(145.0, 25.0)),
-        Item("insert", "insert", "2", insert_coupon, upright + ": the ring on its 45 degree gusset", view=(140.0, 35.0),
+        Item("warp-wall", "warp", "2", warp_wall, upright + ", on its foot flange", count=2, view=(145.0, 25.0)),
+        Item("flat-strip", "warp", "2", flat_strip, "flat, the table face on the bed", ff),
+        Item("insert", "insert", "3", insert_coupon, upright + ": the ring on its 45 degree gusset", view=(140.0, 35.0),
              stated=(Stated(0.0, INSERT_BOSS + 3.0, "the tops of the three level insert holes (5.6 to 5.8 wide)"),)),
-        Item("holes-buttons", "holes", "2", button_plate, "flat, the panel top on the bed"),
-        Item("holes-lever", "holes", "2", lever_plate, "flat, the panel top on the bed"),
-        Item("holes-power", "holes", "2", power_wall, upright + ", on its foot flange", view=(-35.0, 20.0),
+        Item("holes-buttons", "holes", "3", button_plate, "flat, the panel top on the bed"),
+        Item("holes-lever", "holes", "3", lever_plate, "flat, the panel top on the bed"),
+        Item("holes-power", "holes", "3", power_wall, upright + ", on its foot flange", view=(-35.0, 20.0),
              stated=(Stated(19.0, 19.0 + max(POWER_HOLES) / 2 + 0.2, "the tops of the three level holes (16 wide): this is the test"),)),
-        Item("holes-usb", "holes", "2", usb_plate, "flat, the outer face on the bed"),
-        Item("cone-gauge", "cone", "2", cone_gauge, "flat, the sockets open to the top (as the upper floor tile prints)"),
-        Item("cone-plug", "cone", "2", cone_plug, "flat, the cone on top (as the lower floor tile prints)"),
+        Item("holes-usb", "holes", "3", usb_plate, "flat, the outer face on the bed"),
+        Item("cone-gauge", "cone", "3", cone_gauge, "flat, the sockets open to the top (as the upper floor tile prints)"),
+        Item("cone-plug", "cone", "3", cone_plug, "flat, the cone on top (as the lower floor tile prints)"),
     ]
     for c in c1.CLEARANCES:
-        out.append(Item(f"joint1-lower-{c1.tag(c)}", "joint1", "3", lambda c=c: c1.lower_half(c), upright + ", the seam at the top",
+        out.append(Item(f"joint1-lower-{c1.tag(c)}", "joint1", "4", lambda c=c: c1.lower_half(c), upright + ", the seam at the top",
                         stated=_joint1_stated("lower"), view=(145.0, 25.0)))
-        out.append(Item(f"joint1-upper-{c1.tag(c)}", "joint1", "3", lambda c=c: c1.upper_half(c), upright + ", the seam on the bed",
+        out.append(Item(f"joint1-upper-{c1.tag(c)}", "joint1", "4", lambda c=c: c1.upper_half(c), upright + ", the seam on the bed",
                         stated=_joint1_stated("upper"), view=(145.0, 25.0)))
     out += [
-        Item("joint2-lower", "joint2", "4", joint2_lower, "flat, the table face on the bed", ff, stated=(Stated(0.0, 2.0, cs),)),
-        Item("joint2-upper", "joint2", "4", lambda: turned(joint2_upper(), (1, 0, 0), 180), "flat, the top face on the bed (turned over)", ff,
+        Item("weld-lower", "weld", "5", weld_lower, upright + ", the seam at the top", count=3, view=(145.0, 25.0)),
+        Item("weld-upper", "weld", "5", weld_upper, upright + ", the seam on the bed", count=3, view=(145.0, 25.0),
+             stated=(Stated(0.0, j.vgroove_w / 2 + 0.1, "the half V-groove at the bed edge of the outer face"),
+                     Stated(j.groove_depth - 0.2, j.groove_depth + 0.2, "the ceiling of the groove: a bridge of 4.4, inside"))),
+        Item("joint2-lower", "joint2", "5", joint2_lower, "flat, the table face on the bed", ff, stated=(Stated(0.0, 2.0, cs),)),
+        Item("joint2-upper", "joint2", "5", lambda: turned(joint2_upper(), (1, 0, 0), 180), "flat, the top face on the bed (turned over)", ff,
              stated=(Stated(0.0, 2.0, "the mark of the smaller pilot at the bed: a cone of 90 degrees"),)),
-        Item("joint3-floor", "joint3", "4", joint3_floor, "flat, the table face on the bed", ff, stated=(Stated(0.0, 2.0, cs),)),
-        Item("joint3-wall", "joint3", "4", joint3_wall, upright + ": the foot flange is 10 above the bed", view=(145.0, 20.0),
+        Item("joint3-floor", "joint3", "5", joint3_floor, "flat, the table face on the bed", ff, stated=(Stated(0.0, 2.0, cs),)),
+        Item("joint3-wall", "joint3", "5", joint3_wall, upright + ": the foot flange is 10 above the bed", view=(145.0, 20.0),
              stated=(Stated(t - o.foot_key_h - 0.1, t + 0.1, "the foot flange and its key: a level overhang 12 wide, 10 above the bed", support=True),
                      Stated(t + foot_pilot_depth() - 0.3, t + foot_pilot_depth() + 0.3, "the blind ends of the two pilot holes"))),
-        Item("joint5-frame", "joint5", "4", joint5_frame, upright + ": the seat face is upright, the holes are level", view=(-35.0, 25.0),
+        Item("joint5-frame", "joint5", "5", joint5_frame, upright + ": the seat face is upright, the holes are level", view=(-35.0, 25.0),
              stated=(Stated(0.0, 0.6, "the chamfer of the seat face at the bed"),
                      Stated(SERVICE[1] / 2, SERVICE[1] / 2 + 3.2, "the tops of the level insert and pin holes"))),
-        Item("joint5-cover", "joint5", "4", lambda: turned(joint5_cover(), (1, 0, 0), 90), "flat, the outer face on the bed",
+        Item("joint5-cover", "joint5", "5", lambda: turned(joint5_cover(), (1, 0, 0), 90), "flat, the outer face on the bed",
              stated=(Stated(0.0, 0.6, "the chamfer of the outer face at the bed"),)),
-        Item("facet45", "facet45", "5", facet45, upright + " (the upper rear piece): on the door's top edge", view=(150.0, 20.0), real=True,
+        Item("facet45", "facet45", "6", facet45, upright + " (the upper rear piece): on the door's top edge", view=(150.0, 20.0), real=True,
              stated=(Stated(0.0, 64.0, "the rear facet of the rear shelf: 45 degrees, at the limit; only mesh facets pass it"),)),
-        Item("cut-in", "cut-in", "5", cut_in, upright + " (the middle piece): on its lower cut", view=(140.0, 20.0), real=True,
+        Item("cut-in", "cut-in", "6", cut_in, upright + " (the middle piece): on its lower cut", view=(140.0, 20.0), real=True,
              stated=(Stated(0.0, 30.0, "the upper half of the cut-in (33 degrees at its lip) and the steps of the cavity inside"),)),
-        Item("hand-hold", "hand-hold", "5", hand_hold, upright + " (the upper rear piece): on its lower cut", view=(150.0, 5.0), real=True,
+        Item("hand-hold", "hand-hold", "6", hand_hold, upright + " (the upper rear piece): on its lower cut", view=(150.0, 5.0), real=True,
              stated=(Stated(0.0, 52.0, "the roof of the hand-hold: 45 degrees, at the limit; and the steps of the cavity inside"),)),
-        Item("edges-level", "edges", "5", edge_bar, "lying: the edges are level, as on the rear shelf", 0.55, view=(-150.0, 30.0),
+        Item("edges-level", "edges", "6", edge_bar, "lying: the edges are level, as on the rear shelf", 0.55, view=(-150.0, 30.0),
              stated=(Stated(9.0, 17.5, "the facet that faces down 45 degrees and its round: at the limit"),)),
-        Item("edges-upright", "edges", "5", lambda: turned(edge_bar(), (0, 1, 0), -90), "on its end: the edges are upright, as on the band's stub", 0.55,
+        Item("edges-upright", "edges", "6", lambda: turned(edge_bar(), (0, 1, 0), -90), "on its end: the edges are upright, as on the band's stub", 0.55,
              view=(-150.0, 30.0)),
-        Item("floor-tile", "floor", "6", floor_tile, "flat, the table face on the bed", ff),
+        Item("floor-tile", "floor", "7", floor_tile, "flat, the table face on the bed", ff),
     ]
     best = c1.ASSEMBLED_C
     out += [
-        Item(f"finish-lower-{c1.tag(best)}", "finish", "7", lambda: c1.lower_half(best), upright + ", the seam at the top", count=4,
+        Item(f"finish-lower-{c1.tag(best)}", "finish", "8", lambda: c1.lower_half(best), upright + ", the seam at the top", count=4,
              stated=_joint1_stated("lower"), view=(145.0, 25.0)),
-        Item(f"finish-upper-{c1.tag(best)}", "finish", "7", lambda: c1.upper_half(best), upright + ", the seam on the bed", count=4,
+        Item(f"finish-upper-{c1.tag(best)}", "finish", "8", lambda: c1.upper_half(best), upright + ", the seam on the bed", count=4,
              stated=_joint1_stated("upper"), view=(145.0, 25.0)),
     ]
     for k in range(1, 5):
-        out.append(Item(f"plaque-P{k}", "finish", "8", lambda k=k: c1.plaque(k), "upright on its long edge, as a wall piece",
+        out.append(Item(f"plaque-P{k}", "finish", "9", lambda k=k: c1.plaque(k), "upright on its long edge, as a wall piece",
                         stated=(Stated(c1.PLAQUE[1] * 0.6 - c1.DOT_D, c1.PLAQUE[1] * 0.6 + c1.DOT_D, "code dots: cones of 90 degrees, at the limit"),
                                 Stated(c1.PLAQUE[1] - 1.5, c1.PLAQUE[1], "the V notch in the top edge"))))
     return out
@@ -776,6 +823,12 @@ def check_pairs() -> dict:
     d_pin = round(o.pin_d + 2 * o.pin_clearance, 3)
     out["joint5"]["pass"] = bool(out["joint5"]["common_volume_mm3"] < 1e-6 and out["joint5"]["holes_frame"] == {o.pin_d: 2, o.insert_hole_d: 2}
                                  and out["joint5"]["holes_cover"] == {d_pin: 3, M4_CLEAR: 2})
+    wl, wu = weld_lower(), weld_upper()
+    touch = Part.makeCompound(c1.faces_at(wl, 0.0, 1.0)).common(Part.makeCompound(c1.faces_at(wu, 0.0, -1.0))).Area
+    out["weld"] = {"common_volume_mm3": round(wl.common(wu).Volume, 6), "seam_contact_mm2": round(touch, 1),
+                   "holes_lower": holes_of(wl, (0, 0, 1)), "weld_face_mm2_wanted": round(0.6 * (JOINT.flange_h + JOINT.wall_t) * WELD_L, 1)}
+    out["weld"]["pass"] = bool(out["weld"]["common_volume_mm3"] < 1e-6 and touch > out["weld"]["weld_face_mm2_wanted"]
+                               and JOINT.pilot_d_abs in out["weld"]["holes_lower"])
     plug, gauge = cone_plug(), cone_gauge()
     gaps = []
     for k, cl in enumerate(CONE_CLEARANCES):
@@ -856,11 +909,11 @@ def plate_layout(rows: list[dict], lim: c1.Printer) -> dict:
 # ---------- outputs ----------
 
 def table(rows: list[dict], layout: dict) -> str:
-    lines = ["| Plate | Part (`stl/`, `brep/`) | Count | Print box (mm) | Orientation | PETG (g) | Time (h) |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    lines = ["| Plate | Part (`stl/`, `brep/`) | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |", "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in rows:
         lines.append(f"| {r['plate']} | `{r['part']}` | {r['count']} | {' x '.join(f'{v:g}' for v in r['box_mm'])} | {r['how']} | "
                      f"{r['mass_g'] * r['count']:.0f} | {r['time_h'] * r['count']:.1f} |")
-    lines += ["", "| Plate | Content | Parts | PETG (g) | Time (h) | Fits the bed |", "| --- | --- | --- | --- | --- | --- |"]
+    lines += ["", "| Plate | Content | Parts | ABS (g) | Time (h) | Fits the bed |", "| --- | --- | --- | --- | --- | --- |"]
     for key, title in PLATES:
         mine = [r for r in rows if r["plate"] == key]
         lines.append(f"| {key} | {title} | {sum(r['count'] for r in mine)} | {sum(r['mass_g'] * r['count'] for r in mine):.0f} | "
@@ -870,8 +923,9 @@ def table(rows: list[dict], layout: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-PROVES = {"shrink": "the shrink of PETG along X and Y of the bed",
-          "warp": "a tall wall of the skin stays flat and straight",
+PROVES = {"shrink": "the shrink of ABS along X and Y of the bed",
+          "warp": "warp in ABS: a tall wall and a long flat strip stay flat",
+          "weld": "the solvent weld of ABS on the real joint section",
           "insert": "the hole for the M4 heat-set insert, upright and level",
           "holes": "holes: buttons, lever, power button, USB sockets",
           "cone": "the clearance of the cone that locates a seam",
@@ -886,7 +940,7 @@ PROVES = {"shrink": "the shrink of PETG along X and Y of the bed",
           "floor": "the floor sandwich: flat, stiff, its mass and time",
           "finish": "bond, fill, prime and paint: the seam does not show"}
 
-TINT = {"shrink": "#9ec5e8", "warp": "#9ec5e8", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
+TINT = {"shrink": "#9ec5e8", "warp": "#9ec5e8", "weld": "#f0a0a0", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
         "joint2": "#a8d8d0", "joint3": "#c9b8e8", "joint5": "#f2b8a0", "facet45": "white", "cut-in": "white", "hand-hold": "white",
         "edges": "white", "floor": "#d0d0d0", "finish": "#b9dea0"}
 PLATE_PITCH = 280.0
@@ -906,7 +960,7 @@ def main() -> int:
         (out / sub).mkdir(parents=True, exist_ok=True)
         for old in (out / sub).glob("*.*"):
             old.unlink()
-    lim = c1.printer()
+    lim = bed()
     its = items()
     shapes, rows = {}, []
     for it in its:
@@ -928,8 +982,12 @@ def main() -> int:
     manifest, edges, places = {}, {}, {}
     for n, (key, title) in enumerate(PLATES):
         ox, oy = (n % 4) * PLATE_PITCH, -(n // 4) * PLATE_PITCH
-        bed = Part.makePolygon([V(ox, oy, 0), V(ox + lim.xy, oy, 0), V(ox + lim.xy, oy + lim.xy, 0), V(ox, oy + lim.xy, 0), V(ox, oy, 0)])
-        bed.exportBrep(str(out / "layout" / f"plate-{key}.brep"))
+        full = Part.makePolygon([V(ox - BED_MARGIN, oy - BED_MARGIN, 0), V(ox + lim.xy + BED_MARGIN, oy - BED_MARGIN, 0),
+                                 V(ox + lim.xy + BED_MARGIN, oy + lim.xy + BED_MARGIN, 0), V(ox - BED_MARGIN, oy + lim.xy + BED_MARGIN, 0),
+                                 V(ox - BED_MARGIN, oy - BED_MARGIN, 0)])
+        full.exportBrep(str(out / "layout" / f"bed-{key}.brep"))
+        used = Part.makePolygon([V(ox, oy, 0), V(ox + lim.xy, oy, 0), V(ox + lim.xy, oy + lim.xy, 0), V(ox, oy + lim.xy, 0), V(ox, oy, 0)])
+        used.exportBrep(str(out / "layout" / f"plate-{key}.brep"))
         print(f"plate {key} ({title}): {'fits' if layout[key] else 'DOES NOT FIT'}, {len(layout[key] or {})} parts")
         for copy, (x, y) in (layout[key] or {}).items():
             part = copy.split("#")[0]
@@ -958,7 +1016,7 @@ def main() -> int:
     (out / "sheet" / "edges.json").write_text(json.dumps(sheet_edges))
     (out / "sheet" / "focus.json").write_text(json.dumps(focus, indent=1))
     ok = all(r["pass"] for r in rows) and all(v["pass"] for v in pairs.values()) and all(v["pass"] for v in real.values()) and all(layout.values())
-    result = {"printer": {"xy": lim.xy, "z": lim.z}, "rule": {"density_g_cm3": DENSITY, "rate_cm3_h": RATE_CM3_H, "plate_setup_h": PLATE_SETUP_H},
+    result = {"printer": {"xy": lim.xy, "z": lim.z, "bed": list(BED), "bed_margin": BED_MARGIN, "top_margin": TOP_MARGIN}, "material": "ABS", "rule": {"density_g_cm3": DENSITY, "rate_cm3_h": RATE_CM3_H, "plate_setup_h": PLATE_SETUP_H},
               "plates": [{"plate": k, "title": t, "fits": bool(layout[k]), "origin": [(n % 4) * PLATE_PITCH, -(n // 4) * PLATE_PITCH]}
                          for n, (k, t) in enumerate(PLATES)], "proves": PROVES, "parts": rows, "places": places,
               "pairs": pairs, "real": real, "base_screw": base_screw(), "insert_holes": insert_holes(),

@@ -39,6 +39,12 @@ def main() -> int:
         obj.Shape = bed
         obj.ViewObject.LineColor = (0.5, 0.5, 0.5)
         group.addObject(obj)
+        full = Part.Shape()
+        full.read(str(out / "layout" / f"bed-{p['plate']}.brep"))
+        obj = doc.addObject("Part::Feature", f"FullBed_{p['plate']}")
+        obj.Shape = full
+        obj.ViewObject.LineColor = (0.8, 0.8, 0.8)
+        group.addObject(obj)
         for name, part in manifest.items():
             if not name.startswith(f"p{p['plate']}_"):
                 continue

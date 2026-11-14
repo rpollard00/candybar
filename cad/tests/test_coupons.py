@@ -20,7 +20,7 @@ SKIN = split.skin_cached(Blueprint())
 class CouponSetTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.lim = coupon.printer(support.PARAMS)
+        cls.lim = coupons.bed()
         cls.items = [it for it in coupons.items() if SKIN or not it.real]
         cls.shapes = {it.name: coupons.to_bed(it.make()) for it in cls.items}
         cls.rows = [coupons.check_item(it, cls.shapes[it.name], cls.lim) for it in cls.items]
@@ -62,6 +62,14 @@ class CouponSetTest(unittest.TestCase):
                     self.assertLessEqual(x + w, self.lim.xy + 1e-6)
                     self.assertLessEqual(y + h, self.lim.xy + 1e-6)
         self.assertEqual(sum(len(p) for p in layout.values()), sum(r["count"] for r in self.rows))
+
+    def test_the_plates_keep_a_margin_on_the_bed_of_the_printer(self) -> None:
+        self.assertEqual(coupons.BED, (256.0, 256.0, 270.0))
+        self.assertEqual((self.lim.xy, self.lim.z), (256.0 - 2 * coupons.BED_MARGIN, 270.0 - coupons.TOP_MARGIN))
+        self.assertGreaterEqual(coupons.BED_MARGIN, 5.0)
+        self.assertLessEqual(max(r["box_mm"][2] for r in self.rows), 256.0 - coupons.TOP_MARGIN)   # the other reading of the Q2: 256 high
+        strip = next(r for r in self.rows if r["part"] == "flat-strip")
+        self.assertEqual(strip["box_mm"][0], self.lim.xy)
 
     def test_the_parts_on_a_plate_do_not_touch(self) -> None:
         sizes = {"a": (100.0, 50.0), "b": (100.0, 50.0), "c": (30.0, 200.0), "d": (220.0, 12.0)}
@@ -151,6 +159,14 @@ class CouponPairsTest(unittest.TestCase):
     def test_the_holes_of_the_floor_screw_follow_joint_1(self) -> None:
         s = coupons.base_screw()
         self.assertEqual(s, {"d": 3.5, "pilots": [2.6, 2.8], "clearance": 3.95, "head": 7.0})
+
+    def test_the_weld_pair_has_the_section_of_joint_1_and_the_abs_pilot(self) -> None:
+        j = joints.JOINT
+        r = self.checks["weld"]
+        self.assertGreater(r["seam_contact_mm2"], 0.6 * (j.flange_h + j.wall_t) * coupons.WELD_L)
+        self.assertEqual(r["holes_lower"][j.pilot_d_abs], 1)
+        b = coupons.tight_box(coupons.weld_upper())
+        self.assertAlmostEqual(b.YLength, j.wall_t + j.flange_h, delta=1e-6)
 
     def test_the_check_notices_a_cone_that_does_not_go_into_its_socket(self) -> None:
         tight = replace(joints.OTHER_JOINTS, cone_clearance=-0.2)

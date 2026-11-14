@@ -256,7 +256,7 @@ def coupon_set(out: str, renders: bool = True) -> int:
         ax.text(0.5, -0.02, f"{size} mm{support}\nplate {p['plate']}{count}: {p['mass_g'] * p['count']:.0f} g, {p['time_h'] * p['count']:.1f} h\n"
                             f"{data['proves'][p['coupon']]}", transform=ax.transAxes, ha="center", va="top", fontsize=7.6, color=INK, linespacing=1.35)
     total_g = sum(p["mass_g"] * p["count"] for p in parts)
-    fig.suptitle(f"The coupon set: {len(parts)} parts, {sum(p['count'] for p in parts)} prints, {total_g:.0f} g of PETG (estimate). "
+    fig.suptitle(f"The coupon set: {len(parts)} parts, {sum(p['count'] for p in parts)} prints, {total_g:.0f} g of ABS (estimate). "
                  "Each part is in its print orientation; every edge of the model is drawn. Sizes are the print box (mm).", fontsize=13)
     fig.subplots_adjust(left=0.01, right=0.99, top=0.945, bottom=0.035, wspace=0.04, hspace=0.34)
     path = os.path.join(out, "coupons.png")
@@ -275,6 +275,9 @@ def coupon_set(out: str, renders: bool = True) -> int:
     for pl in data["plates"]:
         ox, oy = pl["origin"]
         ax.add_patch(Polygon([px(ox, oy), px(ox + bed, oy), px(ox + bed, oy + bed), px(ox, oy + bed)], closed=True, fill=False, ec=BLUE, lw=1.0))
+        m = data["printer"]["bed_margin"]
+        ax.add_patch(Polygon([px(ox - m, oy - m), px(ox + bed + m, oy - m), px(ox + bed + m, oy + bed + m), px(ox - m, oy + bed + m)],
+                             closed=True, fill=False, ec="#888888", lw=0.7, ls="--"))
         mine = [p for p in parts if p["plate"] == pl["plate"]]
         ax.text(*px(ox, oy + bed + 6), f"Plate {pl['plate']}: {pl['title']}  ({sum(p['mass_g'] * p['count'] for p in mine):.0f} g, "
                                        f"{sum(p['time_h'] * p['count'] for p in mine):.1f} h)", fontsize=8.5, color=BLUE, va="bottom")
@@ -285,7 +288,7 @@ def coupon_set(out: str, renders: bool = True) -> int:
         ax.text(*px(ox + at["x"] + box[part][0] / 2, oy + at["y"] + box[part][1] / 2), copy.replace("#", " #"), fontsize=5.6, color=RED,
                 ha="center", va="center", rotation=90 if box[part][1] > 2.5 * box[part][0] else 0)
     ax.axis("off")
-    ax.set_title(f"The plates of the coupon set, from above. Blue: the usable bed, {bed:g} x {bed:g} mm. Print them in this order.", fontsize=11)
+    ax.set_title(f"The plates of the coupon set, from above. Grey: the bed, {data['printer']['bed'][0]:g} x {data['printer']['bed'][1]:g} mm. Blue: the area that the plates use ({bed:g} x {bed:g}, a margin of {data['printer']['bed_margin']:g}). Print them in this order.", fontsize=11)
     fig.tight_layout()
     path = os.path.join(out, "plates.png")
     fig.savefig(path, dpi=150)
