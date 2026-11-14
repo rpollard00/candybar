@@ -12,6 +12,7 @@ The sheets:
   02-band.png        the band of each variant close up
   03-sections.png    a section through a speaker and one through the marquee, for each variant
   04-reference.png   crops of the reference photos (cad/vendor, not in git) beside the variants
+  05-taller-hood.png the hood as it is beside the studies with a taller hood (+20, +46): front, three-quarter front, side
 
 Blender runs in background mode, one model at a time. Needs numpy, Pillow and matplotlib (cad/.venv-tools); no FreeCAD.
 """
@@ -40,15 +41,18 @@ SHEETS = os.path.join(OUT, "sheets")
 VENDOR = os.path.join(ROOT, "vendor")
 # one frame for every model, so that all renders have one scale (as tools/draw_shell.py)
 FRAME = "-252,-6,-2,252,586,578"
+# the frame for the sheet of the taller hoods: the highest study is 46 higher
+FRAME_TALL = "-252,-6,-2,252,586,626"
+TALL_VIEWS = ("front", "three-quarter-front-left", "side-right")
 WHOLE = ("front", "three-quarter-front-left")
 CLOSE = ("band-front", "band-right", "band-speaker", "band-marquee", "band-logo")
 INK, MUTED = (30, 30, 34), (110, 110, 118)
 # the colour of each kind of part in a section
 FILL = {"hood": "#d9d9d4", "marquee_lip": "#bfc7d6", "speaker_pod": "#bfc7d6", "logo_field": "#bfc7d6", "grille": "#30303a",
-        "logo_badge": "#2f6f4a", "marquee_front": "#e3b93c", "light_box": "#6b6b78", "driver_seat": "#8d7fb5", "logo_backer": "#8d7fb5",
+        "logo_badge": "#2f6f4a", "marquee_front": "#e3b93c", "light_box": "#6b6b78", "driver_seat": "#8d7fb5", "logo_backer": "#8d7fb5", "speaker_enclosure": "#7fa6b5",
         "driver": "#c05a4a", "led_strip": "#f08020"}
 NAMES = {"hood": "hood (skin 4)", "marquee_lip": "lip", "speaker_pod": "pod or frame", "logo_field": "logo field", "grille": "grille",
-         "logo_badge": "badge", "marquee_front": "marquee front", "light_box": "light box", "driver_seat": "driver seat",
+         "logo_badge": "badge", "marquee_front": "marquee front", "light_box": "light box", "driver_seat": "driver seat (baffle)", "speaker_enclosure": "sealed enclosure",
          "logo_backer": "logo backer", "driver": "driver (envelope)", "led_strip": "LED strip (envelope)"}
 # crops of the reference photos: file under cad/vendor, box (left, top, right, bottom), label
 REFERENCES = (("sega-new-astro-city/photo-real-three-quarter.png", (140, 160, 560, 340), "The real cabinet"),
@@ -56,8 +60,18 @@ REFERENCES = (("sega-new-astro-city/photo-real-three-quarter.png", (140, 160, 56
               ("reddit-mgs-mini-astro/photo-b.png", (60, 815, 360, 935), "The maker's mini, from the front"))
 
 
-def variants() -> list[str]:
+def built() -> list[str]:
     return sorted(k for k in os.listdir(OUT) if os.path.exists(os.path.join(OUT, k, "report.json")))
+
+
+def variants() -> list[str]:
+    """The bands on the hood as it is."""
+    return [k for k in built() if len(k) == 1]
+
+
+def studies() -> list[str]:
+    """The studies of a taller hood."""
+    return [k for k in built() if k.startswith("H")]
 
 
 def report(key: str) -> dict:
@@ -77,10 +91,14 @@ def render() -> None:
         model = os.path.join(OUT, key)
         subprocess.run([sys.executable, script, os.path.join(model, "renders"), model, "--views", ",".join(WHOLE + CLOSE),
                         f"--frame={FRAME}", "--size", "1500", "--samples", "16"], check=True)
+    for key in ["A"] + studies():
+        model = os.path.join(OUT, key)
+        subprocess.run([sys.executable, script, os.path.join(model, "renders-tall"), model, "--views", ",".join(TALL_VIEWS + ("band-front",)),
+                        f"--frame={FRAME_TALL}", "--size", "1500", "--samples", "16"], check=True)
 
 
-def picture(key: str, view: str, w: int, crop: tuple[float, float, float, float] | None = None) -> Image.Image:
-    im = Image.open(os.path.join(OUT, key, "renders", f"{view}.png")).convert("RGB")
+def picture(key: str, view: str, w: int, crop: tuple[float, float, float, float] | None = None, folder: str = "renders") -> Image.Image:
+    im = Image.open(os.path.join(OUT, key, folder, f"{view}.png")).convert("RGB")
     if crop:
         im = im.crop((int(crop[0] * im.width), int(crop[1] * im.height), int(crop[2] * im.width), int(crop[3] * im.height)))
     return im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
@@ -138,7 +156,7 @@ def band_sheet() -> None:
 
 
 def draw_section(ax, cut: dict, title: str, span: tuple[float, float, float, float]) -> None:
-    order = ["hood", "light_box", "driver_seat", "logo_backer", "speaker_pod", "logo_field", "marquee_lip", "driver", "led_strip",
+    order = ["hood", "light_box", "speaker_enclosure", "driver_seat", "logo_backer", "speaker_pod", "logo_field", "marquee_lip", "driver", "led_strip",
              "marquee_front", "logo_badge", "grille"]
     parts = sorted(cut["parts"].items(), key=lambda kv: order.index(kind(kv[0])) if kind(kv[0]) in order else 99)
     for name, loops in parts:
@@ -158,6 +176,29 @@ def draw_section(ax, cut: dict, title: str, span: tuple[float, float, float, flo
     ax.set_ylabel("z, mm", fontsize=8)
     ax.tick_params(labelsize=7)
     ax.grid(True, linewidth=0.3, color="#bbbbbb")
+
+
+def tall_sheet() -> None:
+    keys = ["A"] + studies()
+    if len(keys) < 2:
+        return
+    crops = {"front": None, "three-quarter-front-left": (0.08, 0.12, 0.92, 0.96), "side-right": None, "band-front": None}
+    views = TALL_VIEWS + ("band-front",)
+    rows = [[picture(k, v, 620, crops[v], "renders-tall") for k in keys] for v in views]
+    heads, notes = [], ["Every BREP face edge is drawn. One camera and one scale for the three cabinets. The band (A) is the same in all three."]
+    for k in keys:
+        rep = report(k)
+        if "tall" in rep:
+            t = rep["tall"]
+            heads.append(f"{k}: hood +{t['extra']:g}")
+            notes.append(f"{k}: {rep['variant']['text']} Cabinet {t['cabinet_height']:.1f} high. Flat top of the hood {t['hood_flat_h']:g} above its foot "
+                         f"({t['hood_flat_h_over_width']:.2f} of the width). Marquee opening {t['marquee_opening_h']:.1f} high.")
+            notes += [f"   {line}" for line in rep.get("log", []) if "NO EDGE BREAK" in line]
+        else:
+            heads.append("The hood as it is (band A)")
+            notes.append("As it is: the lit window 352 x 32. Cabinet 573.4 high. Flat top of the hood 148 above its foot (0.30 of the width). Marquee opening 36.1 high.")
+    grid(rows, heads, ["front", "three-quarter\nfront", "side", "the band,\nfrom the front"], "Hood band: the hood as it is, +20 and +46", notes,
+         os.path.join(SHEETS, "05-taller-hood.png"))
 
 
 def sections_sheet() -> None:
@@ -228,6 +269,7 @@ def sheets() -> None:
     band_sheet()
     sections_sheet()
     reference_sheet()
+    tall_sheet()
 
 
 if __name__ == "__main__":
