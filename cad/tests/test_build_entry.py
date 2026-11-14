@@ -1,4 +1,5 @@
-"""The build entry: the exit status of freecad-run.sh, and what cad/build.sh does when a step cannot run."""
+"""The build entry: the exit status of freecad-run.sh, what cad/build.sh does when a step cannot run, and what
+cad/check.sh does when a check fails."""
 from __future__ import annotations
 
 import os
@@ -9,6 +10,8 @@ from pathlib import Path
 from . import support
 
 BUILD = support.CAD / "build.sh"
+CHECK = support.CAD / "check.sh"
+CHECKS = ("tools.check_solids", "tools.face_check", "tools.edge_finish", "candybar.shell.fit", "candybar.shell.split", "candybar.shell.structure")
 # what an earlier build left: part files, which a new build must not leave when it breaks, and the results of the
 # studies, which it must keep
 PART_FILES = ("body.brep", "body.stl", "shell.step", "shell.FCStd", "manifest.json", "report.json", "focus.json", "edges.json")
@@ -97,3 +100,35 @@ class BuildScriptTest(unittest.TestCase):
         done = self.build(support.temp_dir(), args=("--no-render",))
         self.assertEqual(done.returncode, 2)
         self.assertIn("usage", done.stderr)
+
+
+class CheckScriptTest(unittest.TestCase):
+    """cad/check.sh with a stand-in for FreeCAD that notes each module it is asked to run."""
+
+    def check(self, failing: str = "", built: bool = True) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        out = support.temp_dir()
+        if built:
+            (out / "manifest.json").write_text("{}", encoding="utf-8")
+        ran = out / "ran.txt"
+        script = f'echo "$CANDYBAR_MODULE" >> "{ran}"; [ "$CANDYBAR_MODULE" = "{failing}" ] && echo 1 > "$CANDYBAR_STATUS" || echo 0 > "$CANDYBAR_STATUS"'
+        env = os.environ | {"CANDYBAR_OUT": str(out)} | path_with(stand_in("freecadcmd", script))
+        done = subprocess.run([str(CHECK)], env=env, capture_output=True, text=True)
+        return done, ran.read_text(encoding="utf-8").split() if ran.exists() else []
+
+    def test_every_check_runs_and_all_good_checks_return_zero(self) -> None:
+        done, ran = self.check()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(ran, list(CHECKS))
+        self.assertEqual([line.split()[0] for line in done.stdout.splitlines()], ["PASS"] * len(CHECKS))
+
+    def test_one_failed_check_returns_one_names_it_and_the_later_checks_still_run(self) -> None:
+        done, ran = self.check(failing="tools.face_check")
+        self.assertEqual(done.returncode, 1)
+        self.assertEqual(ran, list(CHECKS))
+        self.assertEqual([line.split()[1] for line in done.stdout.splitlines() if line.startswith("FAIL")], ["tools.face_check"])
+
+    def test_without_a_build_it_returns_two_and_runs_nothing(self) -> None:
+        done, ran = self.check(built=False)
+        self.assertEqual(done.returncode, 2)
+        self.assertEqual(ran, [])
+        self.assertIn("cad/build.sh", done.stderr)

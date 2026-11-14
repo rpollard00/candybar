@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the generator's tests under headless FreeCAD. Exits non-zero when a test fails.
+# Run the tests of the code under headless FreeCAD. Exits non-zero when a test fails.
 # Some tests run cad/build.sh and the GUI binary of FreeCAD offscreen. No window opens.
 #
 # Usage: cad/test.sh [name-fragment]
