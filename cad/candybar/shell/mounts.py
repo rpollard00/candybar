@@ -67,8 +67,8 @@ class Mounts:
     """The values of the mounts. Lengths in mm."""
     # ---- screws: M3 socket head screws and M3 heat-set inserts everywhere; one 2.5 mm hex driver
     m3_clear: float = 3.4
-    insert_d: float = 4.0
-    insert_l: float = 6.5
+    m3_insert_d: float = 4.0
+    m3_insert_depth: float = 6.5
     cbore_d: float = 8.0
     cbore_l: float = 8.0
     driver_d: float = 6.0      # the room that the driver needs round the axis of a screw
@@ -151,20 +151,25 @@ class Mounts:
     # table, the owner 2026-11-14): on two ribs on the floor behind the hub, its length across the cabinet. Its left
     # end has the barrel socket between two USB-A sockets, its right end the two USB-C sockets
     charger_size: tuple[float, float, float] = (74.7, 51.3, 22.6)
-    charger_plug: float = 40.0                        # the room for the plugs and the bend of the leads at each end
-    charger_at: tuple[float, float] = (2.35, 61.9)    # its plug room right of the stowed cables, its front in front of them
+    charger_plug: float = 41.0                        # the room for the plugs and the bend of the leads at each end:
+    #                                                   156.7 in all, of the 158.35 between the stowed cables and the side wall
+    charger_room: tuple[float, float] = (60.0, 30.0)  # the section of the room with the plugs fitted (research, 2026-11-14)
+    charger_at: tuple[float, float] = (1.35, 63.9)    # its room right of the stowed cables, the front of the room in front of them
     charger_lift: float = 5.0                         # the air under it: the height of the ribs
     charger_rib_w: float = 6.0
     charger_rib_x: tuple[float, float] = (12.0, 56.7)  # the ribs, from its left end
     charger_tie: float = 7.0                          # the staples of its strap, in front of it and behind it
-    barrel_tie: tuple[float, float] = (13.0, 0.0)     # the staple of the barrel plug's lead: left of the plug room, on the axis of the plug
+    barrel_tie: tuple[float, float] = (25.7, 10.0)    # the staple of the barrel plug's lead and its fuse: inside the right end of the room, behind it
     # the adapter of the power button, in its case on the 24-pin lead: on the floor in front of the stowed cables
     button_size: tuple[float, float, float] = (60.0, 25.0, 20.0)
     button_at: tuple[float, float] = (11.35, 18.9)    # right of the power supply, in front of the bundle
     button_tie: float = 6.0                           # its staple in front of it
     deck_tie: tuple[float, float] = (190.0, 170.0)    # the lead of the button on its way to the USB socket plate
     # the audio amplifier: on the floor beside the hub, toward the centre
-    amp_size: tuple[float, float, float] = (50.0, 40.0, 20.0)
+    amp_size: tuple[float, float, float] = (54.0, 41.0, 20.0)   # Adafruit MAX9744, fed from 12 V
+    # the USB sound adapter on its short lead: on the floor behind the amplifier, beside the hub
+    sound_size: tuple[float, float, float] = (44.0, 23.0, 12.0)
+    sound_gap: float = 17.0                           # behind the amplifier, behind the staple TieAmpRear
     amp_at: tuple[float, float] = (14.35, 20.4)       # inside the inner rail of the hub, behind the front of the hub
     amp_tie: float = 10.0                             # its staples in front of it and behind it
 
@@ -375,7 +380,7 @@ def tray(s: Site, m: Mounts, side: float) -> Solid:
         xa = (px - m.arm_h / 2, x0) if side > 0 else (x1, px + m.arm_h / 2)
         adds += [bx(xa[0], xa[1], y0, s.y_air, pz - m.arm_h / 2, pz + m.arm_h / 2), cyl_y(m.post_d, px, pz, s.y_air, s.y_back)]
         cuts.append(cyl_y(m.m3_clear, px, pz, y0 - 1, s.y_back + 1))
-    cuts += [cyl_y(m.insert_d, xc, z, y1 - m.insert_l, y1 + 1) for z in shroud_z(s, m)]
+    cuts += [cyl_y(m.m3_insert_d, xc, z, y1 - m.m3_insert_depth, y1 + 1) for z in shroud_z(s, m)]
     zh = f["zh"]
     cuts += [cyl_y(m.key_entry, xc, zh - m.drop, y0 - 1, y0 + m.web + 0.5), bx(xc - m.key_slot / 2, xc + m.key_slot / 2, y0 - 1, y0 + m.web + 0.5, zh - m.drop, zh),
              cyl_y(m.key_slot, xc, zh, y0 - 1, y0 + m.web + 0.5),
@@ -401,9 +406,9 @@ def dock(s: Site, m: Mounts, side: float) -> Solid:
     plate = bx(inner, side * (s.wall_x - m.dock_wall_gap), f["yd0"], f["y0"], f["zd0"], f["zd1"])
     top = f["zd1"]
     cuts = [cyl_y(m.m3_clear, f["xs"], top - dz, f["yd0"] - 1, f["y0"] + 1) for dz in m.boss_screw_z]
-    cuts.append(cyl_y(m.insert_d, f["xc"], f["zh"], f["yd0"] - 1, f["y0"] + 1))
+    cuts.append(cyl_y(m.m3_insert_d, f["xc"], f["zh"], f["yd0"] - 1, f["y0"] + 1))
     if side > 0:
-        cuts += [cyl_y(m.insert_d, f["xc"], f["zd0"] + dz, f["yd0"] - 1, f["y0"] + 1) for dz in m.secure_z]
+        cuts += [cyl_y(m.m3_insert_d, f["xc"], f["zd0"] + dz, f["yd0"] - 1, f["y0"] + 1) for dz in m.secure_z]
     outer = f["x1"] if side > 0 else f["x0"]
     for dx in m.slot_x:
         xs = outer + side * dx
@@ -429,7 +434,7 @@ def boss(s: Site, m: Mounts, side: float) -> Solid:
     y2 = f["yd0"] + m.boss_pad
     wedge = prism_y([(net, zt), (f["xtip"], zt), (f["xtip"], zb), (net, low)], f["yb0"], f["yd0"])
     shape = less(unite([wedge, prism_y([(net, zt), (pad, zt), (pad, low + m.boss_pad_t), (net, low)], f["yd0"], y2)]),
-                 [cyl_y(m.insert_d, f["xs"], zt - dz, f["yd0"] - m.insert_l, f["yd0"] + 1) for dz in m.boss_screw_z])
+                 [cyl_y(m.m3_insert_d, f["xs"], zt - dz, f["yd0"] - m.m3_insert_depth, f["yd0"] + 1) for dz in m.boss_screw_z])
     root = bx(net, side * (s.wall_x + m.sink), f["yb0"], y2, low, zt)
     name = "BossR" if side > 0 else "BossL"
     return Solid(name, "compute", "boss", shape, "middle R" if side > 0 else "middle L", root=root,
@@ -550,13 +555,14 @@ def ties(s: Site, m: Mounts, x_bay: float) -> tuple[list[Solid], list[dict]]:
                   "the strap of the power button's adapter, with TieBundleFrontL behind it"))
     spots.append(("TieDeck", (*m.deck_tie, s.floor), (0, 0, 1), (0, 1, 0), False, "floor front side R", "the lead of the power button, on its way to the USB socket plate"))
     for tag, y in (("Front", amp[2] - m.amp_tie), ("Rear", amp[3] + m.amp_tie)):
-        spots.append((f"TieAmp{tag}", ((amp[0] + amp[1]) / 2, y, s.floor), (0, 0, 1), (1, 0, 0), False, "floor middle side R", "the strap of the amplifier"))
+        spots.append((f"TieAmp{tag}", ((amp[0] + amp[1]) / 2, y, s.floor), (0, 0, 1), (1, 0, 0), False, "floor middle side R",
+                      "the strap of the amplifier" + (", and the tie of the USB sound adapter" if tag == "Rear" else "")))
     ch = pb["PlaceCharger"][0]
     for tag, y in (("Front", ch[2] - m.charger_tie), ("Rear", ch[3] + m.charger_tie)):
         spots.append((f"TieCharger{tag}", ((ch[0] + ch[1]) / 2, y, s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear side R", "the strap of the charging hub"))
     room = pb["PlaceChargerBarrel"][0]
-    spots.append(("TieBarrel", (room[0] - m.barrel_tie[0], (room[2] + room[3]) / 2 + m.barrel_tie[1], s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear centre",
-                  "the lead of the barrel plug of the charging hub, so that the plug cannot come out"))
+    spots.append(("TieBarrel", (room[1] - m.barrel_tie[0], room[3] + m.barrel_tie[1], s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear side R",
+                  "the lead of the barrel plug of the charging hub, so that the plug cannot come out, and its in-line fuse"))
     out, rows = [], []
     for name, at, n, b, wall, on, use in spots:
         shape, root = staple(m, at, n, b, wall)
@@ -564,7 +570,7 @@ def ties(s: Site, m: Mounts, x_bay: float) -> tuple[list[Solid], list[dict]]:
                          note="the bar is a bridge of 12 mm"))
         rows.append({"name": name, "at": [round(c, 2) for c in at], "on": on, "for": use})
     for side, tag, use in ((-1.0, "L", "the video lead from the I/O end to the monitor (left channel)"),
-                           (1.0, "R", "the USB-C lead from the charging hub to the monitor (right channel), the 12 V lead, the leads from the hood")):
+                           (1.0, "R", "the USB-C lead from the charging hub to the monitor (right channel), the 12 V lead to the board, the leads from the hood")):
         f = tray_frame(s, m, side)
         outer = f["x1"] if side > 0 else f["x0"]
         rows.append({"name": f"tie slots of the dock {tag}", "at": [round(outer + side * (sum(m.slot_x) + m.slot_w) / 2, 2), f["y0"], round(f["zd1"] - 5.0 - m.slot_h / 2, 2)],
@@ -582,21 +588,26 @@ def place_boxes(s: Site, m: Mounts) -> dict[str, tuple[tuple[float, ...], str, s
     dx = fl["x0"] - m.dp_at[0]
     dp = (dx - w, dx, fl["y0"], fl["y0"] + t, fl["zd0"] + m.dp_at[1], fl["zd0"] + m.dp_at[1] + h)
     w, t, h = m.charger_size
-    cx, cy, cz = s.bundle[1] + m.charger_at[0] + m.charger_plug, s.bundle[2] - m.charger_at[1], s.floor + m.charger_lift
+    ry, rz = m.charger_room
+    cx, r0, cz = s.bundle[1] + m.charger_at[0] + m.charger_plug, s.bundle[2] - m.charger_at[1], s.floor + m.charger_lift
+    cy = r0 + (ry - t) / 2
     ch = (cx, cx + w, cy, cy + t, cz, cz + h)
-    ends = ((cx - m.charger_plug, cx, cy, cy + t, cz, cz + h), (cx + w, cx + w + m.charger_plug, cy, cy + t, cz, cz + h))
+    ends = ((cx - m.charger_plug, cx, r0, r0 + ry, cz, cz + rz), (cx + w, cx + w + m.charger_plug, r0, r0 + ry, cz, cz + rz))
     w, t, h = m.button_size
     bx0, by1 = s.psu[1] + m.button_at[0], s.bundle[2] - m.button_at[1]
     button = (bx0, bx0 + w, by1 - t, by1, s.floor, s.floor + h)
     w, t, h = m.amp_size
     ax1, ay0 = s.hub[0] - m.amp_at[0], s.hub[2] + m.amp_at[1]
     amp = (ax1 - w, ax1, ay0, ay0 + t, s.floor, s.floor + h)
+    w, t, h = m.sound_size
+    sound = (ax1 - w, ax1, amp[3] + m.sound_gap, amp[3] + m.sound_gap + t, s.floor, s.floor + h)
     return {"PlaceDpAdapter": (dp, "DockL (a cable tie through two slots)", "the DisplayPort to HDMI adapter: its body, with the HDMI socket up"),
             "PlaceCharger": (ch, "two ribs of the floor tile rear side R (a strap from TieChargerFront to TieChargerRear)", "the DC to USB charging hub that feeds the monitor"),
-            "PlaceChargerBarrel": (ends[0], "PlaceCharger", "the room at its left end: the 12 V barrel plug and two USB-A plugs"),
-            "PlaceChargerUsb": (ends[1], "PlaceCharger", "the room at its right end: two USB-C plugs"),
+            "PlaceChargerUsbC": (ends[0], "PlaceCharger", "the room at its left end: two USB-C plugs"),
+            "PlaceChargerBarrel": (ends[1], "PlaceCharger", "the room at its right end: the 12 V barrel plug and two USB-A plugs"),
             "PlaceButtonAdapter": (button, "the floor tile rear centre (a strap from TieButton to TieBundleFrontL)", "the adapter of the power button, in its case on the 24-pin lead"),
-            "PlaceAmplifier": (amp, "the floor tile middle side R (a strap from TieAmpFront to TieAmpRear)", "the audio amplifier board")}
+            "PlaceAmplifier": (amp, "the floor tile middle side R (a strap from TieAmpFront to TieAmpRear)", "the audio amplifier board (Adafruit MAX9744)"),
+            "PlaceSoundAdapter": (sound, "the floor tile middle side R (a cable tie on TieAmpRear)", "the USB sound adapter on its short lead")}
 
 
 def places(s: Site, m: Mounts) -> list[Solid]:

@@ -49,7 +49,7 @@ Step 1 exits with 1 if a check fails. It takes 2 minutes. The first run takes 3 
 | 16 floor staples, 2 wall staples | boss | 18 | 7 floor tiles, the pieces rear lower L and rear lower R | 0.8 to 1.1 each |
 | `ChargerRib1`, `ChargerRib2` | boss | 1 each | the floor tile rear side R | 2.3 each |
 
-All screws are M3 socket head screws in M3 heat-set inserts (hole 4.0, depth 6.5). One 2.5 mm hex driver does all of them. The four screws of the power supply are the 6-32 screws that come with it.
+All screws are M3 socket head screws in M3 heat-set inserts (hole 4.0, depth 6.5: `m3_insert_d`, `m3_insert_depth`). They are not the M4 inserts of the seams (`joints.py`). One 2.5 mm hex driver does all of them. The four screws of the power supply are the 6-32 screws that come with it.
 
 ## The compute module
 
@@ -156,22 +156,53 @@ The tie points of the small items are in the section "The places of the small it
 
 ## The places of the small items
 
-The owner named four small items on 2026-11-14. Only the charging hub is a known part. Each item has a place: a box of room that the checks keep clear, and a tie point. Each size is an estimate, but the size of the charging hub is from its maker. `Mounts` has the sizes and the positions.
+The owner and the research named five small items on 2026-11-14. Each item has a place: a box of room that the checks keep clear, and a tie point. The sizes of the charging hub and of the amplifier are those of the parts. The other sizes are estimates. `Mounts` has the sizes and the positions.
 
 | Item | Place (x, y, z) | Held by | Path of its leads |
 | --- | --- | --- | --- |
-| DisplayPort to HDMI adapter (body 22 x 12 x 55) | x -200 to -178, y 444.35 to 456.35, z 128 to 183: on the rear face of the left dock, the HDMI socket up | A cable tie through two slots of the left dock (x -203 to -200 and x -178 to -175, z 146 to 153) | The plug is in the DisplayPort socket, in the plug space of the exhaust duct. The short cable of the adapter bends to the front round the left end of the board. The HDMI lead goes up 3 mm into the left cable channel (z 186 to 206) and to the monitor. |
-| DC to USB charging hub that feeds the monitor (74.7 x 51.3 x 22.6, 80 g, from the maker's table) | x 115 to 189.7, y 384 to 435.3, z 15 to 37.6: behind the hub, its length across the cabinet. It lies on two ribs 5 high (`ChargerRib1`, `ChargerRib2`), so it has air below it. Its left end has the barrel socket and the two USB-A sockets. Its right end has the two USB-C sockets. A room of 40 is clear beyond each end (x 75 to 115 and x 189.7 to 229.7). | A strap from `TieChargerFront` (152.35, 377, 10) to `TieChargerRear` (152.35, 442.3, 10). The staple `TieBarrel` (62, 409.65, 10) holds the lead of the barrel plug, 13 from the plug room, so that the plug cannot come out. | 12 V comes from a Molex lead of the supply, with a fuse, along the floor through `TiePower` (40, 397, 10) and `TieBarrel`. The USB-C lead goes from the right end up the right side, through the tie slots of the right dock (180.45, 444.35, 175.5), into the right cable channel and to the monitor. A USB-A lead can go from the left end to the rear plugs of the hub. |
-| Adapter of the power button, in its case on the 24-pin lead (60 x 25 x 20) | x -62 to -2, y 402 to 427, z 10 to 30: on the floor, right of the supply and in front of the stowed cables | A strap from the staple `TieButton` (-32, 396, 10) to `TieBundleFrontL` | The four-wire lead goes along the floor through `TieLead3` and `TieLead4`, then to the front through `TieDeck` (190, 170, 10) to the USB socket plate. The signal wire goes up with the 12 V lead to the board. |
-| Audio amplifier (50 x 40 x 20) | x 112 to 162, y 262 to 302, z 10 to 30: on the floor, 14 left of the hub | A strap from `TieAmpFront` (137, 252, 10) to `TieAmpRear` (137, 312, 10) | Power comes from the hub side or from `TiePower`. The speaker leads come down from the hood (not designed). |
+| DisplayPort to HDMI adapter (body 22 x 12 x 55, an estimate) | x -200 to -178, y 444.35 to 456.35, z 128 to 183: on the rear face of the left dock, the HDMI socket up | A cable tie through two slots of the left dock (x -203 to -200 and x -178 to -175, z 146 to 153) | The plug is in the DisplayPort socket. The short cable of the adapter bends to the front round the left end of the board. The HDMI lead goes up 3 mm into the left cable channel (z 186 to 206) and to the monitor. |
+| DC to USB charging hub that feeds the monitor (74.7 x 51.3 x 22.6, 80 g) | Body: x 115 to 189.7, y 386.35 to 437.65, z 15 to 37.6, behind the hub, its length across the cabinet. With its plugs: x 74 to 230.7, y 382 to 442, z 15 to 45, which is 156.7 x 60 x 30. It lies on two ribs 5 high (`ChargerRib1`, `ChargerRib2`). The two USB-C sockets are at the left end. The barrel socket and the two USB-A sockets are at the right end. | A strap from `TieChargerFront` (152.35, 379.35, 10) to `TieChargerRear` (152.35, 444.65, 10). The staple `TieBarrel` (205, 452, 10) holds the lead of the barrel plug and its in-line fuse, 10 behind the room of the plug. | 12 V comes from a Molex lead of the supply along the floor through `TiePower` (40, 397, 10), in front of the unit, to `TieBarrel`. The USB-C lead goes from the left end back above the unit, up through the tie slots of the right dock (180.45, 444.35, 175.5), into the right cable channel and to the monitor. A USB-A lead goes from the right end to the hub. |
+| Adapter of the power button, in its case on the 24-pin lead (60 x 25 x 20, an estimate) | x -62 to -2, y 402 to 427, z 10 to 30: on the floor, right of the supply and in front of the stowed cables | A strap from the staple `TieButton` (-32, 396, 10) to `TieBundleFrontL` | See "One path to the front of the deck". The signal wire goes up with the 12 V lead to the board. |
+| Audio amplifier, Adafruit MAX9744 (54 x 41 x 20), fed from 12 V | x 108 to 162, y 262 to 303, z 10 to 30: on the floor of the body, 14 left of the hub | A strap from `TieAmpFront` (135, 252, 10) to `TieAmpRear` (135, 313, 10) | 12 V comes along the floor through `TiePower`. The speaker leads come down from the hood (not designed). |
+| USB sound adapter on a short lead (44 x 23 x 12) | x 118 to 162, y 320 to 343, z 10 to 22: on the floor behind the amplifier, 14 left of the hub | A cable tie on `TieAmpRear`, which is 4 in front of it | Its lead goes to a rear plug of the hub. Its audio lead goes 17 to the front to the amplifier. |
 
-- The adapter is in front of the plane of the board and outside its left end. It is not in the shroud, the exhaust duct or an air zone.
-- The charging hub is 32.4 behind the hub and 2.4 behind the plug zone of the hub. It has 5 of air below it and 86 above it to the board. It is 100.7 in front of the rear wall and its make-up air inlet.
-- The right end of the charging hub is below the part of the door opening that is free at the right of the compute module (x 163 to 211). A hand gets to the whole unit when the compute module is out.
-- The amplifier is 185 to the right of the power supply.
+- The adapter at the left dock is in front of the plane of the board and outside its left end. It is not in the shroud, the exhaust duct or an air zone.
+- The sound adapter is on the floor at the right, more than 200 from the exhaust duct. The exhaust air does not go there.
+- The amplifier is 181 to the right of the power supply.
 - The plug of the 24-pin lead is in the plug zone in front of the supply (z 20 to 60). The front stop is below it (z 19.5), and no mount is in that zone. A hand gets to the plug through the door opening when the compute module is out.
 - The adapter of the power button leaves with the 24-pin lead before the supply comes out.
 - The places are solids in the rules of the fit study. A new size changes the box, and the checks run again.
+
+### The room of the charging hub
+
+The research asks for about 160 x 60 x 30 with the two plugs fitted. The place has 156.7 x 60 x 30. The stowed cables end at x 72.65 and the side wall is at x 231.0, so 158.35 is all the length there is at this place. Each plug has 41 beyond the end of the unit.
+
+The unit has 5 of air below it and 86 above it to the board. It is 94 in front of the rear wall and the make-up air inlet. It is 0.4 behind the plug zone of the hub.
+
+The barrel plug and the fuse are at the right end, below the part of the door opening that the compute module leaves free (x 163 to 211, 48 wide). `TieBarrel` is 84 inside the rear wall. A hand gets to the fuse there when the compute module is out. With the module in place, the opening of 48 is narrow for a hand: this is not proved.
+
+### The room at the DisplayPort socket
+
+The fit study keeps 45 beyond the I/O edge of the board for the plug (`bc_dp_clear`), and the exhaust duct is in that room. The adapter with its plug is longer than 45. This is all the room that the place has:
+
+- Straight out from the I/O edge (x -158.15) to the side wall (x -231.0): 72.85. The first 49.2 are inside the zone of the exhaust duct, and the last 23.65 are between the duct and the wall. A rigid adapter of more than 45 goes through the end wall of the duct, so the duct needs an opening with a seal there.
+- For an adapter with a short cable, the body is on the left dock: 55 long, 22 wide, 12 thick. The dock is 58 high, and the room between the dock and the plane of the board is 21.55 deep.
+
+The size of the adapter is not known. Measure it, then choose one of the two.
+
+### One path to the front of the deck
+
+The lead of the power button and the lead of the volume potentiometer go to the front socket plate on one path. It is on the floor: `TieLead3` (50, 230, 10), `TieLead4` (150, 230, 10), then `TieDeck` (190, 170, 10), then the socket plate in the right side of the deck. The lead of the power button comes from its adapter (x -62 to -2, y 402 to 427) to `TieLead3`. The lead of the potentiometer comes from the amplifier (x 108 to 162, y 262 to 303) to `TieLead4`. The leads from the control panel to the hub use `TieLead1` to `TieLead4` too.
+
+## The material
+
+The owner prints the cabinet in ABS on a Qidi Q2, not in PETG (2026-11-14). The estimates of this document use the values of `structure.py` for PETG.
+
+- **The saddle of the hub depends on the material.** A leg bends 1.2 when it snaps on, which is a strain of 1.9 %. PETG takes this. ABS breaks at a smaller strain across its layers. Print the saddle in PETG, or on its side as given (the legs then bend in the plane of the layers), and do a test with one saddle before the floor tile is printed.
+- **The trays are better in ABS.** The posts touch the backplate of the board, which is warm. ABS stays stiff to about 100 degrees C, PETG to about 75.
+- **The fence of the power supply is better in ABS** for the same reason.
+- The inserts, the bosses and the staples do not depend on the material. The stresses are 8.3 MPa or less, and the two materials have almost the same strength for a short load. The bridges (22 and 12) and the 45 degree undersides print in the two materials.
+- The print boxes are for the 240 x 240 x 245 limit of the A1. The largest part is 145.1 x 109.9.
 
 ## Loads
 
@@ -197,10 +228,10 @@ The module does these checks in each run. `cad/out/mounts/report.md` has the num
 
 | Check | Result |
 | --- | --- |
-| No part and no net solid of a boss has volume in the skin. Each root is in the skin or in the floor. | PASS: 37 solids, 0 mm3 |
+| No part and no net solid of a boss has volume in the skin. Each root is in the skin or in the floor. | PASS: 38 solids, 0 mm3 |
 | No two solids of the mounts have a common volume. | PASS |
 | The rules of the fit study on the hardware alone | PASS |
-| The rules of the fit study with the 37 solids added as hardware (the six boxes of the places included): interference (3892 pairs), keep-out zones, containment (131 solids), air zones, door service | PASS, with one declared item (see "The declared item") |
+| The rules of the fit study with the 38 solids added as hardware (the seven boxes of the places included): interference (3982 pairs), keep-out zones, containment (132 solids), air zones, door service | PASS, with one declared item (see "The declared item") |
 | A driver of diameter 6 gets to each screw through the rear door opening | PASS: 6 screws. The smallest margin to the side of the opening is 2.35 (the screws of the docks). |
 | The compute module comes out | PASS: margins 4.0, 48.4, 10.0, 4.0 |
 | The power supply comes out | PASS: margins 52.7, 220.0, 2.0, 77.0 |

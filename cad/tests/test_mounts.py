@@ -51,7 +51,7 @@ class MountsTest(unittest.TestCase):
         self.assertEqual(self.rep["failures"], [])
 
     def test_each_solid_is_one_valid_solid(self) -> None:
-        self.assertEqual(len(self.design.solids), 37)
+        self.assertEqual(len(self.design.solids), 38)
         for s in self.design.solids:
             for shape in (s.shape, s.whole):
                 self.assertTrue(shape.isValid(), s.name)
@@ -135,7 +135,7 @@ class MountsTest(unittest.TestCase):
 
     def test_each_small_item_has_a_place_that_is_clear_and_a_tie_point(self) -> None:
         places = {r["name"]: r for r in self.rep["places"]}
-        self.assertEqual(sorted(places), ["PlaceAmplifier", "PlaceButtonAdapter", "PlaceCharger", "PlaceChargerBarrel", "PlaceChargerUsb", "PlaceDpAdapter"])
+        self.assertEqual(sorted(places), ["PlaceAmplifier", "PlaceButtonAdapter", "PlaceCharger", "PlaceChargerBarrel", "PlaceChargerUsbC", "PlaceDpAdapter", "PlaceSoundAdapter"])
         s, ties = self.design.site, {r["name"]: r for r in self.rep["ties"]}
         for name in ("TieButton", "TieDeck", "TieAmpFront", "TieAmpRear", "TieChargerFront", "TieChargerRear", "TieBarrel", "tie slots of the dock L, at the place"):
             self.assertIn(name, ties)
@@ -146,10 +146,16 @@ class MountsTest(unittest.TestCase):
         # the charging hub has the size that the owner gave, air under it, and its USB end below the door opening
         self.assertEqual([round(ch[1] - ch[0], 1), round(ch[3] - ch[2], 1), round(ch[5] - ch[4], 1)], [74.7, 51.3, 22.6])
         self.assertGreaterEqual(ch[4] - s.floor, 5.0)
-        usb, barrel = places["PlaceChargerUsb"]["box"], places["PlaceChargerBarrel"]["box"]
-        self.assertAlmostEqual(usb[1] - usb[0], 40.0)
-        self.assertAlmostEqual(barrel[1] - barrel[0], 40.0)
-        self.assertLess(ties["TieBarrel"]["at"][0], barrel[0])
+        usb, barrel = places["PlaceChargerBarrel"]["box"], places["PlaceChargerBarrel"]["box"]
+        left = places["PlaceChargerUsbC"]["box"]
+        # with its plugs it has 156.7 x 60 x 30: all the length between the stowed cables and the side wall
+        self.assertAlmostEqual(barrel[1] - left[0], 156.7)
+        self.assertEqual([round(barrel[3] - barrel[2]), round(barrel[5] - barrel[4])], [60, 30])
+        self.assertLess(s.wall_x - barrel[1], 1.0)
+        self.assertLess(left[0] - s.bundle[1], 2.0)
+        # the barrel plug with its fuse is at the right, below the part of the door opening that the module leaves free
+        self.assertTrue(s.bx1 + self.m.upright_gap + self.m.upright_w < ties["TieBarrel"]["at"][0] < s.door["x1"])
+        self.assertEqual([round(x) for x in (places["PlaceAmplifier"]["box"][1] - amp[0], amp[3] - amp[2])], [54, 41])
         self.assertTrue(s.bx1 < usb[0] and usb[0] < s.door["x1"])
         self.assertLess(usb[2] - s.hub[3], 60.0)
         # the amplifier is far from the fan of the power supply
