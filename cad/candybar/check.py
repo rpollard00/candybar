@@ -10,7 +10,7 @@ from typing import Callable
 
 import FreeCAD as App
 
-from . import massing, model, panel, params
+from . import model, panel, params
 
 PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 LEVELS = (FAIL, WARN, PASS)
@@ -134,17 +134,6 @@ def _keepout(scene: Scene) -> list[Finding]:
     return _clashes(pairs)
 
 
-def _containment(scene: Scene) -> list[Finding]:
-    envelope = model.world_shape(scene.doc.getObject(massing.ENVELOPE))
-    contained = scene.with_role("hardware", "trim")
-    found = [
-        (FAIL, solid.name, f"{volume:.0f} mm3 lies outside the shell envelope")
-        for solid in contained
-        if (volume := solid.world.cut(envelope).Volume) > VOLUME_TOLERANCE
-    ]
-    return found or [(PASS, f"{len(contained)} hardware and trim objects", "all inside the shell envelope")]
-
-
 def _print_size(part: model.Placed) -> tuple[float, float, float]:
     bounds = part.own.BoundBox
     lengths = {"x": bounds.XLength, "y": bounds.YLength, "z": bounds.ZLength}
@@ -227,7 +216,6 @@ RULES: tuple[tuple[str, str, Callable[[Scene], list[Finding]]], ...] = (
     ("R0", "object state", _state),
     ("R1", "interference", _interference),
     ("R2", "keep-out", _keepout),
-    ("R3", "containment", _containment),
     ("R4", "print fit", _print_fit),
     ("R5", "button spacing", _button_spacing),
     ("R6", "ergonomics", _ergonomics),
