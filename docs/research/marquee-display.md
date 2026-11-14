@@ -94,7 +94,7 @@ The brief names CachyOS as the starting reference. The front end is not chosen.
 | Way | Facts | Status |
 | --- | --- | --- |
 | A DisplayPort multi-stream hub | "Maximum 2 screens" on the BC-250. It "Shares bandwidth between displays". One hub, the StarTech MST14DP122DP (DisplayPort 1.4), "Worked consistently with different monitors and DP cables". Two hubs for DisplayPort 1.2 gave only a mirror image. | SOURCED [B6] |
-| Is the bandwidth sufficient? | The main screen (3840 x 2400 at 60 Hz) needs 14.2 Gbit/s. A bar LCD of 1920 x 480 needs about 1.6 Gbit/s. The sum is below the 25.9 Gbit/s of DisplayPort 1.4. | ESTIMATED: pixel clock times 24 bits. The limit is recalled from the standard. |
+| Is the bandwidth sufficient? | The main screen (3840 x 2400 at 60 Hz) needs 14.2 Gbit/s. A bar LCD of 1920 x 480 needs about 1.5 Gbit/s. The sum is below the 25.9 Gbit/s of DisplayPort 1.4. | ESTIMATED: pixel clock times 24 bits. The limit is recalled from the standard. |
 | A USB display adapter (DisplayLink) | "Works for desktop use". "Not suitable for gaming". It "Does not work in Steam Deck game mode". | SOURCED [B6] |
 | A bar display that is a USB device | Not examined | NOT CONFIRMED |
 | The board itself | One DisplayPort 1.4 output. No second output. | SOURCED [B1] |

@@ -185,7 +185,7 @@ The parts of the recommended chain:
 | --- | --- | --- |
 | USB sound adapter | Sabrent AU-MMSA or Adafruit 1475 | A USB 2.0 port of the board. If the adapter is in the hot air at the I/O end, put it on a USB extension of 0.3 m to 0.6 m. |
 | Signal lead | 3.5 mm stereo plug to 3.5 mm stereo plug, 0.15 m to 0.3 m | The 3.5 mm socket of the amplifier |
-| Amplifier | Adafruit 1752 (MAX9744) | 12 V from a second branch of the Molex lead, with a fuse of about 3 A. ESTIMATED: 20 W of sound at an efficiency of 90 % is less than 2 A. |
+| Amplifier | Adafruit 1752 (MAX9744) | 12 V from a second branch of the Molex lead, with a fuse of about 3 A. ESTIMATED: two speakers of 10 W are 20 W of sound, which is less than 2 A at an efficiency of 90 %. |
 | Volume potentiometer | 1 kΩ, linear, with a threaded bushing (section 7) | Three wires to the volume pads of the amplifier |
 | Speaker wires | Two twisted pairs, 0.25 mm2 to 0.5 mm2 | The multi-pin plug at the foot of the hood (four pins) |
 | Speakers | Two drivers, each in a sealed pod (part 3) | - |
@@ -214,8 +214,11 @@ Do the tests with the amplifier, one speaker pair and the real supply, before th
 6. **Idle clicks, chain (B).** Stop all sound for one minute, then play a short sound. If it clicks,
    set `session.suspend-timeout-seconds = 0` and do the test again.
 
-Chain (A) passes if the level does not change with the monitor's setting, or the setting stays after
-a power loss; if the built-in speakers are silent; and if the noise is not more than in chain (B).
+Chain (A) passes if it meets these three conditions:
+
+- The level does not change with the monitor's setting, or the setting stays after a power loss.
+- The built-in speakers are silent with the plug in.
+- The noise is not more than in chain (B).
 
 ---
 
@@ -312,10 +315,11 @@ at 1 W and 1 m, which is a different method.
 
 Notes:
 
-- The Tectonic driver has the lowest limit of the three round drivers (154 Hz against about 200 Hz),
-  and the most cone travel (2.5 mm).
+- The Tectonic driver has the lowest limit of the three round drivers (154 Hz against about 180 Hz
+  to 215 Hz), and the most cone travel (2.5 mm).
 - The Visaton FRS 5 X is the most sensitive. It is the choice for a 5 V amplifier.
-- The DMA45-8 is 6 dB to 9 dB quieter for the same power. It needs the 12 V amplifier.
+- The DMA45-8 is 3 dB to 9 dB quieter than the two others for the same power. It needs the 12 V
+  amplifier.
 - The oval Visaton has a cone area of 26.8 cm2, which is more than a round 2.5 inch driver has
   (22.9 cm2). Its Qts of 1.41 is that of a driver for a television set with an open back. Its frame
   and its cone travel were not read.
@@ -387,7 +391,7 @@ Thus each driver gets its own sealed pod.
 
 | Item | Value | Status |
 | --- | --- | --- |
-| Volume for the three round drivers of section 10 | 0.45 l. It is the maker's volume for the Tectonic driver. For the two others, a larger pod changes the low limit by less than 5 Hz. | SOURCED [A2]. ESTIMATED (closed-box rule). |
+| Volume for the three round drivers of section 10 | 0.45 l. It is the maker's volume for the Tectonic driver. For the two others, a larger pod changes the low limit by 5 Hz or less. | SOURCED [A2]. ESTIMATED (closed-box rule). |
 | Volume that the room gives | 0.48 l for a pod with the outline of the speaker form: 91 mm x 53 mm inside, 100 mm deep. 0.63 l for a pod as high as the band: 100 mm x 63 mm x 100 mm. | ESTIMATED from the fit report values, with walls of 2.4 mm |
 | Volume for a larger driver | 0.37 l for the DMA70-8, 0.99 l for the DMA80-8 (the maker's sealed values) | SOURCED [A2] |
 | The part | A printed box with an open front. Its front flange is the baffle: the driver sits on it with four M3 screws in heat-set inserts. The box goes in from behind the band. Four screws hold it to bosses on the band. | PROVISIONAL. The inserts are those of `docs/design/hardware-list.md` 1.9. |
