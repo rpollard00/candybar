@@ -15,7 +15,9 @@ A finding is listed as allowed, and does not fail, in three cases only:
   reveal       it lies inside a named reveal (a seam groove, the bezel reveal, the panel pocket): these are as narrow
                as the reveal is by design
   edge break   it is a narrow face that is a round of the edge break's radius along an edge (the last modelling step
-               of the shell puts one on every sharp convex edge)
+               of the shell puts one on every sharp convex edge). The ball at a corner where three broken edges meet
+               is not a round along an edge, and is not allowed by this: it must lie in a named reveal or be a
+               known item
   known item   it is one of KNOWN: the findings of the shell that stay, each with its part, its rule, its place, its
                size and the reason. A known item holds for the right side and for its mirror image on the left.
                It is one list, and no entry allows a whole part or a whole rule.
@@ -96,6 +98,9 @@ HEAD_FOOT = ("foot of the head's rear corner: OpenCascade's patch where the roun
 RAIL = ("rail: the cut of the edge section stands 0.01 proud of the rail land (solids.OFF_LAND), so that it does not lie on the "
         "land's tangent, and its radius meets the land at 2.5 degrees. Older than revision 7; a smaller value makes the cut fail")
 RUN_OUT = ("hood: the round of the rear corner runs out on the roof, where the side and the rear turn tangent to each other")
+KINK = ("hood: the wall of the front opening has a concave kink of 11.5 degrees at each lower corner, where the round of the sill "
+        "corner ends upright and the leg starts with its lean (the form of R10). The ball of the edge break turns about that "
+        "kink between the break along the corner and the break along the leg")
 KNOWN: tuple[Known, ...] = (
     Known("body", "sliver", (246.8, 549.8, 305.0), "1.20 wide, 4.2 mm2", HIP_TOP, within=0.5),
     Known("body", "sliver", (246.3, 550.7, 304.9), "0.43 wide, 2.0 mm2", HIP_TOP, within=0.5),
@@ -107,6 +112,10 @@ KNOWN: tuple[Known, ...] = (
     Known("body", "kink", (223.9, 438.2, 422.4), "2.2 degrees along 4.2, in the seam bevel", RAIL),
     Known("hood", "sliver", (181.3, 522.6, 572.9), "0.77 wide, 6.4 mm2: the last face of the round, 1.6 wide where it starts, 10 long", RUN_OUT, within=1.0),
     Known("hood", "needle", (176.5, 520.0, 573.4), "the tip of that face: its two edges meet at 10.7 degrees", RUN_OUT, within=1.0),
+    Known("hood", "sliver", (210.5, 447.0, 448.6), "0.08 wide, 0.13 mm2: the face of the break in that turn, 0.21 wide on the front "
+          "and 0.06 on the wall, 1.6 long", KINK, within=0.5),
+    Known("hood", "needle", (209.9, 447.8, 448.4), "the wall of the leg beside that face: the kink and the edge of the face meet at "
+          "3.8 degrees, along 0.05", KINK, within=0.5),
 )
 # the parts of the build that are not printed parts: the lit image is a plate of 1 mm for the renders
 NOT_PARTS = ("screen",)
@@ -207,6 +216,24 @@ def is_break(face: Part.Face, radius: float, tol: float = 0.02) -> bool:
         except Exception:
             return False
         if abs(k[1] - 1.0 / radius) > tol / radius ** 2 or k[0] > 1.0 / (1.5 * radius):
+            return False
+    return True
+
+
+def is_break_surface(face: Part.Face, radius: float, tol: float = 0.02) -> bool:
+    """Whether a face is a part of the edge break: one of its two principal radii is `radius` all over. That is a
+    round along an edge (is_break), the ball at a corner where three broken edges meet, and the face on which the
+    ball turns about a kink in a wall. compare_parts counts a distance at such a face as a distance at the edge
+    break. The face check does not allow a narrow face by this: only a round along an edge is allowed there."""
+    if isinstance(face.Surface, Part.Plane):
+        return False
+    u0, u1, v0, v1 = face.ParameterRange
+    for su, sv in ((0.5, 0.5), (0.2, 0.5), (0.8, 0.5), (0.5, 0.2), (0.5, 0.8)):
+        try:
+            k = [abs(c) for c in face.curvatureAt(u0 + (u1 - u0) * su, v0 + (v1 - v0) * sv)]
+        except Exception:
+            return False
+        if min(abs(c - 1.0 / radius) for c in k) > tol / radius ** 2:
             return False
     return True
 

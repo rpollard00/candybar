@@ -8,6 +8,10 @@ in X too (between two planes a face that turns across X can come nearer by a sma
 measures the wall that results). On faces that turn across X (the sides of the tuck, the rail edge, the soft edges
 and bevels of the hood, the corners of the deck) the wall comes out thicker than wall_t.
 
+The cavity reads the hood before its edge break (form_parts). The break of the hood is cut by lofts, and a section
+through a loft is a spline: the offset of a section with these splines fails at some planes, and then a slab has no
+cavity. The wall is not thinner for it: the break is on convex edges, where the wall is thicker than wall_t.
+
 Two openings go through the skin, because a plate closes them: under the control panel, inside a ledge of
 panel_ledge on which the plate rests (the outline of the plate, profiles.panel_outline, moved in), and behind the bezel plate, inside a ledge of bezel_ledge. The body top is
 open into the hood: the seam gap is filled before the offset.
@@ -85,6 +89,14 @@ def seam_filler(parts: dict[str, Part.Shape], d: Blueprint) -> Part.Shape:
     faces = [Part.Face(w) for w in parts["body"].slice(V(0, 0, 1), z)]
     top = faces[0].fuse(faces[1:]).removeSplitter() if len(faces) > 1 else faces[0]
     return top.extrude(V(0, 0, d.seam_gap + 2 * e))
+
+
+def form_parts(parts: dict[str, Part.Shape], d: Blueprint) -> list[Part.Shape]:
+    """The skin parts as the cavity reads them: the built parts, with the hood as it is before its edge break (the
+    cap of solids.cap_unbroken, which the build breaks as its last step)."""
+    h = pr.hood(d)
+    hood = so.hood_frame(h)(so.cap_unbroken(d, h)[0])
+    return [hood if k == "hood" else parts[k] for k in SKIN]
 
 
 def section(skin: list[Part.Shape], x: float) -> Part.Shape | None:
@@ -177,7 +189,7 @@ def prisms(region: Part.Shape, x0: float, x1: float) -> list[Part.Shape]:
 def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) -> Cavity:
     """The cavity of the skin parts, as slabs symmetric about the centre line plus the two openings."""
     w = d.wall_t
-    skin = [parts[k] for k in SKIN] + [seam_filler(parts, d)]
+    skin = form_parts(parts, d) + [seam_filler(parts, d)]
     half = max(s.BoundBox.XMax for s in skin)
     n = math.ceil(half / SLAB) + 1
     reach = math.ceil(w / SLAB)
@@ -211,7 +223,11 @@ def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) 
                 far[j] = inner(outer[j], j * SLAB, w + RIDGE)
         return common([far[j] for j in window])
 
-    slabs = [(x0, x1, ridge(round(x0 / SLAB)) if k % 2 and region is not None else region, face) for k, (x0, x1, region, face) in enumerate(slabs)]
+    stepped = [(x0, x1, ridge(round(x0 / SLAB)) if k % 2 and region is not None else region, face) for k, (x0, x1, region, face) in enumerate(slabs)]
+    lost = [x0 for (x0, _, region, _), (_, _, before, _) in zip(stepped, slabs) if region is None and before is not None]
+    if lost:
+        raise RuntimeError(f"the cavity has no section for the slabs at x = {', '.join(f'{x:g}' for x in lost)}: the offset by wall_t + RIDGE failed there")
+    slabs = stepped
     cut = openings(d, o)
     pieces = [p for x0, x1, region, _ in slabs if region is not None for p in prisms(region, x0, x1)] + cut
     walls = []

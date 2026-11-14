@@ -13,12 +13,16 @@ Every part is made from the profile paths of profiles.py and the values of dims.
                rear (a cut by the rear profile across the width), the base facet. The lower rear corner, the hip
                and the mitre of the base facet are rounded by hand (lower_corner_cutter); the other edges of the
                rear get their round from the edge rule (rear_design_edges). Then the bevel of the seam groove, the
-               cut-ins, the hand-holds, and the edge break as the last step.
+               cut-ins, the hand-holds, and the edge break as the last step (OpenCascade's round; a flat break
+               on the short edge where the break of the bevel's mitre ends on the round of the head's corner).
   hood         the front as an evolved solid: the quarter ellipse of the soft edge carried round the front outline,
                made to lean as the side view draws it; behind the soft edge the cap is the front outline extruded
                along the depth, in common with the side profile extruded across the width (exact surfaces). Its
                rear corners have the round of the head's corners. The bevel of the seam groove, the recess of the
-               opening; the marquee lip and the forms on the hood band as parts of their own.
+               opening, and the edge break last: on the rim of the opening and on the upper edge of the seam bevel,
+               cut by hand (round_cutters: a ball of the break's radius rolled along each edge in touch with its
+               two faces), because OpenCascade's round on the leaning front is not the same in every run. The
+               marquee lip and the forms on the hood band are parts of their own; they are stand-ins, with no finish.
   bezel        the land on a cylinder bezel_drop below the rail arc, a flat back on the screen, the window as a
                ruled loft from the inner edge of the land to the rim and straight on to the screen.
 
@@ -66,7 +70,27 @@ ROUND_SAMPLES = 4000
 ROUND_BELOW = 5.0
 ROUND_OFF = 1e-4
 ROUND_END = math.radians(0.7)
-# after a cut by several tools, a tool may still hold this share of what it held of the solid, or this volume in mm3
+# the edge break cut by hand (round_cutters): the sections along a curved edge are BREAK_STEP apart or less, and the
+# centre line turns BREAK_TURN or less between two of them; the first pass along an edge has a section each
+# BREAK_FINE. A round runs on BREAK_PAST past an edge that ends on a face. Two edges that meet at less than
+# BREAK_KINK continue each other. Two points of a solid nearer than BREAK_NEAR are one corner, and an edge or a
+# corner nearer than CENTRE to x = 0 lies on the centre line
+BREAK_STEP = 0.5
+BREAK_TURN = math.radians(3.0)
+BREAK_FINE = 0.1
+BREAK_PAST = 2.0
+BREAK_KINK = math.radians(3.0)
+BREAK_NEAR = 2e-3
+CENTRE = 0.05
+# fit_tolerances: a tolerance is set anew when it is more than TOL_FIT, or less than TOL_MARGIN times what its edge
+# or corner needs (found on TOL_SAMPLES points along an edge); none is less than TOL_MIN
+TOL_FIT = 2e-5
+TOL_MARGIN = 2.0
+TOL_SAMPLES = 100
+TOL_MIN = 1e-7
+# after a cut by several tools, a tool may still hold this share of what it held of the solid, or this volume in mm3;
+# what a tool holds is found on the part of the solid within CUT_NEAR of the tool's box (cut_near)
+CUT_NEAR = 2.0
 CUT_LEFT = 0.02
 CUT_LEFT_MM3 = 0.01
 # the edges of the BREP are written to edges.json as polylines with points this far apart
@@ -771,8 +795,9 @@ def rear_break_edges(shape: Part.Shape, d: Blueprint) -> list[tuple[Part.Edge, s
 def bevel_crossings(listed: list[tuple[Part.Edge, str]], in_groove: Callable[[FreeCAD.Vector], bool]) -> tuple[list[tuple[Part.Edge, str]], list[Part.Edge]]:
     """The listed edges without those where the seam bevel crosses a corner round (an edge beside a round, in the seam
     groove); and those edges, in one order. Such an edge is a few mm long. It continues the upper or lower edge of the
-    bevel, which is blunt on the walls, and turns a little more on the round. The edge break on it is a valid solid in
-    some runs and not in others, so it gets none: the build must be the same in every run."""
+    bevel, which is blunt on the walls, and turns a little more on the round. OpenCascade's round on it is a valid
+    solid in some runs and not in others, so it is not in that round: the build must be the same in every run. The
+    round of the bevel's mitre beside it takes the part of it that turns more than edge_break_turn."""
     crossing = [e for e, kind in listed if kind == "beside a round" and in_groove(middle(e))]
     kept = [(e, kind) for e, kind in listed if not any(e.isSame(x) for x in crossing)]
     return kept, sorted(crossing, key=lambda e: (round(abs(middle(e).x), 1), middle(e).x < 0))
@@ -846,6 +871,30 @@ def break_edges(shape: Part.Shape, edges: list[Part.Edge], radius: float, log: l
         log.append(f"{what}: no edge break at {places}: with it, the round of R {radius:g} on the edges that touch it is not a valid solid; "
                    f"{'they stay' if len(u) > 1 else 'it stays'} sharp")
     return out
+
+
+def flat_break(shape: Part.Shape, edges: list[Part.Edge], width: float, log: list[str], what: str) -> Part.Shape:
+    """A flat break of `width` on short edges that cannot take the round of the edge break: for each edge a cut by
+    the plane square to the mean of its two faces' normals at its middle, so far in that the flat is `width` wide
+    there. The plane cuts near the edge only (within three widths of its middle). The planes are found on the shape
+    as it is given, in one order, and then cut one after the other."""
+    place = lambda e: (round(middle(e).z, 2), round(middle(e).y, 2), round(abs(middle(e).x), 2), middle(e).x < 0)
+    cuts = []
+    for e in sorted(edges, key=place):
+        m = middle(e)
+        n = [f.normalAt(*f.Surface.parameter(m)) for f in shape.ancestorsOfType(e, Part.Face)]
+        b = n[0] + n[1]
+        b.normalize()
+        turn = n[0].getAngle(n[1])
+        depth = width / 2 * math.tan(turn / 2)
+        cuts.append((halfspace(m - b * depth, b).common(Part.makeSphere(3 * width, m)), where(e), turn, depth))
+    for tool, at, turn, depth in cuts:
+        out = shape.cut(tool)
+        if not out.isValid() or len(out.Solids) != 1:
+            raise Part.OCCError(f"{what}: the flat break at {at} is not a valid solid")
+        log.append(f"{what}, flat break of {width:g} at {at}: the edge turns {math.degrees(turn):.1f} degrees, the flat lies {depth:.2f} under it")
+        shape = out
+    return shape
 
 
 def chord_frame(fr: pr.Front) -> tuple[FreeCAD.Vector, FreeCAD.Vector]:
@@ -932,9 +981,18 @@ def body(d: Blueprint, fr: pr.Front, log: list[str] | None = None) -> Part.Shape
     front = sharp_edges(s, d, lambda m: not behind_band(d, m) and (reveal(m) or (m.z < 1e-3 and m.y > ya + 0.01)))
     log.append(f"body, edge break R {d.edge_break:g} at the front: {len(front)} edges ({sum(1 for e, _ in front if reveal(middle(e)))} of the rail land "
                f"along the bezel reveal, {sum(1 for e, _ in front if not reveal(middle(e)))} floor edges of the sides)")
-    listed, crossing = bevel_crossings(listed, lambda m: m.z > d.body_top - g - 0.5)
-    log += [f"body: no edge break at {where(e)}, where the seam bevel crosses the round of the head's corner; it stays sharp" for e in crossing]
-    return break_edges(s, [e for e, _ in listed + front], d.edge_break, log, "body")
+    in_groove = lambda m: m.z > d.body_top - g - 0.5
+    listed, crossing = bevel_crossings(listed, in_groove)
+    log += [f"body: the edge at {where(e)}, where the seam bevel crosses the round of the head's corner, is not in the round of the edge break"
+            for e in crossing]
+    s = break_edges(s, [e for e, _ in listed + front], d.edge_break, log, "body")
+    # in the seam groove the break of the bevel's mitre ends on the round of the head's corner in a short edge that
+    # turns more than edge_break_turn. It lies between two rounds, one of them of the break's own radius: a ball of
+    # that radius cannot roll along it. It gets a flat break
+    short = [e for e, _ in sharp_edges(s, d, in_groove)]
+    s = flat_break(s, short, d.edge_break, log, "body")
+    log += [f"body: the edge at {where(e)} is still sharp after the edge break" for e, _ in sharp_edges(s, d, in_groove)]
+    return s
 
 
 # ---------- bezel ----------
@@ -1171,10 +1229,561 @@ def cut_checked(solid: Part.Shape, tools: list[Part.Shape], what: str) -> Part.S
     return out
 
 
-def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shape]:
-    """The cap in the hood's own frame, and its opening as a prism (for the marquee lip): the front and the rear
-    joined on the line where the soft edge ends, cut level at the foot, the bevel of the seam groove, the recess of
-    the opening, and the round of the two rear corners."""
+# ---------- the edge break by hand ----------
+# OpenCascade's own round on the cap is not the same in every run (its front is a sheared spline surface). The break
+# of the cap is cut as the round of its rear corners is: by tools that are lofts through the sections of the round.
+# The sections come from the solid itself: at each one the ball of the break's radius touches the two faces of the edge.
+
+def unit(v: FreeCAD.Vector) -> FreeCAD.Vector:
+    v = V(v)
+    v.normalize()
+    return v
+
+
+def corner_key(p: FreeCAD.Vector) -> tuple[float, float, float]:
+    return (round(p.x, 3), round(p.y, 3), round(p.z, 3))
+
+
+def nearest(face: Part.Face, c: FreeCAD.Vector) -> tuple[FreeCAD.Vector, FreeCAD.Vector]:
+    """The point of a face's surface nearest to c, and the outward normal there."""
+    u, v = face.Surface.parameter(c)
+    return face.Surface.value(u, v), face.normalAt(u, v)
+
+
+def toward(face: Part.Face, c: FreeCAD.Vector) -> FreeCAD.Vector:
+    """The unit vector from c to the nearest point of a face's surface."""
+    return unit(nearest(face, c)[0] - c)
+
+
+def solve3(rows: list[FreeCAD.Vector], values: list[float]) -> FreeCAD.Vector:
+    """x with rows[k] . x = values[k]."""
+    a, b, c = rows
+    return (b.cross(c) * values[0] + c.cross(a) * values[1] + a.cross(b) * values[2]) / a.dot(b.cross(c))
+
+
+def ball_centre(faces: tuple[Part.Face, ...], r: float, guess: FreeCAD.Vector,
+                plane: tuple[FreeCAD.Vector, FreeCAD.Vector] | None = None) -> FreeCAD.Vector:
+    """The centre of a ball of radius r inside the solid that touches the given faces: two faces, with the centre in
+    the plane (point, normal); or three faces."""
+    c = V(guess)
+    for _ in range(60):
+        rows, values = [], []
+        for f in faces:
+            p, n = nearest(f, c)
+            rows.append(n)
+            values.append(-r - (c - p).dot(n))
+        if plane is not None:
+            rows.append(plane[1])
+            values.append(-(c - plane[0]).dot(plane[1]))
+        step = solve3(rows, values)
+        c = c + step
+        if step.Length < 1e-11:
+            return c
+    raise Part.OCCError(f"no ball of R {r:g} that touches the faces at ({guess.x:.3f}, {guess.y:.3f}, {guess.z:.3f})")
+
+
+def mirror_station(st: Station) -> Station:
+    m = lambda v: V(-v.x, v.y, v.z)
+    return Station(m(st.c), m(st.n1), m(st.n2))
+
+
+def edge_between(fa: Part.Face, fb: Part.Face, p: FreeCAD.Vector) -> Part.Edge:
+    """The edge of the solid between two faces that starts at the corner p."""
+    found = [e for e in fa.Edges if any(e.isSame(x) for x in fb.Edges) and min((v.Point - p).Length for v in e.Vertexes) < BREAK_NEAR]
+    if len(found) != 1:
+        raise Part.OCCError(f"{len(found)} edges between two faces at ({p.x:.3f}, {p.y:.3f}, {p.z:.3f})")
+    return found[0]
+
+
+@dataclass
+class BreakEdge:
+    """One edge to break, with its two faces in one order and with one direction (a to b) in every run: OpenCascade
+    lists the edges and the faces of a solid in an order that changes from run to run."""
+    e: Part.Edge
+    fa: Part.Face
+    fb: Part.Face
+    rev: bool
+
+    @property
+    def length(self) -> float:
+        return self.e.Length
+
+    def param(self, s: float) -> float:
+        return self.e.getParameterByLength(self.length - s if self.rev else s)
+
+    def at(self, s: float) -> FreeCAD.Vector:
+        return self.e.valueAt(self.param(s))
+
+    def tangent(self, s: float) -> FreeCAD.Vector:
+        t = self.e.tangentAt(self.param(s))
+        return -t if self.rev else t
+
+    def end(self, which: str) -> FreeCAD.Vector:
+        return self.at(0.0 if which == "a" else self.length)
+
+    def side(self) -> int:
+        """1: on the right, 0: across the centre line, -1: on the left."""
+        x = middle(self.e).x
+        return 0 if abs(x) <= CENTRE else (1 if x > 0 else -1)
+
+    def solved(self, s: float, r: float) -> Station:
+        """The station of the round in the plane square to the edge at the length s."""
+        p = self.at(s)
+        na, nb = nearest(self.fa, p)[1], nearest(self.fb, p)[1]
+        c = ball_centre((self.fa, self.fb), r, p - (na + nb) * (r / (1.0 + na.dot(nb))), (p, self.tangent(s)))
+        return Station(c, toward(self.fa, c), toward(self.fb, c))
+
+    def ordered(self, st: Station) -> Station:
+        """A station with its normals in the order of this edge's faces."""
+        da = toward(self.fa, st.c)
+        return st if da.dot(st.n1) >= da.dot(st.n2) else Station(st.c, st.n2, st.n1)
+
+    def straight(self, r: float) -> bool:
+        """Whether the round has one section all along: a straight edge on which the two normals do not change.
+        The normals are not taken at the ends: a face can end there on a boundary that is not square to the edge."""
+        a, t = self.end("a"), unit(self.end("b") - self.end("a"))
+        if any(((self.at(self.length * k / 8) - a).cross(t)).Length > 1e-6 for k in range(1, 8)):
+            return False
+        s0, sm, s1 = (self.solved(self.length * k / 4, r) for k in (1, 2, 3))
+        return all((st.n1 - sm.n1).Length < 1e-6 and (st.n2 - sm.n2).Length < 1e-6 for st in (s0, s1))
+
+
+def break_edges_of(solid: Part.Shape, edges: list[Part.Edge]) -> list[BreakEdge]:
+    out, seen = [], []
+    for e in edges:
+        if any(e.isSame(x) for x in seen):
+            continue
+        seen.append(e)
+        m = middle(e)
+        order = lambda f: tuple(round(x, 5) for x in (lambda n: (n.z, n.y, n.x))(f.normalAt(*f.Surface.parameter(m))))
+        fa, fb = sorted(solid.ancestorsOfType(e, Part.Face), key=order)
+        out.append(BreakEdge(e, fa, fb, corner_key(e.valueAt(e.LastParameter)) < corner_key(e.valueAt(e.FirstParameter))))
+    return sorted(out, key=lambda b: (corner_key(middle(b.e)), round(b.length, 3)))
+
+
+def spine_dir(st: Station, along: FreeCAD.Vector) -> FreeCAD.Vector:
+    """The direction of the round's centre line at a station (square to both normals), on the side of `along`."""
+    t = unit(st.n1.cross(st.n2))
+    return t if t.dot(along) > 0 else -t
+
+
+def stations_between(fa: Part.Face, fb: Part.Face, sa: Station, sb: Station, r: float, edge: BreakEdge | None = None) -> list[Station]:
+    """The stations of the round between two faces from sa to sb, at one spacing along the centre line (a loft
+    through sections that are not equally spaced swings far off). The first pass finds the centre line: along an
+    edge, in planes square to the edge; with no edge (a short piece), it is the straight line from sa to sb."""
+    ta, tb = spine_dir(sa, sb.c - sa.c), spine_dir(sb, sb.c - sa.c)
+    pts = [sa.c]
+    if edge is not None:
+        n1 = min(4000, max(8, math.ceil(edge.length / BREAK_FINE)))
+        for k in range(1, n1):
+            c = edge.solved(edge.length * k / n1, r).c
+            if (c - sa.c).dot(ta) > 1e-6 and (c - sb.c).dot(tb) < -1e-6:
+                pts.append(c)
+    pts.append(sb.c)
+    along = [0.0]
+    for p, q in zip(pts, pts[1:]):
+        along.append(along[-1] + (q - p).Length)
+    dirs = [unit(q - p) for p, q in zip(pts, pts[1:])]
+    turning = sum(a.getAngle(b) for a, b in zip(dirs, dirs[1:])) + ta.getAngle(dirs[0]) + dirs[-1].getAngle(tb)
+    n = max(2, math.ceil(along[-1] / BREAK_STEP), math.ceil(turning / BREAK_TURN))
+    out, j = [sa], 0
+    for k in range(1, n):
+        target = along[-1] * k / n
+        while along[j + 1] < target:
+            j += 1
+        q = pts[j] + (pts[j + 1] - pts[j]) * ((target - along[j]) / (along[j + 1] - along[j]))
+        c = ball_centre((fa, fb), r, q, (q, dirs[j]))
+        out.append(Station(c, toward(fa, c), toward(fb, c)))
+    return out + [sb]
+
+
+def loft_solid(sections: list[Part.Wire]) -> Part.Shape:
+    """A solid through the sections, of degree 3, the right way out whichever way the sections run."""
+    out = Part.makeLoft(sections, True, False, False, 3)
+    if out.Volume < 0:
+        out = Part.makeLoft(sections[::-1], True, False, False, 3)
+    if out.Volume <= 0 or not out.isValid():
+        raise Part.OCCError("a loft through the sections of a round is not a solid")
+    return out
+
+
+def pivot_section(st: Station, r: float, reach: float, front: float) -> Part.Wire:
+    """The section of a round where the ball turns about a concave edge of one of its faces (st.n1 points to that
+    edge): as round_section, but it reaches only `reach` past the edge, along a line parallel to the other normal,
+    to `front` past the ball's point on the other face."""
+    b = unit(st.n1 + st.n2)
+    p1, p2, mid = st.c + st.n1 * (r + ROUND_OFF), st.c + st.n2 * (r + ROUND_OFF), st.c + b * (r + ROUND_OFF)
+    q1, q2 = p1 + st.n1 * reach, p2 + st.n2 * front
+    corner = q1 + st.n2 * (r * (1.0 - st.n1.dot(st.n2)) + front)
+    return Part.Wire([Part.LineSegment(q1, corner).toShape(), Part.LineSegment(corner, q2).toShape(), Part.LineSegment(q2, p2).toShape(),
+                      Part.Arc(p2, mid, p1).toShape(), Part.LineSegment(p1, q1).toShape()])
+
+
+def fan_cutter(sts: list[Station], walls: tuple[tuple[FreeCAD.Vector, FreeCAD.Vector], ...], r: float) -> tuple[Part.Shape, float, float]:
+    """What a round takes off where the ball turns about a concave edge of one of its two faces (a kink in a wall),
+    from the section sts[0] to the section sts[-1]; walls: (point, normal) of the wall before and after the kink.
+
+    The ball touches the kink all the way, so the sections turn about a line: the line, parallel to the other face's
+    normal, on which the ball's centre and its point on the kink move the same way. A section that reaches past that
+    line folds the loft over. The sections must reach past the two walls, which stand `extent` past the kink in
+    these sections where they meet the other face, and stop before that line, `hinge` past the kink. The tool
+    reaches to the middle between the two. Returns the tool, hinge and extent."""
+    t = unit(sts[-1].c - sts[0].c)
+    dc = (sts[-1].c - sts[0].c).dot(t)
+    dq = ((sts[-1].c + sts[-1].n1 * r) - (sts[0].c + sts[0].n1 * r)).dot(t)
+    hinge = r * dq / (dc - dq)
+    extent = 0.0
+    for st, (pw, nw) in ((sts[0], walls[1]), (sts[-1], walls[0])):
+        q = st.c + st.n1 * r
+        extent = max(extent, -((q + st.n2 * (r * (1.0 - st.n1.dot(st.n2))) - pw).dot(nw)) / st.n1.dot(nw))
+    if hinge - extent < 0.01:
+        raise Part.OCCError(f"a round that turns about a kink: its sections cross {hinge:.4f} past the kink, and the walls reach {extent:.4f}")
+    wires = [pivot_section(st, r, (hinge + extent) / 2, 0.3) for st in sts]
+    for wa, wb in zip(wires, wires[1:]):
+        if min((vb.Point - va.Point).dot(t) for va, vb in zip(wa.OrderedVertexes, wb.OrderedVertexes)) <= 0:
+            raise Part.OCCError("a round that turns about a kink: its sections fold over")
+    return loft_solid(wires), hinge, extent
+
+
+def round_cutters(solid: Part.Shape, edges: list[Part.Edge], r: float, log: list[str]) -> tuple[list[Part.Shape], list[tuple[FreeCAD.Vector, FreeCAD.Vector]]]:
+    """What a round of radius r takes off a solid that is symmetric about x = 0, along the given edges: for each
+    edge the region between the edge and the round that a ball of radius r makes when it rolls along the edge in
+    touch with both of its faces. Returns the tools, and the corners where three of the edges meet as (centre of the
+    ball that touches the three faces, corner of the solid) for cut_round_corners.
+
+    The tools are made for the edges on the right side and on the centre line; the left side gets their mirror
+    images. Where two tools meet, they share a section:
+      - A straight edge between faces whose normals do not change has one section: a prism.
+      - A curved edge: a loft through the sections (stations_between).
+      - A piece ends where the ball's point on one of its two faces crosses to the next face of that side. That is
+        not where the edge passes from one pair of faces to the next: the two differ where a boundary between two
+        faces does not stand square to the edge. Where both faces change, a short piece lies between the two
+        crossings.
+      - Where two edges meet at an angle in a concave edge of one side (a kink in a wall), the ball turns about that
+        edge (fan_cutter).
+      - Where three edges meet, each piece ends on a plane through the centre of the ball that touches the three
+        faces.
+      - An edge that ends where no other edge of the list goes on runs BREAK_PAST past its end."""
+    all_edges = break_edges_of(solid, edges)
+    nodes: dict[tuple, list[tuple[int, str]]] = {}
+    place: dict[tuple, FreeCAD.Vector] = {}
+    for i, be in enumerate(all_edges):
+        for which in "ab":
+            k = corner_key(be.end(which))
+            nodes.setdefault(k, []).append((i, which))
+            place.setdefault(k, be.end(which))
+    at: dict[tuple[int, str], Station] = {}
+    corners: list[tuple[FreeCAD.Vector, FreeCAD.Vector]] = []
+    short: list[tuple] = []
+    tools: list[Part.Shape] = []
+    count = {"prism": 0, "loft": 0, "sections": 0, "short": 0, "kink": 0, "corner": 0}
+    right = lambda node: node[0] >= -CENTRE
+    exact = {i: be.solved(be.length / 2, r) for i, be in enumerate(all_edges) if be.side() >= 0 and be.straight(r)}
+
+    def add(tool: Part.Shape, both: bool) -> None:
+        tools.append(tool)
+        if both:
+            tools.append(tool.mirror(V(0, 0, 0), V(1, 0, 0)))
+
+    def away(i: int, which: str) -> FreeCAD.Vector:
+        """The direction of an edge at its end, away from that end."""
+        be = all_edges[i]
+        return be.tangent(0.0) if which == "a" else -be.tangent(be.length)
+
+    def snap(i: int, st: Station) -> Station:
+        """A station at the end of a straight edge, moved onto that edge's one section at the same place along the
+        edge (the station is found on the boundary between two faces, with the mean of their normals)."""
+        if i not in exact:
+            return all_edges[i].ordered(st)
+        t = unit(all_edges[i].end("b") - all_edges[i].end("a"))
+        return Station(exact[i].c + t * (st.c - exact[i].c).dot(t), exact[i].n1, exact[i].n2)
+
+    for node, ends in sorted(nodes.items()):
+        if len(ends) > 3:
+            raise Part.OCCError(f"corner at {node}: {len(ends)} edges to break meet")
+        if len(ends) != 3 or not right(node):
+            continue
+        # three edges: the ball that touches the three faces
+        faces: list[Part.Face] = []
+        for i, _ in ends:
+            for f in (all_edges[i].fa, all_edges[i].fb):
+                if not any(f.isSame(g) for g in faces):
+                    faces.append(f)
+        if len(faces) != 3:
+            raise Part.OCCError(f"corner at {node}: {len(faces)} faces")
+        p = place[node]
+        ns = [nearest(f, p)[1] for f in faces]
+        c = ball_centre(tuple(faces), r, p - (ns[0] + ns[1] + ns[2]) * (r * 0.6))
+        for i, which in ends:
+            at[(i, which)] = Station(c, toward(all_edges[i].fa, c), toward(all_edges[i].fb, c))
+        corners.append((c, p))
+        if node[0] > CENTRE:
+            corners.append((V(-c.x, c.y, c.z), V(-p.x, p.y, p.z)))
+        count["corner"] += 1
+        log.append(f"  corner at ({p.x:.1f}, {p.y:.1f}, {p.z:.1f}) where three edges meet: a ball, its face {(p - c).Length - r:.2f} from the corner")
+    for node, ends in sorted(nodes.items()):
+        if len(ends) != 2 or not right(node):
+            continue
+        (i, wi), (j, wj) = ends
+        bi, bj = all_edges[i], all_edges[j]
+        k = place[node]
+        # the sides: each face of the one edge with the face of the other edge that continues it
+        na = nearest(bi.fa, k)[1]
+        ja, jb = (bj.fa, bj.fb) if na.dot(nearest(bj.fa, k)[1]) >= na.dot(nearest(bj.fb, k)[1]) else (bj.fb, bj.fa)
+        sides = [(bi.fa, ja), (bi.fb, jb)]
+        if away(i, wi).getAngle(-away(j, wj)) >= BREAK_KINK:
+            same = [n for n, (f, g) in enumerate(sides) if f.isSame(g)]
+            if len(same) != 1:
+                raise Part.OCCError(f"kink at {node}: the two edges do not share one face")
+            common = sides[same[0]][0]
+            wall_i, wall_j = sides[1 - same[0]]
+            le = edge_between(wall_i, wall_j, k)
+            line = unit(le.tangentAt(le.FirstParameter if (le.valueAt(le.FirstParameter) - k).Length < BREAK_NEAR else le.LastParameter))
+            ni, nj = nearest(wall_i, k)[1], nearest(wall_j, k)[1]
+            if edge_turn(solid, le)[0]:
+                raise Part.OCCError(f"kink at {node}: the two walls meet in a convex edge, which is not in the list of edges to break")
+            omega = ni.getAngle(nj)
+
+            def pivot(u: float) -> Station:
+                """The station where the ball touches the kink with the normal a share u of the way from the one
+                wall's to the other's, and touches the common face."""
+                n = (ni * math.sin((1 - u) * omega) + nj * math.sin(u * omega)) / math.sin(omega)
+                s = 0.0
+                for _ in range(60):
+                    c = k + line * s - n * r
+                    p, nf = nearest(common, c)
+                    ds = -((c - p).dot(nf) + r) / line.dot(nf)
+                    s += ds
+                    if abs(ds) < 1e-11:
+                        break
+                c = k + line * s - n * r
+                return Station(c, n, toward(common, c))
+
+            m = max(2, math.ceil(omega / BREAK_TURN))
+            sts = [pivot(u / m) for u in range(m + 1)]
+            at[(i, wi)], at[(j, wj)] = bi.ordered(sts[0]), bj.ordered(sts[-1])
+            tool, hinge, extent = fan_cutter(sts, ((k, ni), (k, nj)), r)
+            add(tool, node[0] > CENTRE)
+            count["kink"] += 1
+            log.append(f"  kink at ({k.x:.1f}, {k.y:.1f}, {k.z:.1f}): the wall turns {math.degrees(omega):.1f} degrees in a concave edge; the ball turns about it "
+                       f"({len(sts)} sections, which cross {hinge:.3f} past the kink; the walls reach {extent:.3f})")
+            continue
+
+        def crossing(side: tuple[Part.Face, Part.Face], other: Part.Face) -> Station:
+            """The station where the ball's point on a side lies on the boundary between that side's two faces, with
+            the ball in touch with the face `other` of the other side."""
+            e = edge_between(side[0], side[1], k)
+            first = (e.valueAt(e.FirstParameter) - k).Length < BREAK_NEAR
+
+            def ball_at(u: float) -> tuple[FreeCAD.Vector, FreeCAD.Vector]:
+                p = e.valueAt(e.getParameterByLength(u if first else e.Length - u))
+                n = unit(nearest(side[0], p)[1] + nearest(side[1], p)[1])
+                return p - n * r, n
+
+            def gap(u: float) -> float:
+                c, _ = ball_at(u)
+                p, n = nearest(other, c)
+                return (c - p).dot(n) + r
+
+            lo, hi = 0.0, min(e.Length, 4 * r)
+            if gap(lo) <= 0 or gap(hi) >= 0:
+                raise Part.OCCError(f"corner at {node}: the ball does not cross the boundary between two faces within {hi:.2f}")
+            for _ in range(60):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if gap(mid) > 0 else (lo, mid)
+            c, n = ball_at((lo + hi) / 2)
+            return Station(c, n, toward(other, c))
+
+        changed = [n for n, (f, g) in enumerate(sides) if not f.isSame(g)]
+        first = second = None
+        if len(changed) == 2:
+            # both sides change: which one first, seen from the edge i
+            n, first = 0, crossing(sides[0], sides[1][0])
+            if not sides[1][0].isPartOfDomain(*sides[1][0].Surface.parameter(first.c)):
+                n, first = 1, crossing(sides[1], sides[0][0])
+            second = crossing(sides[1 - n], sides[n][1])
+        if second is not None and (first.c - second.c).Length > 1e-4:
+            first, second = snap(i, first), snap(j, second)
+            at[(i, wi)], at[(j, wj)] = bi.ordered(first), bj.ordered(second)
+            fa, fb = (sides[0][1], sides[1][0]) if n == 0 else (sides[0][0], sides[1][1])
+            order = lambda st: st if toward(fa, st.c).dot(st.n1) >= toward(fa, st.c).dot(st.n2) else Station(st.c, st.n2, st.n1)
+            short.append((fa, fb, order(first), order(second), node[0] > CENTRE))
+        else:
+            if first is None:
+                first = crossing(sides[changed[0]], sides[1 - changed[0]][0]) if changed else bi.solved(0.0 if wi == "a" else bi.length, r)
+            st = snap(i, first) if i in exact else snap(j, first)
+            at[(i, wi)], at[(j, wj)] = bi.ordered(st), bj.ordered(st)
+    todo = [i for i, be in enumerate(all_edges) if be.side() >= 0]
+    for i in todo:
+        be = all_edges[i]
+        for which in "ab":
+            if len(nodes[corner_key(be.end(which))]) == 1:
+                at[(i, which)] = be.solved(0.0 if which == "a" else be.length, r)
+        if be.side() == 0:                          # an edge across the centre line: its left end mirrors its right end
+            w_right = "b" if be.end("b").x > be.end("a").x else "a"
+            at[(i, "a" if w_right == "b" else "b")] = be.ordered(mirror_station(at[(i, w_right)]))
+    for i in todo:
+        be = all_edges[i]
+        if i in exact:
+            w0 = "b" if be.end("b").x > be.end("a").x + CENTRE else "a"
+            w1 = "a" if w0 == "b" else "b"
+            s0, s1 = at[(i, w0)], at[(i, w1)]
+            centre = be.side() > 0 and abs(be.end(w1).x) <= CENTRE and len(nodes[corner_key(be.end(w1))]) == 2
+            if centre:                              # on to the same place on the left side, in one piece
+                s1 = mirror_station(s0)
+            if (s0.n1 - s1.n1).Length > 1e-6 or (s0.n2 - s1.n2).Length > 1e-6:
+                raise Part.OCCError(f"straight edge at {where(be.e)}: its two end sections are not the same")
+            move = s1.c - s0.c
+            t = unit(move)
+            past = {w: BREAK_PAST if len(nodes[corner_key(be.end(w))]) == 1 else 0.0 for w in "ab"}
+            w = round_section(s0, r, ROUND_OFF)
+            w.translate(t * -past[w0])
+            add(Part.Face(w).extrude(t * (move.Length + past[w0] + past[w1])), be.side() > 0 and not centre)
+            count["prism"] += 1
+        else:
+            sts = stations_between(be.fa, be.fb, at[(i, "a")], at[(i, "b")], r, be)
+            add(loft_solid([round_section(st, r, ROUND_OFF) for st in sts]), be.side() > 0)
+            count["loft"] += 1
+            count["sections"] += len(sts)
+    for fa, fb, sa, sb, both_sides in short:
+        sts = stations_between(fa, fb, sa, sb, r)
+        add(loft_solid([round_section(st, r, ROUND_OFF) for st in sts]), both_sides)
+        count["short"] += 1
+    log.append(f"  {count['prism']} straight pieces, {count['loft']} lofts through {count['sections']} sections, {count['short']} short pieces where both "
+               f"faces change, {count['kink']} kinks, {count['corner']} corners (on the right side and the centre line; the left side is their mirror image)")
+    return tools, corners
+
+
+def cut_round_corners(solid: Part.Shape, corners: list[tuple[FreeCAD.Vector, FreeCAD.Vector]], r: float) -> Part.Shape:
+    """The corners where three rounded edges meet, after the pieces along the edges are cut: each piece ends on a
+    plane through the centre of the ball that touches the three faces, and what is left of the corner stands between
+    those planes, outside the ball. A tool with the ball's face does not cut it off: the ball touches the three faces
+    in three points, and OpenCascade returns the solid as it was. So the corner is found as a solid of its own: the
+    part of the solid near the ball's centre, less the ball, falls into the solid's body and the corner. That corner
+    is then cut off, and the ball's face is left."""
+    for c, p in corners:
+        near = solid.common(Part.makeSphere(2.0 * (p - c).Length, c))
+        parts = [s for s in near.cut(Part.makeSphere(r + ROUND_OFF, c)).Solids if s.isInside(c + (p - c) * 0.97, 1e-6, True)]
+        if len(parts) != 1 or not 0.0 < parts[0].Volume < 2.0 * r ** 3:
+            raise Part.OCCError(f"corner at ({p.x:.3f}, {p.y:.3f}, {p.z:.3f}): the part outside the ball is not one small solid")
+        out = solid.cut(parts[0])
+        if not out.isValid() or len(out.Solids) != 1 or out.common(parts[0]).Volume > CUT_LEFT_MM3:
+            raise Part.OCCError(f"corner at ({p.x:.3f}, {p.y:.3f}, {p.z:.3f}): the cut of the corner failed")
+        solid = out
+    return solid
+
+
+def held(shape: Part.Shape, tool: Part.Shape) -> tuple[float, Part.Shape]:
+    """How much of a shape a tool holds (mm3), found on the part of the shape near the tool; and that part. A common
+    of a small tool with a whole solid can come back empty: OpenCascade looks for the place where a long face meets
+    the tool on a grid of points of the face, and a tool of a few mm can lie between them. The part of the solid in
+    a box round the tool has no such long face."""
+    b = tool.BoundBox
+    near = shape.common(Part.makeBox(b.XLength + 2 * CUT_NEAR, b.YLength + 2 * CUT_NEAR, b.ZLength + 2 * CUT_NEAR,
+                                     V(b.XMin - CUT_NEAR, b.YMin - CUT_NEAR, b.ZMin - CUT_NEAR)))
+    return near.common(tool).Volume, near
+
+
+def cut_near(solid: Part.Shape, tools: list[Part.Shape], what: str) -> Part.Shape:
+    """A solid less some tools, each of which must take something off: as cut_checked, but what a tool holds is
+    found near the tool (held), so that a tool whose cut OpenCascade skips does not pass as a tool with no work.
+    The tools are cut all at once. A tool that then still holds its part of the solid is cut again by that part
+    alone (the common of the tool and the solid near it): its faces lie on the faces of the solid, and OpenCascade
+    finds them from the small part. When that does not take it off either, it is an error."""
+    due = [held(solid, t)[0] for t in tools]
+    idle = [k for k, v in enumerate(due) if v <= 0]
+    if idle:
+        raise Part.OCCError(f"{what}: {len(idle)} of the {len(tools)} tools hold nothing of the solid (the first is tool {idle[0]})")
+    good = lambda s: not s.isNull() and s.isValid() and len(s.Solids) == 1
+    out = solid.cut(tools)
+    if not good(out):
+        out = solid
+        for t in tools:
+            step = out.cut(t)
+            out = step if good(step) else out
+    for k, t in enumerate(tools):
+        limit = max(CUT_LEFT * due[k], CUT_LEFT_MM3)
+        rest, near = held(out, t)
+        if rest <= limit:
+            continue
+        again = out.cut(near.common(t))
+        if not good(again) or held(again, t)[0] > limit:
+            raise Part.OCCError(f"{what}: tool {k} still holds {rest:.3f} mm3 of {due[k]:.3f}")
+        out = again
+    return out
+
+
+def break_by_hand(solid: Part.Shape, edges: list[Part.Edge], r: float, log: list[str], what: str) -> Part.Shape:
+    """The edge break of radius r on the given edges of a symmetric solid, cut by tools made from the solid's own
+    faces (round_cutters), and the same in every run."""
+    lines: list[str] = []
+    tools, corners = round_cutters(solid, edges, r, lines)
+    out = cut_round_corners(cut_near(solid, tools, f"the edge break of the {what}"), corners, r)
+    log.append(f"{what}, edge break R {r:g} by hand: {len(break_edges_of(solid, edges))} edges, {sum(e.Length for e in edges):.0f} mm, {len(tools)} tools")
+    log += lines
+    return out
+
+
+def fit_tolerances(shape: Part.Shape, above: float = TOL_FIT) -> Part.Shape:
+    """The shape with the tolerances of its edges and corners set to what they need, with a margin of TOL_MARGIN:
+    for an edge, how far its curve lies from its curves on its two faces; for a corner, the tolerances of its edges
+    and how far it lies from their ends. A tolerance is set when it is more than `above`, or less than the need.
+
+    Two steps of the cap leave large tolerances that its curves do not need. leaning() gives every edge of the
+    sheared parts SHEAR_TOL (their curves lie within 0.000005 of the faces, except two edges at the roof with
+    0.0003). A cut by tools that share faces can give an edge between two of those faces 0.008. A tool that stands
+    ROUND_OFF proud of a face needs small tolerances round it: with SHEAR_TOL on the edges, the cut by the tools of
+    the edge break is not the same on the right and on the left. And a tolerance that is larger than the faces
+    beside it are wide makes the shape fail the strict check."""
+    out = shape.copy()
+    for e in out.Edges:
+        if e.Degenerated:
+            continue
+        worst = 0.0
+        for f in out.ancestorsOfType(e, Part.Face):
+            c2, a, b = f.curveOnSurface(e)[:3]
+            for k in range(TOL_SAMPLES + 1):
+                p = e.valueAt(e.FirstParameter + (e.LastParameter - e.FirstParameter) * k / TOL_SAMPLES)
+                q = c2.value(a + (b - a) * k / TOL_SAMPLES)
+                worst = max(worst, (f.Surface.value(q.x, q.y) - p).Length)
+        need = max(TOL_MIN, TOL_MARGIN * worst)
+        if e.Tolerance > above or e.Tolerance < need:
+            e.fixTolerance(need)
+    for v in out.Vertexes:
+        need = TOL_MIN
+        for e in out.ancestorsOfType(v, Part.Edge):
+            if e.Degenerated:
+                continue
+            first = (e.valueAt(e.FirstParameter) - v.Point).Length <= (e.valueAt(e.LastParameter) - v.Point).Length
+            need = max(need, e.Tolerance, TOL_MARGIN * (e.valueAt(e.FirstParameter if first else e.LastParameter) - v.Point).Length)
+            for f in out.ancestorsOfType(e, Part.Face):
+                c2, a, b = f.curveOnSurface(e)[:3]
+                q = c2.value(a if first else b)
+                need = max(need, TOL_MARGIN * (f.Surface.value(q.x, q.y) - v.Point).Length)
+        if v.Tolerance > above or v.Tolerance < need:
+            v.fixTolerance(need)
+    if not out.isValid() or len(out.Solids) != 1:
+        raise Part.OCCError("the shape is not valid with the tolerances that its curves need")
+    return out
+
+
+def settled(shape: Part.Shape) -> Part.Shape:
+    """The shape with every tolerance set anew: to the least, then by OpenCascade's repair to what each wire, edge
+    and corner needs to be valid, then with the margin of fit_tolerances (the repair sets an edge to just what it
+    finds, and the strict check finds a little more)."""
+    out = shape.copy()
+    out.fixTolerance(TOL_MIN)
+    out.fix(TOL_MIN, TOL_MIN, SHEAR_TOL)
+    if len(out.Faces) != len(shape.Faces):
+        raise Part.OCCError("the repair of the tolerances changed the faces of the shape")
+    return fit_tolerances(out, math.inf)
+
+
+def cap_unbroken(d: Blueprint, h: pr.Hood, log: list[str] | None = None) -> tuple[Part.Shape, Part.Shape]:
+    """The cap before its edge break, in the hood's own frame, and its opening as a prism (for the marquee lip): the
+    front and the rear joined on the line where the soft edge ends, cut level at the foot, the bevel of the seam
+    groove, the recess of the opening, and the round of the two rear corners."""
+    log = log if log is not None else []
     view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
     solid = cap_front(d, h).fuse(cap_rear(d, h)).removeSplitter()
     solid = solid.common(across(poly([(h.depth, 0.0), (-OVER, 0.0), (-OVER, h.height), view[4].q])[:-1] + view[5:]))
@@ -1187,16 +1796,29 @@ def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shap
     pieces = hood_corner_stations(d, h, d.rear_round_r)
     log.append(f"hood, rear corners R {d.rear_round_r:g} by hand: {len(pieces)} lofts through {sum(len(p) for p in pieces)} sections on each side, "
                f"from below the foot to where the edge turns {math.degrees(pieces[-1][-1].turn):.1f} degrees")
-    # The cap gets no edge break. Its sharp edges are the rim of the opening and the upper edge of the seam bevel (which
-    # turns more than 45 degrees, because the sides and the front of the cap lean). The leaning front is a sheared
-    # spline surface with a tolerance of 0.001, and OpenCascade's round on an edge of it is a valid solid that is not
-    # the same in every run: the rim alone has two outcomes, the bevel alone two, both together three, and the strict
-    # check of one of those does not end. The build must be the same in every run, so these edges stay sharp until the
-    # front of the cap is made of exact surfaces
-    listed = sharp_edges(solid, d, lambda m: m.z > 0.05)
-    bevel = [e for e, _ in listed if middle(e).z < g + 0.5]
-    log.append(f"hood: no edge break ({len(listed) - len(bevel)} edges on the rim of the opening, {len(bevel)} on the seam bevel, "
-               f"{sum(e.Length for e, _ in listed):.0f} mm): the round on the leaning front is not the same in every run; they stay sharp")
+    return solid, opening
+
+
+def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shape]:
+    """The cap in the hood's own frame, and its opening as a prism: cap_unbroken, and the edge break last."""
+    solid, opening = cap_unbroken(d, h, log)
+    g = d.seam_groove
+    # The edge break, by hand: OpenCascade's round on an edge of the leaning front (a sheared spline surface) is a
+    # valid solid that is not the same in every run. Every convex edge that turns more than edge_break_turn gets it:
+    # the rim of the opening, and the upper edge of the seam bevel (which turns more than 45 degrees because the
+    # front and the sides of the cap lean) with the mitres of the bevel at the rear corners. The upper edge of the
+    # bevel on the rear wall turns 45 degrees only; it gets the break too, so that the break goes all round the foot
+    # and does not stop at the rear corners
+    solid = settled(solid)
+    listed = [e for e, _ in sharp_edges(solid, d, lambda m: m.z > 0.05)]
+    foot = edges_where(solid, lambda p: abs(p.z - g) < 1e-3)
+    blunt = [e for e in foot if not any(e.isSame(x) for x in listed)]
+    solid = fit_tolerances(break_by_hand(solid, listed + blunt, d.edge_break, log, "hood"))
+    rim = [e for e in listed if middle(e).z > g + 0.5]
+    log.append(f"  {len(rim)} edges on the rim of the opening, {len(listed) - len(rim)} on the seam bevel and its mitres, and {len(blunt)} that "
+               f"{'turns' if len(blunt) == 1 else 'turn'} 45 degrees ({sum(e.Length for e in blunt):.0f} mm, the upper edge of the bevel on the rear wall)")
+    left = sharp_edges(solid, d, lambda m: m.z > 0.05)
+    log += [f"hood: the edge at {where(e)} is still sharp after the edge break" for e, _ in left]
     return solid, opening
 
 
@@ -1280,7 +1902,14 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-hood-corner-rear": cam((hw - 12, d.depth - 12, d.body_top + 25), 90, 180, 5),
             "closeup-hood-roof-end": cam((h.half_top + 6, h.origin[1] + h.depth - 58, h.origin[2] + h.height - 1), 40, 135, 45),
             "closeup-hood-rear-top": cam((h.half_top - 4, d.depth - 30, h.origin[2] + h.height - 12), 60, 135, 28),
-            "closeup-hood-band": cam((d.logo_w / 2 + d.logo_gap + 40, h.origin[1] + 20, h.origin[2] + (h.z_sill + h.z_rail_top) / 2), 100, 40, 10)}
+            "closeup-hood-band": cam((d.logo_w / 2 + d.logo_gap + 40, h.origin[1] + 20, h.origin[2] + (h.z_sill + h.z_rail_top) / 2), 100, 40, 10),
+            # the edge break of the hood: the right half of the rim of the front opening, its lower corner (where the
+            # wall has its kink), its upper corner, and the rear corner of the seam (the ball on the hood, the flat on
+            # the body)
+            "closeup-hood-opening": cam((h.half_open(h.z_sill + 40.0, d) - 45, h.origin[1] + 12, h.origin[2] + (h.z_sill + h.z_open_top) / 2), 115, 28, 6),
+            "closeup-hood-opening-corner": cam((h.half_open(h.z_sill + d.hood_sill_corner_r, d) - 2, h.origin[1] + 7, h.origin[2] + h.z_sill + d.hood_sill_corner_r), 16, 32, 10),
+            "closeup-hood-opening-top": cam((h.half_open(h.z_open_top - 6.0, d) - 4, h.origin[1] + 15, h.origin[2] + h.z_open_top - 5), 22, 32, -8),
+            "closeup-seam-corner-near": cam((d.side_x(d.body_top) - 1.5, d.depth - 1.5, d.body_top + d.seam_gap / 2), 11, 135, 4)}
 
 
 def edge_polylines(shape: Part.Shape, step: float = EDGE_STEP) -> list[list[list[float]]]:

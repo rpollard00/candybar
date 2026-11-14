@@ -34,7 +34,8 @@ SCRATCH = os.path.join(ROOT, "out", "_scratch", "rev7", "compare-renders")
 FRAME = "-252,-6,-2,252,586,578"
 VIEWS = ("three-quarter-front-left", "three-quarter-rear-right", "rear", "side-right")
 CLOSE = ("closeup-rear-corner", "closeup-cut-in-corner", "closeup-hand-hold", "closeup-hood-corner-above", "closeup-hip-top", "closeup-head-foot",
-         "closeup-hood-roof-end", "closeup-base-corner")
+         "closeup-hood-roof-end", "closeup-base-corner", "closeup-hood-opening", "closeup-hood-opening-corner", "closeup-hood-opening-top",
+         "closeup-seam-rear-corner", "closeup-seam-corner-near")
 SHEET = ("three-quarter-front-left", "three-quarter-rear-right", "rear", "side-right", "closeup-rear-corner", "closeup-cut-in-corner",
          "closeup-hand-hold", "closeup-hood-corner-above")
 INK, MUTED = (30, 30, 34), (110, 110, 118)

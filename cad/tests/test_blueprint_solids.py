@@ -3,7 +3,6 @@ the planar rear of revision 7 (decision record 0007)."""
 from __future__ import annotations
 
 import math
-import re
 import unittest
 from dataclasses import replace
 from unittest import mock
@@ -281,17 +280,14 @@ class PlanarRearTest(unittest.TestCase):
         hood = at_middle(self.hood, d.body_top + d.seam_gap + g + 0.05, d.body_top + d.seam_gap + g + 10)
         self.assertLess(math.dist(body, hood), 0.3)
 
-    def test_no_convex_edge_of_the_rear_stays_sharp_but_those_that_the_build_names(self) -> None:
-        """After the edge break, a convex edge behind the band that turns more than edge_break_turn is what is left
-        of an edge that the build's log names as left sharp: it lies within 3 of the place in the log (the breaks of
-        the edges beside it make it shorter)."""
+    def test_no_convex_edge_of_the_rear_stays_sharp(self) -> None:
+        """After the edge break no convex edge behind the band turns more than edge_break_turn. The build's log
+        names the two edges where the seam bevel crosses the round of the head's corner: OpenCascade's round does
+        not take them, and the round of the bevel's mitre beside them and a flat break leave them blunt."""
         left = solids.sharp_edges(self.body, self.d, lambda m: solids.behind_band(self.d, m))
-        named = [line for line in self.log if line.startswith("body: no edge break at")]
-        places = [tuple(float(v) for v in m.groups()) for line in named for m in re.finditer(r"\((-?[\d.]+), (-?[\d.]+), (-?[\d.]+)\)", line)]
-        self.assertEqual(len(places), 2, named)
-        for e, _ in left:
-            m = solids.middle(e)
-            self.assertLess(min(math.dist((m.x, m.y, m.z), p) for p in places), 3.0, f"sharp edge at {solids.where(e)}")
+        self.assertEqual([solids.where(e) for e, _ in left], [])
+        named = [line for line in self.log if line.startswith("body: the edge at") and "is not in the round of the edge break" in line]
+        self.assertEqual(len(named), 2, named)
 
 
 class LazySolid:

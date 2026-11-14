@@ -14,7 +14,8 @@ The edge break is counted on its own. One build can have the edge break (a round
 on an edge that is sharp in the other. There the two surfaces are (sqrt(2) - 1) x 1 = 0.41 mm apart at an edge of 90
 degrees: the size of the break, not a difference of the form. A point that lies on a face of the edge break, or
 whose nearest face in the other build is one, goes into the columns "at the edge break"; the tolerance is for all
-other points.
+other points. A face of the edge break is a round of its radius along an edge, the ball at a corner where three
+broken edges meet, or the face on which the ball turns about a kink in a wall (face_check.is_break_surface).
 
 Run headless. It writes compare.json and compare.md into CANDYBAR_OUT and exits 1 when a distance is more than
 CANDYBAR_TOL (default 0.3) or a part of the first build has no partner:
@@ -55,7 +56,7 @@ def load(folder: str) -> dict[str, Part.Shape]:
 def surface_points(shape: Part.Shape, radius: float, mesh: float = MESH, step: float = STEP) -> list[tuple[FreeCAD.Vector, bool]]:
     """Points on the surface of a shape: the corners of a mesh of each face, and points along each edge; each with
     whether it lies on a face of the edge break (or on an edge of one)."""
-    broken = {f.hashCode() for f in shape.Faces if face_check.is_break(f, radius)}
+    broken = {f.hashCode() for f in shape.Faces if face_check.is_break_surface(f, radius)}
     out = []
     for f in shape.Faces:
         out += [(p, f.hashCode() in broken) for p in f.tessellate(mesh)[0]]
@@ -86,7 +87,7 @@ class Surface:
     """The faces of a shape, with their boxes, for the distance from a point to the nearest face."""
 
     def __init__(self, shape: Part.Shape, radius: float) -> None:
-        self.faces = [(f, f.BoundBox, face_check.is_break(f, radius)) for f in shape.Faces]
+        self.faces = [(f, f.BoundBox, face_check.is_break_surface(f, radius)) for f in shape.Faces]
 
     def distance(self, p: FreeCAD.Vector, near: float = NEAR) -> tuple[float, bool]:
         """The distance from p to the nearest face, and whether that face is one of the edge break. The faces whose
