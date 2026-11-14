@@ -75,7 +75,7 @@ USB_WEB, USB_POCKET, USB_HOLE, USB_PITCH = 2.0, 3.0, 3.4, 38.0
 
 # ---------- sizes of the coupons ----------
 
-SHRINK_L, SHRINK_W, SHRINK_T, STOP_L, STOP_H = 220.0, 12.0, 3.0, 6.0, 8.0
+SHRINK_L, SHRINK_W, SHRINK_T, STOP_L, STOP_H = 230.0, 12.0, 3.0, 6.0, 8.0   # the two bars and the gap fill one plate
 WARP = (180.0, 100.0)       # long, high
 PAIR_L = 100.0              # joints 2, 3 and 5: along the seam
 TILE_W = 25.0               # joints 2 and 3: the floor behind the joint
@@ -89,13 +89,15 @@ HAND_HOLD_BOX = (135.0, 185.0, 500.0, 600.0, 372.0, 430.0)
 TILE = "floor middle side R"
 
 DENSITY = 1.05              # g/cm3, ABS (the owner chose ABS on 2026-11-14)
-# the printer: a Qidi Q2. The owner gives its build volume as 256 x 256 x 270 (to be confirmed from the maker; the ABS
-# note has 270 x 270 x 256). The plates keep BED_MARGIN free at each side of the bed, for a brim or brim ears and the
-# purge line, and TOP_MARGIN under the top. The set fits both readings: no part is higher than 100.
-BED = (256.0, 256.0, 270.0)
-BED_MARGIN = 8.0
-TOP_MARGIN = 10.0
-FLAT = (240.0, 40.0)        # the long flat strip of the floor: as long as the plate allows
+# the printer: a Qidi Q2. Its print size is 270 x 270 x 256 as width, depth, height (the maker's specification, read by
+# the research of 2026-11-14). The limit of a piece is 250 x 250 on the bed and 250 high. The footprint in the model is
+# PIECE_GROWTH less, because the slicer makes a piece larger to compensate the shrink. The plates use that footprint,
+# which leaves BED_MARGIN at each side of the bed and TOP_MARGIN below the top (the margins are estimates)
+BED = (270.0, 270.0, 256.0)
+PIECE_XY, PIECE_Z, PIECE_GROWTH = 250.0, 250.0, 2.0
+BED_MARGIN = (BED[0] - (PIECE_XY - PIECE_GROWTH)) / 2
+TOP_MARGIN = BED[2] - PIECE_Z
+FLAT = (PIECE_XY - PIECE_GROWTH, 40.0)   # the long flat strip of the floor: as long as the plate allows
 WELD_L, WELD_HALF = 40.0, 30.0   # the weld pair: along the seam, from the seam to the free edge
 RATE_CM3_H = 21.6           # 6 mm3/s on average, travel and small features included
 PLATE_SETUP_H = 0.1
@@ -105,7 +107,7 @@ MESH = (0.02, 0.1)
 
 def bed() -> c1.Printer:
     """The part of the build volume that the plates use: the bed less its margins."""
-    return c1.Printer(min(BED[0], BED[1]) - 2 * BED_MARGIN, BED[2] - TOP_MARGIN)
+    return c1.Printer(PIECE_XY - PIECE_GROWTH, PIECE_Z)
 
 
 def floor_fill() -> float:
@@ -700,11 +702,11 @@ def items() -> list[Item]:
                      Stated(SERVICE[1] / 2, SERVICE[1] / 2 + 3.2, "the tops of the level insert and pin holes"))),
         Item("joint5-cover", "joint5", "5", lambda: turned(joint5_cover(), (1, 0, 0), 90), "flat, the outer face on the bed",
              stated=(Stated(0.0, 0.6, "the chamfer of the outer face at the bed"),)),
-        Item("facet45", "facet45", "6", facet45, upright + " (the upper rear piece): on the door's top edge", view=(150.0, 20.0), real=True,
+        Item("facet45", "facet45", "6", facet45, upright + " (the upper rear piece): on the door's top edge", count=2, view=(150.0, 20.0), real=True,
              stated=(Stated(0.0, 64.0, "the rear facet of the rear shelf: 45 degrees, at the limit; only mesh facets pass it"),)),
         Item("cut-in", "cut-in", "6", cut_in, upright + " (the middle piece): on its lower cut", view=(140.0, 20.0), real=True,
              stated=(Stated(0.0, 30.0, "the upper half of the cut-in (33 degrees at its lip) and the steps of the cavity inside"),)),
-        Item("hand-hold", "hand-hold", "6", hand_hold, upright + " (the upper rear piece): on its lower cut", view=(150.0, 5.0), real=True,
+        Item("hand-hold", "hand-hold", "6", hand_hold, upright + " (the upper rear piece): on its lower cut", count=2, view=(150.0, 5.0), real=True,
              stated=(Stated(0.0, 52.0, "the roof of the hand-hold: 45 degrees, at the limit; and the steps of the cavity inside"),)),
         Item("edges-level", "edges", "6", edge_bar, "lying: the edges are level, as on the rear shelf", 0.55, view=(-150.0, 30.0),
              stated=(Stated(9.0, 17.5, "the facet that faces down 45 degrees and its round: at the limit"),)),

@@ -26,7 +26,9 @@ Three coupons are cut from the real skin of the body: `facet45`, `cut-in` and `h
 
 ## The printer and the plates
 
-The owner gives the build volume of the Qidi Q2 as 256 x 256 x 270 mm. The ABS note (`docs/research/abs-switch.md`, section 1) has 270 x 270 x 256. A research agent gets the numbers from the maker. The plates use 240 x 240 mm: the bed of 256 less a margin of 8 mm at each side, for brim ears and the purge line. The parts have 5 mm between them. The height limit is 260 (270 less 10). The highest part is 100 mm, so the set fits the two readings of the build volume.
+The print size of the Qidi Q2 is 270 x 270 x 256 mm (width, depth, height), from the maker's specification. The limit of a piece of the cabinet is 250 x 250 mm on the bed and 250 mm high. The footprint in the model is 248 x 248 mm, because the slicer makes a piece larger to compensate the shrink. The margins are estimates.
+
+The plates use 248 x 248 mm. This leaves 11 mm at each side of the bed, for brim ears and the purge line. The parts have 5 mm between them. The height limit is 250 mm. The highest part is 100 mm.
 
 ## The rule for the estimates
 
@@ -38,16 +40,16 @@ Print the plates in this order. Plate 1 gives the shrink value for the slicer, s
 
 | Plate | Content | Prints | ABS (g) | Time (h) | Print it |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Shrink | 2 | 19 | 0.9 | First |
-| 2 | Warp: two walls and the flat strip | 3 | 224 | 10.0 | After the shrink value is in the slicer |
+| 1 | Shrink | 2 | 20 | 1.0 | First |
+| 2 | Warp: two walls and the flat strip | 3 | 226 | 10.1 | After the shrink value is in the slicer |
 | 3 | Holes, inserts and the cone | 7 | 110 | 4.9 | After plate 1 |
 | 4 | Joint 1: the fit | 6 | 324 | 14.4 | After plate 1 |
 | 5 | The weld pairs and joints 2, 3 and 5 | 12 | 193 | 8.6 | After plates 3 and 4 (they give the insert hole and the key clearance) |
-| 6 | The form: facet, edges, cut-in, hand-hold | 5 | 89 | 4.0 | After plate 2 gives the fan setting |
+| 6 | The form: facet, edges, cut-in, hand-hold | 7 | 129 | 5.8 | After plate 2 |
 | 7 | The floor tile | 1 | 128 | 5.7 | After plate 2 |
 | 8 | The finish: four pairs | 8 | 432 | 19.1 | After plate 4 chooses the clearance and plate 5 chooses the weld |
 | 9 | The finish: four plaques | 4 | 136 | 6.1 | With plate 8 |
-| | All | 48 | 1654 | 73.9 | |
+| | All | 50 | 1697 | 75.7 | |
 
 The ABS note says to print few parts on one plate, because a short layer time decreases the layer bond. If a plate with many parts shows weak layers, divide it.
 
@@ -57,7 +59,8 @@ The settings are those of the real shell pieces. Write down the values that you 
 
 - Dry the filament before you print.
 - Heat the chamber. The ABS note gives 60 C for large or dense parts. Preheat the chamber before the first layer.
-- Use a low part fan. Plate 2 and plate 6 give the value: the fan must be low for the layer bond, and high enough for the 45 degree facets.
+- Examine the chamber setting in the filament profile before each print. The "Generic ABS" profile for the Q2 has the chamber heater off.
+- The part fan: the ABS profiles for the Q2 put 80 % fan on overhangs. By the calculation of the research, this includes the 45 degree facets at layers of 0.12 or 0.16 mm. More fan gives a cleaner face and a weaker bond between layers. Plate 6 compares two fan values.
 - The skin is 4 mm. Bambu warns that more than 6 wall loops and infill of more than 50 % increase warp in ABS. A skin that is all wall loops has about 10 loops. The two prints of `warp-wall` compare the two builds of the skin (plate 2).
 - Put the seam of the layers on the inside.
 - Use no hole compensation. The coupons measure the holes as printed.
@@ -90,20 +93,20 @@ Sunk dots identify the variants. One dot is the first value in the list, two dot
 
 | Part | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |
 | --- | --- | --- | --- | --- | --- |
-| `shrink-x` | 1 | 220 x 12 x 8 | Flat, along X of the bed | 9 | 0.4 |
-| `shrink-y` | 1 | 12 x 220 x 8 | Flat, along Y of the bed | 9 | 0.4 |
+| `shrink-x` | 1 | 230 x 12 x 8 | Flat, along X of the bed | 10 | 0.4 |
+| `shrink-y` | 1 | 12 x 230 x 8 | Flat, along Y of the bed | 10 | 0.4 |
 
-Each bar has three stops. The outer faces of the stops are 110.00 and 220.00 mm from the first face. The stops stand above the base, so the first layer does not change the measurement.
+Each bar has three stops. The outer faces of the stops are 115.00 and 230.00 mm from the first face. The two bars fill one plate. The stops stand above the base, so the first layer does not change the measurement.
 
-One study measured printed ABS 0.59 % short in X and 0.69 % short in Y, and 0.92 % long in Z (`abs-switch.md`, section 3.3). Prusa gives 1 % to 2 % for ABS. Thus the bar can be 218.5 to 218.7 mm, or as short as 215.6 mm. The value depends on the filament and the chamber temperature. The coupon gives it.
+One study measured printed ABS 0.59 % to 0.69 % short in the plane of the bed, and 0.92 % long in Z (`abs-switch.md`, section 3.3). A printer maker gives 1 % to 2 % for ABS. Thus the bar can be 228.4 to 228.6 mm, or as short as 225.4 mm. The sources do not agree, so the bars must give the value for this printer and this filament.
 
 1. Let the bars cool to room temperature.
-2. Measure 110 and 220 on each bar with a caliper, over the outer faces of the stops.
+2. Measure 115 and 230 on each bar with a caliper, over the outer faces of the stops.
 3. Calculate the shrink in percent for X and for Y.
 4. Set the shrink compensation of the filament in the slicer to the measured value.
 5. Print the two bars again and measure them again.
 
-- Pass: after the compensation, each length is in the range 219.8 to 220.2 mm (0.1 %). X and Y differ by less than 0.2 percentage points.
+- Pass: after the compensation, each length is in the range 229.8 to 230.2 mm (0.1 %). X and Y differ by less than 0.2 percentage points.
 - If it fails: do not change the model. If X and Y differ by more, set different values for X and Y in the slicer. If the slicer cannot do that, the closing gap of 0.5 mm (`OtherJoints.closing_gap`) becomes too small for the pieces that are 229 mm long. Then increase that gap.
 - Shrink in Z: plate 2 measures it on the wall.
 
@@ -112,7 +115,7 @@ One study measured printed ABS 0.59 % short in X and 0.69 % short in Y, and 0.92
 | Part | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |
 | --- | --- | --- | --- | --- | --- |
 | `warp-wall` | 2 | 180 x 16 x 100 | Upright on its foot flange, as the wall pieces print | 169 | 7.5 |
-| `flat-strip` | 1 | 240 x 40 x 10 | Flat, the table face on the bed | 55 | 2.4 |
+| `flat-strip` | 1 | 248 x 40 x 10 | Flat, the table face on the bed | 57 | 2.5 |
 
 Warp is the largest risk of ABS for this cabinet. The ABS note found no published limit for the size of a part. Large flat dense parts warp even in a chamber of 65 C. These coupons give the limit for this printer. The pass values are the values that the joints need. They are not from a source.
 
@@ -131,14 +134,14 @@ Warp is the largest risk of ABS for this cabinet. The ABS note found no publishe
 - Choose the build of the skin: wall A if it passes, because sanding cannot get to infill. Wall B if only wall B passes.
 - If the two walls fail: increase the chamber temperature, decrease the fan, add brim ears, and print again. If a wall still fails, the largest pieces (229 x 228) need ribs on their flat walls or a smaller size, and the split changes.
 
-**`flat-strip`: a long flat piece on the bed.** A strip of the floor (the 10 mm sandwich), 240 x 40 mm, as long as the plate allows. It has sharp corners, as the floor tiles have. The corners show the lift.
+**`flat-strip`: a long flat piece on the bed.** A strip of the floor (the 10 mm sandwich), 248 x 40 mm, as long as the plate allows. It has sharp corners, as the floor tiles have. The corners show the lift.
 
 1. Look at the four corners during the print. Write down the height at which a corner lifts from the bed.
 2. Let the strip cool in the closed chamber. Then remove it.
 3. Put the strip on a flat surface, table face down. Measure the gap below each corner with a feeler gauge.
-4. Hold a straight edge along the top face. Measure the bow over the 240 mm.
+4. Hold a straight edge along the top face. Measure the bow over the 248 mm.
 
-- Pass: no corner lifts during the print. Gap below each corner less than 0.3 mm. Bow less than 0.5 mm over 240 mm.
+- Pass: no corner lifts during the print. Gap below each corner less than 0.3 mm. Bow less than 0.5 mm over 248 mm.
 - If it fails: print it again with brim ears on the four corners. If it passes with ears, all flat pieces of the cabinet get ears.
 - If it fails with ears: the floor tiles (up to 212 x 188) cannot print flat in this ABS. The options from the ABS note are smaller tiles, shallow grooves in the table face that divide the long flat face, round corners, or a glass-filled ABS for the floor.
 
@@ -207,7 +210,7 @@ The research gives a printed hole about 0.25 mm smaller than its model. It does 
 
 These are the three pairs of the joint coupon, with a groove clearance of +0.1, +0.2 and +0.3 mm. The procedure for the fit test and for the repeated-drive test is in `cad/out/coupon/README.md` (made by `candybar.shell.coupon`). That file was written for PETG on the Bambu A1. Where it and this sheet differ, this sheet applies.
 
-Each lower half has two pilot holes: 2.25 mm (the table value for PET) and 2.4 mm (the table value for ABS, 0.8 of the screw diameter). For ABS, 2.4 is the value to expect. The repeated-drive test proves it.
+Each lower half has two pilot holes: 2.25 mm (the table value for PET) and 2.4 mm (the table value for ABS, 0.8 of the screw diameter). For ABS, 2.4 is the first candidate. The repeated-drive test confirms it: drive the same screw into the same hole several times.
 
 For a weld with acetone the flange faces must touch, because acetone does not fill a gap. Thus the fit of the flange faces matters more in ABS than the fit of the key.
 
@@ -276,22 +279,39 @@ In the upright print of a lower piece, the foot flange and its key are a level o
 
 | Part | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |
 | --- | --- | --- | --- | --- | --- |
-| `facet45` | 1 | 60 x 56 x 64 | Upright, as the upper rear piece prints: on the door's top edge | 23 | 1.0 |
+| `facet45` | 2 | 60 x 56 x 64 | Upright, as the upper rear piece prints: on the door's top edge | 47 | 2.1 |
 | `cut-in` | 1 | 35.4 x 44 x 30 | Upright, as the middle piece prints: on its lower cut | 10 | 0.5 |
-| `hand-hold` | 1 | 50 x 30.1 x 51.9 | Upright, as the upper rear piece prints: on its lower cut | 16 | 0.7 |
+| `hand-hold` | 2 | 50 x 30.1 x 51.9 | Upright, as the upper rear piece prints: on its lower cut | 33 | 1.4 |
 | `edges-level` | 1 | 60 x 30 x 24 | Lying: the edges are level, as on the rear shelf | 20 | 0.9 |
 | `edges-upright` | 1 | 24 x 30 x 60 | On its end: the edges are upright, as on the band's stub | 20 | 0.9 |
 
 `facet45`, `cut-in` and `hand-hold` are cut from the real skin. Their inner faces are the stepped faces of the cavity, as on the real pieces.
 
-**The 45 degree faces in ABS.** ABS prints with less part cooling than PETG, because a high fan causes cracks between layers. A face that points down 45 degrees needs cooling to print clean. The two needs are opposite. No source gives a fan value that satisfies the two. `facet45`, `cut-in` and `hand-hold` are the proof: print them with the fan value that passed on plate 2. If they fail, increase the fan in steps and print them again, and then print `warp-wall` again with the new value.
+**The 45 degree faces in ABS.** A face that points down 45 degrees needs cooling to print clean. ABS needs a low fan for the bond between layers. The two needs are opposite. The ABS profiles for the Q2 put 80 % fan on overhangs, which includes these faces. `facet45`, `cut-in` and `hand-hold` are the proof.
+
+Print `facet45` and `hand-hold` two times. Write the letter on the inside with a pen.
+
+- Print F: the fan of the profile (80 % on overhangs).
+- Print L: less fan on overhangs. Start with half of the profile's value.
+
+Compare the two prints of each coupon:
+
+| Compare | How | Better is |
+| --- | --- | --- |
+| The face that points down 45 degrees | Raking light, a straight edge, a fingernail across the layers | No loops that hang, no curl at the lower edge, a gap of less than 0.3 mm |
+| The bond between layers in the 45 degree face | Examine for cracks. Then, after all other tests, break the coupon by hand across the facet or the roof. | No crack. The break goes across the layers and does not divide two layers clean. |
+| `hand-hold` only: the roof under load | Hook two fingers below the roof, hold the coupon in a vice by its lower end, and pull up hard | No crack and no sound. The roof carries the lift of the cabinet. |
+
+- Choose the highest fan value whose bond passes. If print F passes the bond tests, use the profile as it is.
+- If print L has a bad face and print F has a weak bond: print the pair again with a value between the two.
+- Print `cut-in` and the two edge bars one time, with the fan of the profile.
 
 **`facet45`: the 45 degree facet.** 490 cm2 of face that shows prints at exactly 45 degrees with no support (the rear shelf, the band, the roofs of the hand-holds). The coupon is 60 mm of the upper rear piece (x 5 to 65): the frame above the door, the crease of the rear shelf, the rear facet, its round of 3 mm and the foot of the upper rear wall. A foot flange inside stands for the flange of the door frame.
 
 - Print it with no support.
 - Pass: the facet has no loops that hang and no curl at the crease. A straight edge on the facet shows a gap of less than 0.3 mm. A fingernail does not catch on the layers. The round is clean. No crack shows between layers.
 - Then prime and paint it with the system of plate 9. Pass: the facet reads as one flat face at 1 m.
-- If no fan value passes: the rear shelf and the band cannot print at 45 degrees in ABS with no support. The options are a steeper facet (a change of the form, decision record 0007), a tilted print of the upper rear pieces, or support and more work on 490 cm2.
+- If no fan value gives a clean face and a good bond: the rear shelf and the band cannot print at 45 degrees in ABS with no support. The options are a steeper facet (a change of the form, decision record 0007), a tilted print of the upper rear pieces, or support and more work on 490 cm2.
 
 **`cut-in`: a cut-in.** The right lower rear corner of the body (the ellipse column) with the second cut-in, whole: 1.5 mm deep, 10 high, with its round ends. The upper half of the groove points down 33 degrees at its lip.
 
@@ -301,7 +321,7 @@ In the upright print of a lower piece, the foot flange and its key are a level o
 **`hand-hold`: the rim and the roof of a hand-hold.** The outer end of the right hand-hold: the rim, the roof that falls 45 degrees, the wall above the rim (9.8 mm high) and the body top.
 
 - Pass: the roof prints clean with no support. The rim is straight. The wall above the rim is not bent. After primer and paint, the rim shows no thin paint.
-- The coupon does not prove the strength of the hand-hold. It is 50 mm wide. The ABS note gives a lower impact strength across the layers for ABS than for PETG.
+- The roof carries the lift of the cabinet, and the ABS note gives a lower impact strength across the layers for ABS than for PETG. The pull test above compares the two fan values. It does not prove the full load: the coupon is 50 mm wide.
 - If it fails: the roof needs a steeper angle, or the upper rear piece needs support in the recess.
 
 **`edges-level` and `edges-upright`: the edge finish and paint.** One bar, printed two times: lying (the edges are level and the layers make the round) and on its end (the edges are upright). The section has six edges:
@@ -381,16 +401,17 @@ The plaques P1 to P4 are the primer tests. The matrix of the PETG note (section 
 
 | Coupon | Change |
 | --- | --- |
-| `flat-strip` | New: a long flat strip of the floor, to see the corners lift |
+| `flat-strip` | New: a long flat strip of the floor (248 mm), to see the corners lift |
 | `weld-lower`, `weld-upper` | New: three pairs for the solvent weld |
 | `warp-wall` | Print two: one for each build of the skin |
-| `shrink-x`, `shrink-y` | Same parts. ABS values for the length to expect. On a plate of their own. |
+| `shrink-x`, `shrink-y` | 230 mm long (they were 220), on a plate of their own. ABS values for the length to expect. |
 | `joint1-*`, `joint2-*`, `joint3-*` | Same parts. The pilot hole to expect is the ABS value (2.4, and 2.8 for the 3.5 screw). The flange faces must touch for the weld. |
 | `insert`, `holes-lever`, `joint5-*` | Same parts. A check for cracks after one day is new. |
-| `facet45`, `cut-in`, `hand-hold` | Same parts. They are the proof of the 45 degree faces with the low fan of ABS. |
+| `facet45`, `hand-hold` | Same parts. Print two of each: one with the fan of the profile, one with less. They are the proof of the 45 degree faces in ABS. |
+| `cut-in` | Same part. It is a proof of the 45 degree faces too. |
 | `finish-*`, `plaque-*` | Same parts. The matrix is for ABS: weld, slurry or putty, wait, primer, lacquer, stress crack. |
 | `floor-tile` | Same part. The mass range is for ABS. |
-| All plates | Nine plates for a bed of 256 x 256 with a margin of 8 mm, and a height of 270. All masses are for ABS (1.05 g/cm3). |
+| All plates | Nine plates of 248 x 248 on the bed of 270 x 270 (a margin of 11 mm), with a height limit of 250. All masses are for ABS (1.05 g/cm3). |
 
 ## What the modelling found
 

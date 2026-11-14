@@ -64,12 +64,16 @@ class CouponSetTest(unittest.TestCase):
         self.assertEqual(sum(len(p) for p in layout.values()), sum(r["count"] for r in self.rows))
 
     def test_the_plates_keep_a_margin_on_the_bed_of_the_printer(self) -> None:
-        self.assertEqual(coupons.BED, (256.0, 256.0, 270.0))
-        self.assertEqual((self.lim.xy, self.lim.z), (256.0 - 2 * coupons.BED_MARGIN, 270.0 - coupons.TOP_MARGIN))
-        self.assertGreaterEqual(coupons.BED_MARGIN, 5.0)
-        self.assertLessEqual(max(r["box_mm"][2] for r in self.rows), 256.0 - coupons.TOP_MARGIN)   # the other reading of the Q2: 256 high
+        self.assertEqual(coupons.BED, (270.0, 270.0, 256.0))
+        self.assertEqual((self.lim.xy, self.lim.z), (248.0, 250.0))
+        self.assertEqual((coupons.BED_MARGIN, coupons.TOP_MARGIN), (11.0, 6.0))
         strip = next(r for r in self.rows if r["part"] == "flat-strip")
         self.assertEqual(strip["box_mm"][0], self.lim.xy)
+        self.assertLessEqual(coupons.SHRINK_L + coupons.GAP + coupons.SHRINK_W, self.lim.xy)
+
+    def test_the_facet_and_the_hand_hold_print_two_times_for_the_two_fan_values(self) -> None:
+        self.assertEqual({r["part"]: r["count"] for r in self.rows if r["part"] in ("facet45", "hand-hold", "warp-wall")},
+                         {"facet45": 2, "hand-hold": 2, "warp-wall": 2})
 
     def test_the_parts_on_a_plate_do_not_touch(self) -> None:
         sizes = {"a": (100.0, 50.0), "b": (100.0, 50.0), "c": (30.0, 200.0), "d": (220.0, 12.0)}
