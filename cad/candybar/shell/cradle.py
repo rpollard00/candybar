@@ -109,7 +109,7 @@ class Cradle:
     lug_x1: float = 72.0
     lug_reach: float = 11.1
     lug_t: float = 6.0
-    lug_v: float = 141.6            # the row of the screw, the pin and the magnet, from the centre of the image
+    lug_v: float = 143.0            # the row of the screw, the pin and the magnet, from the centre of the image
     lug_slot: float = 1.25          # the screw hole is a slot, this far each way along the face
     head_d: float = 8.2             # counterbore for an M4 button head (ISO 7380)
     head_h: float = 2.4

@@ -92,7 +92,7 @@ def cameras(d: Blueprint, c: dict) -> dict:
     return {"closeup-face": cam(f.pt(0, 0, 0), 262, 0, d.recline, 0.78),
             "closeup-window-corner": cam(f.pt(MON_ACTIVE_W / 2 - 6, MON_ACTIVE_H / 2 - 4, 4), 20, -18, d.recline + 8),
             "closeup-outline-corner": cam(f.pt(hw - 5, hl - 5, -3), 20, 22, d.recline + 10),
-            "closeup-seam": cam(f.pt(0, hl - 22, 0), 46, 0, d.recline + 6),
+            "closeup-seam": cam(f.pt(0, hl - 24, -4), 60, 0, d.recline),
             "closeup-lug": cam(f.pt(lug[0], lug[1] + 4, 10), 52, -14, d.recline + 14),
             "closeup-bottom-jaw": cam(f.pt(c["bar_x"], -128, 20), 62, 26, d.recline + 20),
             "closeup-top-jaw": cam(f.pt(c["bar_x"], 124, 20), 62, 26, d.recline - 22),
@@ -110,7 +110,7 @@ def render_all() -> None:
     inside = [(MODEL, p, None) for p in CRADLE]
     hardware = [(MODEL, "monitor", None), (MODEL, "plugs", "#e0c890"), (MODEL, "pads", None)]
     skin = [(MODEL, "skin", "white")]
-    jobs = [("plate-on", shell + [(MODEL, "bezel_plate", None), (MODEL, "monitor", "#22262e")], ["closeup-face", "closeup-window-corner", "closeup-outline-corner", "closeup-seam"]),
+    jobs = [("plate-on", shell + [(MODEL, "bezel_plate", None), (SHELL, "screen", "#1c2230")], ["closeup-face", "closeup-window-corner", "closeup-outline-corner", "closeup-seam"]),
             ("plate-off", skin + inside + hardware, ["closeup-face", "closeup-lug", "closeup-bottom-jaw", "closeup-top-jaw", "closeup-channel"]),
             ("empty", skin + inside, ["closeup-face", "closeup-lug", "closeup-channel"]),
             ("way-out", skin + inside + [(os.path.join(MODEL, "path", k), "monitor", colour) for k, colour in (("in", "#3a4250"), ("half", "#7f8aa0"), ("out", "#c0c8d8"))]
@@ -119,7 +119,10 @@ def render_all() -> None:
             ("option-halves", [(os.path.join(MODEL, "options", "halves"), p, None) for p in ("bezel_half_right", "bezel_half_left")], ["closeup-face", "closeup-seam"]),
             ("option-bars", [(os.path.join(MODEL, "options", "bars"), p, None)
                              for p in json.load(open(os.path.join(MODEL, "options", "bars", "manifest.json")))], ["closeup-face", "closeup-seam"])]
+    only = sys.argv[2:]
     for name, parts, views in jobs:
+        if only and name not in only:
+            continue
         render(name, scene(name, parts, cams), views)
 
 
@@ -183,10 +186,10 @@ def sections_sheet(data: dict, rep: dict) -> None:
     fig, axs = plt.subplots(1, 2, figsize=(17, 7.5), gridspec_kw={"width_ratios": [1.0, 1.9]})
     xw = c["side_wall_x"]
     draw_cut(axs[0], cuts["channel"], (165, 252), (62, -16), f"Cable channel, right side: section across the face at v {c['boss_v'][1]:g}; x across, t behind the face")
-    note(axs[0], "side of the body, inner face x 243", (xw + 1, 40), (168, 58))
-    note(axs[0], "boss with insert M3 (added solid)", (xw - 2.5, 36), (168, 52))
-    note(axs[0], f"clear {c['channel_in'][0]:g} x {c['channel_in'][1]:g}: video lead, power lead, slack", (xw - 18, 36), (168, 46))
-    note(axs[0], "entry slot 9, toward the plugs", (xw - 29.5, 36), (168, 40))
+    note(axs[0], "side of the body, inner face x 243", (xw + 2, 56), (168, 58))
+    note(axs[0], "boss with insert M3 (added solid)", (xw - 2, 40), (168, 52))
+    note(axs[0], f"clear {c['channel_in'][0]:g} x {c['channel_in'][1]:g}: video lead, power lead, slack", (xw - 17, 38), (168, 46))
+    note(axs[0], "entry slot 9, toward the plugs", (xw - 30.5, 36), (168, 40))
     note(axs[0], "plug room 22 (right-angle plugs)", (188, 13), (168, -10))
     note(axs[0], "jamb of the opening", (219, 0), (222, -10))
     draw_cut(axs[1], cuts["across the image"], (-252, 252), (62, -16), "Across the centre of the image: both channels, both uprights, the monitor with its plug room")
@@ -198,9 +201,9 @@ def sections_sheet(data: dict, rep: dict) -> None:
 
     fig, axs = plt.subplots(1, 3, figsize=(17, 6.8))
     v = c["lug_v"]
-    draw_cut(axs[0], cuts["pin"], (-v - 16, -v + 12), (20, -8), f"Locating pin (x {c['pin_x']:g}), bottom: dowel 4 x 12 pressed in the lug; slot in the plate")
-    draw_cut(axs[1], cuts["magnet"], (-v - 16, -v + 12), (20, -8), f"Magnets (x {c['magnet_x']:g}), bottom: 8 x 3 in the lug and 8 x 3 in the plate")
-    draw_cut(axs[2], cuts["lug and ear"], (-v - 16, -v + 12), (26, -8), "Screw of the upright: under the plate, in a slot of 2.5 along the face")
+    draw_cut(axs[0], cuts["pin"], (-v - 16, -v + 12), (20, -8), f"Locating pin (x {c['pin_x']:g}): dowel 4 x 12 in the lug, slot in the plate")
+    draw_cut(axs[1], cuts["magnet"], (-v - 16, -v + 12), (20, -8), f"Magnets (x {c['magnet_x']:g}): 8 x 3 in the lug, 8 x 3 in the plate")
+    draw_cut(axs[2], cuts["lug and ear"], (-v - 16, -v + 12), (26, -8), "Screw of the upright, under the plate")
     note(axs[0], f"plate {c['plate_fit']:g} smaller than its recess", (-f["half_len"] + 0.25, 0), (-v - 15, -6))
     note(axs[0], "slot 4.3 wide, +-2 along the radius, 6.5 deep", (-v, t0 - 3), (-v - 15, 17))
     handles, labels = axs[0].get_legend_handles_labels()
@@ -233,7 +236,8 @@ def tile(scene_name: str, view: str, w: int) -> Image.Image:
 
 
 def page(title: str, rows: list[list[tuple[str, Image.Image]]], notes: list[str], out: str) -> None:
-    gap, top, width = 14, 74, max(sum(im.width for _, im in row) + gap * (len(row) + 1) for row in rows)
+    gap, top = 14, 74
+    width = max(sum(im.width for _, im in row) + gap * (len(row) + 1) for row in rows)
     lines = [ln for n in notes for ln in textwrap.wrap(n, int(width / 10.2)) + [""]]
     height = top + sum(max(im.height for _, im in row) + 30 + gap for row in rows) + 25 * len(lines) + 20
     sheet = Image.new("RGB", (width, height), (255, 255, 255))
