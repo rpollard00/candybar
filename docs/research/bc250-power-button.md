@@ -270,7 +270,7 @@ I/O end is above it. Each length has 0.2 m of slack. ESTIMATED.
 
 | Place | Piece of the shell | Cable from the adapter or the 24-pin plug | For | Against |
 | --- | --- | --- | --- | --- |
-| Right side face of the deck, in the USB socket plate or beside it | The USB socket plate (a service part), or deck side R | About 1.0 m | Out of view, as the USB sockets are. The seated player reaches it. A plate that comes off can be printed again if the button changes. The leads of the hub go to the same place. | The wall is 31 mm tall: 16 mm fits, 19 mm is tight. The longest cable. |
+| Right side face of the deck, in the USB socket plate or beside it | The USB socket plate (a service part), or deck side R | About 1.0 m | Out of view, as the USB sockets are. The seated player reaches it. A plate that comes off can be printed again if the button changes. The leads of the hub go to the same place. | The wall is 31 mm tall: a button of 16 mm fits, and one of 19 mm is tight (ESTIMATED from a rim of about 22 mm). The longest cable. |
 | Left side face of the deck | Deck side L | About 0.5 m | Out of view. A short cable. | A hole in a piece that is bonded and painted. |
 | Lower rear wall, beside the opening for the supply | Rear lower L | About 0.3 m | The shortest cable. The front and the sides have no hole. | The player reaches behind the cabinet, where the rocker already is. |
 | The apron, below the bezel plate | Apron | About 0.7 m | The button shows, as a power lamp does on an arcade cabinet. | It changes the look of the screen face. The room behind the apron is not examined. The roadmap has the open decision "What the apron carries". |
