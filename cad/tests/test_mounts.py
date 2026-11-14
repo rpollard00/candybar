@@ -51,7 +51,7 @@ class MountsTest(unittest.TestCase):
         self.assertEqual(self.rep["failures"], [])
 
     def test_each_solid_is_one_valid_solid(self) -> None:
-        self.assertEqual(len(self.design.solids), 30)
+        self.assertEqual(len(self.design.solids), 37)
         for s in self.design.solids:
             for shape in (s.shape, s.whole):
                 self.assertTrue(shape.isValid(), s.name)
@@ -104,7 +104,7 @@ class MountsTest(unittest.TestCase):
 
     def test_no_boss_is_near_a_seam(self) -> None:
         rows = self.rep["seams"]
-        self.assertEqual(len(rows), 21)
+        self.assertEqual(len(rows), 26)
         self.assertGreaterEqual(min(r["distance"] for r in rows), mounts.SEAM_CLEAR)
         x_bay = split.lines(self.d).x_bay
         on_seam = mounts.build(self.d, self.lay, replace(self.m, power_tie=(x_bay, 397.0)), self.v, self.result.skin)
@@ -135,16 +135,23 @@ class MountsTest(unittest.TestCase):
 
     def test_each_small_item_has_a_place_that_is_clear_and_a_tie_point(self) -> None:
         places = {r["name"]: r for r in self.rep["places"]}
-        self.assertEqual(sorted(places), ["PlaceAmplifier", "PlaceButtonAdapter", "PlaceDpAdapter", "PlacePdBoard"])
+        self.assertEqual(sorted(places), ["PlaceAmplifier", "PlaceButtonAdapter", "PlaceCharger", "PlaceChargerBarrel", "PlaceChargerUsb", "PlaceDpAdapter"])
         s, ties = self.design.site, {r["name"]: r for r in self.rep["ties"]}
-        for name in ("TieButton", "TieDeck", "TieAmpFront", "TieAmpRear", "tie slots of the dock L, at the place", "tie slots of the dock R, at the place"):
+        for name in ("TieButton", "TieDeck", "TieAmpFront", "TieAmpRear", "TieChargerFront", "TieChargerRear", "TieBarrel", "tie slots of the dock L, at the place"):
             self.assertIn(name, ties)
-        dp, pd, amp = places["PlaceDpAdapter"]["box"], places["PlacePdBoard"]["box"], places["PlaceAmplifier"]["box"]
-        # the adapter and the board are in front of the plane of the board and outside its ends: clear of the shroud and of the air zones
+        dp, ch, amp = places["PlaceDpAdapter"]["box"], places["PlaceCharger"]["box"], places["PlaceAmplifier"]["box"]
+        # the adapter is in front of the plane of the board and outside its end: clear of the shroud and of the air zones
         self.assertLess(dp[3], s.y_pcb)
         self.assertLess(dp[1], s.bx0)
-        self.assertLess(pd[3], s.y_pcb)
-        self.assertGreater(pd[0], s.bx1)
+        # the charging hub has the size that the owner gave, air under it, and its USB end below the door opening
+        self.assertEqual([round(ch[1] - ch[0], 1), round(ch[3] - ch[2], 1), round(ch[5] - ch[4], 1)], [74.7, 51.3, 22.6])
+        self.assertGreaterEqual(ch[4] - s.floor, 5.0)
+        usb, barrel = places["PlaceChargerUsb"]["box"], places["PlaceChargerBarrel"]["box"]
+        self.assertAlmostEqual(usb[1] - usb[0], 40.0)
+        self.assertAlmostEqual(barrel[1] - barrel[0], 40.0)
+        self.assertLess(ties["TieBarrel"]["at"][0], barrel[0])
+        self.assertTrue(s.bx1 < usb[0] and usb[0] < s.door["x1"])
+        self.assertLess(usb[2] - s.hub[3], 60.0)
         # the amplifier is far from the fan of the power supply
         self.assertGreater(amp[0] - s.psu[1], 150.0)
         # a place that moves into the exhaust duct fails the rules: the rules see the places

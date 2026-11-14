@@ -46,7 +46,8 @@ Step 1 exits with 1 if a check fails. It takes 2 minutes. The first run takes 3 
 | `PsuRailL`, `PsuRailR`, `PsuStopL`, `PsuStopR` | boss | 1 each | the floor tiles rear side L and rear centre | 34 in total |
 | `HubRailIn`, `HubRailOut` | boss | 1 each | the floor tile middle side R | 11 in total |
 | `HubSaddle` | printed | 1 | the two hub rails (snap fit) | 9.9 |
-| 13 floor staples, 2 wall staples | boss | 15 | 6 floor tiles, the pieces rear lower L and rear lower R | 0.8 to 1.1 each |
+| 16 floor staples, 2 wall staples | boss | 18 | 7 floor tiles, the pieces rear lower L and rear lower R | 0.8 to 1.1 each |
+| `ChargerRib1`, `ChargerRib2` | boss | 1 each | the floor tile rear side R | 2.3 each |
 
 All screws are M3 socket head screws in M3 heat-set inserts (hole 4.0, depth 6.5). One 2.5 mm hex driver does all of them. The four screws of the power supply are the 6-32 screws that come with it.
 
@@ -147,24 +148,26 @@ A staple is a bar 20 x 6 x 3 on two legs, with an opening 12 x 4 for a cable tie
 | `TieBundleFrontL`, `TieBundleFrontR` | (-45, 437.9, 10), (45, 437.9, 10) | floor rear centre | The strap of the stowed cables |
 | `TieBundleRearL`, `TieBundleRearR` | (-45, 535.9, 84), (45, 535.9, 84) | rear lower L, rear lower R | The strap of the stowed cables: it goes over the bundle from the floor to the rear wall |
 | `TieLead1` to `TieLead4` | x -150, -50, 50, 150 at y 230, z 10 | floor middle side L, centre, side R | The leads from the control panel to the hub |
-| `TiePower` | (75, 397, 10) | floor rear centre | The 12 V lead to the BC-250 and the 5 V lead to the hub |
+| `TiePower` | (40, 397, 10) | floor rear centre | The 12 V lead to the BC-250, the Molex lead to the charging hub and the 5 V lead to the hub |
 | Tie slots of the dock L | (-189.15, 444.35, 175.5) | `DockL` | The video lead from the I/O end to the left cable channel of the monitor |
-| Tie slots of the dock R | (180.45, 444.35, 175.5) | `DockR` | The power lead of the monitor, the 12 V lead where it goes up, the leads from the hood |
+| Tie slots of the dock R | (180.45, 444.35, 175.5) | `DockR` | The USB-C lead from the charging hub to the monitor, the 12 V lead where it goes up, the leads from the hood |
 
-No tie point is in an air zone or in a keep-out zone. The leads from the hood have no tie point above the docks: the hood and its hardware are not designed.
+The tie points of the small items are in the section "The places of the small items". No tie point is in an air zone or in a keep-out zone. The leads from the hood have no tie point above the docks: the hood and its hardware are not designed.
 
 ## The places of the small items
 
-The owner named four small items on 2026-11-14. No part is chosen, so each has a place: a box of room that the checks keep clear, and a tie point. Each size is an estimate. `Mounts` has the sizes and the positions.
+The owner named four small items on 2026-11-14. Only the charging hub is a known part. Each item has a place: a box of room that the checks keep clear, and a tie point. Each size is an estimate, but the size of the charging hub is from its maker. `Mounts` has the sizes and the positions.
 
 | Item | Place (x, y, z) | Held by | Path of its leads |
 | --- | --- | --- | --- |
 | DisplayPort to HDMI adapter (body 22 x 12 x 55) | x -200 to -178, y 444.35 to 456.35, z 128 to 183: on the rear face of the left dock, the HDMI socket up | A cable tie through two slots of the left dock (x -203 to -200 and x -178 to -175, z 146 to 153) | The plug is in the DisplayPort socket, in the plug space of the exhaust duct. The short cable of the adapter bends to the front round the left end of the board. The HDMI lead goes up 3 mm into the left cable channel (z 186 to 206) and to the monitor. |
-| 12 V to USB-C power delivery board (50 x 15 x 30) | x 168 to 218, y 444.35 to 459.35, z 132 to 162: on the rear face of the right dock, below its two screws | A cable tie through two slots of the right dock (x 165 to 168 and x 218 to 221, z 130 to 137) | 12 V comes from the supply along the floor through `TiePower`, then up to the dock. The USB-C lead goes up 24 mm into the right cable channel and to the monitor. |
+| DC to USB charging hub that feeds the monitor (74.7 x 51.3 x 22.6, 80 g, from the maker's table) | x 115 to 189.7, y 384 to 435.3, z 15 to 37.6: behind the hub, its length across the cabinet. It lies on two ribs 5 high (`ChargerRib1`, `ChargerRib2`), so it has air below it. Its left end has the barrel socket and the two USB-A sockets. Its right end has the two USB-C sockets. A room of 40 is clear beyond each end (x 75 to 115 and x 189.7 to 229.7). | A strap from `TieChargerFront` (152.35, 377, 10) to `TieChargerRear` (152.35, 442.3, 10). The staple `TieBarrel` (62, 409.65, 10) holds the lead of the barrel plug, 13 from the plug room, so that the plug cannot come out. | 12 V comes from a Molex lead of the supply, with a fuse, along the floor through `TiePower` (40, 397, 10) and `TieBarrel`. The USB-C lead goes from the right end up the right side, through the tie slots of the right dock (180.45, 444.35, 175.5), into the right cable channel and to the monitor. A USB-A lead can go from the left end to the rear plugs of the hub. |
 | Adapter of the power button, in its case on the 24-pin lead (60 x 25 x 20) | x -62 to -2, y 402 to 427, z 10 to 30: on the floor, right of the supply and in front of the stowed cables | A strap from the staple `TieButton` (-32, 396, 10) to `TieBundleFrontL` | The four-wire lead goes along the floor through `TieLead3` and `TieLead4`, then to the front through `TieDeck` (190, 170, 10) to the USB socket plate. The signal wire goes up with the 12 V lead to the board. |
 | Audio amplifier (50 x 40 x 20) | x 112 to 162, y 262 to 302, z 10 to 30: on the floor, 14 left of the hub | A strap from `TieAmpFront` (137, 252, 10) to `TieAmpRear` (137, 312, 10) | Power comes from the hub side or from `TiePower`. The speaker leads come down from the hood (not designed). |
 
-- The adapter and the power delivery board are in front of the plane of the board and outside its two ends. They are not in the shroud, the exhaust duct or an air zone.
+- The adapter is in front of the plane of the board and outside its left end. It is not in the shroud, the exhaust duct or an air zone.
+- The charging hub is 32.4 behind the hub and 2.4 behind the plug zone of the hub. It has 5 of air below it and 86 above it to the board. It is 100.7 in front of the rear wall and its make-up air inlet.
+- The right end of the charging hub is below the part of the door opening that is free at the right of the compute module (x 163 to 211). A hand gets to the whole unit when the compute module is out.
 - The amplifier is 185 to the right of the power supply.
 - The plug of the 24-pin lead is in the plug zone in front of the supply (z 20 to 60). The front stop is below it (z 19.5), and no mount is in that zone. A hand gets to the plug through the door opening when the compute module is out.
 - The adapter of the power button leaves with the 24-pin lead before the supply comes out.
@@ -194,10 +197,10 @@ The module does these checks in each run. `cad/out/mounts/report.md` has the num
 
 | Check | Result |
 | --- | --- |
-| No part and no net solid of a boss has volume in the skin. Each root is in the skin or in the floor. | PASS: 30 solids, 0 mm3 |
+| No part and no net solid of a boss has volume in the skin. Each root is in the skin or in the floor. | PASS: 37 solids, 0 mm3 |
 | No two solids of the mounts have a common volume. | PASS |
 | The rules of the fit study on the hardware alone | PASS |
-| The rules of the fit study with the 30 solids added as hardware (the four places included): interference (3290 pairs), keep-out zones, containment (124 solids), air zones, door service | PASS, with one declared item (see "The declared item") |
+| The rules of the fit study with the 37 solids added as hardware (the six boxes of the places included): interference (3892 pairs), keep-out zones, containment (131 solids), air zones, door service | PASS, with one declared item (see "The declared item") |
 | A driver of diameter 6 gets to each screw through the rear door opening | PASS: 6 screws. The smallest margin to the side of the opening is 2.35 (the screws of the docks). |
 | The compute module comes out | PASS: margins 4.0, 48.4, 10.0, 4.0 |
 | The power supply comes out | PASS: margins 52.7, 220.0, 2.0, 77.0 |
@@ -247,4 +250,4 @@ Each tray half has two posts through the air zone behind the backplate (`Compute
 - `docs/blueprint/index.md`, "Hardware in the shell": a reference to this document and to the sheets.
 - `cad/README.md`: the four commands of "Build".
 - `cad/candybar/shell/structure.py`, `mounts()` and `members()`: the text for the BC-250 says "two uprights and two rails, right upright on the floor, left upright on the door sill". The proposal is two docks on the side walls. The text for the power supply says "a saddle, two straps over it". The proposal is a fence and the four rear screws.
-- The split and the floor: 2 bosses on the pieces middle L and middle R, 2 staples on the pieces rear lower L and rear lower R, and 19 bosses on six floor tiles. `cad/out/mounts/report.md` ("Bosses") has the box of each. The opening of the supply in the piece rear lower L needs the four holes.
+- The split and the floor: 2 bosses on the pieces middle L and middle R, 2 staples on the pieces rear lower L and rear lower R, and 24 bosses on seven floor tiles. `cad/out/mounts/report.md` ("Bosses") has the box of each. The opening of the supply in the piece rear lower L needs the four holes.
