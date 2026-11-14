@@ -124,14 +124,19 @@ class Layout:
 
 # ---------- the parameter sheet, with the anchors of this form ----------
 
+# the anchors that are angles; every other value that the study sets is a length
+ANGLES = ("recline",)
+
+
 def sheet_rows(params_dir: Path, values: dict[str, float]) -> list[params.Param]:
     """The rows of the parameter sheets, with the values of `values` in place of the rows of the same name, and new
-    rows for the names that the sheets do not have."""
+    rows for the names that the sheets do not have. The anchors are new rows: the sheets hold the sizes of the
+    hardware, and the study calculates where each item stands."""
     rows = params.load(params_dir)
     known = {r.name for r in rows}
     out = [replace(r, value=repr(float(values[r.name])), status="derived", source=SHEET_ROWS) if r.name in values else r for r in rows]
     unit = {r.name: r.unit for r in rows}
-    extra = [params.Param(k, repr(float(v)), "mm", "derived", "", SHEET_ROWS, "fit study", SHEET_ROWS, i + 1)
+    extra = [params.Param(k, repr(float(v)), "deg" if k in ANGLES else "mm", "derived", "", SHEET_ROWS, "fit study", SHEET_ROWS, i + 1)
              for i, (k, v) in enumerate(values.items()) if k not in known]
     for k in values:
         if k in known and not unit[k]:
