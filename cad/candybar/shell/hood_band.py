@@ -186,8 +186,8 @@ VARIANTS = {
 PARTS = {
     "hood": ("white", "painted"), "marquee_lip": ("white", "painted"), "speaker_pod": ("white", "painted"),
     "logo_field": ("white", "painted"), "grille": ("black", "black"), "logo_badge": ("#2f4f3a", "plate"),
-    "marquee_front": ("#e9dca6", "translucent"), "light_box": ("dark", "inside"), "driver_seat": ("dark", "inside"),
-    "logo_backer": ("dark", "inside"), "driver": ("grey", "hardware"), "led_strip": ("#d8c060", "hardware"),
+    "marquee_front": ("#e9dca6", "translucent"), "light_box": ("#2a2a30", "inside"), "driver_seat": ("#2a2a30", "inside"),
+    "logo_backer": ("#2a2a30", "inside"), "driver": ("#5a5a5c", "hardware"), "led_strip": ("#d8c060", "hardware"),
 }
 BASE = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black", "screen": "#3a4250"}
 PRINT = {
