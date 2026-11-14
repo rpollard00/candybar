@@ -20,8 +20,8 @@ Each sheet is an SVG file and a PNG file with the same name.
 | `06-junctions` | Hood to body and body to deck, large, from the side, the front and above |
 | `07-face-map` | Every face in a flat false color with its ID |
 | `08-curvature` | Each curved line against its straight chord, with the deviation drawn five times too large, and the same curve on the references as ghost lines |
-| `09-hardware` | The fit study: the hardware and its keep-out zones in the cavity of a 4 mm skin. Two side sections, three plan sections, the rear view with a proposed door opening, the sight lines of three players. Made from `cad/out/shell-bp/fit/sections.json` (see "Hardware in the shell") |
-| `10-split` | The split that the owner chose: front, right side, top and rear, each piece numbered and tinted, every seam drawn and labelled (blue in a design line, red on an open face), and the piece list with the print box of each piece. Made from the cut of `candybar.shell.split` (see "The split") |
+| `09-hardware` | The fit study: the hardware and its keep-out zones in the cavity of a 4 mm skin. Two side sections, three plan sections, the rear view with the door opening, the cut-ins and the hand-holds, the sight lines of three players. Made from `cad/out/shell-rev7/fit/sections.json` (see "Hardware in the shell") |
+| `10-split` | The split of the shell (the owner's choice of 2026-11-11, on revision 7): front, right side, top and rear, each piece numbered and tinted, every seam drawn and labelled (blue in a design line, red on an open face), and the piece list with the print box of each piece. Made from the cut of `candybar.shell.split` (see "The split") |
 | `11-joints` | The joints: dimensioned sections of joints 1 to 7, the coupon pair and the named values. Every value comes from `cad/candybar/shell/joints.py` (see "The joints") |
 
 Drawings of the references are third-party material. They are in `cad/out/shell-d/reconstruction/` (ignored by git):
@@ -64,8 +64,8 @@ Drawings of the references are third-party material. They are in `cad/out/shell-
 | Bezel width / W | 0.885 | 0.858 +-0.016 (measured) | about 0.79 | 0.879 | 344.7 image + 2 x 45 frame |
 | Rail land / W | 0.016 | 0.05 +-0.015 (estimated) | not read | 0.032 | what the bezel leaves, less the edge section; 9.0 at the bezel top (the tuck) |
 | Rail edge, in x back / W | 0.039 x 0.039 (45 deg facet) | 0.03 x 0.12 (band 10 to 18 deg) | not read | 0.026 x 0.049 | the deck's own edge section (10 deg band), so the edge follows through |
-| Side band depth at the desk / W | 0.277 | 0.27 (estimated) | not read | 0.197 | follows both references; the built model has 0.35 |
-| Rear body narrower, each side / W | 0.074 | 0.01 to 0.03 (uncertain) | not read | 0.024 | a shallow step behind the side band |
+| Side band depth at the desk / W | 0.277 | 0.27 (estimated) | not read | 0.359 | revision 7: the stub of the band stands 80 behind the line of its lean; that line passes the desk at 0.197 W; the built model has 0.35 |
+| Rear body narrower, each side / W | 0.074 | 0.01 to 0.03 (uncertain) | not read | 0.024 | the band: a facet of 45 degrees behind the side band |
 | Hood foot width / W | 0.990 | 0.94 to 0.96 (measured) | 0.95 (measured) | 0.954 | the outline of the body top: no shoulder, a groove at the seam |
 | Hood side lean, seam to top corner, deg | 13.5 to 22 (one arc) | about 6, then one long blend (estimated) | 11 to 19 (measured +-3) | 11.1 to 13.1 | tangent to the tuck, then near straight (R 7.2 W), as on the real cabinet |
 | Hood top corner radius / W | 0.074 | none: one long blend (estimated) | 0.06 to 0.07 (measured, left) | 0.070 | the real cabinet's tight corner |
@@ -309,7 +309,7 @@ The planar rear, 2026-11-13 (decision record 0007). The owner rejected the rear 
 
 **The edge rule.** The form is not rounded off, but no outside edge stays fully sharp:
 
-- A convex edge of the rear design that turns 40 degrees or more has a round of 3 (`rear_corner_r`): the outer edge of the band, the hip, the edge where the rear facet ends on the side band (RB10), the lower edge of the upper rear wall, the upright corners of the head (RB7) and of the hood (HC16).
+- A convex edge of the rear design that turns 40 degrees or more has a round of 3 (`rear_round_r`): the outer edge of the band, the hip, the edge where the rear facet ends on the side band (RB10), the lower edge of the upper rear wall, the upright corners of the head (RB7) and of the hood (HC16).
 - Each other convex edge that shows and turns more than 45 degrees has the edge break, a round of 1 (`edge_break`). It is the last modelling step. The faces of this blueprint do not draw it.
 - Concave creases and blunt mitres stay sharp.
 
@@ -321,7 +321,7 @@ The planar rear, 2026-11-13 (decision record 0007). The owner rejected the rear 
 | Hood rear corners | round of 18 | round of 3, on one line with the head's corners |
 | Foot | sharp | base facet of 5 |
 | Parts of the body | front body and rear body | one part, body |
-| Rear door (marking RB6) | 426.7 x 182 | 424.4 x 165 by the rule of the study; the fit study must set it |
+| Rear door (RB6) | 426.7 x 182 | 422.7 x 165: its sides 4 inside the ends of the cut-ins, its top 12 below the crease of the rear shelf |
 
 **How the model makes it.** The band is a cut between two offsets of the stroke: each piece is a true plane. The lower rear corner, the hip and the mitre of the base facet are cut by hand as exact cylinders. One builder makes the other rounds of 3 together. The round of the hood's rear corners is cut by hand: four lofts through sections of the rolling ball on each side. The hood behind its soft edge is now made of exact surfaces (the front outline along the depth, in common with the side profile across the width).
 
@@ -357,16 +357,18 @@ The default build has the edge break on edges that are sharp in R10: the rim of 
 
 The deck front, the deck sides, the rail and the soft edge of the hood have rounds of the design.
 
+**The inside follows the form.** The skin, the fit study, the split and the structure read revision 7 (2026-11-13). The values of the rear have the names of what they are: `rear_shelf_z0` and `rear_shelf_z1` (the creases of the rear shelf), `rear_round_r` (the round of 3), `band_depth`, `band_lean`, `band_lean_y0` (where the line of the lean passes the desk) and `band_foot_y` (the foot of the band at the desk, which is the stub). The names of revision 6 (`rear_step_z0`, `rear_step_z1`, `rear_corner_r`, `step_y0`, `step_in`, `step_lean`) are gone. The door opening is a rule of the form (`door_w`, `door_z0`, `door_z1`): its sides are 4 inside the ends of the cut-ins, and its top is 12 below the crease of the rear shelf. The sections "Hardware in the shell" and "The split" have the results.
+
 ## Hardware in the shell
 
-This section and sheet 09 are those of revision 6. The fit study runs on revision 7, but its layout and its door are not yet changed for the planar rear. `docs/roadmap.md` (step 9) has the results of that run.
+`cad/candybar/shell/fit.py` is a fit study of the hardware in the form of revision 7. It does not change the outer form. Sheet 09 draws it. `cad/out/shell-rev7/fit/report.md` has all the numbers. The study exits 1 when an item does not fit. Result: PASS, with a skin of 4. The test `FitOnTheRealCavityTest` (`cad/tests/test_fit.py`) puts the hardware into the real cavity and checks each rule, so a fit failure shows in the test suite.
 
-`cad/candybar/shell/fit.py` is a fit study of the hardware in the accepted form. It does not change the outer form. Sheet 09 draws it. `cad/out/shell-bp/fit/report.md` has all the numbers. The study exits 1 when an item does not fit. Result: PASS, with a skin of 4.
-
-- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`. It is thicker where the form turns across the width. Measured on 2151 points: smallest 4.00, median 4.00, largest 18.84. Examples: 5.6 at the sides of the body and the hood, 4.5 in the tuck, 12.5 at the rail edge at the middle of the bezel (square to the screen). The wall is open under the control panel (inside a ledge of 8, on the outline of the panel). It is open behind the bezel plate, with a ledge of 6 at the top and the bottom only. The body top is open into the hood.
+- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`. It is thicker where the form turns across the width. Every second slab stands 0.05 farther in (`cavity.RIDGE`): without this step, the skin is not a valid shape. Measured on 2765 points: smallest 4.00, median 4.00, largest 18.84. Examples: 5.6 at the side of the hood, 4.3 at the side of the body below the tuck, 4.5 in the tuck, 12.5 at the rail edge at the middle of the bezel (square to the screen). At a cut-in the wall is 4.0 to 4.9 behind the floor of the groove, and the cavity steps in behind each groove. Round a hand-hold the wall is 4.0 to 5.0, and the cavity ends 30 in front of the rear face. The wall is open under the control panel (inside a ledge of 8, on the outline of the panel). It is open behind the bezel plate, with a ledge of 6 at the top and the bottom only. The body top is open into the hood. The cavity is 56.99 l.
 - **Hardware.** The sizes come from `cad/params/*.csv`. The envelopes are those of `candybar/hardware.py` and `candybar/panel.py`. The anchors come from `Blueprint`. The layout choices are the named values of `fit.Layout`. New rows in `hardware.csv`: the USB sockets and the hub, the room for the marquee modules, and the generic monitor.
 - **Floor.** The power supply and the hub stand on the printed floor of 10 (`Layout.floor_t`, decision record 0006). The floor stands on the table on thin non-slip pads (the owner, 2026-11-11). On the floor of 7 of the study everything stood 3 lower: the power supply is now at z 10, the BC-250's lower edge at z 124, the door sill at z 116, the hub at z 10.1.
-- **Compute module.** The BC-250 has a fixed mount behind the rear door (decision record 0005). The door is a cover with the vents and has no cable on it. The fan stands 5 from the door, and the shroud seals the gap. The BC-250 stands 3 above the clear space over the fan of the power supply (`Layout.bc_above_psu`, 1 more than before), so that its exhaust duct stays out of that space. The proposed door opening is 426.7 x 182: revision 6 narrows it by 20 for the rear corner round, and the floor of 10 raises its sill by 3. The rule "door service" checks that the board, the heatsink, the shroud and the duct lie inside it, and that the power supply's rear face lies on the flat of the rear wall below it. The power supply stands at x -212.4 and the BC-250's I/O edge at x -163.2 (revision 6).
+- **Compute module.** The BC-250 has a fixed mount behind the rear door (decision record 0005). The door is a cover with the vents and has no cable on it. The fan stands 5 from the door, and the shroud seals the gap. The BC-250 stands 3 above the clear space over the fan of the power supply (`Layout.bc_above_psu`), so that its exhaust duct stays out of that space. Its exhaust duct runs along the door at the height of the cut-ins. The end of the duct stands 8 inside the ends of the cut-ins (`Layout.cut_in_reach`): the wall of 4, one slab of the cavity, and 3 clear. Thus the I/O edge of the BC-250 is at x -158.2 (it was -163.2 in revision 6), and the duct goes from x -207.4 to -101.1. The skin steps in behind the cut-ins from x -211, which is 3.65 from the end of the duct.
+- **Rear door.** The form sets the opening: 422.7 x 165 (`Blueprint.door_w`, `door_z0`, `door_z1`). Each side is 4 inside the ends of the cut-ins (`door_land`). The top is 12 below the crease of the rear shelf (`door_frame`), at z 281. The sill is at z 116, 8 below the lower edge of the board. The opening was 426.7 x 182 in revision 6: it is 4 narrower and 17 lower. The top of the board is at z 268, 13 below the top of the opening. The rule "door service" checks that the board, the heatsink, the shroud and the duct lie inside the opening, that the duct keeps its distance from the cut-ins, and that the sill is below the board.
+- **Power supply.** It stands 8 from the inner face of the side of the lower body, at x -223.4 (it was -212.4 in revision 6, where the round of the rear corner moved it). Its rear face stands against the lower rear wall, z 10 to 96, 30 below the lowest cut-in. The rule "door service" checks that this face lies on the flat of the wall, below the cut-ins and below the door. The stowed cables stand 6 beside it, from x -67.4 to 72.7. A solid against the rear wall stands 0.1 off it (`fit.SEAT`).
 - **Air zones (rule R2b).** The rules R1 and R2 compare a solid with the solids and the keep-out zones of other items. They do not compare two keep-out zones. Rule R2b compares each air zone (the exhaust duct, the fan shroud, the air under the board, the fan space of the power supply) with every solid of every other item. Result: PASS, 4 air zones, no common volume with 81 solids of other items.
 - **Monitor.** Any 16 inch 16:10 portable monitor must fit (`docs/research/hardware-envelopes.md` section 1). The room for it is the largest body of the survey (360 x 247.1 x 20.6), 8 of movement each way in the plane of the face, a clamp jaw of 6 on the top and bottom edges, the cradle (20) behind it, plug space of 22 (right-angle plugs) on both side edges over the full height, and a cable channel of 20 from each side to the BC-250. Straight plugs need 258 from the centre line, but the cavity is 243 at the middle of the image and 239 at the top corners (z 369). Thus the cabinet needs right-angle plugs. The gap from this room to the skin is 3.3 at its top and at its bottom. The present unit has 34.0 at the top and 29.4 at the bottom.
 - **Monitor out to the front.** The monitor comes out to the front, through the opening behind the bezel plate (the owner, 2026-11-11). The opening is 434.7 wide, with its ledge at the top and the bottom only. Any 16:10 monitor with its plug space passes with 7.3 on each side. Its carrier, with the side flanges that hold the bezel plate (`Layout.carrier_flange`, 4), passes with 3.3 on each side.
@@ -374,9 +376,7 @@ This section and sheet 09 are those of revision 6. The fit study runs on revisio
 
 ## The split
 
-This section, sheet 10 and the section "The joints" are those of revision 6. The seams of revision 6 follow the step and the rear slope, which revision 7 does not have. `docs/roadmap.md` (step 9) has the results of the split on revision 7.
-
-Sheet 10 draws the split. `cad/candybar/shell/split.py` holds the seams as data and cuts the skin into pieces. `cad/out/shell-bp/split/proposal.md` is the full study, with the options that the owner did not choose (a build output). Decision record 0006 records the choice.
+Sheet 10 draws the split. `cad/candybar/shell/split.py` holds the seams as data and cuts the skin into pieces. There is one layout: the owner's choice of 2026-11-11 (decision record 0006), on the form of revision 7. `cad/out/shell-rev7/split/report.md` has all the numbers (a build output). The study of 2026-11-11 also had the options that the owner did not choose; they are not in the code.
 
 Decided by the owner (2026-11-11):
 
@@ -386,38 +386,48 @@ Decided by the owner (2026-11-11):
 - The bonded seams lock with keys first, and are then fastened for good. They are filled and painted.
 - The hood has keys, so that it bolts on easily. The owner will look at both a bolted and a bonded hood.
 - The floor stands on the table (2026-11-11). It is the 10 mm sandwich of the study, on thin non-slip pads (2 to 3 mm). There are no feet and no ribs under it.
-- Hand-holds: only at the rear (2026-11-11). Each is a pocket up into the overhang of the upper rear near a back corner, open downward through the rear slope. There is no grip under the deck nose. One person lifts the back, and the cabinet pivots on the front bottom edge of the deck.
+- Hand-holds: only at the rear (2026-11-11). Since revision 7 each is a recess in the rear wall of the head, a part of the shell. There is no grip under the deck nose. One person lifts the back, and the cabinet pivots on the front bottom edge of the deck.
 - The material is open: PETG on the A1, or ABS on an enclosed printer. The coupons decide.
 
 Dropped: the ribs under the floor on feet of 18 mm, and the front grip under the deck nose.
 
-The make-up air for the power supply comes in through a slot grille in the rear lower wall, right of the centre line and below the door. The gap under the floor (2 to 3 mm) is too thin for it. `cad/out/shell-bp/split/proposal.md` ("Air path") has the numbers.
+The seams follow the form of revision 7:
 
-Not modelled yet: the flanges, the keys, the ribs, the carriers, the grip pockets and the inlet grille. The grip pockets and the inlet are data in `cad/candybar/shell/structure.py` (`grip_box`, `INLET`). The cut is the bare 4 mm skin, with the rear corner round of revision 6.
+- No seam goes through a hand-hold or a cut-in. Each seam is 4 or more from them (a test checks this).
+- S1 lies in the inner crease of the band: up its stub, its kick and its lean.
+- L1 has two heights, and its step is hidden in S1. In front of the band it lies at the bottom corner of the bezel (z 134). Behind the band it lies at the height of the door sill (z 116), 10 below the lowest cut-in. Thus the four cut-ins are whole in each middle piece.
+- B1 lies in the crease of the rear shelf (z 293), on the back and on the sides.
+- On the back, R3 lies on the line of the door's side (x 211.3) and R5 on the centre line. The upper rear is two halves, and each half has one hand-hold whole, 41 from R3 and 70 from R5. In revision 6 the upper rear was one piece between two seams at x 106, which is where the hand-holds are now.
+
+The make-up air for the power supply comes in through a slot grille in the lower rear wall, right of the centre line and below the door. The gap under the floor (2 to 3 mm) is too thin for it. `cad/out/shell-rev7/split/report.md` ("Air path") has the parts of the path.
+
+Not modelled yet: the flanges, the keys, the ribs, the carriers and the inlet grille. The inlet is data in `cad/candybar/shell/structure.py` (`INLET`). The cut is the bare 4 mm skin.
 
 ### Pieces
 
-22 printed pieces and 9 floor tiles. All fit the usable volume of the A1 (240 x 240 x 245). The largest is rear lower R (228 x 228 x 134; it was 231 x 230 x 134 before the rear corner round of revision 6).
+23 printed pieces and 9 floor tiles. All fit the usable volume of the A1 (240 x 240 x 245). The largest is rear lower R (229.4 x 228.1 x 116.0): it is 10.6 less than the limit. A right piece and its left twin have the same box, the same mass and the same areas.
 
-| # | Piece | Print box (mm) | On the bed |
-| --- | --- | --- | --- |
-| 1 | deck nose | 218 x 218 x 72 | upright, on the bed diagonal |
-| 2, 3 | deck side R, L | 186 x 185 x 72 | upright |
-| 4 | apron | 210 x 210 x 113 | on its rear edge, on the bed diagonal |
-| 5, 6 | lower R, L | 203 x 202 x 134 | upright |
-| 7, 8 | middle R, L | 205 x 204 x 176 | upright, on the bed diagonal |
-| 9, 10 | upper R, L | 207 x 206 x 126 | upright |
-| 11 | brow | 170 x 170 x 38 | upright |
-| 12 | upper rear | 181 x 181 x 126 | upright |
-| 13, 14 | speaker form R, L | 94 x 76 x 13 | front face on the bed |
-| 15 | logo form | 160 x 160 x 5 | front face on the bed |
-| 16, 17 | rear lower R, L | 228 x 228 x 134 | upright |
-| 18, 19 | door half R, L | 213 x 182 x 4 | outer face on the bed |
-| 20 | hood centre | 148 x 139 x 212 | on a cut face |
-| 21, 22 | hood side R, L | 139 x 129 x 148 | upright |
-| - | floor tiles, front, middle and rear, each side R, centre, side L | 212 x 190 at most | flat |
+| # | Piece | Print box (mm) | On the bed | Seen face over 45 deg (cm2) | Seen face at 45 deg (cm2) |
+| --- | --- | --- | --- | --- | --- |
+| 1 | deck nose | 218 x 218 x 72 | upright, on the bed diagonal | 0.0 | 19.6 |
+| 2, 3 | deck side R, L | 186 x 185 x 72 | upright | 1.9 each | 16.3 each |
+| 4 | apron | 210 x 210 x 114 | on its rear edge, on the bed diagonal | 2.7 | 0.0 |
+| 5, 6 | lower R, L | 181 x 181 x 134 | upright | 0.0 each | 1.4 each |
+| 7, 8 | middle R, L | 209 x 208 x 177 | upright, on the bed diagonal | 0.0 each | 0.0 each |
+| 9, 10 | upper R, L | 206 x 205 x 131 | upright | 0.6 each | 28.6 each |
+| 11 | brow | 170 x 170 x 38 | upright | 0.0 | 0.0 |
+| 12, 13 | upper rear R, L | 180 x 180 x 143 | upright | 0.0 each | 149.7 each |
+| 14, 15 | rear lower R, L | 229 x 228 x 116 | upright | 0.3 each | 24.6 each |
+| 16, 17 | door half R, L | 211 x 165 x 4 | outer face on the bed | 0.0 each | 0.0 each |
+| 18 | hood centre | 148 x 139 x 212 | on a cut face | 0.0 | 0.0 |
+| 19, 20 | hood side R, L | 139 x 129 x 148 | upright | 7.4 each | 16.4 each |
+| 21, 22 | speaker form R, L | 94 x 76 x 13 | front face on the bed | 0.0 each | 0.0 each |
+| 23 | logo form | 160 x 160 x 5 | front face on the bed | 0.0 | 0.0 |
+| - | floor tiles, front, middle and rear, each side R, centre, side L | 212 x 188 at most | flat | | |
 
 The bezel plate is two halves, bonded and painted black as one plate (223 x 223 x 217 each). It is a finish piece.
+
+"Seen face over 45 deg" is the area that a person sees and that faces down more than 45 degrees from upright in the print orientation. It needs support. The total is 23.1 cm2 (it was 63.1 in revision 6, and 362.6 in the first cut of revision 7 with the seams of revision 6). "Seen face at 45 deg" is the area at 45 degrees (within 0.05): the facets of the rear shelf, the roofs of the hand-holds and the base facet, which are 45 degrees by design and print without support. The total is 493.6 cm2.
 
 ### Seams
 
@@ -430,17 +440,18 @@ Class: a **bonded** seam is permanent: it is locked, screwed, bonded, filled and
 | F1 | bonded | in a design line | deck nose to deck side, in the crease of the flank break |
 | F2 | bonded | on an open face | deck nose to deck side, across the border to the front corner of the panel |
 | P1 | bonded | on an open face | apron to the lower pieces, up to the bottom edge of the bezel |
-| L1 | bonded | on an open face | lower to middle pieces: level at the bottom corner of the bezel, round the sides and the rear |
-| B1 | bonded | on an open face | middle to upper pieces: the belt at the lower crease of the rear slope (z 310) |
-| S1 | bonded | in a design line | front body to rear body, in the inner crease of the step |
-| R1 | bonded | on an open face | 12 on the back, from the top corner of the door to the slope crease |
+| L1 | bonded | on an open face | in front of the band: lower to middle pieces, level at the bottom corner of the bezel. Behind the band: rear lower to middle pieces, level at the height of the door sill, round the rear corner to the door's side |
+| B1 | bonded | on an open face | middle to upper pieces: the belt in the crease of the rear shelf (z 293) |
+| S1 | bonded | in a design line | front body to rear body below L1, in the inner crease of the band |
+| R1 | bonded | on an open face | 12 on the back, from the top corner of the door to the crease of the rear shelf |
 | R2 | bonded | on an open face | rear lower R to L, on the centre line below the door |
-| R3 | bonded | on an open face | upper rear to the upper pieces, above the door, in line with H1 |
+| R3 | bonded | on an open face | upper rear to the upper pieces, on the line of the door's side; it continues R1 to the groove |
 | R4 | bonded | on an open face | door half R to L, on the centre line; the door is bonded into one cover |
+| R5 | bonded | on an open face | upper rear R to L, on the centre line above the door; it continues R4 and R2 to the groove |
 | W1 | bonded | on an open face | brow to the upper pieces, 32 upright above the bezel |
 | H1 | bonded | on an open face | hood centre to hood side, between the logo form and the speaker form |
 | BA1 to BA3 | bonded | in a design line | the floor tiles, under the cabinet |
-| DR | service | in a design line | the rear door in its opening (426.7 x 182, the fit study) |
+| DR | service | in a design line | the rear door in its opening (422.7 x 165, from the cut-ins and the rear shelf) |
 | G | service | in a design line | the hood on the body top, in the level groove FB5 / HC15 |
 | BZ4 | service | in a design line | the bezel plate in its reveal |
 | DK8 | service | in a design line | the control panel in its pocket |
@@ -459,26 +470,26 @@ Class: a **bonded** seam is permanent: it is locked, screwed, bonded, filled and
 The datum is the floor: its nine tiles screwed together (joint 2), on a flat table. Each lower piece stands on the floor with a key under its foot flange (joint 3). The pieces below set the rest. The first pass is dry, with screws only. The second pass opens the seams in batches of one to three, bonds them and screws them again in the same holes.
 
 1. The floor.
-2. The rear lower halves.
+2. The rear lower halves (R2).
 3. The deck nose and the deck sides.
 4. The apron and the two lower pieces (S1, D1, D2, F1, F2, P1).
 5. The fixed monitor cradle, from the top.
 6. The two middle pieces (L1).
 7. The BC-250 carrier and the power supply, through the door opening.
-8. The two upper pieces, the brow and the upper rear, from above (B1, W1, R1, R3).
+8. The two upper pieces, the brow and the two upper rear halves, from above (B1, W1, R1, R3, R5).
 9. The door, the hood, the bezel plate and the control panel.
 
 ### Where each ring closes
 
 - The L1 ring (the sides and the rear) closes at the second middle piece.
-- The B1 ring closes at the upper rear, which drops in between the two upper pieces.
+- The B1 ring closes at the second upper rear half, which drops in between the first half and an upper piece.
 - The top ring closes at the brow, which drops in between the two upper pieces at the front.
 
 A closing piece goes in last, from above, into two seams at once. Those two seams get a design gap of 0.5 at each side (`OtherJoints.closing_gap`). Every other seam has the key clearance, 0.2 (`Joint.groove_clearance`). The coupon sets the clearance.
 
 ## The joints
 
-Sheet 11 draws the joints. `cad/candybar/shell/joints.py` is the one source of their values: `Joint` for joint 1, `OtherJoints` for joints 2 to 7 and the cones. The sheet and the proposal read them, and `cad/tests/test_joints.py` fails when a joint value is set in a second place. Each bonded joint works in two steps: a key, a cone or a pin sets the place in a dry assembly held by screws; then adhesive, the same screws, and filler in the V-groove. The values are proposed. The coupon sets the clearances and the pilot hole.
+Sheet 11 draws the joints. `cad/candybar/shell/joints.py` is the one source of their values: `Joint` for joint 1, `OtherJoints` for joints 2 to 7 and the cones. The sheet and the report of the split (`cad/out/shell-rev7/split/report.md`) read them, and `cad/tests/test_joints.py` fails when a joint value is set in a second place. Each bonded joint works in two steps: a key, a cone or a pin sets the place in a dry assembly held by screws; then adhesive, the same screws, and filler in the V-groove. The values are proposed. The coupon sets the clearances and the pilot hole.
 
 1. **Skin to skin** (all bonded seams of the walls). An inside flange 6 x 12 on each piece, with a 45 degree gusset, so that it prints with no support. A key 1.5 x 4 on the flange of the piece below, in a groove of the piece above (+0.2 each side). Thread-forming screws 3.0 x 16 for plastics, every 60. The pilot hole is open: 2.25 (the value for PET) or 2.4 (the value for ABS); the coupon decides. A V-groove 1.0 wide and 0.8 deep on the outside takes the filler. This joint is modelled: the coupon (`cad/out/coupon/README.md`, built by `candybar.shell.coupon`) has three pairs on a wall of radius 300, with grooves of +0.1, +0.2 and +0.3, and one pilot of each candidate in each lower half.
 2. **Floor tile to floor tile.** A half-lap 20 wide; a cone 8 x 3 in the lower lap; thread-forming screws 3.5 x 12 from below, every 50.
@@ -500,7 +511,7 @@ New words in this blueprint. They are not in `CONTEXT.md` yet.
 | Land | The front face of the rail, beside the bezel |
 | Edge section | The section of a top or front edge: a radius, then a band that leans, then a crease |
 | Side band | The face of the rail in the side plane, behind the edge. It carries the stripe. Above the rear shelf it goes back to the rear. |
-| Round | A round of `rear_corner_r` (3) on a convex edge of the rear design that turns 40 degrees or more |
+| Round | A round of `rear_round_r` (3) on a convex edge of the rear design that turns 40 degrees or more |
 | Run-out | Where the round of the hood's rear corner ends on the roof: the side and the rear turn tangent to each other there |
 | Body top | The flat top of the body under the hood. The foot of the hood has its outline, so no strip of it is bare. |
 | Rail arc | The convex arc of the rail land in side view, from the end of the sweep to the body top |
@@ -557,18 +568,18 @@ The IDs are stable. A face of a reference that corresponds has the same ID.
 | BZ4 | bezel reveal | bezel | the walls face the plate, the floor faces the player | single-curved | panel_gap 1 wide at the sides, bezel_drop 2 deep from the rail land to the bezel land | RL1, FB2, FB3, BZ1 | recess cut in the front body; the plate fills it below the bezel land |
 | BZ3 | bezel rim wall | bezel | faces the centre of the screen | flat | bezel_rim 2 deep | BZ2, SC1 | extrusion |
 | SC1 | screen | bezel | faces the player, flat, reclined 30 deg | flat | 344.7 x 215.4; mon_setback 7.2 behind the chord of the rail, 14.0 to 20.2 behind the rail land | BZ3 | the monitor |
-| RB1 | side of the lower body | rear body | faces sideways, vertical | flat | step_in 12 in from the side band (rear_w 470.7); below the rear shelf and behind the band | RB2, RB9, RB11, RB12 | a plane cut with the band |
-| RB2 | band | rear body | faces out and back or down, 45 deg to the side band | flat: four facets that meet on mitres | step_in 12 deep; its outer edge (the stroke) is four straight lines: a stub of band_stub 20 at the desk, a kick of band_kick 28 deg to the knee at z 85.2, the lean of step_lean 28 deg, one mitre into the level run at z 305; the run is the side facet of the rear shelf | RL4, RB1, RB9, RB11 | a ruled cut between two offsets of the stroke; each piece is a plane |
-| RB3 | lower rear wall | rear body | faces the rear, vertical | flat | body_d 540, up to the crease of the rear shelf at rear_step_z0 293 | RB4, RB9, RB11, RB12, RB6 | extrusion |
+| RB1 | side of the lower body | rear body | faces sideways, vertical | flat | band_depth 12 in from the side band (rear_w 470.7); below the rear shelf and behind the band | RB2, RB9, RB11, RB12 | a plane cut with the band |
+| RB2 | band | rear body | faces out and back or down, 45 deg to the side band | flat: four facets that meet on mitres | band_depth 12 deep; its outer edge (the stroke) is four straight lines: a stub of band_stub 20 at the desk, a kick of band_kick 28 deg to the knee at z 85.2, the lean of band_lean 28 deg, one mitre into the level run at z 305; the run is the side facet of the rear shelf | RL4, RB1, RB9, RB11 | a ruled cut between two offsets of the stroke; each piece is a plane |
+| RB3 | lower rear wall | rear body | faces the rear, vertical | flat | body_d 540, up to the crease of the rear shelf at rear_shelf_z0 293 | RB4, RB9, RB11, RB12, RB6 | extrusion |
 | RB4 | rear shelf, rear facet | rear body | faces the rear and down, 45 deg | flat | z 293 to 333, rear_proud 40 deep; it meets the band's level run on the hip | RB3, RB5, RB9, RB10 | extrusion of the rear profile across the width |
 | RB5 | upper rear wall | rear body | faces the rear, vertical | flat | rear_proud 40 behind the lower wall, at the full width (the rear of the head) | RB4, RB7, RB13, FB5 | extrusion |
-| RB7 | rear corner round, head | rear body | turns from the side band to the upper rear wall, upright | single-curved | rear_corner_r 3, from the rear shelf to the seam bevel; the hood's corner round HC16 stands on the same line | RL4, RB5, RB10, FB5 | a true round (makeFillet) after the seam bevel |
-| RB9 | lower rear corner and hip | rear body | turns from the side of the lower body to the lower rear wall; on the hip from the band's run to the rear facet | single-curved: a cylinder on the hip, an elliptic cylinder below it | the hip (the line where the two facets of the rear shelf meet) has rear_corner_r 3; the upright corner below it is the ellipse of that round in plan (5.2 x 3, tangent at 2.1 from the corner), so both meet on one curve | RB1, RB2, RB3, RB4, RB11, RB12 | cut by hand (lower_corner_cutter), so that the surfaces are exact |
-| RB10 | round of the head's lower edge | rear body | turns from the side band to the rear facet of the shelf | single-curved | rear_corner_r 3, on the edge where the rear facet ends on the side band | RL4, RB4, RB7, RB9 | a true round (Part::Fillet) with the other edges of the rear that the edge rule rounds |
+| RB7 | rear corner round, head | rear body | turns from the side band to the upper rear wall, upright | single-curved | rear_round_r 3, from the rear shelf to the seam bevel; the hood's corner round HC16 stands on the same line | RL4, RB5, RB10, FB5 | a true round (makeFillet) after the seam bevel |
+| RB9 | lower rear corner and hip | rear body | turns from the side of the lower body to the lower rear wall; on the hip from the band's run to the rear facet | single-curved: a cylinder on the hip, an elliptic cylinder below it | the hip (the line where the two facets of the rear shelf meet) has rear_round_r 3; the upright corner below it is the ellipse of that round in plan (5.2 x 3, tangent at 2.1 from the corner), so both meet on one curve | RB1, RB2, RB3, RB4, RB11, RB12 | cut by hand (lower_corner_cutter), so that the surfaces are exact |
+| RB10 | round of the head's lower edge | rear body | turns from the side band to the rear facet of the shelf | single-curved | rear_round_r 3, on the edge where the rear facet ends on the side band | RL4, RB4, RB7, RB9 | a true round (Part::Fillet) with the other edges of the rear that the edge rule rounds |
 | RB11 | base facet, body | rear body | faces out and down, 45 deg | flat | base_facet 5, along the lower rear wall, the side of the lower body and the foot of the band; the side band has none | RB1, RB2, RB3, RB9, FL1 | a 45 degree cut on the floor edges (makeChamfer) |
 | RB12 | cut-ins | rear body | four level grooves that turn each lower rear corner | double-curved: a round floor | cut_in_count 4 from z 126, 22 apart; slot cut_in_h 10, cut_in_depth 1.5; 30 along the side and 20 along the rear, to round ends | RB1, RB3, RB9 | a ball (R 9.08) milled along the true offset of the plan outline, so the lips are level round the corner |
 | RB13 | hand-holds | rear body | two recesses in the upper rear wall | flat faces with rounds | x 70 to 170 each side, z 349 to 411, 26 deep; a level floor, a roof that falls 45 deg toward the inside, ends R 10 in plan, rounds R 8 inside and R 3 on the roof's edges | RB5 | cut by a solid whose inside edges are rounded; the rim gets the edge break |
-| RB6 | rear door | rear body | faces the rear, vertical | flat | 424.4 x 165 by the rule of the rear study (4 clear of the cut-ins, 12 below the shelf); the fit study sets it | RB3 | plate |
+| RB6 | rear door | rear body | faces the rear, vertical | flat | door_w 422.7 x 165: door_land 4 inside the ends of the cut-ins, door_frame 12 below the crease of the rear shelf, sill door_z0 116; the fit study checks it | RB3 | plate |
 | FL1 | underside | floor | faces down | flat | on the desk (the floor stands on thin pads) | DK9, RL4, RB11 | extrusion |
 | HC1 | hood leg, front face | hood cap | faces the player; leans back 16 deg below the bend, 2 deg above it | single-curved | hood_bar 21 less the soft edge; its outline follows the side | HC4, HC11, HC3, HC15 | the front outline carried along the front of the side view |
 | HC2 | hood top bar, front face | hood cap | faces the player; leans back 2 deg | flat | hood_bar 21 less the soft edge | HC4, HC10 | the front outline carried along the front of the side view |
@@ -583,7 +594,7 @@ The IDs are stable. A face of a reference that corresponds has the same ID.
 | HC11 | hood leg, inner wall | hood cap | faces the centre line | single-curved | from the front plane back to the band | HC1, HB1, MQ1 | extrusion of the opening outline |
 | HC12 | hood ledge | hood cap | faces up | flat | 13.9 deep: what the band leaves of the sill | HC3, HB1 | extrusion |
 | HC13 | marquee lip | hood cap | faces the player; its top and bottom face up and down | flat | hood_rail_h 6 high, hood_rail_proud 5 proud: its front is flush with the hood front; its top is an edge of hood_marquee_edge 5 in front of the marquee; ends on the legs | MQ1, HB1, HC11 | extrusion across the width, cut by the opening |
-| HC16 | hood rear corner round | hood cap | turns from the side to the rear, then to the rear arc and the roof | single-curved on the rear wall; double-curved round the rear arc | rear_corner_r 3, as on the head's corners RB7: the round that a ball makes when it rolls up the edge where the side meets the rear; near the roof the two turn tangent and the round runs out | HC5, HC6, HC7, HC8, HC9, HC15 | cut by hand through sections of the rolling ball (hood_corner_cutter); print the cap on its rear face |
+| HC16 | hood rear corner round | hood cap | turns from the side to the rear, then to the rear arc and the roof | single-curved on the rear wall; double-curved round the rear arc | rear_round_r 3, as on the head's corners RB7: the round that a ball makes when it rolls up the edge where the side meets the rear; near the roof the two turn tangent and the round runs out | HC5, HC6, HC7, HC8, HC9, HC15 | cut by hand through sections of the rolling ball (hood_corner_cutter); print the cap on its rear face |
 | HC14 | hood foot | hood cap | faces down | flat | seam_gap 1.5 above the body top FB4 | HC1, HC3, HC4, HC9, HC15 | plane cut |
 | HC15 | seam bevel, hood | hood cap | faces out and down | flat on the straight runs; single-curved round the corners | seam_groove: from the side 3 above the foot, 3 in to the foot; one height all round the foot of the cap | HC1, HC3, HC4, HC5, HC9, HC14 | a ruled cut from the section of the cap 3 above its foot |
 | MQ1 | marquee cover | marquee | faces the player, upright: in the plane of the hood band | flat | ends follow the corner of the opening | HC10, HC11, HC13, MQ2 | plate |
@@ -683,7 +694,10 @@ CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.edge_finish   
 CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc   # shell.FCStd with colours, to open in FreeCAD
 cad/.venv-tools/bin/python cad/tools/draw_shell.py render                              # the renders with every edge drawn, in cad/out/shell-rev7/renders
 CANDYBAR_A=cad/out/shell-rev7 CANDYBAR_B=cad/out/shell-bp-rev7/R10 cad/candybar/freecad-run.sh tools.compare_parts   # each part against another build: volume, box, distance
-CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit      # the fit study (about 10 minutes); exit status 1 when an item does not fit
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit      # the fit study (about 30 minutes); exit status 1 when an item does not fit
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.split    # the split: makes the skin when its cache is empty (about 20 minutes, 6 GB), cuts it, measures each piece (about 20 minutes)
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.structure   # the hardware in the skin and the walls of the hand-holds, after the fit study and the split
+cad/.venv-tools/bin/python cad/tools/draw_split.py                                  # the sheets of the split and cad/out/shell-rev7/split/report.md
 cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit                          # sheet 09 from the fit study
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint                       # sheets 10 and 11, from the cut of the split and joints.py
 ```

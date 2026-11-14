@@ -20,6 +20,6 @@ The owner chose this form on 2026-11-13, after a study of ten candidates. Revisi
 
 The side view shows the stroke as straight lines. The values of the form are in `dims.Blueprint`, and the default build makes this form.
 
-The crease of the rear shelf limits the height of the rear door. The cut-ins take 20 mm of the lower rear wall at each side, which limits the width of the door. The hand-holds are part of the shell. The fit study, the split and the structure of revision 6 do not apply to this form without changes.
+The crease of the rear shelf limits the height of the rear door. The cut-ins take 20 mm of the lower rear wall at each side, which limits the width of the door. The hand-holds are part of the shell. The fit study, the split and the structure of revision 6 do not apply to this form without changes. They were changed for this form on 2026-11-13 (`docs/roadmap.md`, step 9).
 
 A sharp edge in a drawing of the rear is an edge with the edge break. Where three small rounds meet at one corner, the model has faces less than 2 mm wide. The face check has one list of these places.
