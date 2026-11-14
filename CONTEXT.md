@@ -112,6 +112,31 @@ The removable panel in the rear wall. It carries the vents and nothing else. The
 The BC-250 with its heatsink, fan and shroud, handled as one unit on a fixed mount behind the rear door.
 _Avoid_: compute assembly, compute tray
 
+**Land** (of the rear door):
+The part of the shell that the rear door lies on. It is the inner part of the wall, and it stands 6 mm inside the opening all round: the lip on the sill, a tongue on each side, and the tongue of the head rail.
+_Avoid_: frame, flange (a flange is part of a bonded seam)
+
+**Lip**:
+The land on the sill of the rear door. Its top falls 45 degrees to the inside, and the foot of the door hooks behind it.
+
+**Head rail**:
+A printed bar that is bonded behind the strip above the door opening, one for each half of the door. It has the land of the head, the seat of a quarter-turn fastener and the socket of a locating cone.
+
+**Fan vent**:
+The vent in the rear door over the fan of the compute module: upright slots that end on the circle of the fan.
+
+**Hot-air vent**:
+The vent in the rear door at the I/O end of the compute module. The exhaust duct lets the hot air out through it.
+
+**Inlet**:
+The grille in the lower rear wall, right of the center line. Make-up air for the fan of the power supply comes in through it.
+
+**Shroud**:
+The printed part round the fan and the fins of the BC-250. It has a base (the walls) and a top (the plate under the fan and the collar round it).
+
+**Exhaust duct**:
+The printed box over the I/O end of the BC-250. It turns the hot air from the fins to the hot-air vent.
+
 **Recline**:
 The angle of the screen face from vertical.
 _Avoid_: tilt (that word is for the hood face)
