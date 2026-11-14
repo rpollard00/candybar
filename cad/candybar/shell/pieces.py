@@ -780,7 +780,9 @@ def free_length(sc: Screw, head_into, obstacles: list, j: Joint, b: Build = BUIL
             hits.append(hit)
     if sum(x.Volume for x in hits) < b.clash_mm3:
         return reach
-    best = min((v.Point - sc.at).dot(head_into) - h for x in hits for v in x.Vertexes)
+    # from the mesh of what is in the way: where a round shaft meets a flat wall, the nearest point is on a curve
+    # and no vertex is there
+    best = min((v - sc.at).dot(head_into) - h for x in hits for v in x.tessellate(0.3)[0])
     return max(best, 0.0)
 
 
