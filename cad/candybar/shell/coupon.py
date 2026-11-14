@@ -89,7 +89,12 @@ def _dots(j: Joint, n: int, z: float):
         s = (k - (n - 1) / 2) * DOT_PITCH
         lift = 0.2
         base = App.Vector(*p.point(s, j.wall_t + lift, z))
-        out.append(Part.makeCone(DOT_D / 2 + lift, 0.0, DOT_D / 2 + lift, base, App.Vector(*[-v for v in p.inward(s)])))
+        axis = App.Vector(*[-v for v in p.inward(s)])
+        dot = Part.makeCone(DOT_D / 2 + lift, 0.0, DOT_D / 2 + lift, base, axis)
+        # the seam of the cone is turned away from the level plane: with the seam there, the cut of the second dot of
+        # the +0.2 upper half left a face that is not valid (FreeCAD 1.1.4 on the print server)
+        dot.rotate(base, axis, 90.0)
+        out.append(dot)
     return out
 
 
