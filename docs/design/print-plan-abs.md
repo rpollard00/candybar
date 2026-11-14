@@ -220,9 +220,9 @@ one-part plastic primer that lists ABS, an adhesion promoter with a filler prime
 direct, and a hobby lacquer primer direct.
 
 What must be done before the large pieces: T2, T3, C1, C2, C4, C6, C7, C8 and C9. They take about one
-week. C12 is then the first large piece. Coupon C3 runs for about four weeks: 3 days for the weld, 7 days for the filler, 7 days for
-the paint, and a look at the seam after 14 days more. The pieces can be printed and assembled dry in
-that time.
+week. C12 is then the first large piece. Coupon C3 runs for about four weeks: 3 days for the weld,
+7 days for the filler, 7 days for the paint, and a look at the seam after 14 days more. The pieces can
+be printed and assembled dry in that time.
 
 ### 6.3 Stage 3: the pieces, in the order of the dry assembly
 

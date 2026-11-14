@@ -40,7 +40,7 @@ The source numbers point to section 8.
    The bed is 270 x 270 and the height is 256. The owner wrote 256 x 256 x 270. The numbers are correct,
    but the order is the other way round: the long dimension is the bed, not the height. MAKER [Q1][Q2]
 2. **The height does not change.** The A1 is 256 high and the Q2 is 256 high. No piece can become
-   taller. The bed is 14 larger on each side.
+   taller. The bed is 14 mm longer in X and in Y.
 3. **The piece limit.** A limit of 250 x 250 on the bed and 250 high is correct for the Q2 (it was
    240 x 240 x 245). In the model the footprint limit is 248, because the slicer makes the piece
    larger to compensate the shrink. PROVISIONAL
@@ -392,8 +392,9 @@ What this means for the shell. ESTIMATED:
 | PETG HF: heat deflection at 62 °C, Vicat at 69 °C to 70 °C | MAKER [M2] and the PETG note |
 | The chamber of the Q2 is hotter (55 °C to 65 °C) than the inside of the cabinet. | MAKER [Q1] |
 
-ABS has 34 K to 48 K of margin at 50 °C (heat deflection at 1.8 MPa). PETG had 12 K. The vents and the duct do not change. The owner
-already found PETG satisfactory near the BC-250, so this is more margin and not a repair.
+ABS has 34 K to 48 K of margin at 50 °C (heat deflection at 1.8 MPa). PETG had 12 K. The vents and the
+duct do not change. The owner already found PETG satisfactory near the BC-250, so this is more margin
+and not a repair.
 
 ### 3.6 Overhangs and bridges with little part cooling
 
