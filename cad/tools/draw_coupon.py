@@ -1,6 +1,7 @@
 """The drawing of the joint coupon: coupon.png in the coupon's output directory.
 
     cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupon [--no-render]
+    cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupons --set [--no-render]    # the sheets of the coupon set
 
 Run it after candybar.shell.coupon has finished (one FreeCAD or Blender process at a time). It reads what candybar.shell.coupon wrote there: drawing.json (the sections across the joint, cut from the solids)
 and assembled/*.stl (the pair at 0.2 in the assembled position). Panels: the section through a screw and the section
@@ -226,7 +227,77 @@ def main(out: str, renders: bool = True) -> int:
     return 0
 
 
+def coupon_set(out: str, renders: bool = True) -> int:
+    """The sheets of the coupon set (candybar.shell.coupons): coupons.png shows every part with all its BREP edges,
+    its name, its size, its plate, its mass and its time; plates.png shows the plates from above."""
+    data = json.load(open(os.path.join(out, "coupons.json")))
+    parts = data["parts"]
+    tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "render_views.py")
+    if renders:
+        names = ",".join(p["part"] for p in parts)
+        for cmd in ([sys.executable, tool, os.path.join(out, "sheet", "renders"), os.path.join(out, "sheet"), "--views", names, "--size", "900"],
+                    [sys.executable, tool, os.path.join(out, "plates"), out, "--views", "top", "--size", "3000"]):
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            sys.stdout.write(proc.stdout[-300:])
+            if proc.returncode:
+                sys.stderr.write(proc.stderr[-2000:])
+                return 1
+    cols = 6
+    rows = -(-len(parts) // cols)
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.7, rows * 3.5))
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, p in zip(axes.flat, parts):
+        ax.imshow(plt.imread(os.path.join(out, "sheet", "renders", f"{p['part']}.png")))
+        size = " x ".join(f"{v:g}" for v in p["box_mm"])
+        count = f", print {p['count']}" if p["count"] > 1 else ""
+        support = "  NEEDS SUPPORT" if p["needs_support_mm2"] else ""
+        ax.set_title(p["part"], fontsize=11, fontweight="bold", color=INK, pad=3)
+        ax.text(0.5, -0.02, f"{size} mm{support}\nplate {p['plate']}{count}: {p['mass_g'] * p['count']:.0f} g, {p['time_h'] * p['count']:.1f} h\n"
+                            f"{data['proves'][p['coupon']]}", transform=ax.transAxes, ha="center", va="top", fontsize=7.6, color=INK, linespacing=1.35)
+    total_g = sum(p["mass_g"] * p["count"] for p in parts)
+    fig.suptitle(f"The coupon set: {len(parts)} parts, {sum(p['count'] for p in parts)} prints, {total_g:.0f} g of PETG (estimate). "
+                 "Each part is in its print orientation; every edge of the model is drawn. Sizes are the print box (mm).", fontsize=13)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.945, bottom=0.035, wspace=0.04, hspace=0.34)
+    path = os.path.join(out, "coupons.png")
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print(f"draw_coupon: {path}")
+
+    cam = json.load(open(os.path.join(out, "plates", "views.json")))["views"]["top"]
+    img = plt.imread(os.path.join(out, "plates", "top.png"))
+    w, h = cam["res"]
+    k = cam["mm_per_px"]
+    px = lambda x, y: (w / 2 + (x - cam["center_ru"][0]) / k, h / 2 - (y - cam["center_ru"][1]) / k)
+    fig, ax = plt.subplots(figsize=(w / 150, h / 150 + 0.6))
+    ax.imshow(img)
+    bed = data["printer"]["xy"]
+    for pl in data["plates"]:
+        ox, oy = pl["origin"]
+        ax.add_patch(Polygon([px(ox, oy), px(ox + bed, oy), px(ox + bed, oy + bed), px(ox, oy + bed)], closed=True, fill=False, ec=BLUE, lw=1.0))
+        mine = [p for p in parts if p["plate"] == pl["plate"]]
+        ax.text(*px(ox, oy + bed + 6), f"Plate {pl['plate']}: {pl['title']}  ({sum(p['mass_g'] * p['count'] for p in mine):.0f} g, "
+                                       f"{sum(p['time_h'] * p['count'] for p in mine):.1f} h)", fontsize=8.5, color=BLUE, va="bottom")
+    box = {p["part"]: p["box_mm"] for p in parts}
+    for copy, at in data["places"].items():
+        part = copy.split("#")[0]
+        ox, oy = next(pl["origin"] for pl in data["plates"] if pl["plate"] == at["plate"])
+        ax.text(*px(ox + at["x"] + box[part][0] / 2, oy + at["y"] + box[part][1] / 2), copy.replace("#", " #"), fontsize=5.6, color=RED,
+                ha="center", va="center", rotation=90 if box[part][1] > 2.5 * box[part][0] else 0)
+    ax.axis("off")
+    ax.set_title(f"The plates of the coupon set, from above. Blue: the usable bed, {bed:g} x {bed:g} mm. Print them in this order.", fontsize=11)
+    fig.tight_layout()
+    path = os.path.join(out, "plates.png")
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"draw_coupon: {path}")
+    return 0
+
+
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if "--set" in sys.argv:
+        sys.exit(coupon_set(args[0] if args else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", "coupons"),
+                            renders="--no-render" not in sys.argv))
     sys.exit(main(args[0] if args else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out", "coupon"),
                   renders="--no-render" not in sys.argv))

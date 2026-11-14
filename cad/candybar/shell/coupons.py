@@ -17,7 +17,7 @@ The parts, each in its print orientation (z up, on the bed):
   joint2-*, joint3-*, joint5-*   a pair for the floor lap, the wall foot on the floor and the service seam
   facet45, cut-in, hand-hold     cut from the real skin of the body (the cache of candybar.shell.split)
   edges-level, edges-upright     one bar with the edges of decision record 0007, in two print orientations
-  floor-tile            the smallest floor tile of the split, as the 10 mm sandwich
+  floor-tile            a plate of the size of the smallest floor tile of the split, as the 10 mm sandwich
 
 Values. The joints come from candybar.shell.joints (JOINT, OTHER_JOINTS) and the form from dims.Blueprint. A value
 that the concept does not have yet is derived from those or named here as PROPOSED, with its reason; the hand-over
@@ -547,29 +547,32 @@ def hand_hold():
     return skin_piece("hand-hold", HAND_HOLD_BOX)
 
 
-def floor_tile():
-    """The smallest floor tile of the split, as the sandwich of structure.FLOOR_T: the outline of the tile in the
-    floor of the skin, extruded. The laps of joint 2 are not on the tiles of the split yet, so it has none."""
+def tile_size() -> tuple[float, float]:
+    """The plan box of the smallest floor tile of the split (TILE), cut from the floor of the cached skin."""
     import Part
     from . import split
-    from . import structure as st
-    f = skin_cache() / f"floor-tile-{split.fingerprint(Blueprint())}.bin"
+    f = skin_cache() / f"floor-tile-{split.fingerprint(Blueprint())}.json"
     if f.exists():
-        s = Part.Shape()
-        s.importBinary(str(f))
-        return s
+        return tuple(json.loads(f.read_text()))
     seams, pieces = split.expanded(split.layout(Blueprint()))
     base = [p for p in pieces if p.module == "base"]
     shapes, problems = split.cut([s for s in seams if s.module == "base"], base, split.Modules({"base": skin("base")}, {}, {}, ""))
     if [p for p in problems if p["problem"] != "debris"]:
         raise RuntimeError(f"floor tile: the cut of the floor has problems: {problems}")
-    piece = shapes[TILE]
-    bottom = [face for face in piece.Faces if abs(face.BoundBox.ZMax) < 1e-6 and abs(face.BoundBox.ZMin) < 1e-6]
-    plan = bottom[0] if len(bottom) == 1 else bottom[0].fuse(bottom[1:]).removeSplitter()
-    s = plan.extrude(V(0, 0, st.FLOOR_T)).removeSplitter()
+    b = tight_box(shapes[TILE])
+    size = (round(b.XLength, 1), round(b.YLength, 1))
     f.parent.mkdir(parents=True, exist_ok=True)
-    s.exportBinary(str(f))
-    return s
+    f.write_text(json.dumps(size))
+    return size
+
+
+def floor_tile():
+    """A plate of the size of the smallest floor tile of the split, as the sandwich of structure.FLOOR_T. The laps of
+    joint 2 are not on the tiles of the split yet and the outline of the tile in the skin is stepped, so the coupon
+    is the plain rectangle."""
+    from . import structure as st
+    w, h = tile_size()
+    return box(0, w, 0, h, 0, st.FLOOR_T)
 
 
 # ---------- the set ----------
@@ -660,7 +663,7 @@ def items() -> list[Item]:
              stated=(Stated(9.0, 17.5, "the facet that faces down 45 degrees and its round: at the limit"),)),
         Item("edges-upright", "edges", "5", lambda: turned(edge_bar(), (0, 1, 0), -90), "on its end: the edges are upright, as on the band's stub", 0.55,
              view=(-150.0, 30.0)),
-        Item("floor-tile", "floor", "6", floor_tile, "flat, the table face on the bed", ff, real=True),
+        Item("floor-tile", "floor", "6", floor_tile, "flat, the table face on the bed", ff),
     ]
     best = c1.ASSEMBLED_C
     out += [
@@ -705,6 +708,17 @@ def check_item(it: Item, shape, lim: c1.Printer) -> dict:
            "unstated_overhang_mm2": round(sum(g["area_mm2"] for g in groups if not g["exception"]), 2)}
     res["pass"] = bool(res["valid"] and res["solids"] == 1 and fits and res["unstated_overhang_mm2"] < 0.5)
     return res
+
+
+def face_findings(shape, name: str) -> dict[str, int]:
+    """The findings of tools/face_check.py on a part, by rule (the edge break is allowed). They are for information:
+    a coupon has narrow faces by design (a chamfer, a V-groove, a key, a mark), and a cut from the real skin has the
+    steps of the cavity inside."""
+    from tools import face_check
+    out: dict[str, int] = {}
+    for f in face_check.failures(face_check.check(shape, name, break_radius=Blueprint().edge_break)):
+        out[f.rule] = out.get(f.rule, 0) + 1
+    return out
 
 
 def holes_of(shape, axis: P3) -> dict[float, int]:
@@ -856,11 +870,27 @@ def table(rows: list[dict], layout: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+PROVES = {"shrink": "the shrink of PETG along X and Y of the bed",
+          "warp": "a tall wall of the skin stays flat and straight",
+          "insert": "the hole for the M4 heat-set insert, upright and level",
+          "holes": "holes: buttons, lever, power button, USB sockets",
+          "cone": "the clearance of the cone that locates a seam",
+          "joint1": "joint 1: the groove clearance and the pilot hole",
+          "joint2": "joint 2: the floor lap with its cones and screws",
+          "joint3": "joint 3: the wall foot on the floor",
+          "joint5": "joint 5: the service seam with inserts and pins",
+          "facet45": "the 45 degree rear facet prints clean with no support",
+          "cut-in": "a cut-in prints clean and takes paint",
+          "hand-hold": "the rim and the roof of a hand-hold print clean",
+          "edges": "where paint goes thin: sharp edge, break, round, lip, crease",
+          "floor": "the floor sandwich: flat, stiff, its mass and time",
+          "finish": "bond, fill, prime and paint: the seam does not show"}
+
 TINT = {"shrink": "#9ec5e8", "warp": "#9ec5e8", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
         "joint2": "#a8d8d0", "joint3": "#c9b8e8", "joint5": "#f2b8a0", "facet45": "white", "cut-in": "white", "hand-hold": "white",
         "edges": "white", "floor": "#d0d0d0", "finish": "#b9dea0"}
 PLATE_PITCH = 280.0
-SHEET_PITCH = 420.0
+SHEET_PITCH = 1000.0
 
 
 def main() -> int:
@@ -883,8 +913,9 @@ def main() -> int:
         shapes[it.name] = to_bed(it.make())
         rows.append(check_item(it, shapes[it.name], lim))
         r = rows[-1]
+        r["face_check"] = face_findings(shapes[it.name], it.name)
         print(f"{it.name}: valid {r['valid']}, {r['faces']} faces, box {r['box_mm']}, {r['mass_g']} g, {r['time_h']} h, overhangs "
-              f"{[(g['z'], g['z_max'], g['area_mm2'], g['steepest_deg'], bool(g['exception'])) for g in r['overhangs']]} -> {'pass' if r['pass'] else 'FAIL'}")
+              f"{[(g['z'], g['z_max'], g['area_mm2'], g['steepest_deg'], bool(g['exception'])) for g in r['overhangs']]} -> {'pass' if r['pass'] else 'FAIL'}; face check {r['face_check']}")
         shapes[it.name].exportBrep(str(out / "brep" / f"{it.name}.brep"))
         MeshPart.meshFromShape(Shape=shapes[it.name], LinearDeflection=MESH[0], AngularDeflection=MESH[1], Relative=False).write(
             str(out / "stl" / f"{it.name}.stl"))
@@ -928,7 +959,8 @@ def main() -> int:
     (out / "sheet" / "focus.json").write_text(json.dumps(focus, indent=1))
     ok = all(r["pass"] for r in rows) and all(v["pass"] for v in pairs.values()) and all(v["pass"] for v in real.values()) and all(layout.values())
     result = {"printer": {"xy": lim.xy, "z": lim.z}, "rule": {"density_g_cm3": DENSITY, "rate_cm3_h": RATE_CM3_H, "plate_setup_h": PLATE_SETUP_H},
-              "plates": [{"plate": k, "title": t, "fits": bool(layout[k])} for k, t in PLATES], "parts": rows, "places": places,
+              "plates": [{"plate": k, "title": t, "fits": bool(layout[k]), "origin": [(n % 4) * PLATE_PITCH, -(n // 4) * PLATE_PITCH]}
+                         for n, (k, t) in enumerate(PLATES)], "proves": PROVES, "parts": rows, "places": places,
               "pairs": pairs, "real": real, "base_screw": base_screw(), "insert_holes": insert_holes(),
               "edges": [{"y": y, "z": z, "what": w} for (y, z), w in EDGE_NAMES.items()], "pass": bool(ok)}
     (out / "coupons.json").write_text(json.dumps(result, indent=1))
