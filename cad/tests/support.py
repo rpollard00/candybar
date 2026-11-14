@@ -9,8 +9,8 @@ from pathlib import Path
 
 import Part
 
-from candybar import params
 from candybar.shell import cavity as shell_cavity
+from candybar.shell import params
 from candybar.shell import solids as shell_solids
 from candybar.shell.dims import Blueprint
 

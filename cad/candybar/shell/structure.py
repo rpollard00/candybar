@@ -359,8 +359,6 @@ AIR = (
 
 def fit_items(root: Path):
     """The hardware and keep-out solids of the fit study, placed with the anchors that the study wrote."""
-    from candybar import params  # noqa: PLC0415
-
     from . import fit  # noqa: PLC0415
 
     anchors = json.load(open(root / "fit" / "report.json"))["anchors"]

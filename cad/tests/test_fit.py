@@ -7,8 +7,7 @@ import unittest
 import FreeCAD as App
 import Part
 
-from candybar import check, model, panel, params
-from candybar.shell import cavity, fit
+from candybar.shell import cavity, check, controls, fit, model, params
 from candybar.shell import solids as so
 from candybar.shell import profiles as pr
 from candybar.shell.dims import Blueprint
@@ -112,7 +111,7 @@ class ItemRulesTest(unittest.TestCase):
         doc = placed_with("FitRules", **changes)
         try:
             scene = check.Scene(doc, tuple(model.placed(doc)), ())
-            rules = {"R1": check._interference(scene), "R2": check._keepout(scene), "R5": check._button_spacing(scene)}
+            rules = {"R1": check.interference(scene), "R2": check.keepout(scene), "R5": check.button_spacing(scene)}
         finally:
             App.closeDocument(doc.Name)
         return {(rule, subject) for rule, rows in rules.items() for level, subject, _ in rows if level == check.FAIL}
@@ -197,8 +196,8 @@ class EnvelopeTest(unittest.TestCase):
         self.assertAlmostEqual(after["Btn2_Body"].Center.x, before["Btn2_Body"].Center.x, places=4)
 
     def test_six_buttons_build_six_action_buttons(self) -> None:
-        for count in panel.BUTTON_COUNTS:
-            bodies = [p.name for p in fit.control_panel(count).prims if p.name.startswith("Btn") and p.name.endswith("_Body")]
+        for count in controls.BUTTON_COUNTS:
+            bodies = [p.name for p in controls.control_panel(count).prims if p.name.startswith("Btn") and p.name.endswith("_Body")]
             self.assertEqual(len(bodies), count)
 
     def test_button_count_that_has_no_layout_is_rejected(self) -> None:

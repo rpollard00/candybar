@@ -1,3 +1,4 @@
+"""The parameter sheets (cad/params/*.csv): the loader, and the `Params` sheet of a FreeCAD document."""
 from __future__ import annotations
 
 import csv
@@ -139,15 +140,6 @@ def value(doc: App.Document, name: str) -> float:
     if isinstance(result, str):
         raise ParamError(f"{name!r} does not evaluate: {result}")
     return float(getattr(result, "Value", result))
-
-
-def edit(doc: App.Document, name: str, number: float) -> None:
-    """Overwrite one parameter with a literal, keeping its unit. The caller recomputes."""
-    sheet = doc.getObject(SHEET)
-    cell = sheet.getCellFromAlias(name)
-    if cell is None:
-        raise ParamError(f"no parameter named {name!r}")
-    sheet.set(cell, _literal(repr(float(number)), _text(sheet, f"C{cell[1:]}")))
 
 
 def table(doc: App.Document) -> list[dict[str, str]]:
