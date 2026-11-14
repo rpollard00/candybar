@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" width="900" height="470" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">
+<title>Way (a): a momentary button soldered to the pads of the board's own button</title>
+<rect x="0" y="0" width="900" height="470" fill="#ffffff"/>
+<text x="20" y="28" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">Way (a): a momentary button soldered to the pads of the board's own button</text>
+<rect x="20" y="150" width="90" height="44" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="28" y="168" font-size="13" font-weight="bold" fill="#111111" text-anchor="start">Mains</text>
+<text x="28" y="184" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">socket</text>
+<polyline points="110,172 150,172" fill="none" stroke="#111111" stroke-width="2"/>
+<text x="112" y="164" font-size="11" font-weight="normal" fill="#666666" text-anchor="start">lead</text>
+<rect x="150" y="90" width="215" height="165" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="158" y="108" font-size="13" font-weight="bold" fill="#111111" text-anchor="start">Power supply (ATX)</text>
+<text x="158" y="124" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">EVGA SuperNOVA 1000 P5</text>
+<text x="158" y="140" font-size="13" font-weight="normal" fill="#111111" text-anchor="start"></text>
+<text x="158" y="156" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">Rear face: C14 inlet and</text>
+<text x="158" y="172" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">rocker switch (full off)</text>
+<text x="158" y="188" font-size="13" font-weight="normal" fill="#111111" text-anchor="start"></text>
+<text x="158" y="204" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">VGA socket  -&gt;</text>
+<text x="158" y="220" font-size="13" font-weight="normal" fill="#111111" text-anchor="start"></text>
+<text x="158" y="236" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">MB sockets  -&gt;</text>
+<polyline points="365,191 410,191 410,110 530,110" fill="none" stroke="#b00020" stroke-width="3"/>
+<text x="380" y="80" font-size="12" font-weight="normal" fill="#b00020" text-anchor="start">PCIe 6+2 lead: 12 V</text>
+<rect x="530" y="60" width="350" height="150" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="538" y="78" font-size="13" font-weight="bold" fill="#111111" text-anchor="start">BC-250 (compute module)</text>
+<text x="538" y="94" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">J1000: 8-pin, 12 V and ground</text>
+<text x="538" y="110" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">AUTO_PWRON1: pins 2-3, or pins 1-2</text>
+<circle cx="530" cy="110" r="4" fill="#b00020"/>
+<text x="538" y="128" font-size="12" font-weight="normal" fill="#111111" text-anchor="start">Pads of the power button: bottom side, I/O end</text>
+<text x="538" y="144" font-size="12" font-weight="normal" fill="#111111" text-anchor="start">(1 signal pad and ground: find them with a meter)</text>
+<polyline points="365,223 400,223 400,300 430,300" fill="none" stroke="#111111" stroke-width="2"/>
+<text x="318" y="290" font-size="12" font-weight="normal" fill="#666666" text-anchor="start">24-pin lead</text>
+<rect x="430" y="275" width="225" height="70" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="438" y="293" font-size="13" font-weight="bold" fill="#111111" text-anchor="start">Bridging plug (EVGA tester)</text>
+<text x="438" y="309" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">PS_ON (pin 16) to ground:</text>
+<text x="438" y="325" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">the supply runs, rocker on</text>
+<polyline points="700,210 700,258" fill="none" stroke="#1a4fb0" stroke-width="2"/>
+<polyline points="720,210 720,258" fill="none" stroke="#1a4fb0" stroke-width="2"/>
+<circle cx="700" cy="210" r="4" fill="#1a4fb0"/>
+<circle cx="720" cy="210" r="4" fill="#1a4fb0"/>
+<text x="728" y="232" font-size="12" font-weight="normal" fill="#1a4fb0" text-anchor="start">2 solder joints</text>
+<rect x="670" y="258" width="120" height="40" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="678" y="276" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">2-pin connector</text>
+<text x="678" y="292" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">(for service)</text>
+<polyline points="700,298 700,370" fill="none" stroke="#1a4fb0" stroke-width="2"/>
+<polyline points="720,298 720,370" fill="none" stroke="#1a4fb0" stroke-width="2"/>
+<text x="728" y="340" font-size="12" font-weight="normal" fill="#1a4fb0" text-anchor="start">twisted pair, about 1 m</text>
+<rect x="600" y="370" width="280" height="56" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="608" y="388" font-size="13" font-weight="bold" fill="#111111" text-anchor="start">Momentary button (normally open)</text>
+<text x="608" y="404" font-size="13" font-weight="normal" fill="#111111" text-anchor="start">on a fixed part of the shell</text>
+<text x="20" y="395" font-size="12" font-weight="normal" fill="#111111" text-anchor="start">Short press: start. Short press again: the system shuts down.</text>
+<text x="20" y="413" font-size="12" font-weight="normal" fill="#111111" text-anchor="start">Press for 5 s or more: forced off. After a shutdown the supply still runs.</text>
+<text x="20" y="431" font-size="12" font-weight="normal" fill="#111111" text-anchor="start">Full off: the rocker switch.</text>
+</svg>
