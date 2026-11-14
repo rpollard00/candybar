@@ -30,10 +30,10 @@ The fit study has two monitor bodies. The present unit is 354 x 230 x 10. The bo
 | Upright | 2 | A bar of 24 x 12, 301.2 long, at `x` 84 on each side. Each end has a slot of 4.5 x 29 and an ear with an M4 heat-set insert. |
 | Jaw | 4 | A slider on an upright. It has a wall beside the edge of the monitor, a rest behind the monitor, and a land for the lock screw. |
 | Shoe | 4 | A block behind the slot of the upright. It holds the M4 nut of a lock screw. |
-| Cable channel | 2 | A C section on the inner face of each side, 100 long. |
+| Cable channel | 2 | A C section on the inner face of each side, 100 long, with slots for cable ties. |
 | Boss | 4 | An added solid on the inner face of each side. It holds an M3 heat-set insert for a cable channel. |
 
-Bought parts: 8 screws M4 x 25 with a button head (ISO 7380), 4 hexagon nuts M4, 4 washers M4, 4 heat-set inserts M4, 4 heat-set inserts M3, 4 screws M3 x 8, cellular rubber strip 2 thick, felt 1 thick.
+Bought parts: 4 screws M4 x 25 and 4 screws M4 x 12 with a button head (ISO 7380), 4 hexagon nuts M4, 4 washers M4, 4 heat-set inserts M4, 4 heat-set inserts M3, 4 screws M3 x 8, 4 dowel pins 4 x 12, 4 dowel pins 4 x 16 for the seams, 8 disc magnets 8 x 3, cable ties 2.5 wide, cellular rubber strip 2 thick, felt 1 thick.
 
 ### How the monitor is held
 
@@ -113,21 +113,48 @@ Each side has one channel on the inner face of the side, in the hollow of the ra
 
 The channel holds the leads and their slack. The monitor needs a slack of about 100 to come forward before the plugs are pulled.
 
-The leads of the present unit (the owner, 2026-11-14):
+The leads of the present unit (the owner and the monitor research, 2026-11-14):
 
-| Lead | Diameter (estimate) | Socket on the monitor | Channel |
-| --- | --- | --- | --- |
-| HDMI to mini HDMI, picture and sound | 5 to 7 | Left edge, about 49 above the bottom edge | Left |
-| USB-C, power (30 W) | 3.5 to 4.5 | Left edge, about 68 or 86 above the bottom edge | Left |
-| 3.5 mm audio | 3 to 4 | Right edge, about 30 above the bottom edge | Right |
+| Lead | Diameter (estimate) | Socket on the monitor | Channel | Lead clamp |
+| --- | --- | --- | --- | --- |
+| HDMI to mini HDMI, picture and sound | 5 to 7 | Left edge, about 49 above the bottom edge | Left | 44.0 from the socket |
+| USB-C, power (30 W) | 3.5 to 4.5 | Left edge, the upper USB-C socket, about 86 above the bottom edge | Left | 44.0 from the socket |
+| 3.5 mm audio | 3 to 4 | Right edge, about 30 above the bottom edge | Right | 44.0 from the socket |
 
-The sides are those that a person sees from the front. The source is `docs/research/hardware-envelopes.md`, section 1, and the owner's product pictures. One picture shows two USB-C sockets and the mini HDMI socket on the left edge. A second picture shows the button, the wheel and a jack on the right edge. The heights are estimates from a render.
+The sides are those that a person sees from the front. The maker's page confirms the sides. The owner's product pictures agree: one shows two USB-C sockets and the mini HDMI socket on the left edge, and a second shows the button, the wheel and a jack on the right edge. The heights are estimates from a render (`docs/research/hardware-envelopes.md`, section 1).
+
+**The lead clamp.** The small mini HDMI plug must not carry the weight of its lead. The front arm of each channel has four pairs of slots (4 x 2.5) at `v` -88, -70, -50 and -30. A cable tie through one pair holds the leads on the channel. The check measures the distance from each socket to the middle of its tie. The limit is 50.
+
+Not known: the direction of the mini HDMI socket. It sets the type of the right-angle plug (up or down). The channel and the ties are the same for the two types.
 
 The three leads have a total section of about 70 mm2. One channel has 462 mm2. Thus one channel takes all three leads, and each side has a channel for a replacement monitor with other sockets.
 
 The plug room is 22 beside each side edge, as in the fit study. Right-angle plugs are necessary. The stand-out of a right-angle mini HDMI plug is an estimate (15 to 20) and is not measured.
 
 The channels do not touch the cable zones of the fit study (`MonitorCables_Left`, `MonitorCables_Right`): the gap is 1.0.
+
+## The power button of the monitor (an option)
+
+The power button is on the right edge of the monitor, about 66 above its bottom edge. With the bezel plate on, it is behind the right bar of the plate. The research did not find out if the monitor starts by itself when power arrives.
+
+The ways to the button, without a change to the outer form:
+
+| Way | Result |
+| --- | --- |
+| Through the reveal | Not possible. The reveal is 1 wide and 2 deep, and its floor is the body. The gap between the plate and the jamb is 0.5. |
+| From below the bezel plate | Not possible. The apron below the plate is closed, and the gap at the end of the plate is 0.5. |
+| The plate off | Possible with no part. Pull the plate off (magnets), push the button with a finger, put the plate back. |
+| Through the plate (the option) | A push rod in the inner frame of the right bar. It puts one mark of 4.4 x 4.4 on the face of the plate. |
+
+The option has three printed parts, and they leave with the plate:
+
+- A square push rod of 4 x 4 goes through a hole in the inner frame at `x` 192.5. It stands 1.5 out of the face. Its inner end has a slope of 45 degrees.
+- A striker of 6 x 6 moves across the face in a guide. The slope of the rod moves it onto the button. Its nose is 1.0 from the button, and the travel is 2.0.
+- The guide is bonded to the back of the plate, in the plug room of the right edge. The present unit has no socket at that height.
+
+The spring of the button moves the striker and the rod back. The option is in `cradle.button_option`. It is not in the default plate. The checks find no clash with the monitor, the jaws, the skin, the right channel and the lugs.
+
+Not designed: a stop that keeps the rod and the striker in the guide when the plate is off.
 
 ## The bezel plate as a printed part
 
@@ -212,6 +239,8 @@ The window of a 16:9 or a 4:3 plate is smaller than the lit image. A vertical pl
 
 One study measured printed PETG 0.54 % to 0.76 % short. The monitor does not shrink.
 
+The owner said on 2026-11-14 that the cabinet will be printed in ABS on a Qidi Q2. ABS shrinks and warps as much as PETG or more, so the room for shrink is as important. The numbers of this section are for the PETG values. The print checks use the limits of the Bambu A1 (240 x 240 x 245). The Q2 is not examined.
+
 | Value | As designed | 0.54 % | 0.76 % |
 | --- | --- | --- | --- |
 | Opening | 434.7 x 293.4 | 432.3 x 291.8 | 431.4 x 291.2 |
@@ -241,6 +270,8 @@ The command `candybar.shell.cradle` writes `cad/out/cradle/report.md` and `repor
 | Sight lines | The same as in the fit study: the child of 8 loses 0.4 of the image at the bottom, and the adults lose nothing. |
 | Edge rule on the plate | 12 faces of the break. The 32 convex edges that stay sharp are those of the back, against the monitor. |
 | Face check | No finding without a reason. The known items are in the table of the plate, and one more: the seat of the M4 nut in each shoe is a ring 1.25 wide. |
+| Lead clamps | Each of the three leads has a tie 44.0 from its socket (the limit is 50). |
+| Power-button option | The three parts and the plate with the hole are valid solids with no clash. The striker is 1.0 from the button. |
 | Print | Each part fits 240 x 240 x 245. |
 
 The skin comes from the cache of the split. On this machine FreeCAD 1.1.4 says that this skin is not a valid shape, and the booleans with it give results that agree with the sections. The fit study is not run again: the positions of the hardware come from `fit/report.json` of the built shell.
@@ -253,7 +284,7 @@ The skin comes from the cache of the split. On this machine FreeCAD 1.1.4 says t
 | Upright | 2 | On its back, on the bed diagonal (needs 238.4 of 240). The ears stand up. | 301.2 x 36 x 32.4 | The back of the bar, 301 x 24 | 120 g |
 | Jaw | 4 | On a side face | 32 x 25.1 x 23 | The side face, which is the whole profile | 12 g |
 | Shoe | 4 | On its back. The lip stands up. | 25.2 x 14 x 10 | The back, 25 x 14 | 3 g |
-| Cable channel | 2 | On one end | 28 x 27 x 100 | The end face, which is the whole section | 34 g |
+| Cable channel | 2 | On one end. The roofs of the tie slots are bridges of 4. | 28 x 27 x 100 | The end face, which is the whole section | 34 g |
 
 The lugs print with the apron and the brow. The apron stands with the chord of the screen face upright, so the bottom lugs are at its top. The back of each lug ends in a slope of 45 degrees.
 
@@ -267,7 +298,8 @@ The brow is "upright" in the split. In that position the top lugs hang 11.1 belo
 4. A plate that is 0.5 smaller than its recess is permitted.
 5. The estimates of the load check, as the section "Load check" names them.
 6. The magnets and the pull at the rim are not tested on a real part.
-7. The sockets of the present unit are where the research note and the product pictures show them. The real unit is not measured.
+7. The sockets and the power button of the present unit are where the research note and the product pictures show them. The real unit is not measured.
+8. The material values of the load check are for PETG. ABS is not examined.
 
 ## Not done
 
@@ -275,5 +307,6 @@ The brow is "upright" in the split. In that position the top lugs hang 11.1 belo
 - No real test of the magnets, the pads and the lock screws.
 - No printed stop under the bottom jaws.
 - No plate for 16:9, 4:3 or vertical.
+- No stop for the rod and the striker of the power-button option.
 - No mount for the DisplayPort to HDMI adapter, the USB-C power board or the amplifier. The channels end at the cable zones of the fit study.
 - The lugs and the bosses are not in the pieces of the split. `split.py` does not know them.
