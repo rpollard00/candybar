@@ -150,12 +150,15 @@ class StraightSeamTest(unittest.TestCase):
         self.assertFalse(high.isInside(sc.at + V(0, 0, 3.0), 1e-6, False), "no clearance hole")
         self.assertFalse(high.isInside(sc.at + V(j.head_pocket_d / 2 - 0.5, 0, j.flange_t + 3.0), 1e-6, False), "no head pocket")
 
-    def test_the_outer_edge_has_the_rebate_for_the_filler(self) -> None:
+    def test_the_outer_edge_has_the_v_for_the_filler(self) -> None:
         j = JOINT
         low = self.res.pieces["low"]
         z = SEAM_Z - split.KERF / 2
-        self.assertFalse(low.isInside(V(80.0, j.vgroove_d / 2, z - j.vgroove_w / 4), 1e-6, False))
-        self.assertTrue(low.isInside(V(80.0, j.vgroove_d / 2, z - j.vgroove_w / 2 - 0.3), 1e-6, False))
+        # inside the V: a quarter of its depth from the outside, a quarter of its half width from the seam
+        self.assertFalse(low.isInside(V(80.0, j.vgroove_d / 4, z - j.vgroove_w / 8), 1e-6, False))
+        # outside it: under its tip, and inward of its depth
+        self.assertTrue(low.isInside(V(80.0, j.vgroove_d / 4, z - j.vgroove_w / 2 - 0.2), 1e-6, False))
+        self.assertTrue(low.isInside(V(80.0, j.vgroove_d + 0.2, z - 0.1), 1e-6, False))
 
 
 class CreaseSeamTest(unittest.TestCase):
@@ -290,11 +293,11 @@ class FloorDataTest(unittest.TestCase):
         self.assertLess(f("floor middle centre"), f("floor rear centre"))
 
     def test_the_floor_screw_does_not_reach_the_table(self) -> None:
-        self.assertLess(pieces.FLOOR.screw_l, pieces.FLOOR.t)
+        self.assertLess(pieces.FLOOR.screw_len, pieces.FLOOR.t)
 
     def test_the_foot_flange_and_the_lip_over_it_make_the_floor(self) -> None:
         fl = pieces.FLOOR
-        self.assertAlmostEqual(fl.foot_t, fl.t / 2)
+        self.assertAlmostEqual(fl.foot_thick, fl.t / 2)
         self.assertGreater(fl.foot_w - fl.inset, 8.0)
 
     def test_no_tile_with_its_laps_is_longer_than_the_bed(self) -> None:
@@ -324,8 +327,8 @@ class WholeSetTest(unittest.TestCase):
         cls.pl = pieces.plain(cls.d, out, quiet)
         cls.items = pieces.hardware()
         cls.res = pieces.generate(cls.d, cls.pl, None, None, cls.items, quiet)
-        cls.chk = pieces.check_set(cls.d, cls.res, cls.items, quiet, detail=False)
         cls.rep = pieces.seam_report(cls.res)
+        cls.chk = pieces.check_set(cls.d, cls.pl, cls.res.pieces, cls.rep, cls.items, quiet)
 
     def test_there_are_32_pieces(self) -> None:
         self.assertEqual(len(self.res.pieces), 32)

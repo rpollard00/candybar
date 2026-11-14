@@ -17,7 +17,7 @@ are fused, and the form and the other seams trim the result:
     key       u key_u, key_proj high, on the piece with the pilot holes
     groove    the key with the clearance, in the piece with the screw heads
     screws    on the line u = screw_u, square to the seam plane
-    rebate    on the outer line, for the seams that are filled (it replaces the V of the joint sheet)
+    V         on the outer line, for the seams that are filled
 
 The same code makes a straight seam, a seam in a crease (the wall of one piece leaves the seam plane at 45 degrees:
 that side gets a band outside the outer line too, and the form trims it) and the place where three pieces meet (the
@@ -26,8 +26,9 @@ corner).
 
     CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces
 
-CANDYBAR_PIECES names what to build: "pilot" (the two pilot pairs), "all" (default), or piece names separated by
-commas. No FreeCAD at import.
+CANDYBAR_PIECES names what to do: "all" (default: every piece, the files and the checks), "pilot" (the two pilot
+pairs only), "check" (the checks again, on the files of a build) or "views" (the folders that tools/draw_pieces.py
+renders). No FreeCAD at import.
 """
 from __future__ import annotations
 
@@ -63,7 +64,7 @@ class Build:
     screw_end: float = 12.0        # a screw axis stays this far from the end of its run
     wall_left: float = 1.2         # a hole or a pocket leaves this much of the skin to the outside
     driver_d: float = 8.0          # the shaft of the screwdriver (a 1/4 inch bit holder)
-    driver_len: float = 80.0       # the clear length that it needs behind the screw head
+    driver_len: float = 40.0       # the clear length that it needs behind the screw head: a 25 mm bit in a flat ratchet
     hardware_gap: float = 2.0      # a flange stays this far from the hardware and the keep-out zones of fit.Layout
     door_stop: float = 10.0        # the flanges stop this far from the opening of the rear door (another package)
     floor_gap: float = 0.3         # the wall flanges stop this far above the printed floor
@@ -286,7 +287,6 @@ class Skeleton:
     segs: list
     n: object
     sign: float
-    true_wire: object      # the outer line as it is on the form
     closed: bool = False
 
     def inward(self, t):
@@ -340,16 +340,48 @@ def _intersect(p, dp, q, dq, n):
     return p + dp * ((q - p).cross(dq).dot(n) / den)
 
 
-def simple_line(edges: list, n, b: Build = BUILD) -> tuple[list[Seg], list[bool]]:
-    """The ordered edges of an outer line as segments. Returns the segments and, for each end, whether a tail was
-    left out there."""
+JOIN = 0.05   # two edges of an outer line join when their ends are this near
+
+
+def chains(edges: list, tol: float = JOIN) -> list[tuple[list, bool]]:
+    """Edges put end to end: a list of (chain, closed), a chain being (edge, start, end) in order. An edge shorter
+    than the tolerance is left out. Part.Wire does this too, but it fails on some of the outer lines (an edge of no
+    length at a corner of the form), and then a seam had a flange on one side of the cabinet only."""
+    items = [(e, e.valueAt(e.FirstParameter), e.valueAt(e.LastParameter)) for e in edges if e.Length > tol / 2]
+    out = []
+    while items:
+        chain = [items.pop(0)]
+        grown = True
+        while grown:
+            grown = False
+            start, end = chain[0][1], chain[-1][2]
+            for k, (e, p, q) in enumerate(items):
+                if p.distanceToPoint(end) < tol:
+                    chain.append((e, p, q))
+                elif q.distanceToPoint(end) < tol:
+                    chain.append((e, q, p))
+                elif q.distanceToPoint(start) < tol:
+                    chain.insert(0, (e, p, q))
+                elif p.distanceToPoint(start) < tol:
+                    chain.insert(0, (e, q, p))
+                else:
+                    continue
+                items.pop(k)
+                grown = True
+                break
+        out.append((chain, len(chain) > 1 and chain[0][1].distanceToPoint(chain[-1][2]) < tol))
+    return out
+
+
+def simple_line(edges: list, n, b: Build = BUILD, chain: list | None = None, closed: bool = False) -> tuple[list[Seg], list[bool]]:
+    """The edges of one outer line as segments (or a chain of chains()). Returns the segments and, for each end,
+    whether a tail was left out there."""
     import Part  # noqa: PLC0415
 
-    wire = Part.Wire(edges)
-    verts = [v.Point for v in wire.OrderedVertexes]
+    if chain is None:
+        chain, closed = chains(edges)[0]
     items = []   # (kind, edge, start, end): kind "small", "line", "arc", "curve"
-    for i, e in enumerate(wire.OrderedEdges):
-        p, q = verts[i], verts[(i + 1) % len(verts)] if wire.isClosed() else verts[i + 1]
+    for e, p, q in chain:
         c = e.Curve
         if e.Length < b.small_edge:
             kind = "small"
@@ -361,7 +393,7 @@ def simple_line(edges: list, n, b: Build = BUILD) -> tuple[list[Seg], list[bool]
             kind = "curve"
         items.append((kind, e, p, q))
     dropped = [False, False]
-    if not wire.isClosed():
+    if not closed:
         for end in (0, 1):
             seq = items if end == 0 else items[::-1]
             while seq and seq[0][0] == "small":
@@ -370,7 +402,8 @@ def simple_line(edges: list, n, b: Build = BUILD) -> tuple[list[Seg], list[bool]
             tail = 0.0
             for i, it in enumerate(seq):
                 if it[0] == "small":
-                    if tail < b.end_drop:
+                    rest = sum(x[1].Length for x in seq[i:] if x[0] != "small")
+                    if tail < b.end_drop and tail < rest:
                         k = i
                         while k < len(seq) and seq[k][0] == "small":
                             k += 1
@@ -435,12 +468,8 @@ def outer_lines(cf: CutFace, outer, section, b: Build = BUILD) -> list[Skeleton]
         if all(section.distToShape(Part.Vertex(e.valueAt(a + (z - a) * t)))[0] < 0.08 for t in (0.2, 0.5, 0.8)):
             on.append(e)
     out = []
-    for group in Part.sortEdges(on):
-        try:
-            true_wire = Part.Wire(group)
-        except Part.OCCError:
-            continue
-        segs, dropped = simple_line(group, cf.n, b)
+    for chain, closed in chains(on):
+        segs, dropped = simple_line([], cf.n, b, chain, closed)
         if not segs or sum(s.length for s in segs) < b.run_flange:
             continue
         if dropped[0]:
@@ -449,10 +478,17 @@ def outer_lines(cf: CutFace, outer, section, b: Build = BUILD) -> list[Skeleton]
         if dropped[1]:
             t = segs[-1].tangent(True, cf.n)
             segs.append(Seg(segs[-1].q, segs[-1].q + t * b.end_reach))
-        long = max(segs, key=lambda s: s.length)
-        p, t = long.point(long.length / 2, cf.n)
-        sign = 1.0 if outer.isInside(p + cf.n.cross(t) * 1.0, 1e-4, False) else -1.0
-        out.append(Skeleton(segs, cf.n, sign, true_wire, true_wire.isClosed()))
+        # which side of the line is inside the form: points 1 mm beside it, 1 mm into the piece (a point in the seam
+        # plane itself can lie on a face of the form, as on the table)
+        votes = 0
+        for seg in segs:
+            for f in (0.25, 0.5, 0.75):
+                p, t = seg.point(seg.length * f, cf.n)
+                side_ = cf.n.cross(t)
+                base = p + cf.into * 1.0
+                votes += int(outer.isInside(base + side_, 1e-4, False)) - int(outer.isInside(base - side_, 1e-4, False))
+        sign = 1.0 if votes >= 0 else -1.0
+        out.append(Skeleton(segs, cf.n, sign, closed))
     return out
 
 
@@ -562,6 +598,26 @@ def grown_kerf(poly, reach: float):
     return split.kerf(face)
 
 
+def near_part(outer, shape, by: float = 1.0):
+    """The part of the outer solid in the box of a shape. A common with the whole outer solid comes back empty for
+    some solids that lie inside it (OpenCascade, on the brow at W1); the common with the part near them is right."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+
+    bb = shape.BoundBox
+    box = Part.makeBox(bb.XLength + 2 * by, bb.YLength + 2 * by, bb.ZLength + 2 * by, App.Vector(bb.XMin - by, bb.YMin - by, bb.ZMin - by))
+    return outer.common(box)
+
+
+def inside_form(shape, outer):
+    """The part of a shape inside the outer solid. OpenCascade loses volume in this common in two different ways (with
+    the whole outer solid on the brow at W1, with the part near the shape on the feet of the deck); what is lost is
+    never added, so the larger of the two results is the right one."""
+    a = shape.common(outer)
+    b = shape.common(near_part(outer, shape))
+    return a if a.Volume >= b.Volume else b
+
+
 def flange(side: Side, piece, outer, trims: list, j: Joint, b: Build = BUILD, section=None):
     """Flange and gusset of one side: the section carried along each outer line, inside the form, less the cut faces
     of the other seams and the zones that stay free. Only the solids that reach into the piece stay."""
@@ -576,13 +632,14 @@ def flange(side: Side, piece, outer, trims: list, j: Joint, b: Build = BUILD, se
         except Exception as e:  # noqa: BLE001
             side.notes.append(f"no flange on a line of {sk.length:.0f} mm: {e}")
             continue
-        got = raw.common(outer)
+        got = inside_form(raw, outer)
         if not got.Solids:
             side.notes.append(f"no flange on a line of {sk.length:.0f} mm: it is outside the form")
             continue
-        near = [t for t in trims if t.BoundBox.intersect(got.BoundBox)]
-        if near:
-            got = got.cut(near)
+        # one tool at a time: a cut by many tools at once is another place where OpenCascade loses solids
+        for t in trims:
+            if t.BoundBox.intersect(got.BoundBox):
+                got = got.cut(t)
         for s in got.Solids:
             if s.Volume > b.debris_mm3 and s.common(piece).Volume > 0.5:
                 kept.append(s)
@@ -843,17 +900,17 @@ def _fuse_all(shapes: list):
     return out
 
 
-def rebate(side: Side, j: Joint):
-    """The half of the filler groove on the outer edge of one piece: vgroove_d deep from the outside, half of
-    vgroove_w wide. It is a square rebate where the joint sheet has a V, so that it is an exact offset of the line."""
-    h = split.KERF / 2
-    section = [(-1.5, -0.01), (j.vgroove_d, -0.01), (j.vgroove_d, j.vgroove_w / 2), (-1.5, j.vgroove_w / 2)]
+def vee(side: Side, j: Joint):
+    """The half of the V on the outer edge of one piece, for the filler: the section of joints.vgroove_profile,
+    which starts outside the outer line so that it cuts the edge of a wall that leans."""
+    h = side.cf.gap / 2
+    section = [(-1.5, -0.01), (j.vgroove_d, -0.01), (j.vgroove_d, 0.0), (0.0, j.vgroove_w / 2), (-1.5, j.vgroove_w / 2)]
     out = []
     for sk in side.lines:
         try:
             out.append(carry(sk, section, side.cf.into, h, corners=False))
         except Exception as e:  # noqa: BLE001
-            side.notes.append(f"no rebate: {e}")
+            side.notes.append(f"no V: {e}")
     return _fuse_all(out) if out else None
 
 
@@ -876,6 +933,7 @@ class Result:
     pairs: list[Pair]
     feet: list[Side] = field(default_factory=list)
     ribs: list[Side] = field(default_factory=list)
+    added: dict = field(default_factory=dict)            # name -> what the generator added to the plain piece, with its holes
     hits: list[dict] = field(default_factory=list)       # hardware that a flange was cut back for
     log: list[str] = field(default_factory=list)
     extra: dict = field(default_factory=dict)            # what the floor and the ribs report
@@ -976,7 +1034,7 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
         if side.solid is not None:
             add.setdefault(side.cf.piece, []).append(side.solid)
             if seam_of[side.cf.seam].joint == "bond-fill":
-                r = rebate(side, j)
+                r = vee(side, j)
                 if r is not None:
                     cut.setdefault(side.cf.piece, []).append(r)
     for pair in res.pairs:
@@ -994,7 +1052,15 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
             continue
         out = shape
         if add.get(name):
-            out = out.fuse(_fuse_all(add[name]))
+            extra = _fuse_all(add[name])
+            res.added[name] = extra.cut(cut[name]) if cut.get(name) else extra
+            out = shape.fuse(extra)
+            if out.Volume < shape.Volume + 0.2 * extra.Volume:
+                # the fuse lost solids: one at a time
+                out = shape
+                for sd in add[name]:
+                    out = out.fuse(sd)
+                log(f"pieces: {name}: the fuse of all flanges at once lost volume; fused one at a time")
         if cut.get(name):
             out = out.cut(cut[name])
         if add.get(name) or cut.get(name):
@@ -1030,14 +1096,14 @@ class Floor:
     inset: float = 5.0            # the edge of the floor, inward from the outline of the cabinet on the table: the wall is 4.4 there
     notch_gap: float = 0.5        # round a part of a wall that stands in the plan of the floor (the web between the deck and the body)
     foot_w: float = 16.0          # the foot flange reaches this far inward from that outline
-    foot_t: float = 5.0           # and is this thick: half the floor
+    foot_thick: float = 5.0          # and is this thick: half the floor
     rebate_gap: float = 0.3       # the rebate is this much wider than the foot flange
     rebate_lift: float = 0.2      # and this much higher: the bond line
     lap_gap: float = 0.2          # between two tiles, in plan
     lap_lift: float = 0.1         # between the two halves of a lap: the bond line
-    screw_l: float = 9.5          # 3.5 x 9.5, countersunk: it does not reach the table through 10 mm
-    pilot_d: float = 2.6          # ASSUMPTION: 0.75 d, the table value for PET, as joints.Joint.pilot_d_pet
-    clearance_d: float = 3.9
+    screw_len: float = 9.5         # 3.5 x 9.5, countersunk: it does not reach the table through 10 mm
+    pilot_hole: float = 2.6         # ASSUMPTION: 0.75 d, the table value for PET, as joints.Joint.pilot_d_pet
+    clear_hole: float = 3.9
     head_d: float = 7.0           # the countersink at the top face, 90 degrees
     foot_screw_u: float = 10.5    # the screws into the foot flange, from the outline of the cabinet
     foot_pitch: float = 80.0      # joints.OtherJoints.foot_screw_pitch
@@ -1145,7 +1211,7 @@ def floor(pl: Plain, walls: dict, items: list, log=print, fl: Floor = FLOOR, b: 
         lower[n] = max(face.Faces, key=lambda f: f.Area)
     # the rebate over the foot flange: everything within foot_w + rebate_gap of the outline of the cabinet
     inner = outline.makeOffset2D(-(fl.foot_w + fl.rebate_gap), join=2)
-    rebate = outline.cut(Part.makeFace(inner.Wires, "Part::FaceMakerBullseye")).translated(up * -1.0).extrude(up * (1.0 + fl.foot_t + fl.rebate_lift))
+    rebate = outline.cut(Part.makeFace(inner.Wires, "Part::FaceMakerBullseye")).translated(up * -1.0).extrude(up * (1.0 + fl.foot_thick + fl.rebate_lift))
     tiles = {}
     report_notches: list[dict] = []
     half = fl.t / 2
@@ -1181,9 +1247,9 @@ def floor(pl: Plain, walls: dict, items: list, log=print, fl: Floor = FLOOR, b: 
 
     def screw_at(p, top: float):
         """The holes of one floor screw at p, its head at the height top: (through the upper part, into the lower)."""
-        hole = Part.makeCylinder(fl.clearance_d / 2, half + 1.0, App.Vector(p.x, p.y, top - half - 0.5), up)
-        sink = Part.makeCone(fl.clearance_d / 2, fl.head_d / 2 + 0.01, (fl.head_d - fl.clearance_d) / 2, App.Vector(p.x, p.y, top - (fl.head_d - fl.clearance_d) / 2 + 0.01), up)
-        pilot = Part.makeCylinder(fl.pilot_d / 2, fl.screw_l - half + 1.5, App.Vector(p.x, p.y, top - fl.screw_l - 1.0), up)
+        hole = Part.makeCylinder(fl.clear_hole / 2, half + 1.0, App.Vector(p.x, p.y, top - half - 0.5), up)
+        sink = Part.makeCone(fl.clear_hole / 2, fl.head_d / 2 + 0.01, (fl.head_d - fl.clear_hole) / 2, App.Vector(p.x, p.y, top - (fl.head_d - fl.clear_hole) / 2 + 0.01), up)
+        pilot = Part.makeCylinder(fl.pilot_hole / 2, fl.screw_len - half + 1.5, App.Vector(p.x, p.y, top - fl.screw_len - 1.0), up)
         return hole.fuse(sink), pilot
 
     inside = lambda face, p: any(f.isInside(p, 0.01, True) for f in face.Faces)
@@ -1237,7 +1303,7 @@ def floor(pl: Plain, walls: dict, items: list, log=print, fl: Floor = FLOOR, b: 
                 why = "in a lap"
         wall = None
         if not why:
-            q = App.Vector(p.x, p.y, fl.foot_t / 2)
+            q = App.Vector(p.x, p.y, fl.foot_thick / 2)
             wall = next((w for w, sh in walls.items() if sh.isInside(q, 0.01, True)), None)
             if wall is None:
                 why = "no foot flange under it"
@@ -1277,7 +1343,7 @@ def feet(pl: Plain, names: list[str] | None, items: list, hits: list, log=print,
     outer = pl.outer["body"]
     section = Part.makeCompound(outer.slice(App.Vector(0, 0, 1), TABLE)).translated(App.Vector(0, 0, -TABLE))
     kerfs = [grown_kerf(poly, b.seam_reach) for s in pl.seams if s.module == "body" for poly in s.polys]
-    profile = [(b.skin_lap, 0.0), (fl.foot_w, 0.0), (fl.foot_w, fl.foot_t), (b.skin_lap, fl.foot_t)]
+    profile = [(b.skin_lap, 0.0), (fl.foot_w, 0.0), (fl.foot_w, fl.foot_thick), (b.skin_lap, fl.foot_thick)]
     out = []
     for name, shape in pl.shapes.items():
         if module[name] != "body" or (names is not None and name not in names):
@@ -1360,7 +1426,12 @@ def rib_sides(d: Blueprint, pl: Plain, names: list[str] | None, items: list, hit
                 continue
             trims = kerfs + extra_trims.get(name, [])
             flange(side, pl.shapes[name], outer, trims, JOINT, b, section=lambda seg: profile)
+            whole = side.solid.Volume if side.solid is not None else 0.0
             cut_back(side, pl.shapes[name], items, hits, b)
+            if side.solid is not None and side.solid.Volume < 0.5 * whole:
+                # hardware stands against the wall here: a stub of a rib does nothing
+                side.solid = None
+                side.notes.append("left out: less than half of the rib is clear of the hardware")
             out.append(side)
             log(f"pieces: rib {rib.axis} {at:g} of {name}: {0 if side.solid is None else side.solid.Volume / 1000:.1f} cm3 {side.notes}")
     return out
@@ -1427,12 +1498,22 @@ def vec(v) -> list[float]:
 
 def seam_report(res: Result) -> dict:
     """What was made on each seam, as plain data."""
-    side_row = lambda sd: {"seam": sd.cf.seam, "k": sd.cf.k, "piece": sd.cf.piece,
+    up = {p.full: p.up for p in res.plain.pieces}
+
+    def on_bed(sd: Side) -> str:
+        """Where the flange lies in the print orientation of its piece."""
+        u = up.get(sd.cf.piece, (0.0, 0.0, 1.0))
+        n = math.sqrt(sum(v * v for v in u))
+        dot = (sd.cf.into.x * u[0] + sd.cf.into.y * u[1] + sd.cf.into.z * u[2]) / n
+        return "on the bed" if dot > 0.7 else "at the top" if dot < -0.7 else "upright"
+
+    side_row = lambda sd: {"seam": sd.cf.seam, "k": sd.cf.k, "piece": sd.cf.piece, "in_print": on_bed(sd),
+                           "longest_straight_mm": round(max((seg.length for sk in sd.lines for seg in sk.segs if seg.c is None), default=0.0), 1),
                            "flange_cm3": round(sd.solid.Volume / 1000, 1) if sd.solid is not None else 0.0,
                            "line_mm": round(sum(sk.length for sk in sd.lines), 1), "lean_out": sd.lean_out, "gusset": sd.gusset, "notes": sd.notes}
     pairs = [{"seam": p.a.cf.seam, "k": p.a.cf.k, "head": p.head.cf.piece, "pilot": p.pilot.cf.piece, "mate_cm2": round(p.mate.Area / 100, 1),
               "run_mm": round(sum(r[-1][0] - r[0][0] for r in p.runs), 1), "normal": vec(p.head.cf.into),
-              "screws": [{"at": vec(sc.at), "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
+              "screws": [{"at": vec(sc.at), "along": [round(v, 4) for v in sc.tangent], "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
     return {"sides": [side_row(sd) for sd in res.sides], "feet": [side_row(sd) for sd in res.feet], "ribs": [side_row(sd) for sd in res.ribs],
             "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {})}
 
@@ -1448,77 +1529,128 @@ def tight_box(shape):
     return p, p.min(axis=0), p.max(axis=0)
 
 
-def check_set(d: Blueprint, res: Result, items: list, log=print, b: Build = BUILD, detail: bool = True) -> dict:
+def overhang(shape, up, deflection: float = 0.3) -> dict:
+    """What a print orientation does to a piece, from its mesh, cm2: the area on the bed, the area that faces down
+    more than split.OVERHANG from upright (it needs support) and the area at that limit."""
+    import numpy as np  # noqa: PLC0415
+
+    pts, tris = shape.tessellate(deflection)
+    p = np.array([(v.x, v.y, v.z) for v in pts])
+    t = np.array(tris)
+    u = np.array(up, float)
+    u /= np.linalg.norm(u)
+    a, b_, c = p[t[:, 0]], p[t[:, 1]], p[t[:, 2]]
+    n = np.cross(b_ - a, c - a)
+    area = np.linalg.norm(n, axis=1) / 2
+    nz = (n @ u) / (2 * area + 1e-12)
+    h = ((a + b_ + c) / 3) @ u
+    z0 = (p @ u).min()
+    at_bed = h < z0 + 0.5
+    over = -math.sin(math.radians(split.OVERHANG + split.OVERHANG_BAND))
+    limit = -math.sin(math.radians(split.OVERHANG - split.OVERHANG_BAND))
+    return {"bed_cm2": round(float(area[(nz < -0.9998) & at_bed].sum()) / 100, 1),
+            "overhang_cm2": round(float(area[(nz < over) & ~at_bed].sum()) / 100, 1),
+            "limit_cm2": round(float(area[(nz >= over) & (nz <= limit) & ~at_bed].sum()) / 100, 1)}
+
+
+def split_rows() -> dict:
+    """The rows of the split's own measurement of the plain pieces (seen faces that overhang), when it is on disk."""
+    for root in (Path(os.environ.get("CANDYBAR_SHELL", CAD / "out" / "shell-rev7")), SHARED):
+        f = root / "split" / "measurements.json"
+        if f.exists():
+            return json.loads(f.read_text(encoding="utf-8"))[split.SHELL]["pieces"]
+    return {}
+
+
+def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=print, b: Build = BUILD) -> dict:
     """The checks of the whole set: every piece is one valid solid inside the printer's limit; no two pieces share
-    volume; no piece is in the hardware; the mass; the screws; what each print orientation overhangs."""
+    volume; no piece is in the hardware; a screwdriver reaches each screw past the finished pieces; the mass; the
+    screws; what each print orientation overhangs. made: the finished pieces; rep: seam_report of the build."""
+    import FreeCAD as App  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
     lim = split.printer()
-    pl = res.plain
     up = {p.full: p.up for p in pl.pieces}
     bed = {p.full: p.bed for p in pl.pieces}
-    module = {p.full: p.module for p in pl.pieces}
-    covers = split.cover_shapes(d) if detail else []
+    before = split_rows()
     rows, boxes = {}, {}
     t0 = time.time()
-    for name, shape in res.pieces.items():
+    for name, shape in made.items():
         pts, lo, hi = tight_box(shape)
         boxes[name] = (lo, hi)
         row = {"valid": bool(shape.isValid()), "solids": len(shape.Solids), "faces": len(shape.Faces),
                "volume_cm3": round(shape.Volume / 1000, 1), "plain_cm3": round(pl.shapes[name].Volume / 1000, 1) if name in pl.shapes else None,
-               "mass_g": round(shape.Volume / 1000 * split.PETG_G_PER_CM3), "bed": bed[name], **split.print_box(pts, up[name], lim)}
-        if detail and module[name] in ("body", "hood", "base"):
-            m = split.measure(shape, up[name], lim, pl.outer[module[name]], covers, d, True, split.seam_planes(pl.seams, module[name]))
-            row.update({k: m[k] for k in ("seen", "overhang_seen", "limit_seen", "overhang_inside", "bed")} | {"bed_cm2": m["bed"]})
-            row["bed"] = bed[name]
+               "mass_g": round(shape.Volume / 1000 * split.PETG_G_PER_CM3), "bed": bed[name], "up": [round(v, 3) for v in up[name]],
+               **split.print_box(pts, up[name], lim), **overhang(shape, up[name])}
+        if name.startswith("floor"):
+            # a tile prints flat either way up: the way with less overhang
+            flipped = overhang(shape, tuple(-v for v in up[name]))
+            row["flipped"] = flipped
+            if flipped["overhang_cm2"] < row["overhang_cm2"]:
+                row.update(flipped)
+                row["bed"] = "flat, top face on the bed"
+                row["up"] = [-v for v in row["up"]]
+        elif name in before:
+            row["seen_overhang_plain_cm2"] = before[name].get("overhang_seen")
+            row["overhang_plain_cm2"] = round(before[name].get("overhang_seen", 0.0) + before[name].get("overhang_inside", 0.0), 1)
         rows[name] = row
-        log(f"pieces: check {name}: valid {row['valid']}, solids {row['solids']}, box {row['x']} x {row['y']} x {row['z']}, fits {row['fits']} [{time.time() - t0:.0f} s]")
-    names = list(res.pieces)
+    log(f"pieces: boxes and overhangs [{time.time() - t0:.0f} s]")
+    names = list(made)
     clashes = []
     for i, a in enumerate(names):
         for c in names[i + 1:]:
             (alo, ahi), (clo, chi) = boxes[a], boxes[c]
             if np.any(alo > chi + 0.1) or np.any(clo > ahi + 0.1):
                 continue
-            v = res.pieces[a].common(res.pieces[c]).Volume
+            v = made[a].common(made[c]).Volume
             if v > b.clash_mm3:
                 clashes.append({"a": a, "b": c, "mm3": round(v, 1)})
     log(f"pieces: clashes between pieces: {clashes} [{time.time() - t0:.0f} s]")
     hard = []
     for iname, role, solid in items or []:
         sb = solid.BoundBox
-        for name, shape in res.pieces.items():
+        for name, shape in made.items():
             lo, hi = boxes[name]
             if sb.XMin > hi[0] or sb.XMax < lo[0] or sb.YMin > hi[1] or sb.YMax < lo[1] or sb.ZMin > hi[2] or sb.ZMax < lo[2]:
                 continue
             v = shape.common(solid).Volume
-            plain_v = pl.shapes[name].common(solid).Volume if name in pl.shapes and not name.startswith("floor") else 0.0
             if v > b.clash_mm3:
+                plain_v = pl.shapes[name].common(solid).Volume if name in pl.shapes and not name.startswith("floor") else 0.0
                 hard.append({"piece": name, "item": iname, "role": role, "mm3": round(v, 1), "of_the_plain_piece_mm3": round(plain_v, 1)})
     log(f"pieces: clashes with hardware: {hard} [{time.time() - t0:.0f} s]")
-    # the screwdriver again, against the finished pieces
+    # the screwdriver again, past the finished pieces
     j = joint()
     reach = []
-    solids = list(res.pieces.values())
-    for p in res.pairs:
-        for sc in p.screws:
-            free = free_length(sc, p.head.cf.into, solids, j, b)
-            reach.append({"seam": p.a.cf.seam, "head": p.head.cf.piece, "at": vec(sc.at), "free": round(free)})
+    solids = list(made.values())
+    for p in rep["pairs"]:
+        into = App.Vector(*p["normal"])
+        for sc in p["screws"]:
+            free = free_length(Screw(App.Vector(*sc["at"]), None), into, solids, j, b)
+            reach.append({"seam": p["seam"], "head": p["head"], "at": sc["at"], "free": round(free)})
     short = [r for r in reach if r["free"] < b.driver_len]
-    fl = res.extra.get("floor", {})
+    log(f"pieces: screws that a screwdriver does not reach: {short} [{time.time() - t0:.0f} s]")
+    fl = rep.get("floor", {})
     wall_g = sum(r["mass_g"] for n, r in rows.items() if not n.startswith("floor"))
     plain_g = sum(pl.shapes[n].Volume / 1000 * split.PETG_G_PER_CM3 for n in rows if not n.startswith("floor"))
+    part = lambda rows_: round(sum(r["flange_cm3"] for r in rows_) * split.PETG_G_PER_CM3)
     twins = [{"piece": n[:-2], "right_cm3": r["volume_cm3"], "left_cm3": rows[n[:-1] + "L"]["volume_cm3"]} for n, r in rows.items()
              if n.endswith(" R") and n[:-1] + "L" in rows and abs(r["volume_cm3"] - rows[n[:-1] + "L"]["volume_cm3"]) > 0.05]
-    out = {"pieces": rows, "twins_that_differ": twins, "clashes": clashes, "hardware": hard, "reach": reach, "reach_short": short,
-           "screws": {"joint 1, 3.0 x 16": sum(len(p.screws) for p in res.pairs),
-                      "floor, 3.5 x 9.5 countersunk": len(fl.get("lap_screws", [])) + len(fl.get("foot_screws", []))},
-           "cones": len(fl.get("cones", [])),
-           "mass": {"pieces_without_floor_g": wall_g, "plain_skin_without_floor_g": round(plain_g),
-                    "joints_ribs_feet_g": round(wall_g - plain_g), "floor_solid_g": sum(r["mass_g"] for n, r in rows.items() if n.startswith("floor"))},
-           "printer": vars(lim),
-           "ok": all(r["valid"] and r["solids"] == 1 and r["fits"] for r in rows.values()) and not clashes}
-    return out
+    return {"pieces": rows, "twins_that_differ": twins, "clashes": clashes, "hardware": hard, "reach": reach, "reach_short": short,
+            "screws": {"joint 1, 3.0 x 16": sum(len(p["screws"]) for p in rep["pairs"]),
+                       "floor, 3.5 x 9.5 countersunk": len(fl.get("lap_screws", [])) + len(fl.get("foot_screws", []))},
+            "cones": len(fl.get("cones", [])),
+            "mass": {"pieces_without_floor_g": wall_g, "plain_skin_without_floor_g": round(plain_g),
+                     "joints_ribs_feet_g": round(wall_g - plain_g), "flanges_and_gussets_g": part(rep["sides"]), "feet_g": part(rep["feet"]),
+                     "ribs_g": part(rep["ribs"]), "floor_solid_g": sum(r["mass_g"] for n, r in rows.items() if n.startswith("floor"))},
+            "printer": vars(lim),
+            "ok": all(r["valid"] and r["solids"] == 1 and r["fits"] for r in rows.values()) and not clashes and not short}
+
+
+def summary(chk: dict, log=print) -> int:
+    bad = [n for n, r in chk["pieces"].items() if not r["valid"] or r["solids"] != 1 or not r["fits"]]
+    log(f"pieces: {len(chk['pieces'])} pieces, screws {chk['screws']}, not one valid solid in the limit: {bad}, clashes {len(chk['clashes'])}, "
+        f"in hardware {len(chk['hardware'])}, screws out of reach {len(chk['reach_short'])}, twins that differ {chk['twins_that_differ']}, mass {chk['mass']}")
+    return 0 if chk["ok"] else 1
 
 
 def build_all(out: Path, log=print) -> int:
@@ -1527,13 +1659,145 @@ def build_all(out: Path, log=print) -> int:
     items = hardware()
     res = generate(d, pl, None, None, items, log)
     write_parts(out, res.pieces)
-    (out / "seams.json").write_text(json.dumps(seam_report(res), indent=1), encoding="utf-8")
-    chk = check_set(d, res, items, log)
+    # the joints alone, for tools/face_check.py: the skin has narrow step faces of its own, which hide the joints' faces
+    write_parts(out / "joints", res.added, {n: "#9ec5e8" for n in res.added})
+    rep = seam_report(res)
+    (out / "seams.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
+    chk = check_set(d, pl, res.pieces, rep, items, log)
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
-    bad = [n for n, r in chk["pieces"].items() if not r["valid"] or r["solids"] != 1 or not r["fits"]]
-    log(f"pieces: {len(res.pieces)} pieces, screws {chk['screws']}, not one valid solid in the limit: {bad}, clashes {len(chk['clashes'])}, "
-        f"in hardware {len(chk['hardware'])}, mass {chk['mass']}")
-    return 0 if chk["ok"] else 1
+    return summary(chk, log)
+
+
+def check_files(out: Path, log=print) -> int:
+    """The checks of the whole set again, on the BREP files and seams.json of a build folder."""
+    d = Blueprint()
+    pl = plain(d, out, log)
+    shapes, _ = read_parts(out)
+    rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
+    chk = check_set(d, pl, shapes, rep, hardware(), log)
+    (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
+    return summary(chk, log)
+
+
+# ---------- the folders that the sheets are rendered from ----------
+
+@dataclass(frozen=True)
+class View:
+    """A picture of some pieces: which ones, how far each is moved, and the camera (tools/render_views.py)."""
+    name: str
+    title: str
+    pieces: tuple[str, ...]            # empty: all
+    target: tuple[float, float, float]
+    radius: float
+    az: float
+    el: float
+    moved: tuple[tuple[str, tuple[float, float, float]], ...] = ()
+    explode: float = 0.0               # every piece moved away from the middle of the cabinet by this share
+    aspect: float = 0.75
+
+
+CENTRE = (0.0, 290.0, 250.0)
+VIEWS = (
+    View("exploded-front", "The 32 pieces, moved apart, from the front right", (), (0.0, 290.0, 235.0), 640.0, 38.0, 22.0, explode=0.45, aspect=0.85),
+    View("exploded-rear", "The 32 pieces, moved apart, from the rear left", (), (0.0, 290.0, 235.0), 640.0, -142.0, 22.0, explode=0.45, aspect=0.85),
+    View("pilot-front-closed", "Pilot, front: deck side R on lower R at seam D2, closed, seen from inside", ("deck side R", "lower R"),
+         (195.0, 207.0, 38.0), 85.0, -128.0, 28.0),
+    View("pilot-front-open", "Pilot, front: seam D2 open by 40 mm", ("deck side R", "lower R"),
+         (195.0, 187.0, 38.0), 100.0, -128.0, 28.0, moved=(("deck side R", (0.0, -40.0, 0.0)),)),
+    View("pilot-rear-closed", "Pilot, rear: upper R on middle R at seam B1 in the crease of the rear shelf, closed, seen from inside",
+         ("middle R", "upper R"), (225.0, 440.0, 293.0), 150.0, -75.0, 12.0),
+    View("pilot-rear-open", "Pilot, rear: seam B1 open by 40 mm", ("middle R", "upper R"),
+         (225.0, 440.0, 313.0), 160.0, -75.0, 12.0, moved=(("upper R", (0.0, 0.0, 40.0)),)),
+    View("pilot-rear-under", "Pilot, rear: the flange of upper R at B1 from below (no gusset where the wall leaves at 45 degrees)", ("upper R",),
+         (225.0, 440.0, 300.0), 150.0, -70.0, -35.0),
+    View("close-l1-cut-in", "Seam L1 behind the band, under the lowest cut-in: middle R on rear lower R, open by 30 mm",
+         ("middle R", "rear lower R"), (232.0, 505.0, 131.0), 75.0, -55.0, 18.0, moved=(("middle R", (0.0, 0.0, 30.0)),)),
+    View("close-door-land", "The land between the door's side and the cut-ins: the flanges stop 10 mm from the door opening",
+         ("middle R", "rear lower R", "upper rear R"), (222.0, 538.0, 200.0), 120.0, -22.0, 8.0),
+    View("close-hand-hold", "The hand-hold in upper rear R, from inside: seams R3, R5 and B1 round it",
+         ("upper rear R", "upper R"), (130.0, 560.0, 360.0), 130.0, -12.0, -8.0),
+    View("close-s1-node", "Seam S1 in the crease of the band, where lower R, rear lower R and middle R meet",
+         ("lower R", "rear lower R", "middle R"), (238.0, 385.0, 105.0), 95.0, -100.0, 14.0),
+    View("close-floor", "The floor: the foot flange of rear lower R; the side tile lifted 35 mm and the centre tile 70 mm (rebate, half-lap, cones)",
+         ("rear lower R", "floor rear side R", "floor rear centre"), (140.0, 470.0, 30.0), 175.0, -40.0, 30.0,
+         moved=(("floor rear side R", (0.0, 0.0, 35.0)), ("floor rear centre", (0.0, 0.0, 70.0)))),
+    View("close-floor-under", "The same two tiles from below: the rebate for the foot flange, the upper half of the lap, the sockets of the cones",
+         ("floor rear side R", "floor rear centre"), (110.0, 450.0, 20.0), 170.0, -35.0, -40.0,
+         moved=(("floor rear centre", (0.0, 0.0, 40.0)),)),
+    View("close-apron", "The apron between the two lower pieces (P1) and the deck (D1), from behind",
+         ("apron", "lower R", "deck side R"), (150.0, 215.0, 85.0), 120.0, 150.0, 22.0),
+    View("close-hood", "The hood: the flange of hood side R at seam H1 (hood centre left out)", ("hood side R",), (106.0, 510.0, 500.0), 110.0, -100.0, 8.0),
+    View("close-hood-centre", "The hood: the flange of hood centre at seam H1, cut back for the marquee modules", ("hood centre",),
+         (106.0, 510.0, 500.0), 110.0, 80.0, 8.0),
+)
+
+
+def read_parts(out: Path) -> tuple[dict, dict]:
+    """The finished pieces and their tints, from the BREP files of a build folder."""
+    import Part  # noqa: PLC0415
+
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    shapes, tint = {}, {}
+    for stem, m in manifest.items():
+        s = Part.Shape()
+        s.read(str(out / m["brep"]))
+        shapes[stem.replace("_", " ")] = s
+        tint[stem.replace("_", " ")] = m["finish"]
+    return shapes, tint
+
+
+def section_of_a_joint(out: Path, shapes: dict) -> None:
+    """The section through the first screw of each pilot seam, square to the seam: polygons in (u, z), u inward
+    along the flange and z across the seam, for tools/draw_pieces.py."""
+    import FreeCAD as App  # noqa: PLC0415
+
+    rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
+    done = {}
+    for seam, _ in PILOT:
+        pair = next((p for p in rep["pairs"] if p["seam"] == seam and p["screws"]), None)
+        if pair is None:
+            continue
+        sc = pair["screws"][len(pair["screws"]) // 2]
+        at, t, n = App.Vector(*sc["at"]), App.Vector(*sc["along"]), App.Vector(*pair["normal"])
+        polys = {}
+        for name in (pair["head"], pair["pilot"]):
+            rows = []
+            for w in shapes[name].slice(t, at.dot(t)):
+                pts = [p - at for p in w.discretize(Distance=0.25)]
+                if min(p.Length for p in pts) > 45.0:
+                    continue
+                rows.append([[round(p.dot(n.cross(t)), 3), round(p.dot(n), 3)] for p in pts])
+            polys[name] = rows
+        done[seam] = {"head": pair["head"], "pilot": pair["pilot"], "polys": polys}
+    (out / "views").mkdir(exist_ok=True)
+    (out / "views" / "section.json").write_text(json.dumps(done), encoding="utf-8")
+
+
+def views(out: Path, log=print) -> int:
+    """Write a folder for each picture under out/views: the meshes and the edges of its pieces, moved as the view
+    asks, and the camera. tools/draw_pieces.py renders them."""
+    import numpy as np  # noqa: PLC0415
+
+    shapes, tint = read_parts(out)
+    for v in VIEWS:
+        names = [n for n in (v.pieces or tuple(shapes)) if n in shapes]
+        moved = dict(v.moved)
+        if v.explode:
+            for n in names:
+                _, lo, hi = tight_box(shapes[n])
+                c = (lo + hi) / 2 - np.array(CENTRE)
+                shift = c * v.explode
+                if n.startswith("floor"):
+                    shift[2] -= 60.0
+                moved[n] = tuple(float(x) for x in shift)
+        folder = out / "views" / v.name
+        write_parts(folder, {n: shapes[n] for n in names}, tint, moved)
+        (folder / "focus.json").write_text(json.dumps({v.name: {"target": list(v.target), "radius": v.radius, "az": v.az, "el": v.el,
+                                                                 "aspect": v.aspect}}), encoding="utf-8")
+        (folder / "title.txt").write_text(v.title, encoding="utf-8")
+        log(f"pieces: view {v.name}: {len(names)} pieces")
+    section_of_a_joint(out, shapes)
+    return 0
 
 
 def main() -> int:
@@ -1541,4 +1805,8 @@ def main() -> int:
     what = os.environ.get("CANDYBAR_PIECES", "all")
     if what == "pilot":
         return pilot(out)
+    if what == "views":
+        return views(out)
+    if what == "check":
+        return check_files(out)
     return build_all(out)
