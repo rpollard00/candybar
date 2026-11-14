@@ -168,7 +168,7 @@ def write(meas: dict, lay: sp.Layout, d: Blueprint, face_cloud, crossed, near_ha
                            ("wall_above_MPa", f"Wall above the rim ({hh['wall_above']:.1f} x {d.wall_t:g}) as a beam with fixed ends, half the load: bending stress", "MPa")):
         w(f"| {label} | {a[k]:.2f} {unit} | {b[k]:.2f} {unit} |")
     w("")
-    w(f"Printed PETG holds about {hh['yield_MPa']:.0f} MPa for a short time and {st.CREEP_MPA:g} MPa for a long time (ESTIMATED from data sheets). "
+    w(f"Printed ABS holds about {hh['yield_MPa']:.0f} MPa for a short time and {st.CREEP_MPA:g} MPa for a long time (ESTIMATED from data sheets). "
       "A lift is a short load.")
     walls = struct.get("hand_hold_walls")
     if walls:
@@ -253,8 +253,8 @@ def write(meas: dict, lay: sp.Layout, d: Blueprint, face_cloud, crossed, near_ha
       f"{O.insert} heat-set insert in the fixed part, {O.insert} screw | {g(O.service_pitch_min)} to {g(O.service_pitch_max)} | "
       f"none: never bonded | chamfer {g(O.service_chamfer)} on both edges | yes: bosses on the flanges, inside |")
     w("")
-    w("Adhesive and filler: the classes of `docs/research/petg-finishing.md` (section 1), to prove on the coupon. No "
-      "strength for printed PETG is claimed.")
+    w("The weld and the filler: ABS dissolved in acetone or a solvent cement (`docs/research/abs-on-the-q2.md`, section 4), "
+      "to prove on the coupon. No strength of the weld is claimed.")
     w("")
     w(f"**Coupon test before the real parts** (`joints.png`, panel 6): three pairs of joint 1 on a curved face of radius {g(ds.cp.RADIUS)}, "
       f"printed in the real orientation, with groove clearances of {', '.join('+' + g(c) for c in ds.cp.CLEARANCES)}. It must prove the "

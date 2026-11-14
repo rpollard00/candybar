@@ -667,14 +667,14 @@ def air_path(v) -> dict:
 def print_table(parts: dict[str, Part.Shape], v) -> list[dict]:
     """The bounding size of each part of the shell against the bed: the fewest pieces if it is cut on the grid of the
     largest recommended footprint and height."""
-    bed, xy, zmax = v("a1_bed"), v("a1_part_max_xy"), v("a1_part_max_z")
+    bed, height, xy, zmax = v("q2_bed"), v("q2_height"), v("q2_part_max_xy"), v("q2_part_max_z")
     out = []
     for k, s in parts.items():
         if k == "screen":  # the lit image, not a part
             continue
         bb = s.BoundBox
         a, b, c = sorted((bb.XLength, bb.YLength, bb.ZLength))
-        fits = c <= bed and b <= bed and a <= bed
+        fits = c <= bed and b <= bed and a <= height
         pieces = math.ceil(c / xy) * math.ceil(b / xy) * math.ceil(a / zmax)
         out.append({"part": k, "x": round(bb.XLength, 1), "y": round(bb.YLength, 1), "z": round(bb.ZLength, 1), "fits_bed": fits, "pieces_at_least": pieces})
     return out

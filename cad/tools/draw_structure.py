@@ -453,7 +453,7 @@ def joint_values(ax) -> None:
     ax.axis("off")
     left = ["joints.Joint (joint 1, on the coupon):", ""] + value_rows(J)
     right = ["joints.OtherJoints (2 to 7, concept):", ""] + value_rows(O)
-    right += ["", "PETG and ABS use the same values;", "the coupon of each material sets", "the clearances and the pilot."]
+    right += ["", "ABS (decision record 0008);", "the ABS coupon sets", "the clearances and the pilot."]
     for x, rows in ((0.0, left), (0.45, right)):
         ax.text(x, 1, "\n".join(rows), fontsize=7.5, family="DejaVu Sans Mono", va="top", transform=ax.transAxes)
 

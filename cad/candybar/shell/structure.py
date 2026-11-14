@@ -25,12 +25,12 @@ from pathlib import Path
 from .dims import Blueprint
 
 P3 = tuple[float, float, float]
-E_PETG = 2000.0        # MPa, printed PETG in the layer plane (ESTIMATED from data sheets: 1.9 to 2.1 GPa)
+E_ABS = 2200.0         # MPa, printed ABS in the layer plane (ESTIMATED from data sheets, abs-on-the-q2.md 6)
 NU = 0.38
 E_AL = 70000.0         # MPa
 G = 9.81
-CREEP_MPA = 5.0        # sustained stress limit for PETG at room temperature (ESTIMATED: a tenth of the 50 MPa yield)
-YIELD_MPA = 50.0       # short-term strength of printed PETG in the layer plane (ESTIMATED from data sheets: 45 to 55 MPa)
+CREEP_MPA = 4.1        # sustained stress limit for ABS at room temperature (ESTIMATED: no value found; a tenth of the 41 MPa strength)
+YIELD_MPA = 41.0       # short-term strength of printed ABS in the layer plane, 32 across the layers (ESTIMATED, abs-on-the-q2.md 6)
 
 
 # ---------- masses ----------
@@ -60,7 +60,7 @@ FLOOR_T = 10.0
 PAD_T = (2.0, 3.0)  # the non-slip pads under the floor (ESTIMATED: thin adhesive pads)
 FLOOR_SKIN = 1.2
 FLOOR_INFILL = 0.40
-FLOOR_KG_DM2 = 1.27 * (2 * FLOOR_SKIN + FLOOR_INFILL * (FLOOR_T - 2 * FLOOR_SKIN)) / 100  # g/cm3 x mm -> kg/dm2
+FLOOR_KG_DM2 = 1.05 * (2 * FLOOR_SKIN + FLOOR_INFILL * (FLOOR_T - 2 * FLOOR_SKIN)) / 100  # g/cm3 x mm -> kg/dm2
 
 
 def total_mass(skin_kg: float, floor_area_dm2: float) -> dict:
@@ -103,9 +103,9 @@ HARDWARE_AT = {"power supply": (460.0, 55.0), "monitor": (350.0, 250.0), "BC-250
 def floor_stiffness() -> dict:
     """Bending stiffness D per mm of width: the sandwich (skins only, core ignored for E) against a solid plate."""
     h = FLOOR_T - FLOOR_SKIN
-    sandwich = E_PETG * FLOOR_SKIN * h ** 2 / 2
-    solid4 = E_PETG * 4.0 ** 3 / 12
-    solid7 = E_PETG * FLOOR_T ** 3 / 12
+    sandwich = E_ABS * FLOOR_SKIN * h ** 2 / 2
+    solid4 = E_ABS * 4.0 ** 3 / 12
+    solid7 = E_ABS * FLOOR_T ** 3 / 12
     # the power supply (3.27 kg) on a tile span of 190: a strip 150 wide, simply supported, load at mid span
     p, span, width = 3.27 * G * 2, 190.0, 150.0
     w = p * span ** 3 / (48 * sandwich * width)
@@ -124,7 +124,7 @@ def plate_deflection(p: float, b: float, a: float, t: float, e: float, nu: float
     return alpha * p * b ** 2 / d
 
 
-def rib_spacing(p: float, w_max: float, t: float, e: float = E_PETG) -> float:
+def rib_spacing(p: float, w_max: float, t: float, e: float = E_ABS) -> float:
     """The largest short side of a skin panel that keeps the deflection under a point load p below w_max (a/b = 2)."""
     d = e * t ** 3 / (12 * (1 - NU ** 2))
     return math.sqrt(w_max * d / (0.0165 * p))
@@ -154,7 +154,7 @@ def estimates(mass: dict, d: Blueprint) -> dict:
              "side of the lower body below L1": (d.door_z0, d.body_d - (d.band_foot_y + d.band_depth)),
              "lower rear wall below the door, one half": (d.door_z0, d.door_w / 2),
              "upper rear wall between the hand-holds": (d.body_top - d.rear_shelf_z1, 2 * d.grip_x0)}
-    out["finger"] = {k: plate_deflection(20.0, min(v), max(v), d.wall_t, E_PETG) for k, v in spans.items()}
+    out["finger"] = {k: plate_deflection(20.0, min(v), max(v), d.wall_t, E_ABS) for k, v in spans.items()}
     out["rib_spacing_mm"] = rib_spacing(20.0, 0.3, d.wall_t)
     out["rib_spacing_3mm"] = rib_spacing(20.0, 0.3, 3.0)
     out["floor"] = floor_stiffness()
@@ -166,7 +166,7 @@ def estimates(mass: dict, d: Blueprint) -> dict:
     out["monitor"] = {"along_face_N": along, "into_cradle_N": normal,
                       "clamp_stress_MPa": 6 * along * lever / (bw * bt ** 2), "creep_limit_MPa": CREEP_MPA,
                       "note": "bottom clamp tab 20 wide, 4 thick, load 10 from its root"}
-    # hot air: dT = P / (rho cp Q); no limit on PETG near it (the owner's PETG case for a BC-250 does not soften)
+    # hot air: dT = P / (rho cp Q); no limit on ABS near it (ABS softens 22 to 36 K higher than PETG, and the owner's PETG case for a BC-250 does not soften)
     q = 40.0 / 3600
     out["heat"] = {"exhaust_dT_K": 200.0 / (1.2 * 1005 * q),
                    "note": "200 W of the BC-250 at 40 m3/h through the fins (bc250-cooling-and-psu.md: about 15 K)"}
@@ -175,7 +175,7 @@ def estimates(mass: dict, d: Blueprint) -> dict:
 
 def portal(p: float, h: float, i: float) -> float:
     """Sway of a portal with fixed feet and a stiff top beam: p h^3 / (24 E I) for the two posts."""
-    return p * h ** 3 / (24 * E_PETG * i)
+    return p * h ** 3 / (24 * E_ABS * i)
 
 
 # ---------- the parts of each architecture, as drawing data ----------
@@ -242,7 +242,7 @@ def members(d: Blueprint, board: tuple[float, float] | None = None) -> list[Memb
     y_band = d.band_foot_y + d.band_depth
     out = [
         Member("floor", "floor", box=(-243.3, 243.3, 4.0, 536.0, 0.0, FLOOR_T),
-               note=f"printed PETG sandwich {FLOOR_T:g} mm, nine tiles with half-lap joints: the datum that the lower pieces bolt "
+               note=f"printed sandwich {FLOOR_T:g} mm, nine tiles with half-lap joints: the datum that the lower pieces bolt "
                     "to; it stands on the table on thin non-slip pads"),
         Member("ring L1, front", "ring", box=(-x, x, 194.0, y_band, 130.0, 138.0), note="flanges of L1 in front of the band, at the bezel's bottom corner"),
         Member("ring L1, rear", "ring", box=(-x, x, y_band - 16.0, d.body_d, d.door_z0 - 4.0, d.door_z0 + 4.0),
@@ -487,7 +487,7 @@ def floor_options(mass_kg: float) -> dict:
         """Rectangles (width, height, z of the centre): E I about the common neutral axis."""
         area = sum(w * h for w, h, _ in parts)
         zc = sum(w * h * z for w, h, z in parts) / area
-        return E_PETG * sum(w * h ** 3 / 12 + w * h * (z - zc) ** 2 for w, h, z in parts)
+        return E_ABS * sum(w * h ** 3 / 12 + w * h * (z - zc) ** 2 for w, h, z in parts)
 
     s = FLOOR_SKIN
     sandwich = lambda t: [(width, s, s / 2), (width, s, t - s / 2)]
@@ -533,7 +533,7 @@ def hand_holds(total_kg: float, com_y: float, d: Blueprint) -> dict:
     above = d.body_top - d.seam_groove - z1
 
     def loads(f: float) -> dict:
-        return {"load_N": f, "roof_plate_mm": plate_deflection(f, slope, span, t, E_PETG),
+        return {"load_N": f, "roof_plate_mm": plate_deflection(f, slope, span, t, E_ABS),
                 "roof_strip_MPa": (f * slope / 4) / (HAND_W * t ** 2 / 6), "roof_edge_shear_MPa": f / (2 * span * t),
                 "wall_above_MPa": (f / 2 * span / 12) / (t * above ** 2 / 6)}
 
@@ -574,5 +574,5 @@ ABS_CHANGES = (
     ("sanding", "wet only (PETG gums dry)", "wet or dry"),
     ("primer and lacquer", "scuff and prime every face; hobby lacquer only over primer", "1K plastic primers name ABS; hobby lacquers grip it, but thinners crack stressed ABS"),
     ("shrink", "0.76 % and 0.54 % in X and Y (one study)", "0.59 % and 0.69 % in X and Y, 0.92 % growth in Z (same study): the clearances stay; warp, not shrink, decides"),
-    ("printer", "the A1", "an enclosed printer with a chamber, a vent to outdoors; flat floor tiles may warp"),
+    ("printer", "the A1", "the Qidi Q2 (decision record 0008): a chamber, a vent to outdoors; flat floor tiles may warp"),
 )

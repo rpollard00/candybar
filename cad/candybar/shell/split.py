@@ -42,7 +42,7 @@ P3 = tuple[float, float, float]
 Poly = tuple[P3, ...]
 
 HIDDEN, FACE = "hidden", "face"
-PETG_G_PER_CM3 = 1.27
+ABS_G_PER_CM3 = 1.05  # ABS (decision record 0008); 1.12 for PolyLite ABS
 CAD = Path(__file__).resolve().parents[2]
 # the two things that are cut: the shell (the layout), and the bezel plate
 SHELL, PLATE = "shell", "bezel"
@@ -130,10 +130,10 @@ class Printer:
 
 def printer(params_dir: Path = CAD / "params") -> Printer:
     rows = {r["name"]: r for r in csv.DictReader(open(params_dir / "printer.csv", encoding="utf-8"))}
-    if "a1_part_max_xy" in rows and "a1_part_max_z" in rows:
-        return Printer(float(rows["a1_part_max_xy"]["value"]), float(rows["a1_part_max_z"]["value"]), float(rows["a1_bed"]["value"]),
-                       "params/printer.csv: a1_part_max_xy, a1_part_max_z (bed less brim)")
-    return Printer(250.0, 250.0, 256.0, "no limits in params/printer.csv: 250 x 250 x 250 assumed")
+    if "q2_part_max_xy" in rows and "q2_part_max_z" in rows:
+        return Printer(float(rows["q2_part_max_xy"]["value"]), float(rows["q2_part_max_z"]["value"]), float(rows["q2_bed"]["value"]),
+                       "params/printer.csv: q2_part_max_xy, q2_part_max_z (the Qidi Q2, less the growth for the shrink)")
+    return Printer(248.0, 250.0, 270.0, "no limits in params/printer.csv: 248 x 248 x 250 assumed")
 
 
 # ---------- polygons from lines in a view ----------
@@ -759,7 +759,7 @@ def measure(piece, up: P3, lim: Printer, outer, covers, d: Blueprint, detail: bo
         pts, _ = piece.tessellate(0.5)
         box = print_box([(v.x, v.y, v.z) for v in pts], up, lim)
         return {**box, "up": [round(v, 3) for v in up], "volume_cm3": round(piece.Volume / 1000, 1),
-                "mass_g": round(piece.Volume / 1000 * PETG_G_PER_CM3)}
+                "mass_g": round(piece.Volume / 1000 * ABS_G_PER_CM3)}
     faces = faces_of(piece, outer, covers, d, planes)
     pts = np.concatenate([tri.reshape(-1, 3) for _, tri, _, _ in faces])
     box = print_box(pts, up, lim)
@@ -783,7 +783,7 @@ def measure(piece, up: P3, lim: Printer, outer, covers, d: Blueprint, detail: bo
         acc["bed"] += area[(nz < -0.9998) & at_bed].sum()
     bb = piece.BoundBox
     return {**box, "up": [round(v, 3) for v in up], "volume_cm3": round(piece.Volume / 1000, 1),
-            "mass_g": round(piece.Volume / 1000 * PETG_G_PER_CM3), "cabinet": [round(bb.XMin, 1), round(bb.XMax, 1), round(bb.YMin, 1),
+            "mass_g": round(piece.Volume / 1000 * ABS_G_PER_CM3), "cabinet": [round(bb.XMin, 1), round(bb.XMax, 1), round(bb.YMin, 1),
                                                                               round(bb.YMax, 1), round(bb.ZMin, 1), round(bb.ZMax, 1)],
             **{k: round(v / 100, 1) for k, v in acc.items()}}
 

@@ -55,7 +55,7 @@ class Printer:
 
 def printer(params_dir: Path = CAD / "params") -> Printer:
     rows = {r["name"]: r for r in csv.DictReader(open(params_dir / "printer.csv", encoding="utf-8"))}
-    return Printer(float(rows["a1_part_max_xy"]["value"]), float(rows["a1_part_max_z"]["value"]))
+    return Printer(float(rows["q2_part_max_xy"]["value"]), float(rows["q2_part_max_z"]["value"]))
 
 
 def tag(c: float) -> str:

@@ -695,7 +695,7 @@ REPLACED = {"Compute_FanShroud": ("shroud_base", "shroud_top", "fan"), "Compute_
 # make-up air for the power supply (structure.makeup_air): 25 W of loss, 10 K of rise, and three times that flow
 SUPPLY_LOSS_W, AIR_RISE_K, FLOW_FACTOR = 25.0, 10.0, 3.0
 INLET_SPEEDS = (1.0, 1.5)
-PETG_E = 2000.0  # MPa, for the beam estimate of the head rib
+ABS_E = 2200.0  # MPa, printed ABS in the layer plane (abs-on-the-q2.md 6), for the beam estimate of the head rib
 
 
 def inlet_need() -> dict[float, float]:
@@ -882,7 +882,7 @@ def print_rows(parts: dict[str, Part.Shape], lim: split.Printer) -> list[dict]:
                     hang += n.Length / 2
         rows.append({"part": name, "how": how, "up": list(up), "x": size["x"], "y": size["y"], "z": size["z"], "fits": size["fits"],
                      "flat_on_bed_cm2": round(flat / 100, 1), "overhang_cm2": round(hang / 100, 2),
-                     "volume_cm3": round(shape.Volume / 1000, 1), "mass_g": round(shape.Volume / 1000 * split.PETG_G_PER_CM3)})
+                     "volume_cm3": round(shape.Volume / 1000, 1), "mass_g": round(shape.Volume / 1000 * split.ABS_G_PER_CM3)})
     return rows
 
 
@@ -897,7 +897,7 @@ def head_beam(d: Blueprint, r: Rear, p: Place, push: float) -> dict:
     span = 2 * r.qt_x
     a = r.qt_x - p.x(p.v["bc_fan_cx"])
     b = span - a
-    return {"push_N": push, "span": span, "inertia_mm4": round(inertia), "deflection_mm": round(push * a ** 2 * b ** 2 / (3 * PETG_E * inertia * span), 2)}
+    return {"push_N": push, "span": span, "inertia_mm4": round(inertia), "deflection_mm": round(push * a ** 2 * b ** 2 / (3 * ABS_E * inertia * span), 2)}
 
 
 def seal_push(r: Rear, p: Place, d: Blueprint) -> dict:
