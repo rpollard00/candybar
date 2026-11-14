@@ -770,15 +770,17 @@ def free_length(sc: Screw, head_into, obstacles: list, j: Joint, b: Build = BUIL
 
     h = split.KERF / 2 + j.flange_t + 0.5
     shaft = cylinder(sc.at, head_into, h, h + reach, b.driver_d)
-    best = reach
+    # the volumes add: a shaft that grazes a wall and its flange is stopped, also when each graze alone is small
+    hits = []
     for o in obstacles:
         if not o.BoundBox.intersect(shaft.BoundBox):
             continue
         hit = shaft.common(o)
-        if hit.Volume < b.clash_mm3:
-            continue
-        for v in hit.Vertexes:
-            best = min(best, (v.Point - sc.at).dot(head_into) - h)
+        if hit.Volume > 1e-3:
+            hits.append(hit)
+    if sum(x.Volume for x in hits) < b.clash_mm3:
+        return reach
+    best = min((v.Point - sc.at).dot(head_into) - h for x in hits for v in x.Vertexes)
     return max(best, 0.0)
 
 
@@ -888,10 +890,7 @@ def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = No
     key = key.common([f.translated(up * -1.0).extrude(up * 4.0) for f in pair.mate.Faces][0] if len(pair.mate.Faces) == 1
                      else _fuse_all([f.translated(up * -1.0).extrude(up * 4.0) for f in pair.mate.Faces]))
     gaps_key, gaps_groove = [], []
-    wide = j.key_w + 3.0
-    mid = sum(j.key_u) / 2 - j.screw_u
     for sc in pair.screws:
-        across = up.cross(sc.tangent)
         gaps_key.append(box_along(sc.at, sc.tangent, up, j.key_gap, j.flange_h, -2.0, 4.0))
         gaps_groove.append(box_along(sc.at, sc.tangent, up, j.key_gap - c, j.flange_h, -2.0, 4.0))
     for run in pair.runs:

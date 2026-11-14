@@ -372,7 +372,9 @@ class WholeSetTest(unittest.TestCase):
         cut = {twin(h["piece"]) for h in self.rep["hits"]}
         # the two pieces of a seam on the centre line: one has the key and the pilot holes, its twin the groove and the pockets
         centre = {twin(p["head"]) for p in self.rep["pairs"] if twin(p["head"]) == twin(p["pilot"])}
-        odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut | centre and not t["piece"].startswith("floor")]
+        # the hood centre prints on one of its two cut faces: the key is on the hood side there, and on the hood centre at the other end
+        moved = {twin(n) for p in self.rep["pairs"] if p["key"] and p["key"] != p["pilot"] for n in (p["head"], p["pilot"])}
+        odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut | centre | moved and not t["piece"].startswith("floor")]
         self.assertEqual(odd, [])
 
     def test_a_screwdriver_reaches_every_screw(self) -> None:

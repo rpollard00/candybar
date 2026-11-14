@@ -31,7 +31,6 @@ from matplotlib.patches import Polygon  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 CAD = os.path.dirname(HERE)
 sys.path.insert(0, CAD)
-from candybar.shell import joints  # noqa: E402
 from candybar.shell import pieces  # noqa: E402
 
 OUT = os.environ.get("CANDYBAR_OUT", os.path.join(CAD, "out", "pieces"))
