@@ -75,7 +75,7 @@ class Driver:
     basket_depth: float = 12.0
     magnet_d: float = 36.0
     magnet_depth: float = 14.0
-    cone_d: float = 44.0
+    cone_dia: float = 44.0
 
 
 @dataclass(frozen=True)
@@ -501,7 +501,7 @@ def driver(b: Band, drv: Driver, pl: Places) -> Part.Shape:
 
 def open_area(b: Band, v: Variant, drv: Driver, pl: Places) -> dict[str, float]:
     """How much of the driver's cone the grille leaves open: the area of its holes or slots inside the cone's circle."""
-    disc = Part.Face(Part.Wire(Part.Circle(V(pl.cx, 0, pl.zc), V(0, 1, 0), drv.cone_d / 2).toShape()))
+    disc = Part.Face(Part.Wire(Part.Circle(V(pl.cx, 0, pl.zc), V(0, 1, 0), drv.cone_dia / 2).toShape()))
     cuts = Part.makeCompound(grille_cutters(b, v, pl, -1.0, 1.0))
     area = disc.common(cuts).Area
     return {"open_mm2": round(area, 1), "cone_mm2": round(disc.Area, 1), "share": round(area / disc.Area, 3)}
