@@ -5,11 +5,11 @@ Run headless. It exits 1 when an item fails a check:
     CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit
 
 It builds the outer form (solids.build), the cavity inside its skin (cavity.build) and the hardware. Every hardware
-size comes from cad/params/*.csv through params.load, and the envelopes and keep-out zones are those of
-candybar/hardware.py and candybar/panel.py; only their anchors change. The anchors come from Blueprint; the layout
-choices that nothing fixes yet are the named values of Layout. The checks are rules R1 (interference), R2 (keep-out)
-and R5 (button spacing) of candybar/check.py, run on these solids, and containment: the test of R3 with the cavity in
-place of the outline shell. It writes into <out>/fit:
+size comes from cad/params/*.csv through params.load, and the envelopes and keep-out zones are those of hardware.py
+and controls.py. The anchors come from Blueprint; the layout choices that nothing fixes yet are the named values of
+Layout. The checks are rules R1 (interference), R2 (keep-out) and R5 (button spacing) of check.py, run on these
+solids, and containment in the cavity. It writes into <out>/fit:
+  warnings.md              the ergonomic targets of the control panel, and the parameters that are still to measure
   report.md, report.json   the clearance table, the findings, the wall, the air path, the room for the speakers and
                            the marquee, and the print table
   sections.json            the sections and the rear view for sheet 09 (tools/draw_blueprint.py fit)
@@ -29,12 +29,11 @@ import FreeCAD as App
 import MeshPart
 import Part
 
-from .. import check, hardware, model, panel, params
-from ..model import ORIGIN, X_AXIS, ZERO, Assembly, Pose, box, cyl
-from . import cavity
+from . import cavity, check, controls, hardware, model, params
 from . import profiles as pr
 from . import solids as so
 from .dims import CHAIR_H, DESK_H, PEOPLE, SLUMP, Blueprint, eye_of
+from .model import ORIGIN, X_AXIS, ZERO, Assembly, Pose, box, cyl, owned
 
 V = App.Vector
 FIT = "fit"
@@ -127,14 +126,19 @@ class Layout:
 
 # ---------- the parameter sheet, with the anchors of this form ----------
 
+# the anchors that are angles; every other value that the study sets is a length
+ANGLES = ("recline",)
+
+
 def sheet_rows(params_dir: Path, values: dict[str, float]) -> list[params.Param]:
     """The rows of the parameter sheets, with the values of `values` in place of the rows of the same name, and new
-    rows for the names that the sheets do not have."""
+    rows for the names that the sheets do not have. The anchors are new rows: the sheets hold the sizes of the
+    hardware, and the study calculates where each item stands."""
     rows = params.load(params_dir)
     known = {r.name for r in rows}
     out = [replace(r, value=repr(float(values[r.name])), status="derived", source=SHEET_ROWS) if r.name in values else r for r in rows]
     unit = {r.name: r.unit for r in rows}
-    extra = [params.Param(k, repr(float(v)), "mm", "derived", "", SHEET_ROWS, "fit study", SHEET_ROWS, i + 1)
+    extra = [params.Param(k, repr(float(v)), "deg" if k in ANGLES else "mm", "derived", "", SHEET_ROWS, "fit study", SHEET_ROWS, i + 1)
              for i, (k, v) in enumerate(values.items()) if k not in known]
     for k in values:
         if k in known and not unit[k]:
@@ -185,9 +189,9 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
            "panel_y0": d.deck_nose + d.panel_gap, "cp_top_z": d.panel_top, "deck_t": d.panel_t, "panel_d": d.panel_d, "panel_w": d.panel_w,
            "stick_x": lay.stick_x, "stick_y": lay.stick_y_share * d.panel_d,
            "enc_x": -open_x + lay.enc_edge_gap + v("enc_w") / 2, "enc_y": d.panel_d / 2}
-    for j in range(panel.SERVICE_COUNT):
+    for j in range(controls.SERVICE_COUNT):
         out[f"svc{j + 1}_x"] = d.panel_w / 2 - lay.svc_end_gap
-        out[f"fit_svc{j + 1}_y"] = d.panel_d / 2 + (j - (panel.SERVICE_COUNT - 1) / 2) * lay.svc_pitch
+        out[f"fit_svc{j + 1}_y"] = d.panel_d / 2 + (j - (controls.SERVICE_COUNT - 1) / 2) * lay.svc_pitch
     out["fit_usb_x"] = side_in - SEAT
     out["fit_usb_y0"] = usb_row_start(d, lay, v)
     out["fit_usb_z"] = usb_row_z(d)
@@ -211,19 +215,6 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
 
 
 # ---------- the items: the earlier envelopes, and the new ones ----------
-
-def owned(name: str, prims) -> tuple:
-    return tuple(replace(p, owner=name) for p in prims)
-
-
-def control_panel(count: int) -> Assembly:
-    """The lever, the action buttons, the service buttons in their column and the encoder, on the panel top."""
-    action = [b for b in panel.buttons(count) if b.nut_tag == panel.ACTION_NUT]
-    service = [panel.Button(f"Svc{j}", f"svc{j}_x", f"fit_svc{j}_y", "svc_hole_d", "svc_rim_d", "svc_body_d", "svc_nut_d", "svc_nut_h",
-                            "svc_depth", panel.SERVICE_NUT) for j in range(1, panel.SERVICE_COUNT + 1)]
-    prims = (*owned("Lever", panel.LEVER), *(p for b in action + service for p in owned(b.name, b.prims())), *owned("Encoder", (panel.ENCODER,)))
-    return Assembly(panel.OWNER, base=(ZERO, "panel_y0", "cp_top_z"), prims=prims)
-
 
 USB_ORDER = "ACAC"
 
@@ -371,12 +362,20 @@ def speaker_room(d: Blueprint, lay: Layout, h: pr.Hood, walls: list[Part.Shape],
 # ---------- the document of the items ----------
 
 def build_items(rows: list[params.Param]) -> App.Document:
+    """The document of the items: the sheet, and every envelope and keep-out zone bound to it. An item that does not
+    recompute or is not one valid solid stops the study (rule R0): placed() would leave it out of every check."""
     doc = sheet(rows, "Fit")
     m = model.Model(doc, [r.name for r in rows])
-    count = int(params.value(doc, "btn_count"))
-    for spec in (hardware.MONITOR, MONITOR_ANY, MONITOR_CABLES, hardware.COMPUTE, hardware.PSU, hardware.CABLE_BUNDLE, control_panel(count), usb_row(), HUB, *speakers(), MARQUEE):
+    count = params.value(doc, "btn_count")
+    if count not in controls.BUTTON_COUNTS:
+        raise params.ParamError(f"btn_count must be one of {controls.BUTTON_COUNTS}, not {count:g}")
+    count = int(count)
+    for spec in (hardware.MONITOR, MONITOR_ANY, MONITOR_CABLES, hardware.COMPUTE, hardware.PSU, hardware.CABLE_BUNDLE, controls.control_panel(count), usb_row(), HUB, *speakers(), MARQUEE):
         m.assembly(spec)
     doc.recompute()
+    broken = model.errors(doc)
+    if broken:
+        raise ValueError("fit: " + "; ".join(f"{name}: {reason}" for name, reason in broken))
     return doc
 
 
@@ -451,7 +450,7 @@ def run_checks(doc: App.Document, found: list[Item], cav: cavity.Cavity, bezel: 
     the bezel plate, and each one's middle inside the cavity (the test of R3). The buttons and the lever pass through
     the control panel plate; every other item must keep out of it too."""
     scene = check.Scene(doc, tuple(model.placed(doc)), ())
-    rules = {"R1 interference": check._interference(scene), "R2 keep-out": check._keepout(scene), "R5 button spacing": check._button_spacing(scene)}
+    rules = {"R1 interference": check.interference(scene), "R2 keep-out": check.keepout(scene), "R5 button spacing": check.button_spacing(scene)}
     contained = []
     for it in found:
         obstacles = cav.walls + [bezel] + ([] if it.group == "Panel" else [plate])
@@ -843,6 +842,30 @@ def markdown(rep: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+WARNINGS = "warnings.md"
+
+
+def warnings(doc: App.Document) -> str:
+    """What the older report gave as warnings and the study's own report does not have: the ergonomic targets of the
+    control panel (R6), the count of the parameters by status (R7) and the list of what is still to measure."""
+    scene = check.Scene(doc, tuple(model.placed(doc)), tuple(params.table(doc)))
+    targets = [(subject, level, detail) for level, subject, detail in check.ergonomics(scene)]
+    counts = [(status, str(count)) for status, count in check.status_counts(scene).items()]
+    todo = [(r["name"], r["value"], r["status"], r["file"], r["measure"]) for r in check.to_measure(scene)]
+    return "\n\n".join([
+        "# Fit study: warnings",
+        "These items do not fail the study. `report.md` has the rules that do.",
+        "## Ergonomic targets of the control panel",
+        check.md_table(("Value", "Level", "Detail"), targets),
+        "## Parameters by status",
+        "A row that the fit study sets from the blueprint is `derived`.",
+        check.md_table(("Status", "Count"), counts),
+        "## Still to measure",
+        "Rows that name a measurement and are not yet marked `measured`.",
+        check.md_table(("Parameter", "Value now", "Status", "File", "What to measure"), todo),
+    ]) + "\n"
+
+
 def main() -> int:
     root = Path(os.environ.get("CANDYBAR_ROOT", Path(__file__).resolve().parents[2]))
     params_dir = Path(os.environ.get("CANDYBAR_PARAMS") or root / "params")
@@ -941,6 +964,7 @@ def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[st
            "seat": {"desk_h": DESK_H, "chair_h": CHAIR_H, "slump": SLUMP}}
     (out / "report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     (out / "report.md").write_text(markdown(rep), encoding="utf-8")
+    (out / WARNINGS).write_text(warnings(doc), encoding="utf-8")
     z = lambda name: pv(name)
     planes = {"side, centre line": (0, 0.0), "side, through the lever": (0, lay.stick_x),
               "plan, power supply": (2, z("psu_z0") + z("psu_h") / 2), "plan, deck": (2, values["fit_usb_z"]),

@@ -10,7 +10,7 @@ from dataclasses import replace
 import FreeCAD as App
 import Part
 
-from candybar import check
+from candybar.shell import check
 from candybar.shell import fit, joints, rear, split, structure
 from candybar.shell.dims import Blueprint
 from tests import support

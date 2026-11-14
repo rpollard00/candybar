@@ -1,46 +1,60 @@
 # Candybar CAD
 
-This directory holds the FreeCAD model of the cabinet. Parameter sheets and Python scripts generate the model. FreeCAD 1.1 runs the scripts.
+This directory holds the FreeCAD model of the cabinet. Python scripts generate the model. FreeCAD 1.1 runs the scripts.
+
+There is one model: the blueprint shell (`candybar/shell/`). `docs/blueprint/index.md` describes it. `docs/design/one-model.md` says what became of the older generator.
 
 ## Status
 
-The model is a layout study, not a set of finished parts.
-
 | Item | State |
 | --- | --- |
-| Monitor, BC-250, power supply, cable bundle, lever, buttons, encoder | Envelope solids and keep-out zones. The dimensions come from data sheets and community CAD, not from the real parts. |
-| Control deck | Two printable tiles: a lever tile and a button tile. The splice between the tiles and the panel latch are not designed. |
-| Cabinet shell | Styled massing: one solid that follows the reference cabinet in `docs/research/cabinet-references.md` section 1. It has the hood, the cheeks, the deck, the panel opening, the rear cut-outs and the side vent. It is not divided into printable parts. |
-| Bezel | Four plates for one opening: 16:9, 16:10, 4:3 and vertical. The document shows the 16:9 plate. The other three plates are hidden alternates. |
-| Hood face | Flush plates for the marquee, two speaker grilles and a light strip. No hardware is chosen for them. |
-| Monitor cradle, compute tray, ducts, power supply mount | Not designed. The keep-out zones hold their space. |
+| Outer form | Revision 7 (decision record 0007): the deck, the body, the hood, the bezel plate and the control panel plate, as solids. The marquee lip, the speaker forms and the logo form are provisional. |
+| Skin | The outer form less the cavity, with a wall of 4 mm |
+| Monitor, BC-250, power supply, cable bundle, lever, buttons, encoder, USB sockets, hub | Envelope solids and keep-out zones in the cavity (the fit study). The dimensions come from data sheets and community CAD, not from the real parts. |
+| Split | 32 pieces for the printer, with the joints as data. The pieces have no flanges, keys or ribs. |
+| Monitor cradle, compute mount, ducts, power supply mount, rear door, control panel frame | Not designed. The keep-out zones hold their space. |
 
-## Build
+## Build, check, test
 
-Requirements: FreeCAD 1.1 (`freecadcmd` and `freecad`) and `rsvg-convert`.
+Requirements: FreeCAD 1.1 (`freecadcmd` and `freecad`). The drawing tools use the Python of `cad/.venv-tools`, and the renders use Blender.
 
 ```sh
-cad/build.sh    # build, check, export, render
-cad/test.sh     # run the tests
+cad/build.sh    # build the model (2 minutes)
+cad/check.sh    # run the checks of the design on the build (about 1 hour)
+cad/test.sh     # run the tests of the code (about 30 minutes)
 ```
 
-`cad/build.sh` writes these files into `cad/out/`. Git ignores this directory.
+`cad/build.sh` writes these files into `cad/out/shell-rev7/`. Git ignores `cad/out/`. `CANDYBAR_OUT` sets a different directory.
 
 | File | Content |
 | --- | --- |
-| `candybar.FCStd` | The native FreeCAD document |
-| `report.md`, `report.json` | The check results, the overall dimensions, and the list of measurements that are not done |
-| `views/front.png`, `right.png`, `top.png`, `iso.png` | Line drawings of the layout |
-| `step/`, `stl/` | One file for each printable part |
-| `candybar.step` | The full layout without the keep-out zones |
+| `<part>.brep`, `<part>.stl` | One pair for each part |
+| `shell.step` | All parts |
+| `shell.FCStd` | The FreeCAD document, with the colours of the parts |
+| `manifest.json`, `report.json` | The list of the parts, and their volumes, face counts and the lines of the build log |
+| `focus.json`, `edges.json` | The cameras and the edges for the renders |
 
-If a check fails, `cad/build.sh` returns a non-zero exit status.
+If a part is not one valid solid, `cad/build.sh` returns a non-zero exit status. The script removes the part files of an earlier build before it starts.
 
-The build has two steps. The first step runs `freecadcmd`: it generates the document, does the checks, and writes the exports and the drawings. The second step runs the FreeCAD GUI program without a window and stores the view settings in the document. Without the second step, FreeCAD opens the document with all solids hidden.
+The build has two steps. The first step runs `freecadcmd` and makes the parts. The second step runs the FreeCAD GUI program without a window and writes `shell.FCStd`. A document that is saved without the GUI opens with all solids hidden.
 
-## The blueprint shell: split, structure, joints, coupon and width
+`cad/check.sh` runs these checks, one FreeCAD process at a time. It writes the text of each check to `cad/out/shell-rev7/check/`. If a check fails, the exit status is 1.
 
-The blueprint shell (`candybar/shell/`) is a second model beside the older generator. `docs/blueprint/index.md` describes it, and its section "How to build and check the solids" gives the commands for the solids, their checks and the fit study. The default build is revision 7 of the outer form (decision record 0007), and it writes to `cad/out/shell-rev7`. These commands make the split, the structure, the joint coupon and the width study. Run one FreeCAD or Blender process at a time. `candybar/freecad-run.sh` holds this rule: each run takes one lock for the machine and waits for it, and a guard stops `freecadcmd` when it uses more than 9.5 GB or the machine has less than 3 GB left. Start a direct `freecadcmd` or `blender` command through `tools/cad-lock.sh`, which takes the same lock.
+| Check | The check fails when |
+| --- | --- |
+| `tools.check_solids` | A solid is more than 0.5 mm from the faces of the blueprint |
+| `tools.face_check` | A face of a part is not a reveal, an edge break or a known item |
+| `tools.edge_finish` | A printed part has a convex edge that shows and is fully sharp |
+| `candybar.shell.fit` | A hardware item breaks a rule of the fit study (see "Rules of the fit study") |
+| `candybar.shell.split` | A piece of the split does not fit the printer |
+| `candybar.shell.structure` | The run breaks. This step measures and has no limit of its own. |
+| `candybar.shell.rear` | A rule of the rear door, its vents, the shroud or the openings fails |
+
+`cad/test.sh <name-fragment>` runs only the tests whose name contains the fragment.
+
+## The studies and the drawings
+
+The commands that follow run one study or make one drawing. `docs/blueprint/index.md` (section "How to build and check the solids") has the commands for the solids and their checks. Run one FreeCAD or Blender process at a time. `candybar/freecad-run.sh` holds this rule: each run takes one lock for the machine and waits for it, and a guard stops `freecadcmd` when it uses more than 9.5 GB or the machine has less than 3 GB left. Start a direct `freecadcmd` or `blender` command through `tools/cad-lock.sh`, which takes the same lock.
 
 The fit study, the split and the structure follow revision 7. The skin (the outer form less the cavity) takes about 20 minutes to make and needs 6 GB of memory. The split keeps it in `cad/out/shell-rev7/split/cache`, under a fingerprint of `dims.py`, `profiles.py`, `solids.py` and `cavity.py`. When one of them changes, the next run makes the skin again.
 
@@ -73,7 +87,16 @@ Large outputs go under `cad/out/`, which git ignores. Do not write them to `/tmp
 
 ## Parameters
 
-All dimensions are in `cad/params/*.csv`. The build copies them into the `Params` sheet of the document. Each solid, sketch dimension and position refers to the sheet by name.
+The dimensions of the outer form are in `candybar/shell/dims.py` (class `Blueprint`). The joint values are in `candybar/shell/joints.py`.
+
+The dimensions of the purchased parts and of the printer are in `cad/params/*.csv`. The fit study copies them into the `Params` sheet of its document. Each envelope and each keep-out zone refers to the sheet by name. The fit study calculates where each item stands (the anchors) from `Blueprint` and from `fit.Layout`, and it adds these values to the sheet as derived rows.
+
+| File | Content |
+| --- | --- |
+| `printer.csv` | The bed and the largest part |
+| `hardware.csv` | The monitor, the BC-250, the fan, the power supply, the USB parts, the marquee |
+| `controls.csv` | The lever, the buttons, the encoder |
+| `cabinet.csv` | Five layout values that the envelopes need, and the targets for the panel top and the palm rest |
 
 | Column | Content |
 | --- | --- |
@@ -94,39 +117,36 @@ All dimensions are in `cad/params/*.csv`. The build copies them into the `Params
 
 ### Enter a measurement
 
-1. Open the CSV file that holds the parameter. `cad/out/report.md` lists the parameters and their files under "Still to measure".
+1. Open the CSV file that holds the parameter. `cad/out/shell-rev7/fit/warnings.md` lists the parameters and their files under "Still to measure".
 2. Replace the number in the `value` column.
 3. Change the `status` column to `measured`.
-4. Run `cad/build.sh`.
-5. Read `cad/out/report.md`.
+4. Run the fit study: `CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit`.
+5. Read `cad/out/shell-rev7/fit/report.md` and `warnings.md`.
 
 ### Rules for values
 
-- An expression uses FreeCAD syntax and other parameter names: `=cp_depth + shelf_depth`.
-- A number in an expression needs its unit: `=stick_x + 36 mm`.
+- An expression uses FreeCAD syntax and other parameter names: `=bc_shroud_w - 12 mm`.
+- A number in an expression needs its unit: `12 mm`, not `12`.
 - A name cannot be a unit (`mm`, `d`, `h`) or look like a cell address (`A1`, `BC250`).
-- `btn_count` sets how many buttons exist. A change of this value needs a rebuild.
+- `btn_count` sets how many action buttons exist: 6 or 8.
 
-### Try a value in FreeCAD
+## Rules of the fit study
 
-You can change a cell in the `Params` sheet of `candybar.FCStd`. The model follows the change after a recompute. Type a negative value as an expression: `=-75 mm`. A rebuild overwrites the document, so put a value that you want to keep into the CSV file.
-
-## Checks
-
-| Rule | The build fails when |
+| Rule | The fit study fails when |
 | --- | --- |
-| R0 object state | An object does not recompute, or a sketch is not fully constrained |
-| R1 interference | Two solids of different owners share more than 1 mm3. An owner is one purchased part, the shell, the bezel, or the hood face. A printable part is also compared with all hardware. Two button nuts are compared by R5 only. |
+| Object state | An item does not recompute, or is not one valid solid. The study stops. |
+| R1 interference | Two solids of different owners share more than 1 mm3. An owner is one purchased part. Two button nuts are compared by R5 only. |
 | R2 keep-out | A solid of one owner is in a keep-out zone of a different owner |
-| R3 containment | A hardware solid or a trim plate is outside the shell envelope |
-| R4 print fit | A printable part is larger than the 256 mm bed. More than 240 mm gives a warning. |
+| R2b air zones | An air zone shares room with a solid or a zone of a different item |
 | R5 button spacing | Two button nuts overlap by more than 1 mm. A smaller overlap gives a warning. |
+| Containment in the cavity | A hardware solid or a keep-out zone is in the skin, in a plate, or outside the form |
+| Door service | The compute module and its exhaust duct are not inside the door opening, or the rear face of the power supply is not on the flat of the lower rear wall |
 
-R6 compares the ergonomic values with their target ranges. R7 counts the parameters that are not measured. These two rules give warnings only.
+`fit/warnings.md` has the items that do not fail the study: the height of the panel top and the palm rest against their targets, the count of the parameters by status, and the list of what is still to measure.
 
 ## View the model
 
-Open `cad/out/candybar.FCStd` in FreeCAD. The shell is opaque, so the hardware inside is not visible. The keep-out zones and the alternate bezel plates are hidden. To show or hide an object, select it in the tree and press the space bar.
+Open `cad/out/shell-rev7/shell.FCStd` in FreeCAD. It holds the parts of the outer form. The hardware is not in this document: sheet 09 of the blueprint and the cutaway meshes in `cad/out/shell-rev7/fit/cutaway/` show it.
 
 ### Live session for Claude
 
@@ -134,9 +154,7 @@ The FreeCAD MCP addon (`neka-nat/freecad-mcp` 0.1.30) is installed in `~/.local/
 
 ```sh
 cad/tools/freecad-gui.sh             # start FreeCAD with the RPC server
-cad/tools/fcrpc.py show              # open the built model in the running FreeCAD
-cad/tools/fcrpc.py show --inside     # the same, with a translucent shell
-cad/tools/fcrpc.py show --keepouts   # the same, with the keep-out zones
+cad/tools/fcrpc.py show              # open shell.FCStd in the running FreeCAD
 cad/tools/fcrpc.py shot view.png --view Right
 ```
 
@@ -146,33 +164,35 @@ CAUTION: The RPC server runs all Python code that a local program sends to port 
 
 The global frame has its origin on the desk, at the cabinet front face, on the center line. X points to the right of the player. Y points from the front face to the rear. Z points up.
 
-Each assembly is an `App::Part` with its own local frame. The module that defines the assembly describes the frame.
+Each hardware assembly of the fit study is an `App::Part` with its own local frame. The module that defines the assembly describes the frame.
 
-Each solid has a `CB_Role` property. The checks use this property.
+Each solid of the fit study has a `CB_Role` property. The rules use this property.
 
 | Role | Meaning |
 | --- | --- |
 | `hardware` | A purchased part |
-| `protrusion` | Hardware that goes through the shell: the lever shaft, the ball, the button caps |
+| `protrusion` | Hardware that goes through the control panel: the lever shaft, the ball, the button caps |
 | `keepout` | Space for a plug, a cable, airflow, or a part that is not designed |
-| `massing` | The shell solid |
-| `trim` | A visible plate in the shell: a bezel plate, a speaker grille, the marquee window, the light strip |
-| `printable` | A designed part for the printer |
 
 ## Code
 
 | Path | Content |
 | --- | --- |
-| `params/` | The parameter sheets |
-| `candybar/params.py` | Loads and validates the sheets. Writes the `Params` sheet. |
-| `candybar/model.py` | The FreeCAD mechanics: bound placements, solids, sketches, roles |
-| `candybar/hardware.py`, `panel.py`, `massing.py` | The assemblies, written as tables |
-| `candybar/check.py` | The rules |
-| `candybar/export.py`, `render.py` | STEP and STL files, line drawings |
-| `candybar/style.py`, `decorate.py` | Colors and visibility for each role, and the build step that stores them |
+| `build.sh`, `check.sh`, `test.sh` | Build the model, run the checks of the design, run the tests of the code |
 | `candybar/freecad-run.sh`, `launch.FCMacro` | Run one module in FreeCAD and return its exit status |
+| `candybar/shell/dims.py`, `profiles.py`, `solids.py` | The dimensions, the profiles and the solids of the outer form |
+| `candybar/shell/cavity.py` | The cavity and the skin |
+| `candybar/shell/viewdoc.py` | Writes `shell.FCStd` |
+| `params/` | The parameter sheets of the purchased parts |
+| `candybar/shell/params.py` | Loads and validates the sheets. Writes the `Params` sheet. |
+| `candybar/shell/model.py` | The FreeCAD mechanics of the hardware items: bound placements, solids, roles |
+| `candybar/shell/hardware.py`, `controls.py` | The envelopes and the keep-out zones, written as tables |
+| `candybar/shell/check.py` | Rules R1, R2 and R5, and the warnings |
+| `candybar/shell/fit.py` | The fit study: the anchors, the items, the rules that need the cavity, the report |
+| `candybar/shell/split.py`, `structure.py`, `joints.py`, `coupon.py` | The split, the structure, the joint values, the joint coupon |
+| `candybar/shell/widths.py`, `width_run.py` | The width study |
 | `tests/` | The tests |
-| `tools/` | The FreeCAD launcher, the RPC client, the vendor fetch script |
+| `tools/` | The checks of the solids, the drawings, the renders, the photo tools, the FreeCAD launcher, the RPC client, the vendor fetch script |
 
 ## Reference CAD
 

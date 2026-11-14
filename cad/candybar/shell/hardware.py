@@ -1,6 +1,9 @@
+"""The envelopes and the keep-out zones of the monitor, the compute module, the power supply and its cable bundle.
+
+Each size is a name of the parameter sheets. The fit study gives the anchors (the `base` of each assembly)."""
 from __future__ import annotations
 
-from .model import ORIGIN, X_AXIS, ZERO, Assembly, Model, Pose, box, leaning_back
+from .model import ORIGIN, X_AXIS, ZERO, Assembly, Pose, box, leaning_back
 
 # Local frame: x across the screen from its left edge, y from the front glass
 # toward the back, z up the screen from its bottom edge.
@@ -116,10 +119,3 @@ CABLE_BUNDLE = Assembly(
     base=("bundle_x0", "bundle_y0", "psu_z0"),
     prims=(box("CableBundle_Body", "hardware", ("psu_bundle_w", "psu_bundle_d", "psu_bundle_h"), ORIGIN),),
 )
-
-ASSEMBLIES = (MONITOR, COMPUTE, PSU, CABLE_BUNDLE)
-
-
-def build(model: Model) -> None:
-    for spec in ASSEMBLIES:
-        model.assembly(spec)

@@ -43,7 +43,7 @@ import FreeCAD as App
 import MeshPart
 import Part
 
-from .. import check, params
+from . import check, params
 from . import joints
 from . import solids as so
 from . import split

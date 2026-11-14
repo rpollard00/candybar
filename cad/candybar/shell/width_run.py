@@ -49,8 +49,7 @@ def tolerant_inner() -> None:
 
 
 def probe(d, out: Path) -> int:
-    from .. import params
-    from . import cavity, fit
+    from . import cavity, fit, params
     from . import solids as so
     V = fit.V
     root = Path(os.environ.get("CANDYBAR_ROOT", Path(__file__).resolve().parents[2]))

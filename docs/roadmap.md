@@ -78,7 +78,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 - [ ] Monitor: the outer case width, height and thickness of the present unit (UPERFECT 16 inch 3840 x 2400, confirmed by the owner on 2026-11-11). This is useful and not necessary: the mount is designed for a generic 16 inch 16:10 travel monitor.
 - [x] Player eye position: not needed. The owner said on 2026-11-11 that the cabinet must work for the average person, children and other adults included. The sight line is checked for a child, a small adult and a tall adult from published data.
 - [ ] BC-250 on the first console: board top face up to the outer face of the fan, with a ruler, to the nearest 2 mm. Low priority: this cabinet gets its own shroud, so the height of the stack is a design value.
-- [ ] Lever and buttons when they arrive: the dimensions that `cad/out/report.md` lists.
+- [ ] Lever and buttons when they arrive: the dimensions that `cad/out/shell-rev7/fit/warnings.md` lists.
 - [ ] A review of revision 5: the screen position (`cad/out/shell-bp/compare/screen-drop-options.png` shows drops of 8, 12 and 16 mm; 12 is built) and the outline of the control panel.
 - [ ] Answers to the open questions 1, 2, 3 and 5 in `docs/blueprint/index.md`. Question 2 matters most: the rail land beside the top corners of the bezel is 9 mm, and 16 mm lower down.
 - [ ] A photo of the reference cabinet from the side, if one exists.
@@ -87,7 +87,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 
 - [ ] A review of the edge finish (unit 3): the renders in `cad/out/shell-rev7/renders/` show every edge (`closeup-hood-opening`, `closeup-hood-opening-corner`, `closeup-seam-corner-near`). Unit 3 made four choices, and the owner can change each one. (1) The upper edge of the seam bevel on the rear wall of the hood has the break, although it turns 45 degrees only. Thus the break goes all round the foot of the hood. (2) The two short edges of the body at the seam bevel have a flat break of 1, not a round. (3) The corner of the hood where three broken edges meet is a ball of R 1. (4) The bezel plate has no break until the owner says how the plate is made.
 
-`cad/out/report.md` has the full list of dimensions to measure, with instructions.
+`cad/out/shell-rev7/fit/warnings.md` has the full list of dimensions to measure (a build output of the fit study).
 
 ## Open decisions
 
@@ -168,7 +168,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 | `cad/reference/` | The picked points and known sizes for each reference photo, which the photo tools use |
 | `cad/README.md` | How to build, check and view the model |
 | `cad/params/` | All dimensions, with their status and source |
-| `cad/out/report.md` | Check results and the list of dimensions to measure (a build output) |
+| `cad/out/shell-rev7/fit/warnings.md` | The warnings of the fit study and the list of dimensions to measure (a build output) |
 | `cad/out/shell-rev7/` | The default build of the shell (revision 7): the parts, the checks, the comparison with the approved candidate, the renders, and the downstream runs of unit 1 (not in git) |
 | `cad/out/shell-bp-rev7/` | The candidates of the rear study, R10 is the approved one (not in git) |
 | `cad/vendor/` | Reference photos and third-party CAD (not in git) |
