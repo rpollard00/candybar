@@ -10,14 +10,14 @@ The fit study (`shell/fit.py`) is the only heavy user. The width study and the s
 
 | Older module | Used by the blueprint shell | Not used |
 | --- | --- | --- |
-| `params.py` | `load`, `Param`, `ParamError`, `write_sheet`, `value` (the fit study, `width_run.py`, `structure.py`) | `edit`, `table` (the saved document and its report) |
+| `params.py` | `load`, `Param`, `ParamError`, `write_sheet`, `value` (the fit study, `width_run.py`, `structure.py`) | `edit` (the saved document). `table` served the older report only. |
 | `model.py` | `Model.expr`, `number`, `bind`, `place`, `pose`, `assembly`, `solid`; `Prim`, `box`, `cyl`, `ball`; `Pose`, `leaning_back`, `Assembly`; `tag`, `Placed`, `placed`, `world_shape` | The sketches, the PartDesign bodies, the booleans, `Corner`, `Side`, `fingerprint`. `errors` had no caller in the fit study. |
 | `hardware.py` | `MONITOR`, `COMPUTE`, `PSU`, `CABLE_BUNDLE` | `ASSEMBLIES`, `build` |
 | `panel.py` | The lever, the action buttons, the encoder, the nut tags, `SERVICE_COUNT` | The two printed deck tiles, the bosses, the fixing holes, the service buttons at `svc_y` |
 | `check.py` | The levels, `VOLUME_TOLERANCE`, `Scene`, rules R1, R2 and R5 (called by their private names) | R0, R3, R4, R6, R7, the report and its writers |
 | `massing.py`, `build.py`, `decorate.py`, `export.py`, `render.py`, `style.py` | Nothing | All |
 | `params/printer.csv`, `hardware.csv`, `controls.csv` | The fit study, the split, the coupon | Some rows that only the deck tiles and the outline shell read |
-| `params/cabinet.csv` | `psu_raise`, `bc_gap_door`, `cradle_t`, `vent_out_w`, `vent_out_h`. The fit study replaces 24 more rows with its anchors. | 87 rows of the outline shell |
+| `params/cabinet.csv` | `psu_raise`, `bc_gap_door`, `cradle_t`, `vent_out_w`, `vent_out_h`. The fit study replaces 23 more rows with its anchors. | 84 rows of the outline shell and of its checks |
 
 The tools:
 
@@ -45,11 +45,11 @@ All of it moves into `cad/candybar/shell/`, because the other modules of the des
 
 | From | To | Change |
 | --- | --- | --- |
-| `candybar/params.py` | `candybar/shell/params.py` | Without `edit` and `table`. With `to_measure`, the list of rule R7. |
+| `candybar/params.py` | `candybar/shell/params.py` | Without `edit`. `table` stays, for the list of rule R7. |
 | `candybar/model.py` | `candybar/shell/model.py` | Only the parts in the table above. `errors` stays without its sketch rule, and the fit study calls it. |
 | `candybar/hardware.py` | `candybar/shell/hardware.py` | The four assemblies. No `build`. |
 | `candybar/panel.py` | `candybar/shell/controls.py` | The lever, the buttons and the encoder. The control panel of the fit study (`control_panel`) moves here from `fit.py`, with the rule for `btn_count`. The new name says what is left: the tiles are gone, and "panel" is the plate of the blueprint. |
-| `candybar/check.py` | `candybar/shell/check.py` | The levels, the tolerance, `Scene`, and the rules with public names: `interference`, `keepout`, `button_spacing`. With `ergonomics` for the two targets of R6 that have no other check. |
+| `candybar/check.py` | `candybar/shell/check.py` | The levels, the tolerance, `Scene`, and the rules with public names: `interference`, `keepout`, `button_spacing`. With `ergonomics` for the two targets of R6 that have no other check, and `to_measure` and `status_counts` of R7. |
 
 No module keeps an old name for a caller, and there is no compatibility layer.
 
@@ -72,9 +72,9 @@ No module keeps an old name for a caller, and there is no compatibility layer.
 
 `cabinet.csv` loses each row that the blueprint shell does not read:
 
-- The 87 rows of the outline shell go (for example `cab_d`, `hood_r`, `sweep_r`, the bezel windows, the vents of the side, the eye position).
-- The 24 rows that the fit study replaced go. The fit study calculates these values from `Blueprint` and `Layout`, and it adds them to the sheet as derived rows. A row in the CSV file with a different number was wrong.
-- The 5 rows that stay are `psu_raise`, `bc_gap_door`, `cradle_t`, `vent_out_w` and `vent_out_h`. The targets `tgt_panel_top` and `tgt_palm` stay with them for `fit/warnings.md`.
+- The 84 rows of the outline shell go (for example `cab_d`, `hood_r`, `sweep_r`, the bezel windows, the eye position and its two targets).
+- The 23 rows that the fit study replaced go. The fit study calculates these values from `Blueprint` and `Layout`, and it adds them to the sheet as derived rows. A row in the CSV file with a different number was wrong.
+- Nine rows stay: `psu_raise`, `bc_gap_door`, `cradle_t`, `vent_out_w`, `vent_out_h`, and the four limits of the targets `tgt_panel_top` and `tgt_palm` for `fit/warnings.md`.
 
 ## What is deleted
 
@@ -89,12 +89,12 @@ The older tests go in the same step as the code that they run. Each row says wha
 | Tests (count) | Protected | After this work |
 | --- | --- | --- |
 | `test_params.py` (11) | The loader and the sheet | 10 stay, on `shell/params.py`. The test of `edit` goes with `edit`. The test of a formula that names a later row stays without its edit. |
-| `test_check.py` (20) | The rules on the older document | R1 between two purchased parts, R2, R5 and the state of an item: new tests on the document of the fit study (`test_fit.py`, class `ItemRulesTest`). The tests of R3, R4, the skin, the trim plates and the report go with their code. `FitOnTheRealCavityTest` protects containment. |
+| `test_check.py` (20) | The rules on the older document | R1 between two purchased parts, R2, R5 and the state of an item: new tests on the document of the fit study (`test_fit.py`, class `ItemRulesTest`). The warnings of R6 and R7: class `WarningsTest`. The tests of R3, R4, the skin, the trim plates and the report go with their code. `FitOnTheRealCavityTest` protects containment. |
 | `test_build.py` (8) | The envelopes of the BC-250, `btn_count`, the tiles, the GUI rebuild | The board on its straight edge and the rule for `btn_count`: new tests in `test_fit.py` (class `EnvelopeTest`). The vents in the rear wall of the outline shell: `FitOnTheRealCavityTest` (the duct inside the door). The tiles and the GUI rebuild go. |
 | `test_live.py` (6) | The envelopes follow the sheet | The monitor leans by the recline, the power supply is measured from the rear of its bay, a button follows its offset: new tests in `test_fit.py` (class `EnvelopeTest`), each on a document made with a changed value. The tests of the tiles go. |
 | `test_shell.py` (18) | The outline shell | Gone. `test_blueprint_solids.py`, `test_face_check.py` and `test_edge_finish.py` protect the form of the blueprint. |
-| `test_export.py` (4) | The STEP and STL files of the older model | A new test of `solids.export` (`test_build_entry.py`): each part has a BREP and an STL file, and the BREP file reads back with the same volume. |
-| `test_view.py` (11), `test_decorate.py` (4), `view_probe.py` | The saved document shows its solids, and the view step does not change FreeCAD's settings of a person | A new test of `shell/viewdoc.py`: each solid of `shell.FCStd` is on show with its colour. `viewdoc` gets the guard of `decorate` (it refuses to run outside the throwaway user directory), with its tests. |
+| `test_export.py` (4) | The STEP and STL files of the older model | New tests of `solids.export` (`test_outputs.py`): each part has a BREP and an STL file, the BREP file reads back with the same volume, and the STEP file holds each part. |
+| `test_view.py` (11), `test_decorate.py` (4), `view_probe.py` | The saved document shows its solids, and the view step does not change FreeCAD's settings of a person | New tests of `shell/viewdoc.py` (`test_outputs.py`): each solid of `shell.FCStd` is on show with its colour. `viewdoc` gets the guard of `decorate` (it refuses to run outside the throwaway user directory), with its tests. |
 | `test_exit_status.py` (7) | The exit status of `cad/build.sh`, and no stale output after a build that broke | New tests of the new `cad/build.sh` and of `freecad-run.sh` (`test_build_entry.py`): a module's result is the exit status, an error gives status 1, and a build that cannot start leaves no part file of an earlier build. |
 
 ## The build entry
