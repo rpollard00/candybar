@@ -1,6 +1,6 @@
 # The hood band: speaker grilles, marquee and logo field
 
-Date: 2026-11-14. State: a design study with three variants. The owner chooses.
+Date: 2026-11-14. State: a design study with three variants on the hood as it is, and two studies of a taller hood. The owner chooses.
 
 The hood band is the strip across the front of the hood. The default build has four stand-ins there: `marquee_lip`, `speaker_left`, `speaker_right` and `logo_form`. This study replaces them with designed parts. The module is `cad/candybar/shell/hood_band.py`. It does not change the outer form: the cap of the hood is the cap of `solids.py`, and each opening of the band is a cutter that the module makes.
 
@@ -48,15 +48,17 @@ The owner set three rules before this study (`docs/blueprint/index.md`): the ban
 
 ### The largest driver
 
-The fit study gives 53.9 as the largest round driver frame. This study examined the number. It is correct for the stand-in, and it is not a limit of the skin:
+The fit study gives 53.9 as the largest round driver frame. This study examined the number, and the audio research of 2026-11-14 agrees:
 
-- 53.9 is the height of the stand-in form (57.9) less a margin of 2 on each side (`fit.Layout.speaker_frame_margin`). The test `test_the_driver_is_inside_the_largest_frame_of_the_fit_study` calculates it again.
-- The band is 67.9 high. Behind the wall, the cavity is open down into the body and up to the light box.
-- The limit in height is the light box. Its flange starts at z 86.9. The driver seat of this study ends at z 82.95.
+- 53.9 is the height of the stand-in form (57.9) less a margin of 2 on each side (`fit.Layout.speaker_frame_margin`). The width of the form (95.9) does not limit it. The test `test_the_driver_is_inside_the_largest_frame_of_the_fit_study` calculates the number again.
+- The band is 67.9 high. Behind the wall, 109.1 of depth is free.
+- The limit in height behind the wall is the light box. Its flange starts at z 86.9.
 
-The study uses a driver of the 50 mm class with a square frame of 50 (`hood_band.Driver`). It is inside 53.9, and it is inside the range of 40 to 50 that the research recommends.
+The driver of this study is the one that the research recommends: the Tectonic TEBM35C10-4, with a square frame of 51.8, in a sealed enclosure of 0.45 l behind each grille. The frame of 51.8 is inside 53.9. `hood_band.Driver` has the frame from the research. Its depth of 28, its basket and its magnet are an envelope that this study did not compare with a data sheet.
 
-A driver with a frame of 57 does not fit in variants A and C. The tunnel of the pod must then be 59 high, and the pod (63.9 high) has 2.45 of wall left at its top and bottom. That is less than the front round and the edge break need (3.5). The pod cannot be higher than the band. In variant B a frame of 57 fits if the seat flange is 4 and not 6: the opening is then 59 high (z 21.5 to 80.5), and the flange ends at z 84.5, which is 2.4 below the light box.
+The fallback of the research is the Visaton FRS 5 X. Its frame is smaller (50), so it passes each opening. It needs its own seat pocket: the pocket follows `Driver.frame`.
+
+A driver with a frame of 57 does not fit in variants A and C. The tunnel of the pod must then be 59 high, and the pod (64.9 high) has 2.95 of wall left at its top and bottom. The front round (2), the edge break (1) and a land of 2 need 5. The pod cannot be higher than the band. In variant B a frame of 57 fits: the opening is then 59 high (z 21.5 to 80.5), inside the baffle.
 
 ## 3. Decisions that all variants share
 
@@ -74,17 +76,23 @@ The grille is a separate black part in an opening of the band. It is not a field
 
 | Part | Values |
 | --- | --- |
-| Speaker opening | 52 high (z 24.95 to 76.95), corner radius 4. Variants A and C: 64 wide, centre at x 151.1. Variant B: from x 112 to 10 inside the leg, centre at x 153.1. |
-| Driver (envelope, assumption) | Frame 50 x 50 x 2, corner radius 3. Basket 47 in diameter and 12 deep. Magnet 36 in diameter and 14 deep. Total depth 28. Cone 44 in diameter. |
-| Driver seat | A flange of 6 behind the wall, 5 thick, and an island that fills the opening. The seat face is 3.5 behind the front of the wall. A pocket of 1.9 holds the frame 0.1 proud. Hole for the basket: 48. |
-| Fasteners | Two M3 screws through the grille, 29 left and right of the centre. Two M3 heat-set inserts in the seat (holes of 4.0, 5.65 deep). |
+| Speaker opening | 54 high (z 23.95 to 77.95), corner radius 4. Variants A and C: 64 wide, centre at x 151.1. Variant B: from x 112 to 10 inside the leg, centre at x 153.1. |
+| Driver | Tectonic TEBM35C10-4 (the research). Frame 51.8 x 51.8 from the research. Envelope, not verified: frame 2 thick with corners of radius 3, basket 47 in diameter and 12 deep, magnet 36 in diameter and 14 deep, total depth 28, cone 44 in diameter. |
+| Driver seat | A baffle behind the wall, 110 x 68.9 x 5 (z 16.5 to 85.4), and an island that fills the opening. The seat face is 3.5 behind the front of the wall. A pocket of 1.9 holds the frame 0.1 proud. Hole for the basket: 48. |
+| Sealed enclosure | A box that is open to the front and closes on the rear of the baffle. Walls 2.4. Inside 87.2 x 62.1 x 87.8, which is 0.45 l of air after the driver (25.3 cm3). Outside 92 x 66.9 x 90.2, with an ear of 9 on each side. |
+| Fasteners of the grille | Two M3 screws through the grille, 29 left and right of the centre, into heat-set inserts in the seat (holes of 4.0, 5.65 deep). |
+| Fasteners of the enclosure | Four M3 screws through the ears into heat-set inserts in the baffle, 50.5 left and right of the centre and 20 above and below it. |
 | Grille | A plate of 2.4 with a gap of 0.15 to its opening. |
+
+The research asks for four bosses on the band for each enclosure. In this study the four inserts are in the baffle. The baffle is bonded behind the band, so it is the boss plate. A gasket between the enclosure and the baffle is not modelled.
 
 In variants A and C, two clamp bars (8 x 40) stand behind the grille plate and reach back to the frame. In variant B the plate lies on the frame. In each variant the two screws press the frame onto the seat.
 
-The driver, its seat and the grille come out to the front. The wires stay in the hood.
+The driver and the grille come out to the front. The enclosure stays in the hood.
 
-The rear of the driver is at y 490.4 of the cabinet. The rear wall of the hood is 85.6 behind it. The monitor is in the body, below the seam, and no part of the band is below z 18.9 of the hood.
+The rear of the enclosure is at y 558.2 of the cabinet. The inner face of the rear wall of the hood is at y 576, so 17.8 is free. The top of the enclosure is 2.5 below the flange of the light box. The monitor is in the body, below the seam, and no part of the band is below z 16.5 of the hood.
+
+The baffle starts at x 96.1 in variants A and C. It goes across the seam H1 (x 106) on the inside, as the light box does.
 
 ### The marquee
 
@@ -112,7 +120,7 @@ The lip stands 0.5 behind the front of the hood. Thus its ends lie on the wall o
 
 **What a cut plate changes.** A printed front is two halves, because 387 is longer than the printer. The lap shows as a fine line in the lit window. A cut plate of opal acrylic, 2 or 3 thick, is one piece with no line. For a plate of 3, the groove of the lip becomes 3.3 wide, and the lip becomes 5.3 proud. The lip then stands 0.3 in front of the hood front, or the fence becomes 1.2 thick. The hooks become two printed clips that are bonded to the plate.
 
-**A small display in place of the lit window.** The lit window is the base. The window of the blueprint, 352 x 34, is eleven modules of 32. This agrees with LED dot-matrix modules of 32 x 32 with 8 x 8 points (not verified against a data sheet in this study). Such a row needs 352 x 32 behind the window and about 15 to 25 of depth. The light box has this room: 356 x 34 x 25. The front then becomes a tinted cover. A bar LCD is a different case. The usual bar panels of 7.9 and 8.8 inches are about 60 to 70 high with their frame (from memory, not verified). The marquee opening is 36.1 high. The lip must then move down by 25 to 35, the band becomes 33 to 43 high, and a 50 mm driver does not fit in it. A bar LCD needs a new band.
+**A display in place of the lit window.** The lit window is the base. The marquee research of 2026-11-14 gives these facts. No full-color display that can be bought is as low as the window (352 x 34, with 82.3 of depth). Lit art fits in it, or a row of single-color text modules. The window of the blueprint is eleven modules of 32, and the light box of this study (356 x 34 x 25) is the room for such a row. Each larger display needs a taller hood. Section 8 shows two of them as built studies.
 
 ### The logo field
 
@@ -123,17 +131,17 @@ No part carries a name or a logo. The field is plain, for the owner's own mark. 
 | | A: pods | B: flush | C: frames |
 | --- | --- | --- | --- |
 | Idea | The band of the reference cabinet | The flat band of the maker's wide cabinet | Between A and B |
-| Round each speaker | A pod, 13 proud, 90 x 63.9, corners R 8, front edge R 2.5 | Nothing. The opening is in the band. | A frame, 5 proud, same outline as the pod |
+| Round each speaker | A pod, 13 proud, 90 x 64.9, corners R 8, front edge R 2 | Nothing. The opening is in the band. | A frame, 5 proud, same outline as the pod |
 | Outer end | The pod's end is parallel to the leg | The opening's end is parallel to the leg | The frame's end is parallel to the leg |
 | Grille | A field of holes: 3.8 in diameter, pitch 5.2 | Six level slots of 3.4, pitch 7, a centre bar of 5.6. The slot ends follow the leg. | Six upright slots of 3.4, pitch 7, a centre bar of 5.6 |
 | Grille set back | 1.5 behind the front of the pod | 1.0 behind the band | 1.5 behind the front of the frame |
 | Open area in front of the cone | 44% | 46% | 46% |
 | Logo | A raised field, 176 x 49.9, 5 proud, with a recess of 3.2 for the badge | A recess in the band for the badge: an opening in the wall with a backer behind it | No field. The band is plain. |
-| Parts of the band | 18 | 16 | 16 |
+| Parts of the band | 20 | 18 | 18 |
 
 The pod is 0.18 W wide and 0.13 W high. The pods of the references are 0.18 to 0.20 W wide and 0.145 to 0.163 W high. The band of this hood is 0.137 W high, so a pod cannot have the height of the references.
 
-The front round of a pod is R 2.5. The blueprint gives R 4 for the stand-in. With R 4, the land between the round and the tunnel is 1.0 at the top and bottom of the pod. With R 2.5 it is 2.5.
+The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With R 4, the land between the round and the tunnel is 0.45 at the top and bottom of the pod. With R 2 it is 2.45.
 
 ## 5. Checks
 
@@ -173,7 +181,8 @@ The fit study (`candybar.shell.fit`) was not run with these parts. The tests com
 | Badge | Flat | The front face |
 | Marquee front (two halves) | Flat, front face on the bed | The front face. The nose of a hook is a bridge of 2. |
 | Light box (two halves) | Mouth on the bed | The flange. The rear wall is a bridge of 38. |
-| Driver seat, logo backer | Flange on the bed | The flange |
+| Driver seat, logo backer | Baffle or flange on the bed | The baffle or the flange |
+| Sealed enclosure | Rear wall on the bed, mouth up | The rear wall, 92 x 66.9 |
 
 No face that shows on a band part needs support.
 
@@ -189,10 +198,47 @@ Variant C has the print properties of A with a lower relief. It is the choice if
 
 The parts can be mixed. The grille patterns fit each pod or frame, because the openings of A and C are the same. The logo options do not depend on the speakers.
 
-## 8. Assumptions
+## 8. A taller hood for a display
 
-1. The driver is a full-range unit of the 50 mm class with a square frame of 50 and a depth of 28. No model is chosen.
-2. The driver plays into the open volume of the hood and the body. It has no closed box.
+The research gives the room that a display needs. This study built two cabinets with a taller hood, each with band A: `H20` for a bar LCD of 8.8 inch, and `H46` for an LED matrix of 128 x 32 points (two panels of 160 x 80). Each is a `Blueprint` that `hood_band.tall_blueprint` makes from the default one. `dims.py` and `solids.py` do not change. The sheet `05-taller-hood.png` shows the hood as it is, +20 and +46 from the front, three-quarter front and the side.
+
+All the added height goes into the marquee opening. The band, the lip, the top bar (21) and the lower front of the hood stay as they are.
+
+| Value | As it is | H20 | H46 |
+| --- | --- | --- | --- |
+| Display | Lit art, or a row of text modules | Bar LCD, 8.8 inch | LED matrix, 320 x 80 |
+| Window in the wall | 352 x 32 | 217 x 54 | 321 x 81 |
+| Marquee opening, height | 36.1 | 56.1 | 82.1 |
+| Depth of the box behind the window | 25 | 15 (assumption) | 40 |
+| Flat top of the hood above its foot | 148 | 168 | 194 |
+| The same, as a part of the width | 0.30 | 0.34 | 0.39 |
+| Height of the cabinet | 573.4 | 593.4 | 619.4 |
+| Top flat of the hood, width | 352.5 | 344.0 | 332.8 |
+| Centre of the window above the desk | 534.3 | 544.3 | 557.3 |
+
+The references have a hood of 0.25 to 0.33 of the width. H20 is at the upper end of that range. H46 is above it, and the sheet shows it: the hood becomes a tower above the screen.
+
+What else moves when the hood grows:
+
+- **The height of the cabinet.** It grows by 20 or by 46. The depth and the width do not change.
+- **The top flat.** The sides of the hood lean in, so the top flat becomes 8.5 or 19.7 narrower. The window of 321 clears the corners of the opening by 9.7 on each side at its top.
+- **The print pieces of the hood.** The hood side prints upright. Its height becomes 168 or 194, and the limit is 245. The hood centre prints on a cut face. Its box becomes 168 x 139 x 212 or 194 x 139 x 212, and the limit is 240 x 240. Each piece fits. These numbers come from the piece sizes of the split and the added height. The split was not run again.
+- **The speakers.** Their room does not change. The band is the same, and the enclosure of 0.45 l is the same. The box of the display is above the enclosure in each study.
+- **The sight lines.** The sill and the lower front of the hood do not move, so the hood hides no more of the screen than it does now. The fit study was not run again. The display is higher: its centre is 10 or 23 higher above the desk.
+- **The front of the marquee.** For a display it is a tinted cover, not a diffuser. The sheet shows it dark.
+- **The weight.** The skin of the hood grows by about 90 cm3 or 210 cm3 (an estimate: its outline, 4 thick), which is about 0.12 kg or 0.27 kg of PETG.
+
+What the studies do not have:
+
+- The checks of a study do not pass, and the run does not fail for them. H20 has 10 findings and H46 has 12. The window stands 1.05 (H20) or 0.55 (H46) below the top bar, so a strip of wall less than 2 wide is left there, with a sharp edge that shows through the gap above the front. A finished design cuts the window up to the top bar. The other findings are the known items of the hood at their new height.
+- The edge break of the cap is complete in both studies (`solids.cap` made it).
+- No skin, no fit study, no split and no section with the skin. The sections of the studies are not on a sheet.
+- The depth of 15 for the bar LCD is an assumption of this study.
+
+## 9. Assumptions
+
+1. The driver is the Tectonic TEBM35C10-4 with a frame of 51.8 (the research). Its depth of 28 and the sizes of its basket and magnet are not verified.
+2. The enclosure is sealed by a gasket on the baffle. The wires go through a sealed hole. Neither is modelled.
 3. An open area of 40% of the cone is sufficient for a small full-range driver.
 4. The grilles, the badge, the light box and the seats are black PETG as printed, and they are not painted. The edge rule is for painted parts.
 5. The marquee light is one LED strip, 10 wide. The diffuser distance of 26.6 gives even light for a strip of 60 LEDs for each metre or more.
@@ -200,25 +246,25 @@ The parts can be mixed. The grille patterns fit each pod or frame, because the o
 7. The hood form in the build folders is the solid outer form with the openings as pockets 8 deep, as the default build writes its parts. The sections use the printed skin from the cache of the split.
 8. The seat, the light box and the logo backer are bonded behind the wall before the hood pieces are bonded.
 
-## 9. Open questions for the owner
+## 10. Open questions for the owner
 
-1. Which band: A, B, C, or a mix?
-2. Which driver? The seat pocket and the clamp bars follow the frame.
-3. Lit window or a row of dot-matrix modules in the marquee? The room is the same.
+1. Which hood: as it is, +20 for a bar LCD, or +46 for the LED matrix? The sheet `05-taller-hood.png` shows the three.
+2. Which band: A, B, C, or a mix?
+3. On the hood as it is: lit art or a row of text modules in the marquee? The room is the same.
 4. A printed front in two halves, or one cut plate?
 5. The lip is 4.5 proud, 0.5 less than the stand-in. Accept?
 6. Two black screw heads show on each grille. Accept, or a snap fit?
 7. Variant B: accept a support in the speaker opening of the hood side?
 
-## 10. Not done
+## 11. Not done
 
 - The fit study and the split were not run with the band parts. The pieces of the hood in the split do not have the openings.
-- The amplifier, the wires, the cable hole of the light box and the plug at the foot of the hood are not modelled.
+- The amplifier, the wires, the cable hole of the light box, the gasket of the enclosure and the plug at the foot of the hood are not modelled.
 - The screws and the heat-set inserts are holes only.
 - The halves of the light box meet on a plane. The joint has no lap.
 - No part was sliced.
 
-## 11. How to build
+## 12. How to build
 
 ```sh
 CANDYBAR_OUT=cad/out/hood-band cad/candybar/freecad-run.sh candybar.shell.hood_band      # the three variants and their checks
@@ -229,8 +275,10 @@ cad/test.sh test_hood_band                                                      
 
 `HOOD_BAND_VARIANTS=A,B` builds only these variants. The first run makes the parts that the variants share and keeps them in `cad/out/hood-band/base`.
 
-The sheets are in `cad/out/hood-band/sheets/`: `01-cabinet.png`, `02-band.png`, `03-sections.png` and `04-reference.png`.
+The sheets are in `cad/out/hood-band/sheets/`: `01-cabinet.png`, `02-band.png`, `03-sections.png`, `04-reference.png` and `05-taller-hood.png`.
+
+`HOOD_BAND_TALL=` (empty) builds no study of a taller hood. `HOOD_BAND_TALL=H20` builds one.
 
 ### The default build on the server pal9000
 
-On this machine `candybar.shell.solids` stops in the edge break of the hood: `the edge break of the hood: tool 1 still holds 0.013 mm3 of 0.013`. The one boolean of `solids.cut_near` with all 30 tools leaves 14 of them uncut. The second try then fails on the tool at the kink of the opening. The result is the same on one core and on 64. `hood_band.cap` calls `solids.cap` first. If that fails, it cuts the same tools one at a time. The cap then has 77 faces, as the roadmap records, and no sharp edge is left.
+On this machine `candybar.shell.solids` stops in the edge break of the hood: `the edge break of the hood: tool 1 still holds 0.013 mm3 of 0.013`. The one boolean of `solids.cut_near` with all 30 tools leaves 14 of them uncut. The second try then fails on the tool at the kink of the opening. The result is the same on one core and on 64. `hood_band.cap` calls `solids.cap` first. If that fails, it cuts the same tools one at a time. The cap then has 77 faces, as the roadmap records, and no sharp edge is left. The caps of the two taller hoods do not have this fault: `solids.cap` makes them on this machine.
