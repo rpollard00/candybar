@@ -7,7 +7,7 @@ BC-250 and the power supply (EVGA SuperNOVA 1000 P5) do when the system starts a
 ways to fit a button, the adapter boards that exist, and what the shell must have for a button.
 It extends `docs/research/bc250-cooling-and-psu.md` (Part B, "Starting the PSU without a motherboard").
 
-Nothing was tested for this note. No part was bought. Section 9 lists the bench tests that decide.
+Nothing was tested for this note. No part was bought. Section 10 lists the bench tests that decide.
 
 ## Status tags
 
