@@ -241,9 +241,9 @@ gives problems.
 
 | Event | What occurs | Status |
 | --- | --- | --- |
-| The system shuts down | The adapter board of the power button releases `PS_ON`. The 12 V rail and the 5 V rail go off. The power delivery board and the monitor go off with them. | `docs/research/bc250-power-button.md` section 5. STANDARD (ATX12V design guide, in that note). |
+| The system shuts down | The adapter board of the power button releases `PS_ON`. The 12 V rail and the 5 V rail go off. The converter and the monitor go off with them. | `docs/research/bc250-power-button.md` section 5. STANDARD (ATX12V design guide, in that note). |
 | The standby 5 V | It stays on. Nothing of the monitor is on it. | The same |
-| The button is pressed | The 12 V arrives. The BC-250 and the power delivery board start at the same time. | ESTIMATED |
+| The button is pressed | The 12 V arrives. The BC-250 and the converter start at the same time. | ESTIMATED |
 | The monitor | NOT CONFIRMED: no source says that it starts with no button press. If it does not, a person must press its power button, which is on its right edge behind the cheek. | Bench test 3. The monitor cradle must then give access to the button, or the owner takes a monitor that starts by itself. |
 
 ## 7. Recommendation
