@@ -118,3 +118,56 @@ Each step leaves the tests in a passing state, and each step is one commit.
 5. `cabinet.csv` loses the rows that the blueprint shell does not read.
 6. The build entry: `cad/build.sh`, `cad/check.sh`, their tests, `cad/README.md`.
 7. The proof, and the result in this file.
+
+## Result
+
+Date: 2026-11-14. The steps are done, and each is one commit on the branch `t3/pal-remove-older-generator`.
+
+### What changed against the plan
+
+- `params.table` stays, because `fit/warnings.md` uses it.
+- The tests of `solids.export` and of `viewdoc` are in `tests/test_outputs.py`. The tests of `freecad-run.sh`, `cad/build.sh` and `cad/check.sh` are in `tests/test_build_entry.py`.
+
+### The proof
+
+The proof ran on the server pal9000 (FreeCAD 1.1.4). On this machine the code of commit 3633457 does not give the results that the roadmap records. These faults are older than this work, and this work does not touch their code:
+
+- `candybar.shell.solids` stops at the edge break of the hood: `tool 1 still holds 0.013 mm3 of 0.013`. The same error comes in each run, also on one processor core.
+- The body has 47166388.0 mm3 here. The reference build (`~/.local/share/candybar/out/shell-rev7`) has 47165352.4 mm3. The face count is the same (191).
+- The split stops: the skin of the body from the cache is not a valid shape (158 of 16248 faces).
+- Three tests of the joint coupon fail (clearance 0.2, part `upper-c02`).
+
+Thus each proof run used the same aid before and after: the hood comes from the reference build (`hood.brep`), and the build makes each other part. The aid is `cad/out/_proof.py`. It is not in git.
+
+| Item | Before (3633457) | After | Result |
+| --- | --- | --- | --- |
+| Parts: volume and face count | 10 parts | 10 parts | The same for each part |
+| Parts: BREP files | | | 9 of 10 have the same bytes. `deck.brep` has the same records in a different sequence. |
+| Parts: `tools/compare_parts.py`, tolerance 0.000001 | | | Pass. The largest distance is 0.0000 for the deck and for each small part. The body and the hood have the same bytes. |
+| Fit study: `report.md`, `report.json`, `sections.json` | PASS | PASS | The same bytes |
+| Split | Stops at the skin from the cache | Stops at the same line | No report on this machine. `split.py`, `joints.py`, `printer.csv` and the four files of the skin fingerprint have no change, and the fingerprint is `6399ee9bd8a99553` in the two runs. |
+| Tests, with the aid | 214 run, 5 failures, 1 error, 53 minutes | 173 run, 5 failures, 1 error, 50 minutes | The same 6 items fail. No test changed its result. |
+| Tests, without the aid | 163 run, 3 failures, 7 errors, 18 minutes | 122 run, 3 failures, 7 errors, 15 minutes | The same 10 items fail. No test changed its result. |
+
+The 6 items that fail with the aid are the three coupon tests, two tests of the face check on the default build, and the class `SplitTest` (9 tests that do not run). On a machine where the suite of commit 3633457 passes with 223 tests, the count after this work is 182. This number is not verified.
+
+The split report and the full suite must run again on the machine that made the reference build.
+
+### Tests that are gone
+
+78 tests are gone, and 37 are new.
+
+| File | Count | Reason |
+| --- | --- | --- |
+| `test_build.py` | 7 | Ran `build.build_document`. The envelope of the BC-250 and the rule for `btn_count` have new tests in `test_fit.py`. |
+| `test_check.py` | 20 | Ran the rules on the older document. R1, R2, R5 and the state rule have new tests in `test_fit.py`. |
+| `test_live.py` | 6 | Edited the saved document. The monitor, the power supply and the button offset have new tests in `test_fit.py`. |
+| `test_shell.py` | 18 | Tested the outline shell. |
+| `test_export.py` | 4 | Tested the files of the older build. `test_outputs.py` tests `solids.export`. |
+| `test_view.py`, `test_decorate.py` | 11, 4 | Tested the saved document of the older build. `test_outputs.py` tests `viewdoc`. |
+| `test_exit_status.py` | 7 | Ran the older `cad/build.sh`. `test_build_entry.py` tests the launcher and the two scripts. |
+| `test_params.py` | 1 | Tested `params.edit`, which is gone. |
+
+### A finding for the owner
+
+`fit/warnings.md` shows the palm rest at 92.5 mm against a target of 100 to 120 mm. The front edge of the cabinet to the centre of the nearest action button is shorter since the deck became shorter. The older generator had this check on its own, longer panel, where the value was in the range.
