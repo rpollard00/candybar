@@ -21,13 +21,18 @@ The parts of one band, by name (left parts are mirror images):
   logo_badge            the plate with the owner's mark (variants A and B)
   marquee_front_*       the printed translucent front of the marquee, in two halves with a lap
   light_box_*           the closed box behind the marquee window that holds the light (black, inside)
-  driver_seat_*         the seat of the driver behind the wall, with the holes for the heat-set inserts (inside)
+  driver_seat_*         the seat of the driver: a baffle behind the wall with the holes for the heat-set inserts (inside)
+  speaker_enclosure_*   the sealed enclosure behind the driver, screwed to the baffle (inside)
   logo_backer           the floor of the logo recess behind the wall (inside; variant B)
   driver_*, led_strip   envelopes of the hardware (assumptions, see Band)
 
 Run headless. It writes one folder for each variant into CANDYBAR_OUT (default cad/out/hood-band): the BREP and STL of
 each part, manifest.json, edges.json, focus.json, sections.json, report.json and check.md. The parts of the shell that
 do not change are written once into <out>/base. HOOD_BAND_VARIANTS=A,B builds only these variants.
+
+It also builds two studies of the whole cabinet with a taller hood, for a display in the marquee (TALL): H20 and H46,
+each with band A, into <out>/H20 and <out>/H46. Their checks are written and do not fail the run. HOOD_BAND_TALL=
+builds none of them.
 
     CANDYBAR_OUT=cad/out/hood-band cad/candybar/freecad-run.sh candybar.shell.hood_band
     CANDYBAR_OUT=cad/out/hood-band/A cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc     # shell.FCStd
@@ -38,7 +43,7 @@ from __future__ import annotations
 import json
 import math
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import FreeCAD
@@ -66,9 +71,11 @@ PRINTER = (240.0, 240.0, 245.0)
 
 @dataclass(frozen=True)
 class Driver:
-    """The speaker driver: an assumption. A full-range driver of the 50 mm (2 inch) class with a square frame. The
-    values are the envelope that the seat and the grille are made for; no model is chosen."""
-    frame: float = 50.0
+    """The speaker driver. The research of 2026-11-14 recommends the Tectonic TEBM35C10-4, with a square frame of
+    51.8, in a sealed enclosure of 0.45 l. The frame is that value. The other values are an envelope of the 50 mm
+    class that this study did not compare with a data sheet. The fallback, the Visaton FRS 5 X, has a smaller frame
+    (50): it needs its own seat pocket."""
+    frame: float = 51.8
     frame_t: float = 2.0
     frame_r: float = 3.0
     basket_d: float = 47.0
@@ -86,16 +93,16 @@ class Band:
     seat_off: float = 0.1           # inside parts stand this far behind the wall, as in the fit study (every second slab of the skin is 0.05 thicker)
     edge_break: float = 1.0
     # --- speakers ---
-    spk_half_h: float = 26.0        # half the height of the speaker opening (52: the frame of 50 passes it)
+    spk_half_h: float = 27.0        # half the height of the speaker opening (54: the frame of 51.8 and its pocket pass it)
     spk_w: float = 64.0             # width of the straight opening (variants A and C)
     spk_r: float = 4.0              # corner radius of the opening
     spk_contour_inner: float = 112.0    # variant B: the inner end of the opening (6 from the seam H1 at x 106)
     spk_contour_gap: float = 10.0       # variant B: the outer end stands this far inside the leg of the opening
     pod_inner: float = 106.0        # the inner end of a pod (on the line of the seam H1)
     pod_leg_gap: float = 8.0        # the outer end of a pod stands this far inside the leg
-    pod_end_gap: float = 2.0        # a pod stands this far above the ledge and below the lip
+    pod_end_gap: float = 1.5        # a pod stands this far above the ledge and below the lip
     pod_r: float = 8.0              # corner radius of a pod, seen from the front
-    pod_edge_r: float = 2.5         # round of the front edge of a pod
+    pod_edge_r: float = 2.0         # round of the front edge of a pod
     grille_t: float = 2.4
     grille_gap: float = 0.15        # between the grille and its opening, each side
     hole_d: float = 3.8
@@ -111,9 +118,20 @@ class Band:
     insert_depth: float = 5.65
     bar_w: float = 8.0              # the clamp bar behind a grille that stands in a pod
     bar_half_h: float = 20.0
+    bar_x: float = 27.5             # the middle of a clamp bar from the driver's centre: it lies on the edge of the frame, inside the tunnel
     seat_face: float = 3.5          # the front of the seat stands this far behind the front of the wall: a flush grille (set back 1.0, 2.4 thick) then lies on the driver's frame
-    seat_flange: float = 6.0
     seat_flange_t: float = 5.0
+    # the baffle: the flange of the seat is a plate behind the wall, and the sealed enclosure closes on its rear
+    baffle_half_w: float = 55.0
+    baffle_z0: float = 16.5         # from the foot of the hood
+    baffle_top_gap: float = 1.5     # below the flange of the light box
+    encl_half_w: float = 46.0
+    encl_edge: float = 1.0          # the enclosure stands this far inside the top and bottom of the baffle
+    encl_wall: float = 2.4
+    encl_litres: float = 0.45       # the air in the enclosure, with the volume of the driver taken off
+    ear_t: float = 3.0
+    ear_half_h: float = 28.0
+    boss_z: float = 20.0            # the four screws of the enclosure: above and below the driver's centre, in the ears
     seat_gap: float = 0.3
     frame_proud: float = 0.1        # the driver's frame stands this far proud of the seat, so that the grille clamps it
     # --- marquee ---
@@ -148,6 +166,7 @@ class Band:
     logo_recess: float = 3.2
     badge_t: float = 2.2
     badge_gap: float = 0.3
+    backer_flange: float = 6.0
 
 
     @property
@@ -176,6 +195,45 @@ VARIANTS = {
     "C": Variant("C", "frames", 5.0, "straight", "upright slots", 1.5, "none",
                  "A low frame round each speaker with an upright slot grille, and a plain band with no logo field."),
 }
+@dataclass(frozen=True)
+class Tall:
+    """A study of the whole cabinet with a taller hood, for a display in the marquee. The hood grows by `extra`, and
+    all of it goes into the marquee opening: the band, the lip, the top bar and the lower front of the hood stay."""
+    key: str
+    name: str
+    extra: float
+    win_w: float
+    win_h: float
+    depth: float
+    text: str
+
+
+TALL = {
+    "H20": Tall("H20", "hood +20, bar LCD of 8.8 inch", 20.0, 217.0, 54.0, 15.0,
+                "The hood is 20 higher, for a bar LCD of 8.8 inch behind a window of 217 x 54. Band A."),
+    "H46": Tall("H46", "hood +46, LED matrix 320 x 80", 46.0, 321.0, 81.0, 40.0,
+                "The hood is 46 higher, for an LED matrix of 128 x 32 points (320 x 80) behind a window of 321 x 81. Band A."),
+}
+TALL_FRONT = "#20242c"
+
+
+def tall_blueprint(t: Tall, d: Blueprint | None = None) -> Blueprint:
+    """The blueprint with the taller hood: the flat top and the top of the rear arc are `extra` higher, and the
+    marquee opening is `extra` higher. The bend of the hood front stays at its height."""
+    d = d or Blueprint()
+    open_h = d.hood_marquee_open_h + t.extra
+    return replace(d, hood_flat_h=d.hood_flat_h + t.extra, hood_h_ratio=(d.hood_h + t.extra) / d.width, hood_marquee_open_h=open_h,
+                   marquee_h=t.win_h, marquee_margin=(open_h - t.win_h) / 2,
+                   hood_front_low_share=d.hood_front_low_share * d.hood_flat_h / (d.hood_flat_h + t.extra))
+
+
+def tall_band(t: Tall, b: Band | None = None) -> Band:
+    """The band for a display: the window in the wall is the window of the display, and the box behind it has the
+    depth of the display. The envelope "led_strip" is then the display panel."""
+    return replace(b or Band(), mq_w=t.win_w, mq_h=t.win_h, box_margin_z=0.0, box_depth=t.depth, led_len=t.win_w - 2.0, led_w=t.win_h - 2.0,
+                   led_t=min(10.0, t.depth - 2.0))
+
+
 # the finish of each part for the renders and the FreeCAD document, and its class for the checks:
 #   painted      a printed part of the exterior that is filled and painted: the edge rule holds
 #   black        a printed part that shows and is not painted (black PETG as printed)
@@ -187,7 +245,7 @@ PARTS = {
     "hood": ("white", "painted"), "marquee_lip": ("white", "painted"), "speaker_pod": ("white", "painted"),
     "logo_field": ("white", "painted"), "grille": ("black", "black"), "logo_badge": ("#2f4f3a", "plate"),
     "marquee_front": ("#e9dca6", "translucent"), "light_box": ("#2a2a30", "inside"), "driver_seat": ("#2a2a30", "inside"),
-    "logo_backer": ("#2a2a30", "inside"), "driver": ("#5a5a5c", "hardware"), "led_strip": ("#d8c060", "hardware"),
+    "speaker_enclosure": ("#3a3a44", "inside"), "logo_backer": ("#2a2a30", "inside"), "driver": ("#5a5a5c", "hardware"), "led_strip": ("#d8c060", "hardware"),
 }
 BASE = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black", "screen": "#3a4250"}
 PRINT = {
@@ -199,7 +257,8 @@ PRINT = {
     "logo_badge": "Flat, front face on the bed.",
     "marquee_front": "Flat, front face on the bed. The hooks stand up; the nose of a hook is a bridge of 2.",
     "light_box": "Mouth on the bed. The rear wall is a bridge of 36 across the box.",
-    "driver_seat": "Flange on the bed, the island up. No support.",
+    "driver_seat": "Baffle on the bed, the island up. No support.",
+    "speaker_enclosure": "Rear wall on the bed, the mouth up. No support.",
     "logo_backer": "Flange on the bed, the island up. No support.",
 }
 
@@ -307,15 +366,28 @@ def right_and_left(name: str, right: Part.Shape) -> dict[str, Part.Shape]:
 
 # ---------- the cap ----------
 
-def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shape]:
+def cap(d: Blueprint, h: pr.Hood, log: list[str], strict: bool = True) -> tuple[Part.Shape, Part.Shape]:
     """The cap of the hood with its edge break, in the hood's frame, and its opening as a prism: solids.cap. On some
     machines the one boolean that solids.cut_near does with all the tools of the break leaves most of them uncut, and
-    its second try fails on a tool of 0.013 mm3. Then the tools are cut one at a time here, which gives the same cap."""
+    its second try fails on a tool of 0.013 mm3. Then the tools are cut one at a time here, which gives the same cap.
+    With strict off (a study of another hood), a cap whose edge break fails that way too is returned with no edge
+    break, and the log says so."""
     try:
         return so.cap(d, h, log)
     except Part.OCCError as err:
         log.append(f"hood: solids.cap failed ({err}). The tools of the edge break are cut one at a time.")
     solid, opening = so.cap_unbroken(d, h, log)
+    try:
+        return break_one_at_a_time(d, solid, log), opening
+    except Part.OCCError as err:
+        if strict:
+            raise
+        log.append(f"hood: the edge break failed one tool at a time too ({err}). THE CAP HAS NO EDGE BREAK.")
+        return solid, opening
+
+
+def break_one_at_a_time(d: Blueprint, solid: Part.Shape, log: list[str]) -> Part.Shape:
+    """The edge break of the cap as solids.cap makes it, with the tools cut one at a time."""
     g = d.seam_groove
     solid = so.settled(solid)
     listed = [e for e, _ in so.sharp_edges(solid, d, lambda m: m.z > 0.05)]
@@ -338,7 +410,7 @@ def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shap
     if left:
         raise Part.OCCError(f"hood: {len(left)} edges are still sharp after the edge break")
     log.append(f"hood, edge break R {d.edge_break:g}, one tool at a time: {len(tools)} tools, {len(out.Faces)} faces")
-    return out, opening
+    return out
 
 
 def base_dir(out: Path, d: Blueprint) -> Path:
@@ -347,10 +419,23 @@ def base_dir(out: Path, d: Blueprint) -> Path:
     return out / "base" / split.fingerprint(d)
 
 
-def base(out: Path, d: Blueprint, log: list[str]) -> dict[str, Part.Shape]:
+def base(out: Path, d: Blueprint, log: list[str], shell: dict[str, Part.Shape] | None = None) -> dict[str, Part.Shape]:
     """The parts that every variant shares, in the cabinet frame, except the cap and its opening, which stay in the
-    hood's frame: built once and kept as binary BREP under the fingerprint of the form."""
+    hood's frame: built once and kept as binary BREP under the fingerprint of the form. `shell` gives the parts below
+    the hood for a blueprint that differs in its hood only: then only the cap is made, and its edge break can fail."""
     folder = base_dir(out, d)
+    if shell is not None:
+        files = {k: folder / f"{k}.bin" for k in ("cap", "opening")}
+        if not all(f.exists() for f in files.values()):
+            made = dict(zip(files, cap(d, pr.hood(d), log, strict=False)))
+            folder.mkdir(parents=True, exist_ok=True)
+            for k, f in files.items():
+                made[k].exportBinary(str(f))
+        parts = {k: shell[k] for k in BASE}
+        for k, f in files.items():
+            parts[k] = Part.Shape()
+            parts[k].importBinary(str(f))
+        return parts
     names = (*BASE, "cap", "opening")
     if all((folder / f"{k}.bin").exists() for k in names):
         parts = {}
@@ -467,26 +552,63 @@ def grille(b: Band, v: Variant, pl: Places) -> Part.Shape:
     y_frame = pl.y_seat - b.frame_proud
     if y_frame - y1 > 0.5:
         for sx in (-1, 1):
-            x0 = pl.cx + sx * (b.screw_x + b.bar_w / 2 - 2.0) - b.bar_w / 2
+            x0 = pl.cx + sx * b.bar_x - b.bar_w / 2
             solid = solid.fuse(box(x0, x0 + b.bar_w, y1, y_frame, pl.zc - b.bar_half_h, pl.zc + b.bar_half_h))
         solid = solid.removeSplitter()
     cutters = grille_cutters(b, v, pl, y0 - 1, y1 + 0.001) + [hole(x, z, b.screw_hole, y0 - 1, y_frame + 1) for x, z in screws(pl, b)]
     return one(solid.cut(cutters), "the grille")
 
 
-def seat(b: Band, drv: Driver, pl: Places) -> Part.Shape:
-    """The right driver seat: a flange behind the wall round the speaker opening, and an island that fills the
-    opening up to the seat face. It has a pocket for the driver's frame, a hole for its basket, and two holes for
-    heat-set inserts."""
+def box_low(d: Blueprint, h: pr.Hood, b: Band) -> float:
+    """The lower edge of the light box's flange, from the foot of the hood."""
+    return window(d, h, b)[0][1] - b.box_margin_z - b.box_wall - b.box_flange
+
+
+def baffle(d: Blueprint, h: pr.Hood, b: Band, pl: Places) -> tuple[float, float, float, float]:
+    """The baffle behind the wall, in (x0, x1, z0, z1): from baffle_z0 up to baffle_top_gap below the light box."""
+    return pl.cx - b.baffle_half_w, pl.cx + b.baffle_half_w, b.baffle_z0, box_low(d, h, b) - b.baffle_top_gap
+
+
+def bosses(d: Blueprint, h: pr.Hood, b: Band, pl: Places) -> list[P2]:
+    """The four screws that hold the enclosure on the baffle."""
+    x = (b.encl_half_w + b.baffle_half_w) / 2
+    return [(pl.cx + sx * x, pl.zc + sz * b.boss_z) for sx in (-1, 1) for sz in (-1, 1)]
+
+
+def seat(d: Blueprint, h: pr.Hood, b: Band, drv: Driver, pl: Places) -> Part.Shape:
+    """The right driver seat: the baffle, a plate behind the wall round the speaker opening, and an island that fills
+    the opening up to the seat face. It has a pocket for the driver's frame, a hole for its basket, two holes for the
+    heat-set inserts of the grille screws, and four for the screws of the enclosure."""
     y_wall = pl.yb + b.wall_t + b.seat_off
+    x0, x1, z0, z1 = baffle(d, h, b, pl)
     island = plate(grow(pl.opening, -b.seat_gap), b.spk_r - b.seat_gap, pl.y_seat, y_wall + 0.001)
-    flange = plate(grow(pl.opening, b.seat_flange), b.spk_r + b.seat_flange, y_wall, y_wall + b.seat_flange_t)
-    solid = island.fuse(flange).removeSplitter()
+    solid = island.fuse(box(x0, x1, y_wall, y_wall + b.seat_flange_t, z0, z1)).removeSplitter()
     f = drv.frame + 2 * b.seat_gap
     cutters = [plate(rect(pl.cx, pl.zc, f, f), drv.frame_r + b.seat_gap, pl.y_seat - 1, pl.y_seat + drv.frame_t - b.frame_proud),
                hole(pl.cx, pl.zc, drv.basket_d + 1.0, pl.y_seat - 1, y_wall + b.seat_flange_t + 1)]
     cutters += [hole(x, z, b.insert_hole, pl.y_seat - 1, pl.y_seat + b.insert_depth) for x, z in screws(pl, b)]
+    cutters += [hole(x, z, b.insert_hole, y_wall + b.seat_flange_t - b.insert_depth + 1.0, y_wall + b.seat_flange_t + 1) for x, z in bosses(d, h, b, pl)]
     return one(solid.cut(cutters), "the driver seat")
+
+
+def enclosure(d: Blueprint, h: pr.Hood, b: Band, drv: Driver, pl: Places) -> tuple[Part.Shape, dict[str, float]]:
+    """The sealed enclosure behind the right driver: a box that is open to the front and closes on the rear of the
+    baffle, with an ear on each side for its four screws. Its depth gives encl_litres of air after the driver's
+    volume behind the baffle is taken off. Returns the solid and its numbers."""
+    y0 = pl.yb + b.wall_t + b.seat_off + b.seat_flange_t
+    _, _, bz0, bz1 = baffle(d, h, b, pl)
+    z0, z1 = bz0 + b.encl_edge, bz1 - b.encl_edge
+    w = b.encl_wall
+    inner = (2 * (b.encl_half_w - w)) * (z1 - z0 - 2 * w)
+    drv_vol = driver(b, drv, pl).common(box(-500.0, 500.0, y0, 500.0, -500.0, 500.0)).Volume
+    depth = (b.encl_litres * 1e6 + drv_vol) / inner
+    outer = box(pl.cx - b.encl_half_w, pl.cx + b.encl_half_w, y0, y0 + depth + w, z0, z1)
+    ears = box(pl.cx - b.baffle_half_w, pl.cx + b.baffle_half_w, y0, y0 + b.ear_t, pl.zc - b.ear_half_h, pl.zc + b.ear_half_h)
+    room_ = box(pl.cx - b.encl_half_w + w, pl.cx + b.encl_half_w - w, y0 - 1, y0 + depth, z0 + w, z1 - w)
+    cutters = [room_] + [hole(x, z, b.screw_hole, y0 - 1, y0 + b.ear_t + 1) for x, z in bosses(d, h, b, pl)]
+    solid = one(outer.fuse(ears).removeSplitter().cut(cutters), "the enclosure")
+    return solid, {"litres": b.encl_litres, "depth_inside": round(depth, 1), "inside": [round(2 * (b.encl_half_w - w), 1), round(z1 - z0 - 2 * w, 1)],
+                   "driver_cm3": round(drv_vol / 1000, 1), "rear_y": round(y0 + depth + w + h.origin[1], 1)}
 
 
 def driver(b: Band, drv: Driver, pl: Places) -> Part.Shape:
@@ -620,7 +742,7 @@ def logo_backer(b: Band, yb: float) -> Part.Shape:
     y_wall = yb + b.wall_t + b.seat_off
     r = b.logo_r - b.logo_inset + 2.0
     island = plate(grow(logo_recess(b), -b.seat_gap), r - b.seat_gap, yb + b.logo_recess, y_wall + 0.001)
-    flange = plate(grow(logo_recess(b), b.seat_flange), r + b.seat_flange, y_wall, y_wall + 3.0)
+    flange = plate(grow(logo_recess(b), b.backer_flange), r + b.backer_flange, y_wall, y_wall + 3.0)
     return one(island.fuse(flange).removeSplitter(), "the logo backer")
 
 
@@ -691,7 +813,8 @@ def build(d: Blueprint, b: Band, drv: Driver, v: Variant, cap_solid: Part.Shape,
     boxes, led = light_box(d, h, b)
     out.update(boxes)
     out["led_strip"] = led
-    out.update(right_and_left("driver_seat", seat(b, drv, pl)))
+    out.update(right_and_left("driver_seat", seat(d, h, b, drv, pl)))
+    out.update(right_and_left("speaker_enclosure", enclosure(d, h, b, drv, pl)[0]))
     out.update(right_and_left("driver", driver(b, drv, pl)))
     return {k: so.hood_frame(h)(s) for k, s in out.items()}
 
@@ -828,6 +951,7 @@ def check(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Bl
     rm = room(parts, skin)
     boxes = print_boxes(parts)
     area = open_area(b, v, drv, pl)
+    encl = enclosure(d, h, b, drv, pl)[1]
     invalid = [k for k, s in parts.items() if not s.isValid() or len(s.Solids) != 1]
     failures = [f"{k}: not one valid solid" for k in invalid]
     failures += [f"edge rule: {e['part']} has a sharp edge that shows at {tuple(e['at'])}, {e['length']} long, {e['turn']} degrees" for e in sharp]
@@ -839,7 +963,7 @@ def check(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Bl
         failures.append(f"grille: the open area is {area['share']:.0%} of the cone, less than 40%")
     return {"variant": asdict(v), "sharp_edges_that_show": sharp,
             "face_findings_that_show": [asdict(f) for f in shown], "face_findings_hidden": [asdict(f) for f in hidden],
-            "room": rm, "print": boxes, "open_area": area, "skin_checked": skin is not None, "failures": failures}
+            "room": rm, "print": boxes, "open_area": area, "enclosure": encl, "skin_checked": skin is not None, "failures": failures}
 
 
 def check_md(rep: dict) -> str:
@@ -849,6 +973,7 @@ def check_md(rep: dict) -> str:
              f"- Face-check findings that show: {len(rep['face_findings_that_show'])}",
              f"- Face-check findings on faces that do not show (in a joint or behind a part): {len(rep['face_findings_hidden'])}",
              f"- Open area of the grille in front of the cone: {rep['open_area']['open_mm2']} mm2 of {rep['open_area']['cone_mm2']} ({rep['open_area']['share']:.0%})",
+             f"- Sealed enclosure: {rep['enclosure']['litres']} l of air, {rep['enclosure']['inside'][0]} x {rep['enclosure']['inside'][1]} x {rep['enclosure']['depth_inside']} inside, its rear at y {rep['enclosure']['rear_y']}",
              f"- Inside parts and hardware that share volume: {len(rep['room']['shared'])}"
              + ("" if rep["skin_checked"] else " (the skin of the hood is not in the cache: not compared with the skin)"), "",
              "| Part | Box, mm | Fits the printer |", "| --- | --- | --- |"]
@@ -901,13 +1026,13 @@ def focus(d: Blueprint, b: Band, v: Variant) -> dict[str, dict]:
 
 
 def export(folder: Path, parts: dict[str, Part.Shape], base_folder: Path, d: Blueprint, b: Band, v: Variant, rep: dict,
-           cuts: dict, log: list[str]) -> None:
+           cuts: dict, log: list[str], finish: dict[str, str] | None = None) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     manifest = {k: {"file": str(base_folder / f"{k}.stl"), "finish": BASE[k], "brep": str(base_folder / f"{k}.brep")} for k in BASE}
     for k, s in parts.items():
         MeshPart.meshFromShape(Shape=s, LinearDeflection=0.03, AngularDeflection=0.05).write(str(folder / f"{k}.stl"))
         s.exportBrep(str(folder / f"{k}.brep"))
-        manifest[k] = {"file": f"{k}.stl", "finish": PARTS[kind(k)][0], "brep": f"{k}.brep", "class": PARTS[kind(k)][1]}
+        manifest[k] = {"file": f"{k}.stl", "finish": (finish or {}).get(kind(k), PARTS[kind(k)][0]), "brep": f"{k}.brep", "class": PARTS[kind(k)][1]}
     json.dump(manifest, open(folder / "manifest.json", "w"), indent=1)
     edges = json.load(open(base_folder / "edges.json"))
     edges.update({k: so.edge_polylines(s) for k, s in parts.items()})
@@ -940,4 +1065,23 @@ def main() -> int:
         for f in rep["failures"]:
             print("  FAIL", f)
         failed = failed or bool(rep["failures"])
+    tall = os.environ.get("HOOD_BAND_TALL")
+    for key in ([k for k in tall.split(",") if k] if tall is not None else list(TALL)):
+        t = TALL[key]
+        d2, b2 = tall_blueprint(t, d), tall_band(t, b)
+        v = replace(VARIANTS["A"], key=t.key, name=t.name, text=t.text)
+        tlog: list[str] = []
+        tall_parts = base(out, d2, tlog, shell=base_parts)
+        parts = build(d2, b2, drv, v, tall_parts["cap"], tall_parts["opening"])
+        rep = check(parts, tall_parts, d2, b2, drv, v, None)
+        bb = parts["hood"].BoundBox
+        rep["tall"] = {"extra": t.extra, "cabinet_height": round(bb.ZMax, 1), "hood_box": [round(bb.XLength, 1), round(bb.YLength, 1), round(bb.ZLength, 1)],
+                       "hood_flat_h": d2.hood_flat_h, "hood_flat_h_over_width": round(d2.hood_flat_h / d2.width, 3),
+                       "window": [t.win_w, t.win_h], "marquee_opening_h": d2.hood_marquee_open_h}
+        export(out / key, parts, base_dir(out, d), d2, b2, v, rep, sections(parts, None, section_x(d2, b2, v)), tlog, {"marquee_front": TALL_FRONT})
+        print(f"study {key} ({t.name}): cabinet {rep['tall']['cabinet_height']} high, {len(rep['failures'])} check failures (a study: they do not fail the run)")
+        for line in tlog:
+            print("  ", line)
+        for f in rep["failures"]:
+            print("   finding:", f)
     return 1 if failed else 0

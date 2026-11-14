@@ -62,7 +62,7 @@ class PlacesTest(unittest.TestCase):
         for key in hb.VARIANTS:
             pl = self.places(key)
             with self.subTest(variant=key):
-                self.assertGreater(2 * self.b.spk_half_h, self.drv.frame + 1.0)
+                self.assertGreater(2 * self.b.spk_half_h, self.drv.frame + 2 * self.b.seat_gap + 1.0)
                 self.assertGreater(max(p[0] for p in pl.opening) - pl.cx, self.b.screw_x + self.b.screw_hole / 2 + 1.0)
 
     def test_the_driver_is_inside_the_largest_frame_of_the_fit_study(self) -> None:
@@ -86,11 +86,38 @@ class PlacesTest(unittest.TestCase):
         self.assertGreaterEqual(win[0][1] - self.h.z_rail_top, 2.0)
         self.assertGreaterEqual(self.h.z_open_top - win[2][1], 2.0)
 
-    def test_the_light_box_stands_clear_of_the_driver_seat(self) -> None:
-        flange_low = hb.window(self.d, self.h, self.b)[0][1] - self.b.box_margin_z - self.b.box_wall - self.b.box_flange
+    def test_the_light_box_stands_clear_of_the_baffle(self) -> None:
         for key in hb.VARIANTS:
-            seat_top = max(p[1] for p in self.places(key).opening) + self.b.seat_flange
-            self.assertGreaterEqual(flange_low - seat_top, 2.0, key)
+            pl = self.places(key)
+            x0, x1, z0, z1 = hb.baffle(self.d, self.h, self.b, pl)
+            self.assertGreaterEqual(hb.box_low(self.d, self.h, self.b) - z1, 1.0, key)
+            for x, z in pl.opening:
+                self.assertTrue(x0 + 3.0 < x < x1 - 3.0 and z0 + 3.0 < z < z1 - 3.0, f"{key}: the baffle goes round the opening")
+
+    def test_the_clamp_bars_lie_on_the_frame_and_inside_the_tunnel(self) -> None:
+        b = self.b
+        self.assertLess(b.bar_x - b.bar_w / 2, self.drv.frame / 2 - 1.5)
+        self.assertLess(b.bar_x + b.bar_w / 2, b.spk_w / 2 - b.grille_gap)
+        self.assertGreater(b.screw_x - b.screw_hole / 2, self.drv.frame / 2 + b.seat_gap)
+        self.assertLess(b.screw_x + b.screw_hole / 2, b.bar_x + b.bar_w / 2 - 0.5)
+
+    def test_a_taller_hood_keeps_the_band_and_the_lower_front(self) -> None:
+        for t in hb.TALL.values():
+            d2 = hb.tall_blueprint(t)
+            h2 = pr.hood(d2)
+            with self.subTest(study=t.key):
+                self.assertAlmostEqual(h2.height, self.h.height + t.extra)
+                self.assertAlmostEqual(d2.hood_h, self.d.hood_h + t.extra)
+                self.assertAlmostEqual(h2.z_band_top, self.h.z_band_top)
+                self.assertAlmostEqual(h2.z_rail_top, self.h.z_rail_top)
+                self.assertAlmostEqual(h2.y_band_top, self.h.y_band_top, places=6)
+                for z in (0.0, 20.0, 40.0):
+                    self.assertAlmostEqual(h2.front_y(z), self.h.front_y(z), places=6)
+                win = hb.window(d2, h2, hb.tall_band(t))
+                self.assertAlmostEqual(win[2][1] - win[0][1], t.win_h)
+                self.assertGreaterEqual(win[0][1] - h2.z_rail_top, 0.5)
+                self.assertGreaterEqual(h2.z_open_top - win[2][1], 0.5)
+                self.assertGreaterEqual(h2.half_open(win[2][1], d2), t.win_w / 2 + 2.0, "the window clears the corner of the opening")
 
     def test_the_front_lifts_far_enough_to_come_out(self) -> None:
         """The front lifts by the gap under the top bar. That frees the hooks, and the foot leaves the groove."""
@@ -140,7 +167,23 @@ class PartsTest(unittest.TestCase):
         pl = hb.places(self.d, self.h, self.b, v)
         grille, drv = hb.grille(self.b, v, pl), hb.driver(self.b, self.drv, pl)
         self.assertAlmostEqual(grille.BoundBox.YMax - drv.BoundBox.YMin, 0.0, places=6)
-        self.assertLess(hb.seat(self.b, self.drv, pl).common(drv).Volume, 1e-6)
+        self.assertLess(hb.seat(self.d, self.h, self.b, self.drv, pl).common(drv).Volume, 1e-6)
+
+    def test_the_enclosure_holds_its_volume_of_air_and_closes_on_the_baffle(self) -> None:
+        for key, v in hb.VARIANTS.items():
+            pl = hb.places(self.d, self.h, self.b, v)
+            solid, _ = hb.enclosure(self.d, self.h, self.b, self.drv, pl)
+            seat, drv = hb.seat(self.d, self.h, self.b, self.drv, pl), hb.driver(self.b, self.drv, pl)
+            bb = solid.BoundBox
+            w = self.b.encl_wall
+            inside = Part.makeBox(bb.XLength - 2 * self.b.baffle_half_w + 2 * self.b.encl_half_w - 2 * w, bb.YLength - w, bb.ZLength - 2 * w,
+                                  V(pl.cx - self.b.encl_half_w + w, bb.YMin, bb.ZMin + w))
+            air = inside.Volume - inside.common(drv).Volume
+            self.assertAlmostEqual(air / 1e6, self.b.encl_litres, places=3, msg=key)
+            self.assertLess(inside.common(solid).Volume, 1e-3, key)
+            self.assertAlmostEqual(bb.YMin, seat.BoundBox.YMax, places=6, msg=key)
+            self.assertLess(solid.common(seat).Volume, 1e-6, key)
+            self.assertLess(solid.common(drv).Volume, 1e-6, key)
 
     def test_the_driver_has_the_depth_of_its_values(self) -> None:
         drv = hb.driver(self.b, self.drv, hb.places(self.d, self.h, self.b, hb.VARIANTS["A"]))
@@ -184,6 +227,8 @@ class VariantsTest(unittest.TestCase):
             self.assertTrue(all(hb.kind(n) in hb.PARTS for n in names), key)
 
     def test_the_bands_differ_as_the_variants_say(self) -> None:
+        for key in hb.VARIANTS:
+            self.assertIn("speaker_enclosure_right", built(key))
         self.assertIn("speaker_pod_right", built("A"))
         self.assertNotIn("speaker_pod_right", built("B"))
         self.assertIn("logo_field", built("A"))
