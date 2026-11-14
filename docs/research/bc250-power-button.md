@@ -2,9 +2,13 @@
 
 Research date: 2026-11-14. Each source was read on this date unless the text gives a different date.
 
-This note answers the open decision "The everyday power button" in `docs/roadmap.md`. It gives what the
-BC-250 and the power supply (EVGA SuperNOVA 1000 P5) do when the system starts and stops, the three
-ways to fit a button, the adapter boards that exist, and what the shell must have for a button.
+This note answers the open decision "The everyday power button" in `docs/roadmap.md`. It has four parts:
+
+- What the BC-250 and the power supply (EVGA SuperNOVA 1000 P5) do when the system starts and stops.
+- The three ways to fit a button.
+- The adapter boards that exist.
+- What the shell must have for a button.
+
 It extends `docs/research/bc250-cooling-and-psu.md` (Part B, "Starting the PSU without a motherboard").
 
 Nothing was tested for this note. No part was bought. Section 10 lists the bench tests that decide.

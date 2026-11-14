@@ -30,10 +30,10 @@ depends on time or filament.
 3. Print the coupons first. The joint coupon gives the key clearance and the pilot hole in the first
    days. The pieces can then be printed and assembled dry while the paint coupons cure. Only the
    bond waits for the result of the paint coupons, which takes about three weeks.
-4. The largest risks are not the print time. They are: the shrink of PETG across the large openings
-   (the door and the bezel), the seen facets at 45 degrees that print with no support, and the first
-   layer at each joint that prints on the bed. A coupon or a measurement answers each one before the
-   large pieces are printed.
+4. The largest risks are not the print time. The first is the shrink of PETG across the large
+   openings (the door and the bezel). The second is the seen facets at 45 degrees, which print with no
+   support. The third is the first layer at each joint that prints on the bed. A coupon or a
+   measurement answers each one before the large pieces are printed.
 5. Only joint 1 has a coupon. Joints 2, 3 and 5 (the floor lap, the wall foot, the insert boss with its
    pins) need a small coupon too.
 
