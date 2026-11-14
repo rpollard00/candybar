@@ -100,7 +100,7 @@ def sheets(out: str) -> None:
           [("latch-screw", "latch", "cut through the front right latch point"), ("latch-screw", "latch-oblique", "the same cut, turned"),
            ("frame", "frame-corner", "the pad of the frame with its insert, panel removed")],
           [edges, f"The pad stands inside the corner of the opening. Its top is {i['pad_drop']:g} below the rest face, so the plate rests on the ledge. "
-           f"Screw: M4 x {i['screw_l']:g} countersunk, 3 mm hex key. The countersink is {i['screw_head_d']:g} across."], per_row=3, w=640)
+           f"Screw: M4 x {i['latch_screw_l']:g} countersunk, 3 mm hex key. The countersink is {i['screw_head_d']:g} across."], per_row=3, w=640)
     sheet(out, "05-latch-options.png", "Two latch options on the same four latch points",
           [("latch-screw", "latch-oblique", "A. Screws (built as the default)"), ("latch-magnet", "latch-oblique", "B. Magnets")],
           [edges, "A. Four flush M4 screws into heat-set inserts. One common tool. The screws pull the panel down on the ledge. Four heads show.",

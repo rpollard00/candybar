@@ -77,8 +77,8 @@ class Interface:
     pad_r: float = 21.0
     pad_drop: float = 0.1
     # the screw: M4 x 16 countersunk (ISO 10642), flush in a countersink of screw_head_d; its insert in the pad
-    screw_d: float = 4.0
-    screw_l: float = 16.0
+    latch_screw_d: float = 4.0
+    latch_screw_l: float = 16.0
     screw_hole_d: float = 4.5
     screw_head_d: float = 9.0
     insert_hole_d: float = OTHER_JOINTS.insert_hole_d
@@ -129,7 +129,7 @@ class Interface:
     rib_rear_yl: float = 150.0
     rib_t: float = 3.0
     rib_end_x: float = 164.0
-    flange_t: float = 4.0
+    seam_flange_t: float = 4.0
     seam_screw_d: float = 3.4
     seam_screw_z: float = 10.0
 
@@ -334,12 +334,12 @@ def long_ribs(d: Blueprint, i: Interface, x0: float, x1: float, rear_x0: float |
 def seam_ribs(d: Blueprint, i: Interface, x: float) -> Part.Shape:
     """The two flanges of a seam at x, as one rib from the front rib to the rear rib."""
     zr = z_rest(d)
-    return box(x - i.flange_t, x + i.flange_t, y0(d) + i.rib_front_yl, y0(d) + i.rib_rear_yl + i.rib_t, zr - i.rib_h, zr)
+    return box(x - i.seam_flange_t, x + i.seam_flange_t, y0(d) + i.rib_front_yl, y0(d) + i.rib_rear_yl + i.rib_t, zr - i.rib_h, zr)
 
 
 def seam_holes(d: Blueprint, i: Interface, x: float, at_yl: tuple[float, ...]) -> list[Part.Shape]:
     z = z_rest(d) - i.seam_screw_z
-    return [Part.makeCylinder(i.seam_screw_d / 2, 2 * i.flange_t + 2, V(x - i.flange_t - 1, y0(d) + yl, z), V(1, 0, 0)) for yl in at_yl]
+    return [Part.makeCylinder(i.seam_screw_d / 2, 2 * i.seam_flange_t + 2, V(x - i.seam_flange_t - 1, y0(d) + yl, z), V(1, 0, 0)) for yl in at_yl]
 
 
 def panel_clip(d: Blueprint, i: Interface) -> Part.Shape:
@@ -434,7 +434,7 @@ def arcade(d: Blueprint, i: Interface, a: Arcade, v) -> dict[str, Part.Shape]:
            box(rl0, rl1, y_f, y_r, z_rib, zr),
            box(a.rib_right_x - a.rib_right_t / 2, a.rib_right_x + a.rib_right_t / 2, y_f, y_r, z_rib, zr),
            # the seat of the lever, from the rib at the left to the flange of the seam
-           box(rl1, xs - i.flange_t, h.lever_plate[2] - a.lever_margin, h.lever_plate[3] + a.lever_margin, h.lever_seat_z, zr),
+           box(rl1, xs - i.seam_flange_t, h.lever_plate[2] - a.lever_margin, h.lever_plate[3] + a.lever_margin, h.lever_seat_z, zr),
            panel_clip(d, i)]
     add += [cyl(a.boss_d, x, y, h.encoder_z, zr) for x, y in h.encoder_holes]
     solid = joined(add)
@@ -458,7 +458,7 @@ def blank(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
     y_f, y_r = ya + i.rib_front_yl, ya + i.rib_rear_yl + i.rib_t
     q = d.panel_w / 4
     add = [plate(d, i), *long_ribs(d, i, -i.rib_end_x, i.rib_end_x), seam_ribs(d, i, 0.0), panel_clip(d, i)]
-    add += [box(x - i.flange_t / 2, x + i.flange_t / 2, y_f, y_r, zr - i.rib_h, zr) for x in (-q, q)]
+    add += [box(x - i.seam_flange_t / 2, x + i.seam_flange_t / 2, y_f, y_r, zr - i.rib_h, zr) for x in (-q, q)]
     cuts = interface_cuts(d, i) + seam_holes(d, i, 0.0, (40.0, 70.0, 105.0, 135.0))
     return tiles(joined(add).cut(cuts), d, i, 0.0, ("blank_left_tile", "blank_right_tile"))
 
@@ -613,12 +613,12 @@ def lift_rows(panel: dict[str, Part.Shape], hw: Hardware, fixed: dict[str, Part.
     return rows
 
 
-def tee(flange_w: float, flange_t: float, web_t: float, web_h: float) -> float:
+def tee(flange_w: float, seam_flange_t: float, web_t: float, web_h: float) -> float:
     """Second moment of area of a T section (the plate as the flange, a rib as the web) about its own centre, mm4."""
-    af, aw = flange_w * flange_t, web_t * web_h
-    yf, yw = flange_t / 2, flange_t + web_h / 2
+    af, aw = flange_w * seam_flange_t, web_t * web_h
+    yf, yw = seam_flange_t / 2, seam_flange_t + web_h / 2
     c = (af * yf + aw * yw) / (af + aw)
-    return flange_w * flange_t ** 3 / 12 + af * (c - yf) ** 2 + web_t * web_h ** 3 / 12 + aw * (yw - c) ** 2
+    return flange_w * seam_flange_t ** 3 / 12 + af * (c - yf) ** 2 + web_t * web_h ** 3 / 12 + aw * (yw - c) ** 2
 
 
 def stiffness(d: Blueprint, i: Interface, a: Arcade, v) -> dict:
@@ -638,11 +638,11 @@ def stiffness(d: Blueprint, i: Interface, a: Arcade, v) -> dict:
     rl0, rl1 = rib_left(i, h)
     xs = seam_x(a)
     span = d.panel_d - 2 * i.ledge
-    bay = xs + i.flange_t - rl0
+    bay = xs + i.seam_flange_t - rl0
     m = a.lever_load * a.lever_arm
     ball = v("stick_ball_cz") + d.panel_t / 2
     t = d.panel_t
-    webs = (i.rib_t, 2 * i.flange_t)
+    webs = (i.rib_t, 2 * i.seam_flange_t)
     af = bay * t
     aw = sum(webs) * i.rib_h
     c = (af * t / 2 + aw * (t + i.rib_h / 2)) / (af + aw)
@@ -658,7 +658,7 @@ def stiffness(d: Blueprint, i: Interface, a: Arcade, v) -> dict:
         slope = m * span / (12 * e * ix)
         rows[name] = {"I_bay_mm4": round(ix), "forward_slope_mrad": round(slope * 1e3, 2), "forward_deflection_mm": round(m * span ** 2 / (72 * math.sqrt(3) * e * ix), 3),
                       "forward_ball_mm": round(slope * ball, 3), "side_slope_mrad": round(side * 1e3, 2), "side_ball_mm": round(side * ball, 3)}
-    field_a = a.rib_right_x - a.rib_right_t / 2 - (xs + i.flange_t)
+    field_a = a.rib_right_x - a.rib_right_t / 2 - (xs + i.seam_flange_t)
     short, long = sorted((span, field_a))
     hand = structure.plate_deflection(a.hand_load, short, long, t, e)
     arm = span
@@ -881,10 +881,10 @@ def latch_hardware(d: Blueprint, i: Interface) -> dict[str, tuple[Part.Shape, st
     a, b = [], []
     for x, y in latch_points(d, i):
         if i.latch == SCREW:
-            head = (i.screw_head_d - 0.4 - i.screw_d) / 2
-            a.append(Part.makeCone(i.screw_d / 2, (i.screw_head_d - 0.4) / 2, head, V(x, y, zt - head), V(0, 0, 1))
-                     .fuse(cyl(i.screw_d, x, y, zt - i.screw_l, zt - head)))
-            b.append(cyl(i.insert_hole_d, x, y, top - i.insert_l, top).cut(cyl(i.screw_d, x, y, top - i.insert_l - 1, top + 1)))
+            head = (i.screw_head_d - 0.4 - i.latch_screw_d) / 2
+            a.append(Part.makeCone(i.latch_screw_d / 2, (i.screw_head_d - 0.4) / 2, head, V(x, y, zt - head), V(0, 0, 1))
+                     .fuse(cyl(i.latch_screw_d, x, y, zt - i.latch_screw_l, zt - head)))
+            b.append(cyl(i.insert_hole_d, x, y, top - i.insert_l, top).cut(cyl(i.latch_screw_d, x, y, top - i.insert_l - 1, top + 1)))
         else:
             a.append(cyl(i.magnet_d, x, y, zr, zr + i.keeper_h))
             b.append(cyl(i.magnet_d, x, y, top - i.magnet_clear - i.magnet_h, top - i.magnet_clear))

@@ -118,8 +118,8 @@ class ArcadeTest(unittest.TestCase):
     def test_the_seam_lies_between_the_lever_body_and_the_first_button(self) -> None:
         x = pf.seam_x(self.b.a)
         first = min(p[0] for p in self.h.action) - values()("btn_nut_d") / 2
-        self.assertGreaterEqual(x - self.b.i.flange_t, self.h.body_x1)
-        self.assertLessEqual(x + self.b.i.flange_t, first)
+        self.assertGreaterEqual(x - self.b.i.seam_flange_t, self.h.body_x1)
+        self.assertLessEqual(x + self.b.i.seam_flange_t, first)
         self.assertAlmostEqual(self.b.arcade["panel_lever_tile"].BoundBox.XMax, x)
         self.assertAlmostEqual(self.b.arcade["panel_button_tile"].BoundBox.XMin, x)
 
@@ -210,7 +210,7 @@ class FrameTest(unittest.TestCase):
         i = self.b.i
         frame = Part.makeCompound(list(self.b.frame.values()))
         self.assertTrue(near(support.hole_centres(frame, i.insert_hole_d), pf.latch_points(self.b.d, i)))
-        self.assertGreaterEqual(i.insert_hole_depth, i.screw_l - self.b.d.panel_t + 1.0)
+        self.assertGreaterEqual(i.insert_hole_depth, i.latch_screw_l - self.b.d.panel_t + 1.0)
 
 
 class ChecksTest(unittest.TestCase):
