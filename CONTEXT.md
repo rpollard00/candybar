@@ -31,6 +31,7 @@ One printed piece of a control panel. A panel is wider than the printer bed, so 
 
 **Shelf**:
 The flat strip of deck between the control panel and the foot of the screen face.
+_Avoid_: shelf for the rear shelf (that is the underside of the head)
 
 **Body**:
 The part of the cabinet behind and above the deck, which holds the screen and the electronics.
@@ -60,6 +61,39 @@ The concave curve where the screen face meets the deck.
 **Facet**:
 A flat angled cut along an edge of the shell, in place of a sharp corner.
 _Avoid_: chamfer, bevel
+
+**Base facet**:
+The facet of 45 degrees round the foot of the cabinet, where the shell meets the desk.
+
+**Head**:
+The part of the body above the rear shelf. It has the full width of the cabinet back to the rear, and the hood stands on it.
+_Avoid_: upper rear, overhang
+
+**Rear shelf**:
+The underside of the head, where the head stands out from the narrower lower body: a flat facet of 45 degrees on each side and one on the rear.
+_Avoid_: shelf (alone), roll, shoulder, rear slope
+
+**Hip**:
+The line where a side facet and the rear facet of the rear shelf meet, at each rear corner.
+
+**Band**:
+The facet of 45 degrees on the rear edge of each side of the cabinet, between the full width and the narrower lower body. The hood band is a different part.
+_Avoid_: step
+
+**Stroke**:
+The outer edge of the band as the side view shows it: an upright stub at the desk, a kick, the lean, and a level run. It has straight lines only.
+
+**Cut-in**:
+One of the short level grooves that turn each lower rear corner. A cut-in is 1.5 mm deep and does not go through the wall.
+_Avoid_: vent, slot (the slot is the opening of a cut-in in the wall)
+
+**Hand-hold**:
+One of the two recesses in the rear wall of the head. A person puts the fingers in them to lift the cabinet.
+_Avoid_: grip, pocket
+
+**Edge break**:
+A round of about 1 mm on a sharp convex edge. It is the last modelling step, and it does not change the form. Paint holds on an edge that has it.
+_Avoid_: fillet (for this round), chamfer
 
 **Hood**:
 The cap above the screen face.
