@@ -261,7 +261,7 @@ A plate of the size of the smallest floor tile of the split (floor middle side R
 2. Weigh the tile.
 3. Put the tile on two supports 150 mm apart. Put 3.3 kg (the mass of the power supply) on its middle. Measure the sag.
 
-- Pass: gap at each corner less than 0.5 mm. Mass in the range 140 to 170 g. Sag less than 0.5 mm, and the tile comes back flat.
+- Pass: gap at each corner less than 0.5 mm. Mass in the range 140 to 170 g. Sag less than 0.5 mm, and the tile comes back flat. The hand estimate of the sag is 0.18 mm (`structure.floor_stiffness`, with this span and width).
 - If it fails: increase the skins to 1.6 mm or the core to 60 % (`structure.FLOOR_SKIN`, `FLOOR_INFILL`). The mass of the floor (1.79 kg) changes with them.
 
 ## Plates 7 and 8: the finish
