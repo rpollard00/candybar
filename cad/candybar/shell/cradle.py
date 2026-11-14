@@ -99,7 +99,7 @@ class Cradle:
     jaw_land_t: float = 6.0
     jaw_rest: float = 16.0          # how far the rest reaches under the monitor
     jaw_front_gap: float = 0.5      # the wall ends this far behind the glass
-    screw_d: float = 4.5            # clearance hole M4
+    screw_hole: float = 4.5            # clearance hole M4
     shoe: tuple[float, float, float] = (22.0, 14.0, 6.0)    # across (from its inner side to the bar's outer face), along, deep
     shoe_lip: tuple[float, float] = (3.0, 4.0)              # the lip beside the bar that stops it turning: thick, high
     nut_af: float = 7.0
@@ -114,7 +114,7 @@ class Cradle:
     head_d: float = 8.2             # counterbore for an M4 button head (ISO 7380)
     head_h: float = 2.4
     pin_x: float = 50.0
-    pin_d: float = 4.0
+    dowel_d: float = 4.0
     pin_len: float = 12.0
     pin_hole: float = 3.9           # press fit in the lug
     pin_slot_w: float = 4.3         # the slot in the plate
@@ -143,6 +143,27 @@ class Cradle:
     boss_in: float = 1.0            # into the skin, so that the boss and the stepped skin are one solid
     boss_insert_d: float = 4.0      # heat-set insert M3
     boss_v: tuple[float, float] = (-95.0, -29.0)
+    # lead clamp: pairs of slots for a cable tie through the front arm of each channel, at these places along the face.
+    # A tie holds the leads on the channel, so that a plug does not carry the weight of its lead
+    tie_v: tuple[float, ...] = (-88.0, -70.0, -50.0, -30.0)
+    tie_slot: tuple[float, float] = (4.0, 2.5)          # across, along the face
+    tie_x: tuple[float, float] = (3.5, 10.5)            # the two slots, from the inner face of the lip
+    clamp_reach: float = 50.0                           # a clamp must be this near to the mini-HDMI plug
+    # the sockets and the button of the present unit, above its bottom edge (hardware-envelopes.md 1; estimates)
+    hdmi_up: float = 49.0                               # mini-HDMI, left edge
+    usb_power_up: float = 86.0                          # the upper USB-C socket, left edge: power
+    audio_up: float = 30.0                              # 3.5 mm output, right edge
+    button_up: float = 66.0                             # power button, right edge
+    button_proud: float = 1.5
+    # the option for the power button: a square push rod through the inner frame of the plate, and a striker that
+    # the rod's slope of 45 degrees moves across onto the button. It is left out if the monitor starts by itself
+    rod: float = 4.0                                    # the rod is square
+    rod_fit: float = 0.2                                # clearance on each side of the rod and of the striker
+    rod_x: float = 192.5
+    rod_proud: float = 1.5
+    striker: float = 6.0
+    striker_gap: float = 1.0                            # from its nose to the button
+    guide_wall: float = 2.5
     # loads
     lock_torque: float = 0.4        # N m on an M4 lock screw
     lock_keep: float = 0.4          # share of the preload that is left after PETG relaxes (an estimate)
@@ -289,7 +310,7 @@ def pin_slot(d: Blueprint, c: Cradle, x: float, v: float) -> Part.Shape:
     f = Frame(d)
     r = math.hypot(x, v)
     ux, uv = x / r, v / r
-    half, w = c.pin_d / 2 + c.pin_slot_play, c.pin_slot_w / 2
+    half, w = c.dowel_d / 2 + c.pin_slot_play, c.pin_slot_w / 2
     corner = lambda a, b: f.pt(x + a * ux - b * uv, v + a * uv + b * ux, f.t0 + 1.0)
     face = Part.Face(Part.makePolygon([corner(-half, -w), corner(half, -w), corner(half, w), corner(-half, w), corner(-half, -w)]))
     return face.extrude(f.into * -(c.pin_slot_depth + 1.0))
@@ -379,7 +400,7 @@ def lug(d: Blueprint, c: Cradle, sx: int, sv: int) -> Part.Shape:
     solid = f.prism_vt([(sv * v, t) for v, t in profile], (sx * c.lug_x0, sx * c.lug_x1))
     x = sx * (c.bar_x - c.bar_w / 2 - c.ear_w / 2)
     v = sv * c.lug_v
-    cut = [f.obround(x, (v - c.lug_slot, v + c.lug_slot), (t0 - 1.0, t1 + 1.0), c.screw_d),
+    cut = [f.obround(x, (v - c.lug_slot, v + c.lug_slot), (t0 - 1.0, t1 + 1.0), c.screw_hole),
            f.obround(x, (v - c.lug_slot, v + c.lug_slot), (t0 - 1.0, t0 + c.head_h), c.head_d),
            f.cyl(sx * c.pin_x, v, (t0 - 1.0, t1 + 1.0), c.pin_hole),
            f.cyl(sx * c.magnet_x, v, (t0 - 1.0, t0 + c.magnet_pocket_h), c.magnet_pocket_d)]
@@ -430,7 +451,7 @@ def jaw(d: Blueprint, c: Cradle, u: Unit, sx: int, sv: int, dv: float = 0.0) -> 
                (end, b - c.jaw_land_t), (end, b), (-c.jaw_rest, b)]
     edge = jaw_edge(u, sv) + dv
     solid = f.prism_vt([(edge + sv * o, t) for o, t in profile], (sx * c.bar_x - c.jaw_w / 2, sx * c.bar_x + c.jaw_w / 2))
-    hole = f.cyl(sx * c.bar_x, screw_v(c, u, sv, dv), (b - c.jaw_land_t - 1.0, b + 1.0), c.screw_d)
+    hole = f.cyl(sx * c.bar_x, screw_v(c, u, sv, dv), (b - c.jaw_land_t - 1.0, b + 1.0), c.screw_hole)
     return one(solid.cut(hole))
 
 
@@ -451,7 +472,7 @@ def shoe(d: Blueprint, c: Cradle, u: Unit, sx: int, sv: int) -> Part.Shape:
     solid = f.prism_xt([(x0, b1), (xo, b1), (xo, b1 - lip_h), (xo + lip_w, b1 - lip_h), (xo + lip_w, b1 + h), (x0, b1 + h)], (v - ln / 2, v + ln / 2))
     r = c.nut_af / math.sqrt(3)
     hexagon = Part.Face(Part.makePolygon([f.pt(c.bar_x + r * math.cos(math.radians(60 * k)), v + r * math.sin(math.radians(60 * k)), b1 + h - c.nut_h) for k in range(7)]))
-    solid = one(solid.cut([f.cyl(c.bar_x, v, (b1 - 1.0, b1 + h + 1.0), c.screw_d), hexagon.extrude(f.into * (c.nut_h + 1.0))]))
+    solid = one(solid.cut([f.cyl(c.bar_x, v, (b1 - 1.0, b1 + h + 1.0), c.screw_hole), hexagon.extrude(f.into * (c.nut_h + 1.0))]))
     return solid if sx > 0 else one(mirror_x(solid))
 
 
@@ -485,7 +506,8 @@ def channel(d: Blueprint, c: Cradle, sx: int) -> Part.Shape:
     solid = f.prism_xt(pts, (c.channel_v0, c.channel_v1))
     tm = t0 + w + ct / 2
     holes = [f.cyl_x((xb - w - 1.0, xb + 1.0), v, tm, 3.4) for v in c.boss_v]
-    # the key reaches each screw through a hole in the lips' side
+    sx_, sv_ = c.tie_slot
+    holes += [f.box((xi + a - sx_ / 2, xi + a + sx_ / 2), (v - sv_ / 2, v + sv_ / 2), (t0 - 1.0, t0 + w + 1.0)) for v in c.tie_v for a in c.tie_x]
     solid = one(solid.cut(holes))
     return solid if sx > 0 else one(mirror_x(solid))
 
@@ -502,12 +524,83 @@ def bosses(d: Blueprint, c: Cradle) -> Part.Shape:
     return Part.makeCompound(out)
 
 
+# ---------- the leads and the power button of the present unit ----------
+
+def sockets(d: Blueprint, c: Cradle, u: Unit) -> dict[str, tuple[float, float]]:
+    """(x, v) of each socket and of the power button of the present unit, on its side edges."""
+    lo, _ = edges_v(u)
+    return {"mini-HDMI": (-u.w / 2, lo + c.hdmi_up), "USB-C power": (-u.w / 2, lo + c.usb_power_up),
+            "3.5 mm audio": (u.w / 2, lo + c.audio_up), "power button": (u.w / 2, lo + c.button_up)}
+
+
+def clamp_rows(d: Blueprint, c: Cradle, u: Unit) -> list[dict]:
+    """How far each socket is from the nearest lead clamp of the channel on its side (the middle of a tie)."""
+    xi = c.side_wall_x - c.boss_h - c.channel_wall - c.channel_in[0]
+    tie_x = xi + sum(c.tie_x) / 2
+    rows = []
+    for name, (x, v) in sockets(d, c, u).items():
+        if name == "power button":
+            continue
+        near = min(c.tie_v, key=lambda t: abs(t - v))
+        rows.append({"lead": name, "side": "left" if x < 0 else "right", "socket_v": round(v, 1), "clamp_v": near,
+                     "distance": round(math.hypot(tie_x - abs(x), near - v), 1), "limit": c.clamp_reach})
+    return rows
+
+
+def button_option(d: Blueprint, c: Cradle, u: Unit, plate: Part.Shape) -> dict[str, Part.Shape]:
+    """The option for the power button on the right edge: the plate with a square hole in its inner frame, a push
+    rod in the hole, a striker that the rod moves across onto the button, and the guide of the striker on the back
+    of the plate. The three parts leave with the plate."""
+    f = Frame(d)
+    x_btn, v = sockets(d, c, u)["power button"]
+    tb = glass_t(d, c) + u.t / 2                       # the button is in the middle of the edge
+    r, s, fit = c.rod / 2, c.striker / 2, c.rod_fit
+    # where the rod leaves the face of the plate
+    line = Part.makeLine(f.pt(c.rod_x, v, -40.0), f.pt(c.rod_x, v, f.t0)).common(plate)
+    front = min(f.local(p.Point)[2] for e in line.Edges for p in e.Vertexes)
+    nose = x_btn + c.button_proud + c.striker_gap
+    # the slope: the line t = x - k in (x, t), through the lower inner corner of the rod at the top of the striker
+    k = (c.rod_x - r) - (tb - s + 1.0)
+    rod = f.prism_xt([(c.rod_x - r, front - c.rod_proud), (c.rod_x + r, front - c.rod_proud), (c.rod_x + r, c.rod_x + r - k), (c.rod_x - r, c.rod_x - r - k)], (v - r, v + r))
+    top = tb - s
+    striker = f.prism_xt([(nose, top), (top + k - fit, top), (tb + s + k - fit, tb + s), (nose, tb + s)], (v - s, v + s))
+    g0, g1 = nose + 1.0, c.rod_x + r + c.guide_wall + 2.0
+    guide = f.box((g0, g1), (v - s - fit - c.guide_wall, v + s + fit + c.guide_wall), (f.t0, tb + s + fit + c.guide_wall))
+    guide = guide.cut([f.box((g0 - 1.0, g1 - c.guide_wall), (v - s - fit, v + s + fit), (top - fit, tb + s + fit)),
+                       f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (f.t0 - 1.0, top))])
+    hole = f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (-40.0, f.t0 + 1.0))
+    return {"bezel_plate_button": one(plate.cut(hole)), "button_rod": one(rod), "button_striker": one(striker), "button_guide": one(guide)}
+
+
+def button_rows(d: Blueprint, c: Cradle, u: Unit, option: dict[str, Part.Shape], parts: dict[str, Part.Shape], skin: Part.Shape) -> dict:
+    """The option against what is near it, and the gap from the striker to the button."""
+    f = Frame(d)
+    x_btn, v = sockets(d, c, u)["power button"]
+    tb = glass_t(d, c) + u.t / 2
+    button = f.box((x_btn, x_btn + c.button_proud), (v - 2.0, v + 2.0), (tb - 2.0, tb + 2.0))
+    others = {"monitor": parts["monitor"], "jaws": parts["jaws"], "skin": skin, "channel_right": parts["channel_right"], "lugs": parts["lugs"]}
+    rows = {"valid": all(s.isValid() and len(s.Solids) == 1 for s in option.values()),
+            "striker to the button": round(gap(option["button_striker"], button), 2),
+            "rod stands out of the face": c.rod_proud, "travel of the rod and of the striker": c.striker_gap + 1.0, "clashes": {}}
+    names = list(option)
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if {a, b} == {"bezel_plate_button", "button_guide"}:
+                continue                                # the guide is bonded to the back of the plate
+            rows["clashes"][f"{a} / {b}"] = round(volume_in(option[a], option[b]), 3)
+        for b, shape in others.items():
+            rows["clashes"][f"{a} / {b}"] = round(volume_in(option[a], shape), 3)
+    rows["guide on the plate, gap"] = round(gap(option["button_guide"], option["bezel_plate_button"]), 3)
+    rows["guide to the monitor"] = round(gap(option["button_guide"], parts["monitor"]), 2)
+    return rows
+
+
 # ---------- the hardware, for the pictures and the checks ----------
 
 def fasteners(d: Blueprint, c: Cradle, u: Unit) -> dict[str, Part.Shape]:
     f = Frame(d)
     b = bed_t(d, c)
-    pins = [f.cyl(x, v, (f.t0 - (c.pin_len - c.lug_t), f.t0 + c.lug_t), c.pin_d) for x, v in pin_places(c)]
+    pins = [f.cyl(x, v, (f.t0 - (c.pin_len - c.lug_t), f.t0 + c.lug_t), c.dowel_d) for x, v in pin_places(c)]
     magnets = [f.cyl(x, v, (f.t0 + dt, f.t0 + dt + c.magnet_h), c.magnet_d) for x, v in magnet_places(c) for dt in (-c.magnet_h, 0.0)]
     screws = []
     for sv in (-1, 1):
@@ -899,6 +992,10 @@ def markdown(rep: dict) -> str:
     keys = list(next(iter(rep["room"].values())))
     lines += ["| Value | " + " | ".join(rep["room"]) + " |", "| --- |" + " --- |" * len(rep["room"])]
     lines += [f"| {k} | " + " | ".join(str(r[k]) for r in rep["room"].values()) + " |" for k in keys]
+    lines += ["", "## Leads and the power button", "", "Sockets of the present unit (x, v): " + json.dumps(rep["sockets"]), "",
+              "| Lead | Side | Socket at v | Clamp at v | Distance | Limit |", "| --- | --- | --- | --- | --- | --- |"]
+    lines += [f"| {r['lead']} | {r['side']} | {r['socket_v']} | {r['clamp_v']} | {r['distance']} | {r['limit']} |" for r in rep["clamps"]]
+    lines += ["", "Option for the power button: " + json.dumps(rep["button"]), ""]
     lines += ["", "## Sight lines", "", "| Player | To the screen normal, deg | Image hidden at the top | At the bottom | Fit study: top | Bottom |", "| --- | --- | --- | --- | --- | --- |"]
     lines += [f"| {r['person']} | {r['to_normal_deg']:.1f} | {r['hidden_top']:.1f} | {r['hidden_bottom']:.1f} | {b['hidden_top']:.1f} | {b['hidden_bottom']:.1f} |"
               for r, b in zip(rep["sight"], rep["sight_before"])]
@@ -932,6 +1029,7 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
     doc, found = fit_items(d)
     halves = bezel_halves(d, c, parts["bezel_plate"])
     plain = bezel_plate(d, c, back=False)
+    option = button_option(d, c, u, parts["bezel_plate"])
     rows = clashes(parts, skin, found, c)
     fixed = [skin, parts["lugs"], parts["bosses"], parts["upright_right"], parts["upright_left"], parts["channel_right"], parts["channel_left"]]
     bottom_jaws = Part.makeCompound([jaw(d, c, u, sx, -1) for sx in (1, -1)])
@@ -939,17 +1037,22 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
            "solids": solid_rows({k: parts[k] for k in PRINTED + ADDED} | halves),
            "clashes": rows, "attached": attached(parts, skin), "side_wall": side_wall(d, c, skin),
            "path": path_out(d, c, u, fixed, bottom_jaws, (0.0, 30.0, 60.0, 150.0)), "sweep": sweep_out(d, c, 200.0, fixed),
+           "sockets": {k: [round(x, 1), round(v, 1)] for k, (x, v) in sockets(d, c, u).items()}, "clamps": clamp_rows(d, c, u),
            "room": room_rows(d, c, u), "loads": loads(d, c, u, parts["bezel_plate"]),
            "sight": sight(d, c, shell, parts["bezel_plate"], doc),
            "sight_before": json.loads((shell_dir() / "fit" / "report.json").read_text(encoding="utf-8"))["sight"],
            "print": print_rows(d, {"bezel_half_right": halves["bezel_half_right"], "upright_right": parts["upright_right"], "jaw": jaw(d, c, u, 1, -1),
                                    "shoe": shoe(d, c, u, 1, -1), "channel_right": parts["channel_right"]}),
            "edge": edge_rows(d, parts["bezel_plate"], shell, parts), "faces": face_rows(d, parts | halves)}
+    rep["button"] = button_rows(d, c, u, option, parts, skin)
     bad = [f"{k}: not one valid closed solid each" for k, r in rep["solids"].items() if not (r["valid"] and r["closed"])]
     bad += [f"clash: {r['a']} / {r['b']}: {r['common_mm3']} mm3" for r in rows if r["common_mm3"] > TOL_VOLUME]
     bad += [f"{k}: an added solid is not on the skin" for k, vs in rep["attached"].items() if min(vs) <= 0]
     bad += [f"way out at {r['out_mm']:g}: {r['what']}: {r['common_mm3']} mm3" for r in rep["path"] if r["common_mm3"] > TOL_VOLUME]
     bad += [f"way out: the prism shares {rep['sweep']['common_mm3']} mm3"] if rep["sweep"]["common_mm3"] > TOL_VOLUME else []
+    bad += [f"lead clamp: {r['lead']} is {r['distance']} from its clamp" for r in rep["clamps"] if r["distance"] > r["limit"]]
+    bad += [f"button option: {k}: {v} mm3" for k, v in rep["button"]["clashes"].items() if v > TOL_VOLUME]
+    bad += ["button option: a part is not one valid solid"] if not rep["button"]["valid"] else []
     bad += [f"print: {r['part']} does not fit the printer" for r in rep["print"] if not r["fits"]]
     bad += [f"edge rule: {x}" for x in rep["edge"]["failures"]]
     bad += [f"face check: {k}: {x['rule']} at {x['at']}: {x['detail']}" for k, r in rep["faces"].items() for x in r["not_allowed"]]
@@ -962,6 +1065,7 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
     export(out, show)
     export(out / "print", halves | {"upright": parts["upright_right"], "jaw": jaw(d, c, u, 1, -1), "shoe": shoe(d, c, u, 1, -1), "channel": parts["channel_right"]})
     export(out / "options" / "halves", {"bezel_half_right": halves["bezel_half_right"], "bezel_half_left": halves["bezel_half_left"]})
+    export(out / "options" / "button", option, {"bezel_plate_button": "black", "button_rod": "#d03030", "button_striker": "#e0a030", "button_guide": "#6080c0"})
     bars = bezel_bars(d, plain)
     export(out / "options" / "bars", bars, {k: ("black" if i % 2 == 0 else "#303030") for i, k in enumerate(bars)})
     # the way out: three positions of the monitor with its plugs
@@ -974,7 +1078,8 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
             "pin": section(scene, f, V(1, 0, 0), f.pt(c.pin_x, 0, 0), (1, 2)),
             "magnet": section(scene, f, V(1, 0, 0), f.pt(c.magnet_x, 0, 0), (1, 2)),
             "channel": section(scene, f, f.up, f.pt(0, c.boss_v[1], 0), (0, 2)),
-            "across the image": section(scene, f, f.up, f.pt(0, 0, 0), (0, 2))}
+            "across the image": section(scene, f, f.up, f.pt(0, 0, 0), (0, 2)),
+            "button": section({k: v for k, v in scene.items() if k != "bezel_plate"} | option, f, f.up, f.pt(0, sockets(d, c, u)["power button"][1], 0), (0, 2))}
     (out / "sections.json").write_text(json.dumps({"cuts": cuts, "frame": {"half_w": f.half_w, "half_len": f.half_len, "t0": f.t0}, "edges_v": edges_v(u),
                                                    "unit": asdict(u), "cradle": asdict(c)}), encoding="utf-8")
     (out / "report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")

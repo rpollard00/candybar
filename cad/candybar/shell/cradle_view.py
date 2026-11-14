@@ -11,6 +11,7 @@ Groups of the document:
   Cradle         the uprights, the jaws, the shoes and the cable channels
   On the body    the lugs and the bosses (added solids), and the skin round the screen face
   Hardware       the monitor, its plug room, the pads, the pins, the magnets and the screws
+  Option         the power-button option: the plate with the hole, the push rod, the striker and the guide (hidden)
   Shell          the outer parts of the built shell; the body and the nominal plate are hidden, because the body is a
                  solid form and hides what is inside
 """
@@ -66,6 +67,13 @@ def main() -> int:
             for name in ("bezel_half_right", "bezel_half_left"):
                 add(group, name, out / "print" / halves[name]["brep"], halves[name]["finish"])
                 count += 1
+    option = json.loads((out / "options" / "button" / "manifest.json").read_text(encoding="utf-8"))
+    group = doc.addObject("App::DocumentObjectGroup", "Option_power_button")
+    group.Label = "Option: power button (hidden)"
+    for name, part in option.items():
+        add(group, name, out / "options" / "button" / part["brep"], part["finish"])
+        doc.getObject(name).ViewObject.Visibility = False
+        count += 1
     shell = cradle.shell_dir()
     group = doc.addObject("App::DocumentObjectGroup", "Shell")
     for name, part in json.loads((shell / "manifest.json").read_text(encoding="utf-8")).items():

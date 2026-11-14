@@ -39,10 +39,11 @@ SCENES, RENDERS, SHEETS = (os.path.join(MODEL, k) for k in ("scenes", "renders",
 INK, MUTED = (30, 30, 34), (110, 110, 118)
 SHELL_PARTS = ("deck", "control_panel", "body", "hood", "marquee_lip", "speaker_right", "speaker_left", "logo_form")
 CRADLE = ("lugs", "bosses", "upright_right", "upright_left", "jaws", "shoes", "channel_right", "channel_left", "pins", "magnets", "screws")
-COLOUR = {"skin": "#c8c8c8", "bezel_plate": "#303030", "lugs": "#d8b060", "bosses": "#d8b060", "upright_right": "#5a7fb5", "upright_left": "#5a7fb5",
+COLOUR = {"bezel_plate_button": "#303030", "button_rod": "#d03030", "button_striker": "#e0a030", "button_guide": "#6080c0", "skin": "#c8c8c8", "bezel_plate": "#303030", "lugs": "#d8b060", "bosses": "#d8b060", "upright_right": "#5a7fb5", "upright_left": "#5a7fb5",
           "jaws": "#d0703a", "shoes": "#8a5a30", "channel_right": "#6aa06a", "channel_left": "#6aa06a", "monitor": "#3a4250", "plugs": "#e0c890",
           "pads": "#202020", "pins": "#8080ff", "magnets": "#b040b0", "screws": "#707078"}
-LABEL = {"skin": "skin of the body (4)", "bezel_plate": "bezel plate", "lugs": "lug (added solid)", "bosses": "boss (added solid)", "upright_right": "upright",
+LABEL = {"bezel_plate_button": "bezel plate with the hole", "button_rod": "push rod", "button_striker": "striker", "button_guide": "guide, on the back of the plate",
+         "skin": "skin of the body (4)", "bezel_plate": "bezel plate", "lugs": "lug (added solid)", "bosses": "boss (added solid)", "upright_right": "upright",
          "jaws": "jaw", "shoes": "shoe with nut", "channel_right": "cable channel", "monitor": "monitor", "plugs": "plug room", "pads": "pad",
          "pins": "locating pin", "magnets": "magnet", "screws": "screw M4"}
 
@@ -99,6 +100,7 @@ def cameras(d: Blueprint, c: dict) -> dict:
             "closeup-channel": cam(f.pt(200, (c["channel_v0"] + c["channel_v1"]) / 2, 30), 95, -34, d.recline + 4),
             "closeup-way-out": cam(f.pt(40, 0, -60), 330, 58, 24, 0.8),
             "closeup-back": cam(f.pt(0, 0, 8), 262, 180, -d.recline, 0.78),
+            "closeup-button": cam(f.pt(c["rod_x"] - 8, -MON_ACTIVE_H / 2 - 9.6 + c["button_up"], -4), 42, -20, d.recline + 6),
             "closeup-back-slot": cam(f.pt(-lug[0], lug[1] + 2, 8), 46, 168, -d.recline - 12)}
 
 
@@ -116,6 +118,8 @@ def render_all() -> None:
             ("way-out", skin + inside + [(os.path.join(MODEL, "path", k), "monitor", colour) for k, colour in (("in", "#3a4250"), ("half", "#7f8aa0"), ("out", "#c0c8d8"))]
              + [(os.path.join(MODEL, "path", k), "plugs", "#e0c890") for k in ("in", "half", "out")], ["closeup-way-out"]),
             ("plate-back", [(MODEL, "bezel_plate", "#404040"), (MODEL, "pins", None), (MODEL, "magnets", None)], ["closeup-back", "closeup-back-slot"]),
+            ("option-button", [(os.path.join(MODEL, "options", "button"), p, None) for p in ("bezel_plate_button", "button_rod", "button_striker", "button_guide")]
+             + [(SHELL, p, None) for p in SHELL_PARTS] + [(SHELL, "screen", "#1c2230")], ["closeup-button", "closeup-face"]),
             ("option-halves", [(os.path.join(MODEL, "options", "halves"), p, None) for p in ("bezel_half_right", "bezel_half_left")], ["closeup-face", "closeup-seam"]),
             ("option-bars", [(os.path.join(MODEL, "options", "bars"), p, None)
                              for p in json.load(open(os.path.join(MODEL, "options", "bars", "manifest.json")))], ["closeup-face", "closeup-seam"])]
@@ -129,7 +133,7 @@ def render_all() -> None:
 # ---------- the drawings of the sections ----------
 
 def draw_cut(ax, cut: dict, xlim, ylim, title: str, flip: bool = False, skip: tuple[str, ...] = ()) -> None:
-    order = ["skin", "bezel_plate", "lugs", "bosses", "upright_right", "upright_left", "channel_right", "channel_left", "shoes", "jaws", "monitor", "plugs",
+    order = ["skin", "bezel_plate", "bezel_plate_button", "button_guide", "button_striker", "button_rod", "lugs", "bosses", "upright_right", "upright_left", "channel_right", "channel_left", "shoes", "jaws", "monitor", "plugs",
              "pads", "screws", "pins", "magnets"]
     seen = set()
     for k in order:
@@ -212,6 +216,17 @@ def sections_sheet(data: dict, rep: dict) -> None:
     fig.savefig(os.path.join(SHEETS, "06a-fastening-sections.png"), dpi=110)
     plt.close(fig)
 
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    bv = data["edges_v"][0] + c["button_up"]
+    draw_cut(ax, cuts["button"], (160, 250), (34, -16), f"Option for the power button: section across the face at the button (v {bv:.1f}); x across, t behind the face", skip=("plugs",))
+    note(ax, "power button on the right edge of the monitor", (178, 13.2), (161, 30))
+    note(ax, "push rod 4 x 4, 1.5 proud of the inner frame", (c["rod_x"], -3), (200, -12))
+    note(ax, "slope of 45 degrees: the rod moves the striker across", (c["rod_x"], 13), (203, 28))
+    ax.legend(loc="lower right", fontsize=8, frameon=False)
+    fig.tight_layout()
+    fig.savefig(os.path.join(SHEETS, "07a-button-section.png"), dpi=110)
+    plt.close(fig)
+
     # the way out: the section on the centre line with the monitor in three positions
     fig, ax = plt.subplots(figsize=(15, 8.5))
     draw_cut(ax, cuts["centre line"], (-175, 175), (64, -175), "Way out, section on the centre line (plate off, top jaws pushed up). v along the face, t behind it; the front is at the top", skip=("monitor", "plugs", "pads", "bezel_plate"))
@@ -269,6 +284,7 @@ def sheets() -> None:
     rep = json.load(open(os.path.join(MODEL, "report.json")))
     c = rep["cradle"]
     sections_sheet(data, rep)
+    lead = "; ".join(f"{r['lead']} ({r['side']}): {r['distance']:g} from its tie" for r in rep["clamps"])
     edge = rep["edge"]["rows"]
     page("The bezel plate (16:10), printed, from the front", [
         [("In the body, seen square to the screen face", tile("plate-on", "closeup-face", 1150)),
@@ -300,11 +316,23 @@ def sheets() -> None:
     page("Cable channel", [[("Sections", drawing("04a-cable-channel-sections.png", 1500))],
                            [("Right channel, with the monitor", tile("plate-off", "closeup-channel", 740)), ("Right channel, without the monitor", tile("empty", "closeup-channel", 740))]],
          [f"One channel on the inner face of each side, on two bosses with M3 inserts. Clear section {c['channel_in'][0]:g} x {c['channel_in'][1]:g}, 100 long, with an entry slot of {c['channel_slot']:g} toward the plugs. "
-          "It holds a video lead and a power lead with right-angle plugs, and the slack of 100 that the monitor needs to come forward before the plugs are pulled."],
+          "It holds the HDMI lead and the USB-C power lead (left) and the audio lead (right) with right-angle plugs, and the slack of 100 that the monitor needs to come forward before the plugs are pulled.",
+          "Lead clamp: four pairs of slots in the front arm of each channel take a cable tie. " + lead + " (the limit is 50)."],
          "04-cable-channel.png")
     page("The monitor on its way out", [[("Three positions: in, 60 out, 150 out", tile("way-out", "closeup-way-out", 900)), ("Section on the centre line", drawing("05a-way-out-section.png", 1000))]],
          ["The way out is square to the screen face. " + " ".join(f"At {r['out_mm']:g} out, {r['what']}: {r['common_mm3']:g} mm3 in common, gap {r['gap']:.1f}." for r in rep["path"])],
          "05-way-out.png")
+    b = rep["button"]
+    page("Option: the power button of the monitor, with the bezel plate on", [
+        [("Section", drawing("07a-button-section.png", 1050)), ("The rod in the inner frame of the right bar", tile("option-button", "closeup-button", 800))],
+        [("The plate with the rod, in the body", tile("option-button", "closeup-face", 900))]],
+         ["The power button is on the right edge of the monitor, 66 above its bottom edge, behind the right bar of the plate. The gap round the plate is 0.5 and the reveal is 1 wide, "
+          "so no rod goes through them, and the apron below the plate is closed. Without a change to the outer form, the way to the button is through the plate.",
+          f"A square rod of 4 goes through the inner frame of the right bar and stands {b['rod stands out of the face']:g} out of it. Its slope of 45 degrees moves a striker across onto the button "
+          f"(gap {b['striker to the button']:g}, travel {b['travel of the rod and of the striker']:g}). The guide is bonded to the back of the plate, so the three parts leave with the plate. "
+          "The spring of the button puts the striker and the rod back. This option is left out if the monitor starts by itself. It puts one mark of 4.4 x 4.4 on the face of the plate.",
+          "Without this option: pull the plate off (magnets), push the button with a finger, put the plate back."],
+         "07-power-button-option.png")
     page("The fastening of the bezel plate", [[("Sections", drawing("06a-fastening-sections.png", 1500))],
                                              [("The back of the plate: four slots that point at the centre, four magnets", tile("plate-back", "closeup-back", 900)),
                                               ("Slot, pin and magnet", tile("plate-back", "closeup-back-slot", 600))]],

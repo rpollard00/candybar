@@ -44,8 +44,8 @@ class ValuesTest(unittest.TestCase):
             for sv in (-1, 1):
                 with self.subTest(unit=unit.name, shift=shift, end=sv):
                     v = abs(cr.screw_v(C, unit, sv, shift))
-                    self.assertGreaterEqual(v - C.screw_d / 2, C.slot_v0)
-                    self.assertLessEqual(v + C.screw_d / 2, C.slot_v1)
+                    self.assertGreaterEqual(v - C.screw_hole / 2, C.slot_v0)
+                    self.assertLessEqual(v + C.screw_hole / 2, C.slot_v1)
 
     def test_the_lock_screw_is_inside_the_opening_for_any_unit(self) -> None:
         f = cr.Frame(D)
@@ -165,7 +165,7 @@ class BezelPlateTest(unittest.TestCase):
         self.assertLess(cr.volume_in(p["magnets"], p["lugs"]), cr.TOL_VOLUME)
         press = cr.volume_in(p["pins"], p["lugs"])                              # the pins are a press fit: 0.05 on the radius
         self.assertGreater(press, 0.0)
-        self.assertLess(press, 4 * math.pi * C.pin_d * 0.06 * C.lug_t)
+        self.assertLess(press, 4 * math.pi * C.dowel_d * 0.06 * C.lug_t)
 
     def test_each_slot_lets_its_pin_move_along_the_radius_only(self) -> None:
         f = cr.Frame(D)
@@ -173,7 +173,7 @@ class BezelPlateTest(unittest.TestCase):
         for x, v in cr.pin_places(C):
             r = math.hypot(x, v)
             ux, uv = x / r, v / r
-            pin = lambda a, b: f.cyl(x + a * ux - b * uv, v + a * uv + b * ux, (f.t0 - 6.0, f.t0), C.pin_d)
+            pin = lambda a, b: f.cyl(x + a * ux - b * uv, v + a * uv + b * ux, (f.t0 - 6.0, f.t0), C.dowel_d)
             with self.subTest(pin=(x, v)):
                 for move in (-C.pin_slot_play, C.pin_slot_play):
                     self.assertLess(cr.volume_in(pin(move, 0.0), plate), cr.TOL_VOLUME)
@@ -255,6 +255,51 @@ class WayOutTest(unittest.TestCase):
     def test_a_lug_that_is_too_long_is_in_the_way_of_a_tall_unit(self) -> None:
         deep = replace(C, lug_reach=C.lug_reach + 8.0)
         self.assertGreater(cr.sweep_out(D, C, 200.0, [cr.lugs(D, deep)])["common_mm3"], 100.0)
+
+
+class LeadsAndButtonTest(unittest.TestCase):
+    def test_each_lead_has_a_clamp_near_its_plug(self) -> None:
+        rows = {r["lead"]: r for r in cr.clamp_rows(D, C, cr.PRESENT)}
+        self.assertEqual(set(rows), {"mini-HDMI", "USB-C power", "3.5 mm audio"})
+        self.assertEqual({k: r["side"] for k, r in rows.items()}, {"mini-HDMI": "left", "USB-C power": "left", "3.5 mm audio": "right"})
+        for r in rows.values():
+            self.assertLessEqual(r["distance"], C.clamp_reach)
+
+    def test_the_channel_has_two_slots_for_each_tie(self) -> None:
+        f = cr.Frame(D)
+        plain = cr.channel(D, replace(C, tie_v=()), 1)
+        slots = plain.Volume - parts()["channel_right"].Volume
+        self.assertAlmostEqual(slots, len(C.tie_v) * 2 * C.tie_slot[0] * C.tie_slot[1] * C.channel_wall, delta=0.01)
+        section = C.channel_in[0] * C.channel_in[1]
+        leads = sum(math.pi * (dia / 2) ** 2 for dia in (7.0, 4.5, 4.0))         # HDMI, USB-C, audio: the largest of each
+        self.assertGreater(section, 4 * leads)
+        del f
+
+    def test_the_push_rod_moves_the_striker_onto_the_button(self) -> None:
+        f = cr.Frame(D)
+        p = parts()
+        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate"])
+        for name, shape in option.items():
+            with self.subTest(part=name):
+                self.assertTrue(shape.isValid())
+                self.assertEqual(len(shape.Solids), 1)
+        rod, striker, guide, plate = (option[k] for k in ("button_rod", "button_striker", "button_guide", "bezel_plate_button"))
+        for a, b in ((rod, striker), (rod, guide), (striker, guide), (rod, plate), (striker, plate), (guide, p["monitor"]), (striker, p["monitor"]), (guide, p["jaws"])):
+            self.assertLess(cr.volume_in(a, b), cr.TOL_VOLUME)
+        self.assertLess(cr.gap(guide, plate), 1e-6)                              # the guide lies on the back of the plate
+        x, v = cr.sockets(D, C, cr.PRESENT)["power button"]
+        tb = cr.glass_t(D, C) + cr.PRESENT.t / 2
+        button = f.box((x, x + C.button_proud), (v - 2.0, v + 2.0), (tb - 2.0, tb + 2.0))
+        self.assertAlmostEqual(cr.gap(striker, button), C.striker_gap, delta=1e-3)
+        # the rod pushed in by the gap: the striker must move the same distance across, and then it is on the button
+        pushed = rod.translated(f.into * C.striker_gap)
+        self.assertGreater(cr.volume_in(pushed, striker), 1.0)
+        moved = striker.translated(V(-C.striker_gap, 0, 0))
+        self.assertLess(cr.volume_in(pushed, moved), cr.TOL_VOLUME)
+        self.assertLess(cr.gap(moved, button), 1e-3)
+        self.assertLess(cr.volume_in(moved, guide), cr.TOL_VOLUME)
+        # the rod shows on the face of the plate
+        self.assertAlmostEqual(cr.gap(rod, plate), C.rod_fit, delta=1e-3)
 
 
 def built() -> bool:
