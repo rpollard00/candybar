@@ -56,7 +56,8 @@ VARIANTS = (
     Variant("b-knob", "B, with the knob: button and knob together at the front, sockets behind them", -48.5, 6.5, 43.1, -25.0),
     Variant("b-plain", "B, no knob: button apart at the front end, sockets at the rear end", -48.5, 6.5, 43.1),
 )
-DEFAULT = "a-knob"
+# the audio research (2026-11-14) recommends the volume control beside the power button: layout B with the knob
+DEFAULT = "b-knob"
 
 
 def variant(key: str) -> Variant:
@@ -97,9 +98,9 @@ class SocketPlate:
     # two screws M3 from the front, on the centre line, screw_end from each end; a heat-set insert in the frame
     screw_end: float = 6.0
     screw_hole_d: float = 3.4
-    insert_hole_d: float = 4.0
-    screw_d: float = 3.0
-    screw_l: float = 8.0
+    m3_insert_hole_d: float = 4.0
+    plate_screw_d: float = 3.0
+    plate_screw_l: float = 8.0
     head_d: float = 5.7      # button head (ISO 7380), for the plate screws and the flange screws: ESTIMATED
     head_h: float = 1.65
     # USB-A socket (DataPro 1698) and USB-C socket (DataPro 1678): cut-out as sourced, with 0.2 added on each side
@@ -129,18 +130,23 @@ class SocketPlate:
     button_clear: float = 45.0
     button_nut_d: float = 22.0
     button_nut_h: float = 3.0
-    # the volume control: a panel potentiometer or encoder with a 9 mm bushing and a 6 mm shaft (ASSUMED). Its nut
-    # is on the front, under the knob. 25 clear behind the plate
-    knob_hole_d: float = 9.3
+    # the volume control: the potentiometer of the amplifier (1 kOhm, three wires that carry no sound; the audio
+    # research of 2026-11-14). Hole 9.4, a wall of 2 to 3 at the hole (the web), 20 clear behind the plate, and a
+    # flat circle of 22 outside for the knob. Its nut is on the front, under the knob. The knob and the body are ESTIMATED
+    knob_hole_d: float = 9.4
+    knob_flat_d: float = 22.0
+    knob_wall: P2 = (2.0, 3.0)
     knob_bush_d: float = 9.0
     knob_d: float = 18.0
     knob_h: float = 15.0
     knob_body_d: float = 17.0
     knob_body_l: float = 12.0
-    knob_clear: float = 25.0
+    knob_clear: float = 20.0
     knob_pocket_d: float = 19.0
     knob_nut_d: float = 12.0
     knob_nut_h: float = 2.0
+    # the centre of the plate along y, when it is not at the rear end of the flat (the small plate for the knob)
+    y_centre: float | None = None
     # the floor of the cabinet (fit.Layout.floor_t): nothing of the plate's hardware goes below its top
     floor_t: float = 10.0
 
@@ -156,7 +162,8 @@ class SocketPlate:
         """The centre of the plate on the outer face of the deck's right side: mid-height of the upright face (from
         the base facet to the crease of the edge section), its rear end d2_gap + reveal in front of D2."""
         y_d2 = d.foot_y - d.bend_t
-        return d.width / 2, y_d2 - self.d2_gap - self.reveal - self.length / 2, (d.base_facet + d.deck_top - d.deck_lean_h) / 2
+        y = y_d2 - self.d2_gap - self.reveal - self.length / 2 if self.y_centre is None else self.y_centre
+        return d.width / 2, y, (d.base_facet + d.deck_top - d.deck_lean_h) / 2
 
     def rows(self) -> P2:
         return self.row_pitch / 2, -self.row_pitch / 2
@@ -198,6 +205,31 @@ def layout_rows(sp: SocketPlate, v: Variant) -> list[dict]:
     items.sort(key=lambda r: (r[1] + r[2]) / 2)
     return [{"item": n, "from": round(s0, 2), "to": round(s1, 2), "gap": None if i == 0 else round(s0 - items[i - 1][2], 2)}
             for i, (n, s0, s1) in enumerate(items)]
+
+
+def outside_rows(sp: SocketPlate, v: Variant) -> list[dict]:
+    """What lies on the front of the plate along the centre line: the head of each plate screw, the flat face of
+    the button and the flat circle of the knob, with the gap to the item before it."""
+    items = [("plate screw, front", sp.screws()[0] - sp.head_d / 2, sp.screws()[0] + sp.head_d / 2),
+             ("flat face of the button", v.button_s - sp.button_flat_d / 2, v.button_s + sp.button_flat_d / 2),
+             ("plate screw, rear", sp.screws()[1] - sp.head_d / 2, sp.screws()[1] + sp.head_d / 2)]
+    if v.knob:
+        items.append(("flat circle of the knob", v.knob_s - sp.knob_flat_d / 2, v.knob_s + sp.knob_flat_d / 2))
+    items.sort(key=lambda r: r[1])
+    return [{"item": n, "from": round(s0, 2), "to": round(s1, 2), "gap": None if i == 0 else round(s0 - items[i - 1][2], 2)}
+            for i, (n, s0, s1) in enumerate(items)]
+
+
+def flat_face(sp: SocketPlate, d: Blueprint) -> dict:
+    """The flat part of the deck's side face, as the form has it, and what one row of all the hardware needs."""
+    y0, y1 = pr.deck_plan(d)[0].q[1], d.foot_y - d.bend_t
+    z0, z1 = d.base_facet, d.deck_top - d.deck_lean_h
+    land = 2.0 + d.edge_break  # a strip of face narrower than 2 beside the edge break is a sliver
+    row = 2 * sp.a_back[0] + 2 * sp.c_back[0]
+    return {"y": [round(y0, 1), round(y1, 1)], "length": round(y1 - y0, 1), "z": [z0, z1], "height": z1 - z0,
+            "longest_recess": round(y1 - sp.d2_gap - y0 - land, 1), "longest_plate": round(y1 - sp.d2_gap - y0 - land - 2 * sp.reveal, 1),
+            "one_row_flanges": round(row, 1), "one_row_all": round(row + sp.button_flat_d + sp.knob_flat_d + 2 * 2 * sp.screw_end + 5 * 2.0, 1),
+            "one_row_sockets_only": round(row + 2 * 2 * sp.screw_end + 3 * 2.0, 1), "plate": sp.length}
 
 
 def moves(sp: SocketPlate, d: Blueprint, v: Variant, was: dict[str, P2]) -> list[dict]:
@@ -353,7 +385,7 @@ def cutter(sp: SocketPlate, d: Blueprint, seat: str = "flush", deep: float | Non
     wb = sp.height / 2 - sp.ledge
     deep = deep or d.wall_t + sp.frame_t + OVER
     tools = [fr.prism(sp.window_half, wb, sp.window_r, -OVER, deep)]
-    tools += [fr.rod(sp.insert_hole_d, -OVER if seat == "proud" else sp.t - OVER, deep, s) for s in sp.screws()]
+    tools += [fr.rod(sp.m3_insert_hole_d, -OVER if seat == "proud" else sp.t - OVER, deep, s) for s in sp.screws()]
     if seat == "flush":
         tools.append(fr.prism(a, b, sp.radius(sp.reveal), -OVER, sp.t))
     out = tools[0].fuse(tools[1:]).removeSplitter()
@@ -406,7 +438,7 @@ def hardware(sp: SocketPlate, d: Blueprint, v: Variant, out: float = 0.0) -> dic
         parts[f"{name}_bend"] = box(w, h, sp.web + sp.usb_body_depth, sp.web + sp.usb_clear_depth, s, t)
         for k in (-1, 1):
             parts[f"{name}_screw{'ab'[k > 0]}"] = fr.rod(sp.head_d, -sp.head_h, 0.0, s + k * sp.holes(kind), t).fuse(
-                fr.rod(sp.screw_d, 0.0, sp.web, s + k * sp.holes(kind), t))
+                fr.rod(sp.plate_screw_d, 0.0, sp.web, s + k * sp.holes(kind), t))
     button = [fr.rod(sp.button_rim_d, -sp.button_rim_h, 0.0, v.button_s), fr.rod(sp.button_thread_d, 0.0, sp.t + sp.button_body_l, v.button_s),
               fr.rod(sp.button_nut_d, sp.t, sp.t + sp.button_nut_h, v.button_s)]
     parts["power_button"] = button[0].fuse(button[1:]).removeSplitter()
@@ -415,14 +447,52 @@ def hardware(sp: SocketPlate, d: Blueprint, v: Variant, out: float = 0.0) -> dic
     parts["power_button_ring"] = ring
     parts["power_button_room"] = fr.rod(sp.button_nut_d, sp.t + sp.button_body_l, sp.t + sp.button_clear, v.button_s)
     if v.knob:
-        knob = [fr.rod(sp.knob_d, -sp.knob_h - sp.knob_nut_h, -sp.knob_nut_h, v.knob_s), fr.rod(sp.knob_nut_d, -sp.knob_nut_h, 0.0, v.knob_s),
-                fr.rod(sp.knob_bush_d, 0.0, sp.web, v.knob_s),
-                fr.rod(sp.knob_body_d, sp.web, sp.web + sp.knob_body_l, v.knob_s)]
-        parts["knob"] = knob[0].fuse(knob[1:]).removeSplitter()
+        parts["knob"] = knob_solid(fr, sp, v.knob_s)
         parts["knob_room"] = fr.rod(sp.knob_body_d, sp.web + sp.knob_body_l, sp.t + sp.knob_clear, v.knob_s)
     for k, s in enumerate(sp.screws()):
-        parts[f"plate_screw{'ab'[k]}"] = fr.rod(sp.head_d, -sp.head_h, 0.0, s).fuse(fr.rod(sp.screw_d, 0.0, sp.screw_l, s))
+        parts[f"plate_screw{'ab'[k]}"] = fr.rod(sp.head_d, -sp.head_h, 0.0, s).fuse(fr.rod(sp.plate_screw_d, 0.0, sp.plate_screw_l, s))
     return parts
+
+
+def knob_solid(fr: Frame, sp: SocketPlate, s: float):
+    knob = [fr.rod(sp.knob_d, -sp.knob_h - sp.knob_nut_h, -sp.knob_nut_h, s), fr.rod(sp.knob_nut_d, -sp.knob_nut_h, 0.0, s),
+            fr.rod(sp.knob_bush_d, 0.0, sp.web, s), fr.rod(sp.knob_body_d, sp.web, sp.web + sp.knob_body_l, s)]
+    return knob[0].fuse(knob[1:]).removeSplitter()
+
+
+# the alternative of the audio research: a second, small plate in the LEFT side of the deck for the knob alone. It has
+# the height, the round ends, the seat and the two screws of the socket plate, and lies at the front end of the flat,
+# opposite the front end of the socket plate. It is built on the right side and mirrored
+KNOB_PLATE_LENGTH = 50.0
+KNOB_PLATE_WINDOW = 14.0
+
+
+def knob_plate_values(sp: SocketPlate, d: Blueprint) -> SocketPlate:
+    _, yc, _ = sp.centre(d)
+    return replace(sp, length=KNOB_PLATE_LENGTH, window_half=KNOB_PLATE_WINDOW, y_centre=yc - sp.length / 2 + KNOB_PLATE_LENGTH / 2)
+
+
+def knob_plate(kp: SocketPlate, d: Blueprint):
+    """The small plate for the knob alone, on the right side (mirror it for the left side)."""
+    fr = Frame(kp, d)
+    a, b = kp.half()
+    cuts = [fr.rod(kp.knob_hole_d, -OVER, kp.t + OVER, 0.0), fr.rod(kp.knob_pocket_d, kp.web, kp.t + OVER, 0.0)]
+    cuts += [fr.rod(kp.screw_hole_d, -OVER, kp.t + OVER, s) for s in kp.screws()]
+    solid = fr.prism(a, b, kp.radius(), 0.0, kp.t).cut(cuts).removeSplitter()
+    return break_front(solid, fr.x, d.edge_break, lambda e: not is_hole(e))
+
+
+def knob_plate_hardware(kp: SocketPlate, d: Blueprint) -> dict:
+    fr = Frame(kp, d)
+    out = {"knob": knob_solid(fr, kp, 0.0)}
+    for k, s in enumerate(kp.screws()):
+        out[f"plate_screw{'ab'[k]}"] = fr.rod(kp.head_d, -kp.head_h, 0.0, s).fuse(fr.rod(kp.plate_screw_d, 0.0, kp.plate_screw_l, s))
+    return out
+
+
+def left(shape):
+    """A shape of the right side as its mirror image on the left side."""
+    return shape.mirror(_v(0, 0, 0), _v(1, 0, 0))
 
 
 ROOM = ("_bend", "_room")
@@ -498,14 +568,12 @@ def opened(cav, sp: SocketPlate, d: Blueprint, v: Variant):
     return cavity.Cavity(cav.pieces + [cut], walls + [frame(sp, d), plate(sp, d, v)], cav.slabs)
 
 
-def fitted(sp: SocketPlate, d: Blueprint, v: Variant, params_dir: Path, parts: dict, cav) -> dict:
-    """The rules of the fit study (R1, R2, R5, containment in the cavity, the air zones, the door service) on the
-    hardware of fit.py with the hardware of the plate in place of fit.usb_row(). fit.py is not changed: this builds
-    the same items from its own functions. Returns the rules, and for each item of the plate its gap to the skin
-    (the frame and the plate count as skin) and to its nearest neighbour."""
+def fit_values(d: Blueprint, params_dir: Path, parts: dict, cav) -> dict:
+    """The anchors of the hardware of fit.py in the cavity, as fit.place makes them: the same for every variant of
+    the plate."""
     import FreeCAD as App  # noqa: PLC0415
 
-    from .. import check, hardware as hw, model, params  # noqa: PLC0415
+    from .. import params  # noqa: PLC0415
     from . import fit  # noqa: PLC0415
 
     lay = fit.Layout()
@@ -517,6 +585,26 @@ def fitted(sp: SocketPlate, d: Blueprint, v: Variant, params_dir: Path, parts: d
     values = fit.anchors(d, lay, pv, side_in)
     _, marquee = fit.marquee_box(d, h, pv("mq_led_depth"))
     values.update({k: marquee[k] for k in ("fit_mq_w", "fit_mq_h", "fit_mq_y", "fit_mq_z0")}, **fit.speaker_room(d, lay, h, cav.walls, pv("mq_led_depth")))
+    values["_side_in"] = side_in
+    values["_usb_pitch"] = pv("usb_pitch")
+    App.closeDocument(base.Name)
+    return values
+
+
+def fitted(sp: SocketPlate, d: Blueprint, v: Variant, params_dir: Path, parts: dict, cav, values: dict | None = None) -> dict:
+    """The rules of the fit study (R1, R2, R5, containment in the cavity, the air zones, the door service) on the
+    hardware of fit.py with the hardware of the plate in place of fit.usb_row(). fit.py is not changed: this builds
+    the same items from its own functions. Returns the rules, and for each item of the plate its gap to the skin
+    and the frame, and to its nearest neighbour. `values` is fit_values(), when the caller
+    has it."""
+    import FreeCAD as App  # noqa: PLC0415
+
+    from .. import check, hardware as hw, model, params  # noqa: PLC0415
+    from . import fit  # noqa: PLC0415
+
+    lay = fit.Layout()
+    values = dict(values or fit_values(d, params_dir, parts, cav))
+    side_in, pitch = values.pop("_side_in"), values.pop("_usb_pitch")
     rows = fit.sheet_rows(params_dir, values)
     doc = fit.sheet(rows, "SocketPlateFit")
     m = model.Model(doc, [r.name for r in rows])
@@ -531,8 +619,9 @@ def fitted(sp: SocketPlate, d: Blueprint, v: Variant, params_dir: Path, parts: d
     rules["door service"] = fit.door_service(found, fit.door_outline(d), d, lay)
     mine = [it for it in found if it.owner.startswith(OWNERS)]
     table = []
+    shell_walls = open_cav.walls[:-1]  # the skin and the frame; the hardware lies against the plate
     for it in mine:
-        skin = fit.gap(it.shape(fit.ENVELOPE), open_cav.walls, d.width)
+        skin = fit.gap(it.shape(fit.ENVELOPE), shell_walls, d.width)
         others = [(o.name, fit.gap(it.body, [o.body], d.width)) for o in found if o.owner != it.owner]
         name, near = min(others, key=lambda r: r[1][0])
         low = min(s.world.BoundBox.ZMin for s in it.solids if s.role in fit.ENVELOPE)
@@ -541,10 +630,9 @@ def fitted(sp: SocketPlate, d: Blueprint, v: Variant, params_dir: Path, parts: d
     hub = next(it for it in found if it.name == "Hub").body.BoundBox
     fails = [f"{title}: {subject}: {detail}" for title, rs in rules.items() for level, subject, detail in rs if level == check.FAIL]
     out = {"rules": {k: [list(r) for r in rs] for k, rs in rules.items()}, "failures": fails, "items": table,
-           "old_row": {f"USB_{kind}{k + 1}": (values["fit_usb_y0"] + k * pv("usb_pitch"), values["fit_usb_z"]) for k, kind in enumerate(fit.USB_ORDER)},
+           "old_row": {f"USB_{kind}{k + 1}": (values["fit_usb_y0"] + k * pitch, values["fit_usb_z"]) for k, kind in enumerate(fit.USB_ORDER)},
            "side_in": round(side_in, 2), "hub": [round(c, 1) for c in (hub.XMin, hub.YMin, hub.ZMin, hub.XMax, hub.YMax, hub.ZMax)]}
-    for doc_ in (doc, base):
-        App.closeDocument(doc_.Name)
+    App.closeDocument(doc.Name)
     return out
 
 
@@ -674,7 +762,7 @@ def print_rows(sp: SocketPlate, d: Blueprint, v: Variant, piece=None) -> dict:
 # ---------- the build folders ----------
 
 FINISH = {"deck": "white", "socket_plate": "white", "usb_sockets": "#26282c", "power_button": "#b9bcc2", "button_ring": "#5fb4ff", "knob": "#17181a", "screws": "#3a3c40",
-          "deck_side_R": "white", "floor": "#8a8f99", "hub": "#6a4fa0", "rooms": "#d07020"}
+          "deck_side_R": "white", "knob_plate": "white", "knob_left": "#17181a", "knob_screws": "#3a3c40", "floor": "#8a8f99", "hub": "#6a4fa0", "rooms": "#d07020"}
 SQUARE_R = 6.0  # the corner radius of the outline option "square" (Blueprint.hood_sill_corner_r has the same value)
 OUT_BY = 75.0  # the plate out of the shell, for the view of what is behind it
 
@@ -744,6 +832,9 @@ def cameras(sp: SocketPlate, d: Blueprint) -> dict:
            "deck-right": cam((x - 40, y - 20, z + 20), 210.0, 52.0, 16.0, 0.6), "plate-button": cam((x, y - 48, z), 30.0, 68.0, 10.0, 0.75),
            "plate-usb": cam((x, y + 10, z), 36.0, 78.0, 8.0, 0.75), "plate-out": cam((x + OUT_BY / 2, y, z), 120.0, 52.0, 18.0, 0.7),
            "plate-inside": cam((x - 10, y, z + 4), 100.0, -104.0, 7.0, 0.6), "plate-out-rear": cam((x + OUT_BY / 2, y, z), 120.0, 128.0, 16.0, 0.7)}
+    out["left-quarter"] = cam((-x, y - sp.length / 2 + KNOB_PLATE_LENGTH / 2, z), 70.0, -58.0, 14.0)
+    out["left-side"] = cam((-x, y - sp.length / 2 + KNOB_PLATE_LENGTH / 2, z), 60.0, -90.0, 0.0, 0.6)
+    out["deck-left"] = cam((-x + 40, y - 20, z + 20), 210.0, -52.0, 16.0, 0.6)
     # from the seat: the eye of the small adult and of the tall adult (dims.PEOPLE), toward the plate
     for person in PEOPLE[1:]:
         ey, ez = eye_of(person)
@@ -789,15 +880,23 @@ def markdown(rep: dict) -> str:
              f"(x {rep['centre'][0]:.1f}, y {rep['centre'][1]:.1f}, z {rep['centre'][2]:.1f}). Print piece: deck side R.", "",
              "## The opening and the lines round it", "", "| From the rim of the recess to | mm |", "| --- | --- |"]
     lines += [f"| {k} | {val:g} |" for k, val in rep["seams"].items()]
+    fl = rep["flat"]
+    lines += ["", "## The flat part of the deck's side face", "",
+              f"Flat from y {fl['y'][0]:g} to y {fl['y'][1]:g}: {fl['length']:g} long. Upright from z {fl['z'][0]:g} to z {fl['z'][1]:g}: {fl['height']:g} high. "
+              f"The longest recess is {fl['longest_recess']:g} and the longest plate {fl['longest_plate']:g}; the plate is {fl['plate']:g}.",
+              f"One row: the four flanges are {fl['one_row_flanges']:g}; the sockets alone with the two plate screws need {fl['one_row_sockets_only']:g}; "
+              f"sockets, button and knob need {fl['one_row_all']:g}. One row does not fit. Two rows of sockets, the button and the knob fit in one plate."]
     lines += ["", f"The recess takes {rep['cut']['recess_mm3']:.0f} mm3 out of the outer form of the deck (the window: {rep['cut']['window']}).", ""]
     for key, r in rep["variants"].items():
         lines += [f"## Variant {key}: {r['title']}", "", "| Along the centre line | From s | To s | Gap to the item before |", "| --- | --- | --- | --- |"]
         lines += [f"| {x['item']} | {x['from']:g} | {x['to']:g} | {'' if x['gap'] is None else format(x['gap'], 'g')} |" for x in r["layout"]]
+        lines += ["", "| On the front, along the centre line | From s | To s | Gap to the item before |", "| --- | --- | --- | --- |"]
+        lines += [f"| {x['item']} | {x['from']:g} | {x['to']:g} | {'' if x['gap'] is None else format(x['gap'], 'g')} |" for x in r["outside"]]
         lines += ["", "| Socket | In fit.Layout (y, z) | On the plate (y, z) | Moved in y | Moved in z |", "| --- | --- | --- | --- | --- |"]
         lines += [f"| {m['socket']} | {m['was'][0]:g}, {m['was'][1]:g} | {m['is'][0]:g}, {m['is'][1]:g} | {m['dy']:+g} | {m['dz']:+g} |" for m in r["moves"]]
         lines += ["", f"Fit rules: {'PASS' if not r['fit']['failures'] else 'FAIL'}.", ""]
         lines += [f"- FAIL {f}" for f in r["fit"]["failures"]]
-        lines += ["", "| Item | Gap to the skin, the frame or the plate | Nearest other item | Gap | Above the floor |", "| --- | --- | --- | --- | --- |"]
+        lines += ["", "| Item | Gap to the skin and the frame | Nearest other item | Gap | Above the floor |", "| --- | --- | --- | --- | --- |"]
         lines += [f"| {i['item']} | {i['skin_gap']:g} | {i['neighbour']} | {i['neighbour_gap']:g} | {i['above_floor']:g} |" for i in r["fit"]["items"]]
         e, f = r["edges"], r["faces"]
         lines += ["", f"Edge finish: plate, {len(e['socket_plate']['shows'])} sharp edges that show, {sum(e['socket_plate']['under'].values())} under hardware, "
@@ -843,13 +942,14 @@ def main() -> int:
     piece_seated = seat(piece, sp, d)
     cav = cavity.build(parts, d) if os.environ.get("CANDYBAR_PLATE_FIT", "1") != "0" else None
     x, yc, zc = sp.centre(d)
-    rep = {"values": asdict(sp), "centre": [x, yc, zc], "seams": seam_distances(sp, d), "variants": {},
+    rep = {"values": asdict(sp), "centre": [x, yc, zc], "seams": seam_distances(sp, d), "flat": flat_face(sp, d), "default": DEFAULT, "variants": {},
            "cut": {"recess_mm3": parts["deck"].Volume - deck_check.Volume,
                    "window": f"{2 * sp.window_half:g} x {sp.height - 2 * sp.ledge:g}, corners R {sp.window_r:g}; recess {sp.length + 2 * sp.reveal:g} x {sp.height + 2 * sp.reveal:g} x {sp.t:g} deep"},
            "piece": {"valid": piece_seated.isValid(), "solids": len(piece_seated.Solids), "volume_before_mm3": round(piece.Volume), "volume_mm3": round(piece_seated.Volume)}}
+    values = fit_values(d, root / "params", parts, cav) if cav else None
     for v in VARIANTS:
-        fit_rep = fitted(sp, d, v, root / "params", parts, cav) if cav else {"failures": ["not run"], "items": [], "rules": {}, "old_row": None}
-        row = {"title": v.title, "layout": layout_rows(sp, v), "fit": fit_rep, "edges": edge_finish(sp, d, v, deck_check), "faces": face_rows(sp, d, v, deck_check),
+        fit_rep = fitted(sp, d, v, root / "params", parts, cav, values) if cav else {"failures": ["not run"], "items": [], "rules": {}, "old_row": None}
+        row = {"title": v.title, "layout": layout_rows(sp, v), "outside": outside_rows(sp, v), "fit": fit_rep, "edges": edge_finish(sp, d, v, deck_check), "faces": face_rows(sp, d, v, deck_check),
                "moves": moves(sp, d, v, fit_rep["old_row"]) if fit_rep["old_row"] else []}
         rep["variants"][v.key] = row
         write_folder(out / v.key, {"deck": deck, "socket_plate": plate(sp, d, v), **groups(sp, d, v)}, base, base_edges, focus)
@@ -866,6 +966,22 @@ def main() -> int:
     write_folder(out / "square", {"deck": seat(parts["deck"], sq, d, hollow=False, deep=deep), "socket_plate": plate(sq, d, v), **groups(sq, d, v)}, base, base_edges, focus)
     sq_deck = seat(parts["deck"], sq, d, hollow=False)
     rep["square"] = {"corner_r": SQUARE_R, "edges": edge_finish(sq, d, v, sq_deck), "faces": face_rows(sq, d, v, sq_deck), "layout": layout_rows(sq, v)}
+    # the alternative: the knob alone in a small plate in the left side of the deck, with the plain form of the default layout
+    kp = knob_plate_values(sp, d)
+    plain = variant(DEFAULT.replace("knob", "plain"))
+    both = seat(left(seat(left(parts["deck"]), kp, d, hollow=False, deep=kp.t + kp.knob_clear + 4.0)), sp, d, hollow=False, deep=deep)
+    khw = knob_plate_hardware(kp, d)
+    kpl = knob_plate(kp, d)
+    write_folder(out / "knob-left", {"deck": both, "socket_plate": plate(sp, d, plain), **groups(sp, d, plain), "knob_plate": left(kpl), "knob_left": left(khw["knob"]),
+                                     "knob_screws": left(Part.makeCompound([khw["plate_screwa"], khw["plate_screwb"]]))}, base, base_edges, focus)
+    kdeck = seat(parts["deck"], kp, d, hollow=False)
+    kfr = Frame(kp, d)
+    shows = [[round(e.Length, 1), round(turn, 1)] for e, turn in sharp(kpl, d) if so.middle(e).x >= kfr.x - kp.web + 1e-3 and not covered(e, khw | {"deck": kdeck})]
+    kx, ky, kz = kp.centre(d)
+    rep["knob_left"] = {"plate": [kp.length, kp.height, kp.t], "centre": [-kx, ky, kz], "window": [2 * kp.window_half, kp.height - 2 * kp.ledge],
+                        "sharp_edges_that_show": shows, "valid": kpl.isValid() and both.isValid(), "with": plain.key,
+                        "front_of_recess_behind_the_corner": round(ky - kp.length / 2 - kp.reveal - pr.deck_plan(d)[0].q[1], 2),
+                        "deepest_x": round(-(kx - kp.t - kp.knob_clear), 1)}
     # the print piece with the seat: the plate in place, and the plate out with what is behind it
     hub = None
     if cav:
@@ -879,7 +995,7 @@ def main() -> int:
     rep["print"] = print_rows(sp, d, v, piece)
     bad = [k for k, r in rep["variants"].items() if r["fit"]["failures"] or r["edges"]["socket_plate"]["shows"] or r["edges"]["deck"]["shows"]
            or r["faces"]["socket_plate"]["fail"] or r["faces"]["deck"]["fail"]]
-    other = rep["proud"]["edges"]["socket_plate"]["shows"] or rep["square"]["edges"]["socket_plate"]["shows"] or rep["square"]["edges"]["deck"]["shows"] \
+    other = rep["knob_left"]["sharp_edges_that_show"] or not rep["knob_left"]["valid"] or rep["proud"]["edges"]["socket_plate"]["shows"] or rep["square"]["edges"]["socket_plate"]["shows"] or rep["square"]["edges"]["deck"]["shows"] \
         or rep["square"]["faces"]["socket_plate"]["fail"] or rep["square"]["faces"]["deck"]["fail"]
     rep["result"] = check.FAIL if bad or other else check.PASS
     (out / "report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")

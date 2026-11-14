@@ -57,6 +57,25 @@ class ValuesTest(unittest.TestCase):
             self.assertLessEqual(abs(v.button_s) + flat, self.sp.length / 2)
             self.assertGreaterEqual(abs(self.sp.screws()[0] - v.button_s), flat + self.sp.head_d / 2)
 
+    def test_the_knob_has_what_the_audio_research_asks_for(self) -> None:
+        self.assertEqual(self.sp.knob_hole_d, 9.4)
+        self.assertEqual(self.sp.knob_flat_d, 22.0)
+        self.assertEqual(self.sp.knob_clear, 20.0)
+        self.assertTrue(self.sp.knob_wall[0] <= self.sp.web <= self.sp.knob_wall[1])
+        self.assertTrue(spm.variant(spm.DEFAULT).knob)
+
+    def test_the_flat_faces_and_the_screw_heads_on_the_front_do_not_overlap(self) -> None:
+        for v in spm.VARIANTS:
+            for row in spm.outside_rows(self.sp, v):
+                if row["gap"] is not None:
+                    self.assertGreaterEqual(row["gap"], MIN_GAP, f"{v.key}: {row['item']}")
+
+    def test_one_row_does_not_fit_the_flat_and_the_plate_does(self) -> None:
+        flat = spm.flat_face(self.sp, self.d)
+        self.assertAlmostEqual(flat["length"], 153.0, delta=0.05)
+        self.assertGreater(flat["one_row_sockets_only"], flat["longest_plate"])
+        self.assertLessEqual(self.sp.length, flat["longest_plate"])
+
     def test_nothing_of_the_hardware_is_below_the_floor(self) -> None:
         _, _, zc = self.sp.centre(self.d)
         low = zc - self.sp.row_pitch / 2 - self.sp.back("a")[1] / 2
@@ -117,6 +136,18 @@ class SolidsTest(unittest.TestCase):
             for name, s in spm.hardware(self.sp, self.d, v).items():
                 self.assertLess(self.plates[v.key].common(s).Volume, 1e-3, f"{v.key}: {name}")
 
+    def test_the_small_plate_for_the_knob_is_valid_and_on_the_flat(self) -> None:
+        kp = spm.knob_plate_values(self.sp, self.d)
+        p = spm.knob_plate(kp, self.d)
+        self.assertTrue(p.isValid())
+        self.assertEqual(len(p.Solids), 1)
+        _, y, _ = kp.centre(self.d)
+        self.assertGreaterEqual(y - kp.length / 2 - kp.reveal - pr.deck_plan(self.d)[0].q[1], MIN_LAND)
+        self.assertGreaterEqual(kp.screws()[1] - kp.head_d / 2 - kp.knob_flat_d / 2, MIN_GAP)
+        self.assertGreater(kp.window_half, kp.knob_pocket_d / 2)
+        for name, s in spm.knob_plate_hardware(kp, self.d).items():
+            self.assertLess(p.common(s).Volume, 1e-3, name)
+
     def test_square_ends_make_a_valid_plate_too(self) -> None:
         sq = replace(self.sp, corner_r=spm.SQUARE_R)
         p = spm.plate(sq, self.d, spm.variant(spm.DEFAULT))
@@ -137,7 +168,7 @@ class SeatTest(unittest.TestCase):
 
     def test_the_cut_changes_the_deck_at_the_seat_only(self) -> None:
         x, y, z = self.sp.centre(self.d)
-        a, b = self.sp.half(self.sp.reveal)
+        a, b = self.sp.half(self.sp.reveal + self.d.edge_break)  # the recess, and the edge break round its rim
         gone = self.deck.cut(self.seated)
         bb = gone.optimalBoundingBox(False, False)
         self.assertGreaterEqual(bb.YMin, y - a - 1e-6)
@@ -187,11 +218,13 @@ class SeatTest(unittest.TestCase):
 class FitTest(unittest.TestCase):
     """The rules of the fit study with the hardware of the plate. It needs the default build and its cavity."""
 
-    def test_every_variant_passes_the_rules_of_the_fit_study(self) -> None:
+    def test_both_layouts_with_the_knob_pass_the_rules_of_the_fit_study(self) -> None:
+        """The two forms with the knob have the most hardware. The module's own run checks all four variants."""
         d, parts, _ = support.shell()
         sp = spm.SocketPlate()
-        for v in spm.VARIANTS:
-            rep = spm.fitted(sp, d, v, support.PARAMS, parts, support.cavity())
+        values = spm.fit_values(d, support.PARAMS, parts, support.cavity())
+        for v in (v for v in spm.VARIANTS if v.knob):
+            rep = spm.fitted(sp, d, v, support.PARAMS, parts, support.cavity(), values)
             self.assertEqual(rep["failures"], [], v.key)
             names = {i["item"] for i in rep["items"]}
             self.assertEqual(names, {"USB_A1", "USB_C2", "USB_A3", "USB_C4", "PowerButton"} | ({"VolumeKnob"} if v.knob else set()), v.key)

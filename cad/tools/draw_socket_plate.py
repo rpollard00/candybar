@@ -31,10 +31,10 @@ SHEETS = os.path.join(MODEL, "sheets")
 # the frame of draw_shell.py, so that the whole cabinet has the scale of the other renders
 FRAME = "-252,-6,-2,252,586,578"
 VARIANTS = ("a-knob", "a-plain", "b-knob", "b-plain")
-DEFAULT = "a-knob"
+DEFAULT = "b-knob"
 SEATS = ("seat-small-adult", "seat-tall-adult")
-VIEWS = {**{v: ("three-quarter-front-right", "deck-right", *SEATS, "plate-side", "plate-quarter", "plate-button", "plate-usb") for v in VARIANTS},
-         "proud": ("plate-side", "plate-quarter"), "square": ("plate-side", "plate-quarter"), "behind": ("plate-inside",), "out": ("plate-out", "plate-out-rear")}
+VIEWS = {**{v: ("front", "three-quarter-front-right", "deck-right", *SEATS, "plate-side", "plate-quarter", "plate-button", "plate-usb") for v in VARIANTS},
+         "proud": ("plate-side", "plate-quarter"), "square": ("plate-side", "plate-quarter"), "knob-left": ("three-quarter-front-left", "deck-left", "left-quarter", "left-side", "deck-right"), "behind": ("plate-inside",), "out": ("plate-out", "plate-out-rear")}
 INK, MUTED = (30, 30, 34), (110, 110, 118)
 
 
@@ -147,14 +147,14 @@ def section_sheet(out: str) -> None:
 def sheets() -> None:
     t = titles()
     rows = [(f"{k}: {t[k].split(': ', 1)[1]}", k) for k in VARIANTS]
-    grid(rows, ("three-quarter-front-right", "deck-right", *SEATS),
-         ("the cabinet from the front right", "the right side of the deck", "from the seat, small adult", "from the seat, tall adult"),
+    grid(rows, ("front", "three-quarter-front-right", "deck-right", *SEATS),
+         ("the front", "the cabinet from the front right", "the right side of the deck", "from the seat, small adult", "from the seat, tall adult"),
          "Front socket plate: the four variants on the cabinet", [
              "The plate is in the right side face of the deck, where fit.Layout has the four USB sockets. The front face of the deck has no hole (settled by "
              "the owner). All BREP face edges are drawn.",
              "From the seat the eye is above the deck and left of the plate: the side face of the deck does not show. Only the knob and the rims of the "
              "button and of the screw heads stand out of the side."],
-         os.path.join(SHEETS, "1-cabinet-with-each-variant.png"))
+         os.path.join(SHEETS, "1-cabinet-with-each-variant.png"), w=430)
     grid(rows, ("plate-side", "plate-quarter"), ("square to the side of the deck (the front of the cabinet is on the left)", "from the front right"),
          "Front socket plate: the four variants close up", [
              "All four have one outline (142 x 33, round ends), one opening in the shell and the same two plate screws. Layout A has the controls at "
@@ -182,6 +182,13 @@ def sheets() -> None:
              "The hardware sizes are estimates until the parts are measured (docs/design/front-socket-plate.md)."],
          os.path.join(SHEETS, "5-behind-the-plate.png"), w=1100)
     section_sheet(os.path.join(SHEETS, "6-sections.png"))
+    grid([("The knob alone in a small plate (50 x 33) in the left side of the deck; the right plate has the button and the sockets", "knob-left")],
+         ("deck-left", "left-quarter", "left-side", "deck-right"), ("the left side of the deck", "the small plate", "square to the left side", "the right side of the deck"),
+         "Front socket plate: the alternative with the knob on the left side", [
+             "This is the alternative that the audio research asks for if one plate is too short. One plate is not too short: with the sockets in two rows, "
+             "the button, the knob and the four sockets fit in the plate of 142 (sheets 1 and 2). One row does not fit: the flat of the side is 153 long.",
+             "The small plate has the height, the round ends, the reveal and the two screws of the socket plate. It adds a second opening, in the print piece deck side L."],
+         os.path.join(SHEETS, "7-knob-on-the-left.png"), w=560)
 
 
 if __name__ == "__main__":
