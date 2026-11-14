@@ -83,7 +83,7 @@ class Band:
     """The values of the hood band that all variants share. Lengths in mm. z is measured from the foot of the hood
     (the hood's own frame), x from the centre line."""
     wall_t: float = 4.0
-    seat_off: float = 0.05          # inside parts stand this far behind the wall (every second slab of the skin is 0.05 thicker)
+    seat_off: float = 0.1           # inside parts stand this far behind the wall, as in the fit study (every second slab of the skin is 0.05 thicker)
     edge_break: float = 1.0
     # --- speakers ---
     spk_half_h: float = 26.0        # half the height of the speaker opening (52: the frame of 50 passes it)
@@ -111,14 +111,14 @@ class Band:
     insert_depth: float = 5.65
     bar_w: float = 8.0              # the clamp bar behind a grille that stands in a pod
     bar_half_h: float = 20.0
-    seat_face: float = 3.4          # the front of the seat stands this far behind the front of the wall
+    seat_face: float = 3.5          # the front of the seat stands this far behind the front of the wall: a flush grille (set back 1.0, 2.4 thick) then lies on the driver's frame
     seat_flange: float = 6.0
     seat_flange_t: float = 5.0
     seat_gap: float = 0.3
     frame_proud: float = 0.1        # the driver's frame stands this far proud of the seat, so that the grille clamps it
     # --- marquee ---
     mq_w: float = 352.0             # the opening in the wall: the lit window (eleven modules of 32)
-    mq_h: float = 32.0
+    mq_h: float = 32.0              # the marquee window of the blueprint (34) less box_margin_z at its top and bottom
     mq_r: float = 3.0
     mq_front_t: float = 2.2
     mq_front_gap: float = 2.0       # between the front and the legs and the top bar: the front lifts by this to come out
@@ -217,6 +217,9 @@ def kind(name: str) -> str:
 def loop(points: list[P2], r: float) -> Part.Wire:
     """A closed polygon in (x, z) on the plane y = 0, each corner rounded with the radius r (arcs of circles)."""
     n = len(points)
+    at = lambda q: V(q[0], 0.0, q[1])
+    if r < 1e-9:
+        return Part.makePolygon([at(p) for p in points + points[:1]])
     cuts = []
     for i, p in enumerate(points):
         a, b = points[i - 1], points[(i + 1) % n]
@@ -228,11 +231,9 @@ def loop(points: list[P2], r: float) -> Part.Wire:
         c = (p[0] + (u1[0] + u2[0]) / k * r / math.sin(half), p[1] + (u1[1] + u2[1]) / k * r / math.sin(half))
         m = (c[0] + (p[0] - c[0]) / math.dist(p, c) * r, c[1] + (p[1] - c[1]) / math.dist(p, c) * r)
         cuts.append(((p[0] + u1[0] * t, p[1] + u1[1] * t), m, (p[0] + u2[0] * t, p[1] + u2[1] * t)))
-    at = lambda q: V(q[0], 0.0, q[1])
     edges = []
     for i, (a, m, b) in enumerate(cuts):
-        if r > 1e-9:
-            edges.append(Part.Arc(at(a), at(m), at(b)).toShape())
+        edges.append(Part.Arc(at(a), at(m), at(b)).toShape())
         nxt = cuts[(i + 1) % n][0]
         if math.dist(b, nxt) > 1e-9:
             edges.append(Part.LineSegment(at(b), at(nxt)).toShape())
@@ -531,14 +532,15 @@ def lip(d: Blueprint, h: pr.Hood, b: Band, opening: Part.Shape) -> dict[str, Par
     return right_and_left("marquee_lip", right)
 
 
-def window(h: pr.Hood, b: Band) -> list[P2]:
-    """The opening of the lit window in the wall, in (x, z): centred between the lip and the top bar."""
-    return rect(0.0, (h.z_rail_top + h.z_open_top) / 2, b.mq_w, b.mq_h)
+def window(d: Blueprint, h: pr.Hood, b: Band) -> list[P2]:
+    """The opening of the lit window in the wall, in (x, z): at the height of the marquee window of the blueprint
+    (marquee_margin above the lip, marquee_h high), less box_margin_z at its top and bottom."""
+    return rect(0.0, h.z_rail_top + d.marquee_margin + d.marquee_h / 2, b.mq_w, b.mq_h)
 
 
-def hook_place(h: pr.Hood, b: Band) -> tuple[float, float]:
+def hook_place(d: Blueprint, h: pr.Hood, b: Band) -> tuple[float, float]:
     """The middle of the right hook, in (x, z)."""
-    return b.mq_w / 2 + b.hook_in, (h.z_rail_top + h.z_open_top) / 2
+    return b.mq_w / 2 + b.hook_in, h.z_rail_top + d.marquee_margin + d.marquee_h / 2
 
 
 def marquee_front(d: Blueprint, h: pr.Hood, b: Band) -> dict[str, Part.Shape]:
@@ -552,7 +554,7 @@ def marquee_front(d: Blueprint, h: pr.Hood, b: Band) -> dict[str, Part.Shape]:
     path = [pr.Line((0.0, zb), (so.ends(side_in)[0][0], zb)), side_in, so.offset_seg(corner, by), so.offset_seg(top, by)]
     yb = h.y_band_top
     solid = so.prism(so.both_sides(path), so.xz(yb - b.mq_front_t), V(0, b.mq_front_t, 0))
-    hx, hz = hook_place(h, b)
+    hx, hz = hook_place(d, h, b)
     y_back = yb + b.wall_t + 0.4
     stem = box(hx - b.hook_w / 2, hx + b.hook_w / 2, yb, y_back + b.hook_nose, hz - b.hook_h / 2, hz + b.hook_h / 2)
     nose = box(hx - b.hook_w / 2, hx + b.hook_w / 2, y_back, y_back + b.hook_nose, hz - b.hook_h / 2 - b.hook_nose - b.hook_hold, hz - b.hook_h / 2)
@@ -565,22 +567,22 @@ def marquee_front(d: Blueprint, h: pr.Hood, b: Band) -> dict[str, Part.Shape]:
     return {"marquee_front_right": right, "marquee_front_left": left}
 
 
-def hook_slot(h: pr.Hood, b: Band, depth: float) -> Part.Shape:
+def hook_slot(d: Blueprint, h: pr.Hood, b: Band, depth: float) -> Part.Shape:
     """The slot in the wall for the right hook: the hook goes in with the front lifted, and its nose stands hook_hold
     below the slot when the front is down."""
-    hx, hz = hook_place(h, b)
+    hx, hz = hook_place(d, h, b)
     z0 = hz - b.hook_h / 2 - b.hook_nose
     z1 = hz + b.hook_h / 2 + b.mq_front_gap
     yb = h.y_band_top
     return box(hx - b.hook_w / 2 - 0.3, hx + b.hook_w / 2 + 0.3, yb - 1, yb + depth, z0, z1)
 
 
-def light_box(h: pr.Hood, b: Band) -> tuple[dict[str, Part.Shape], Part.Shape]:
+def light_box(d: Blueprint, h: pr.Hood, b: Band) -> tuple[dict[str, Part.Shape], Part.Shape]:
     """The light box behind the lit window, in two halves, and the envelope of the LED strip on its rear wall. The
     box is closed: five walls and a flange that lies on the rear of the wall round the window. Its mouth is the
     window with a margin."""
     y0 = h.y_band_top + b.wall_t + b.seat_off
-    win = window(h, b)
+    win = window(d, h, b)
     x1, z0, z1 = win[1][0] + b.box_margin_x, win[0][1] - b.box_margin_z, win[2][1] + b.box_margin_z
     w = b.box_wall
     outer = box(-x1 - w, x1 + w, y0, y0 + b.box_depth + w, z0 - w, z1 + w)
@@ -630,8 +632,8 @@ def hood_cutters(d: Blueprint, h: pr.Hood, b: Band, v: Variant, pl: Places, dept
     yb = pl.yb
     cut = lambda pts, r: plate(pts, r, yb - 1, yb + depth)
     spk = cut(pl.opening, b.spk_r)
-    slot = hook_slot(h, b, depth)
-    cutters = [cut(window(h, b), b.mq_r), spk, spk.mirror(*MIRROR), slot, slot.mirror(*MIRROR)]
+    slot = hook_slot(d, h, b, depth)
+    cutters = [cut(window(d, h, b), b.mq_r), spk, spk.mirror(*MIRROR), slot, slot.mirror(*MIRROR)]
     rims: list[list[P2]] = []
     if not v.pod_proud:
         rims += [pl.opening, [(-x, z) for x, z in pl.opening]]
@@ -686,7 +688,7 @@ def build(d: Blueprint, b: Band, drv: Driver, v: Variant, cap_solid: Part.Shape,
         out["logo_badge"] = logo_badge(b, pl.yb + b.logo_recess)
         out["logo_backer"] = logo_backer(b, pl.yb)
     out.update(marquee_front(d, h, b))
-    boxes, led = light_box(h, b)
+    boxes, led = light_box(d, h, b)
     out.update(boxes)
     out["led_strip"] = led
     out.update(right_and_left("driver_seat", seat(b, drv, pl)))
