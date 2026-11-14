@@ -54,7 +54,7 @@ SNAP_IN, SPREAD = "snap-in", "spread"
 SCREW, MAGNET = "screw", "magnet"
 FINISH = {"deck": "white", "frame": "#8fa6c2", "post": "#6f86a2", "tile": "#2b2b2e", "blank": "#3d4a40",
           "Lever": "#b03030", "Buttons": "#c8a020", "Encoder": "#2f7a3a", "USB": "#3070c0", "Hub": "#6a4fa0",
-          "screw": "#b8bcc4", "insert": "#c9a23a", "magnet": "#9aa0aa"}
+          "screw": "#b8bcc4", "insert": "#c9a23a", "magnet": "#9aa0aa", "floor": "#c9ccd2", "underside": "#9a9da6"}
 
 
 @dataclass(frozen=True)
@@ -356,12 +356,17 @@ def on_outline(points: list[P2], p: App.Vector, tol: float = 1e-4) -> bool:
 
 def tiles(solid: Part.Shape, d: Blueprint, i: Interface, seam_x: float, names: tuple[str, str]) -> dict[str, Part.Shape]:
     """A panel cut at its seam into its two tiles, each with the edge break on the top edge of its outline (the
-    edge that shows in the reveal). The top edges at the seam stay sharp: the seam is bonded."""
+    edge that shows in the reveal). The four upright corners of the plate get the break first, so that the round
+    of the top edge runs round each corner with no mitre. The two blunt corners of the front edge (deck_flank)
+    stay as they are. The top edges at the seam stay sharp: the seam is bonded."""
     edge = pr.panel_outline(d, -i.seat_gap)
+    upright = [edge[k] for k in (0, 3, 4, 5)]
     out = {}
     for name, part in zip(names, (box(-so.BIG, seam_x, -so.BIG, so.BIG, 0, 200), box(seam_x, so.BIG, -so.BIG, so.BIG, 0, 200))):
         tile = one_solid(so.unsplit(solid.common(part)), name)
-        rim = so.edges_where(tile, lambda p: abs(p.z - d.panel_top) < 1e-6 and on_outline(edge, p))
+        posts = so.edges_where(tile, lambda p: any(math.hypot(p.x - x, p.y - y) < 1e-4 for x, y in upright))
+        tile = one_solid(tile.makeFillet(d.edge_break, posts), f"{name}, with its corners broken")
+        rim = so.edges_where(tile, lambda p: abs(p.z - d.panel_top) < 1e-6 and on_outline(edge, p, d.edge_break / 2))
         out[name] = one_solid(tile.makeFillet(d.edge_break, rim), f"{name}, with the edge break")
     return out
 
@@ -704,25 +709,33 @@ def print_rows(parts: dict[str, Part.Shape]) -> list[dict]:
     return rows
 
 
+# an edge on the top face is hidden only where its other face is the wall of a hole or the bonded seam
+HOLE_EDGE = 2.0
+ON_TOP = ("the other tile", "panel_holes")
+
+
 def covers(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
     """What the faces of these parts lie against, for the edge rule (tools/edge_finish.py): the seat of the plate
-    in the pocket, and the room below the top of the panel, inside the shell."""
-    edge = pr.panel_outline(d, -i.seat_gap)
-    seat = plan(pr.panel_outline(d), z_rest(d), d.panel_top).cut(plan(edge, z_rest(d) - 1, d.panel_top + 1))
-    inside = plan(pr.panel_outline(d, 30.0), 0.0, z_rest(d)).fuse(plan(edge, z_rest(d), d.panel_top))
-    return {"panel_seat": seat, "panel_room": so.unsplit(inside)}
+    in the pocket, the holes through the plate (the plate less HOLE_EDGE round its outline, so that the side of the
+    plate is not a hole), and the room below the plate, inside the shell."""
+    zr, zt = z_rest(d), d.panel_top
+    seat = plan(pr.panel_outline(d), zr, zt).cut(plan(pr.panel_outline(d, -i.seat_gap), zr - 1, zt + 1))
+    return {"panel_seat": seat, "panel_holes": plan(pr.panel_outline(d, -i.seat_gap - HOLE_EDGE), zr, zt),
+            "panel_room": plan(pr.panel_outline(d, 30.0), 0.0, zr)}
 
 
-JOINTS = {"panel_seat": "The seat of the panel in the pocket: the side of the plate stands seat_gap from the wall of the seat.",
-          "panel_room": "Below the top face of the panel, inside the shell: the ribs, the frame, and the holes that the buttons, "
-                        "the lever's dust washer and the screws fill. These faces are not painted.",
+JOINTS = {"panel_seat": "The seat of the panel in the pocket: the side of the plate stands seat_gap from the wall of the seat. "
+                        "The top edge of the side shows in the reveal, so the seat does not hide an edge on the top face.",
+          "panel_holes": "A hole through the plate. The rim of a button, the dust washer of the lever or the head of a screw covers its top edge.",
+          "panel_room": "Below the plate, inside the shell: the ribs and the frame. These faces are not painted.",
           "the other tile": "The bonded seam between the two tiles of a panel."}
 
 
 def finish_rows(parts: dict[str, Part.Shape], d: Blueprint, i: Interface, log=lambda text: None) -> tuple[dict, list[str], dict]:
     """The edge rule and the face check on the printed parts, with the functions of the shell's tools
     (tools/edge_finish.py, tools/face_check.py). Every part here is a printed part. A convex edge that turns more
-    than edge_break_turn and has no round passes only where one of its faces lies against a cover of JOINTS.
+    than edge_break_turn and has no round passes only where one of its faces lies against a cover of JOINTS; on the
+    top face of a panel, only in a hole or at the bonded seam (ON_TOP).
     Returns, for each part, its sharp edges by what they lie against and the number of faces of the edge break;
     the failures of both checks; and the summary of the face check."""
     from tools import edge_finish, face_check  # noqa: PLC0415 - the tools are not a package of the generator
@@ -732,7 +745,7 @@ def finish_rows(parts: dict[str, Part.Shape], d: Blueprint, i: Interface, log=la
     for name, shape in parts.items():
         # a tile lies against the other tile of its panel; the two panels stand in the same place, one at a time
         twin = {"the other tile": s for k, s in parts.items() if k != name and kind(k) == "tile" == kind(name) and k.split("_")[0] == name.split("_")[0]}
-        others = {**extra, **twin}
+        others = {**twin, **extra}
         lies = {f.hashCode(): edge_finish.against(f, others, d) for f in shape.Faces}
         groups: dict[str, list] = {}
         for e in shape.Edges:
@@ -743,7 +756,10 @@ def finish_rows(parts: dict[str, Part.Shape], d: Blueprint, i: Interface, log=la
             if not convex or turn <= d.edge_break_turn:
                 continue
             m = so.middle(e)
-            joint = next((lies[f.hashCode()] for f in fs if lies[f.hashCode()]), "")
+            hidden = [lies[f.hashCode()] for f in fs if lies[f.hashCode()]]
+            if abs(m.z - d.panel_top) < 1e-6:
+                hidden = [j for j in hidden if j in ON_TOP]
+            joint = hidden[0] if hidden else ""
             groups.setdefault(joint, []).append((round(e.Length, 1), round(turn, 1), [round(m.x, 1), round(m.y, 1), round(m.z, 1)]))
         rows[name] = {"class": "printed", "break_faces": len([f for f in shape.Faces if face_check.is_break(f, d.edge_break)]),
                       "sharp": [{"against": j, "edges": len(es), "length": round(sum(e[0] for e in es), 1), "at": [e[2] for e in sorted(es, reverse=True)[:6]]}
@@ -752,9 +768,15 @@ def finish_rows(parts: dict[str, Part.Shape], d: Blueprint, i: Interface, log=la
             if not g["against"]:
                 bad.append(f"edge rule: {name}: {g['edges']} sharp edges show ({g['length']} mm), the longest at {tuple(g['at'][0])}")
     log("face check")
+    # at each upright corner of a plate three breaks meet: the corner is a ball of R edge_break, as on the hood. The
+    # face check allows a narrow face of the break along an edge by itself; the ball is allowed here, by its place
+    r = d.edge_break
+    tiles_ = tuple(k for k in parts if kind(k) == "tile")
+    balls = [face_check.Reveal("corner ball of the plate", tiles_, ("sliver",), (x - 1.5 * r, y - 1.5 * r, d.panel_top - 1.5 * r, x + 1.5 * r, y + 1.5 * r, d.panel_top))
+             for x, y in (pr.panel_outline(d, -i.seat_gap)[k] for k in (0, 3, 4, 5))]
     found = []
     for name, shape in parts.items():
-        found += face_check.check(shape, name, [], break_radius=d.edge_break)
+        found += face_check.check(shape, name, balls, break_radius=r)
     bad += [f"face check: {f.part}: {f.rule} at {f.at}: {f.detail}" for f in face_check.failures(found)]
     return rows, bad, face_check.summary(found)
 
@@ -896,20 +918,23 @@ def scenes(out: Path, b: Built, skin: Part.Shape, hw: Hardware, magnet: Built) -
     panel = {k: (s, finish_of(k)) for k, s in b.arcade.items()}
     bought = latch_hardware(d, i)
     on_panel = {k: hard[k] for k in ("Lever", "Buttons", "Encoder")}
-    deck = {"deck": (skin, FINISH["deck"])}
+    # the printed floor is not a part of the shell's model yet: a slab of its thickness under the deck, for the pictures
+    floor = deck_outer.common(box(-so.BIG, so.BIG, -so.BIG, so.BIG, 0.0, fit.Layout().floor_t))
+    deck = {"deck": (skin, FINISH["deck"]), "floor": (floor, FINISH["floor"])}
     outer = {"deck": deck_outer}
+    light = lambda shapes: {k: (s, FINISH["underside"]) for k, s in shapes.items()}
     views = {"above": cam(mid, 265, 0, 62), "above-left": cam(mid, 265, -38, 34)}
     write_model(out / "in-place", {**deck, **panel, **on_panel, "screws": bought["screws"]}, outer, views)
     lift = V(0, 0, 95)
     moved = {k: (s.translated(lift), f) for k, (s, f) in {**panel, **on_panel, "screws": bought["screws"]}.items()}
     views = {"lifted": cam((0, mid[1], zt + 30), 300, -34, 30, 0.8), "frame": cam(mid, 265, 0, 58)}
     write_model(out / "lifted", {**deck, **fixed, "inserts": bought["inserts"], "USB": hard["USB"], **moved}, outer, views)
-    write_model(out / "frame", {**deck, **fixed, "inserts": bought["inserts"], "USB": hard["USB"], "Hub": hard["Hub"]}, outer,
+    write_model(out / "frame", {**deck, **fixed, "inserts": bought["inserts"], "USB": hard["USB"]}, outer,
                 {"frame": cam(mid, 265, 0, 58), "frame-corner": cam((latch_points(d, i)[1][0] - 12, latch_points(d, i)[1][1] + 6, zt - 4), 48, 35, 40)})
     low = cam((0, mid[1], z_rest(d) - 6), 255, 180, -52)
-    write_model(out / "underside", {**panel, **on_panel}, None, {"underside": low, "underside-lever": cam((-95, mid[1], z_rest(d) - 8), 120, 150, -38)})
+    write_model(out / "underside", {**light(b.arcade), **on_panel}, None, {"underside": low, "underside-lever": cam((-95, mid[1], z_rest(d) - 8), 120, 150, -38)})
     write_model(out / "blank", {**deck, **{k: (s, finish_of(k)) for k, s in b.blank.items()}, "screws": bought["screws"]}, outer, {"above-left": cam(mid, 265, -38, 34)})
-    write_model(out / "blank-underside", {k: (s, finish_of(k)) for k, s in b.blank.items()}, None, {"underside": low})
+    write_model(out / "blank-underside", light(b.blank), None, {"underside": low})
     # the section through the lever: everything to the left of the lever's centre, seen from the right
     sx = fit.Layout().stick_x
     keep = box(-so.BIG, sx, -so.BIG, so.BIG, -so.BIG, so.BIG)
