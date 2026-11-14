@@ -311,6 +311,7 @@ The planar rear, 2026-11-13 (decision record 0007). The owner rejected the rear 
 
 - A convex edge of the rear design that turns 40 degrees or more has a round of 3 (`rear_round_r`): the outer edge of the band, the hip, the edge where the rear facet ends on the side band (RB10), the lower edge of the upper rear wall, the upright corners of the head (RB7) and of the hood (HC16).
 - Each other convex edge that shows and turns more than 45 degrees has the edge break, a round of 1 (`edge_break`). It is the last modelling step. The faces of this blueprint do not draw it.
+- An edge that cannot take the round has a flat break of 1. There are two such edges, one at each rear corner of the body top, each 1.1 long.
 - Concave creases and blunt mitres stay sharp.
 
 | Value | Revision 6 | Revision 7 |
@@ -323,18 +324,18 @@ The planar rear, 2026-11-13 (decision record 0007). The owner rejected the rear 
 | Parts of the body | front body and rear body | one part, body |
 | Rear door (RB6) | 426.7 x 182 | 422.7 x 165: its sides 4 inside the ends of the cut-ins, its top 12 below the crease of the rear shelf |
 
-**How the model makes it.** The band is a cut between two offsets of the stroke: each piece is a true plane. The lower rear corner, the hip and the mitre of the base facet are cut by hand as exact cylinders. One builder makes the other rounds of 3 together. The round of the hood's rear corners is cut by hand: four lofts through sections of the rolling ball on each side. The hood behind its soft edge is now made of exact surfaces (the front outline along the depth, in common with the side profile across the width).
+**How the model makes it.** The band is a cut between two offsets of the stroke: each piece is a true plane. The lower rear corner, the hip and the mitre of the base facet are cut by hand as exact cylinders. One builder makes the other rounds of 3 together. The round of the hood's rear corners is cut by hand: four lofts through sections of the rolling ball on each side. The hood behind its soft edge is now made of exact surfaces (the front outline along the depth, in common with the side profile across the width). The edge break of the hood is cut by hand also (see "The edge finish").
 
 **The proof.** `tools/compare_parts.py` compares each part of the default build with the approved files (`cad/out/shell-bp-rev7/R10`): the volume, the bounding box, and the largest distance between the two surfaces in both directions. The tolerance is 0.3. The result is in `cad/out/shell-rev7/compare/compare.md`.
 
 | Part | Volume, default build less R10, mm3 | Bounding box, largest difference | Largest distance, form | Largest distance at the edge break |
 | --- | --- | --- | --- | --- |
 | Deck | -243.2 | 0.0000 | 0.015 | 0.41 |
-| Body | -182.8 | 0.0000 | 0.27 | 0.41 |
-| Hood | +3.0 | 0.0000 | 0.014 | none |
+| Body | -176.8 | 0.0000 | 0.27 | 0.41 |
+| Hood | -226.4 | 0.12 | 0.014 | 0.46 |
 | The seven other parts | 0.0 | 0.0000 | 0.000 | none |
 
-The default build has the edge break on edges that are sharp in R10: the rim of the panel pocket, the rail land along the bezel reveal, and the floor edges of the sides. There the two surfaces are 0.41 apart, which is the size of a round of 1 on an edge of 90 degrees. The tool counts these points in their own column. The 0.27 of the body is at the top corners of the bezel reveal, where that edge break ends. Before this edge break was added, the largest distance of the body was 0.11.
+The default build has the edge break on edges that are sharp in R10: the rim of the panel pocket, the rail land along the bezel reveal, the floor edges of the sides, the rim of the hood's front opening and the upper edge of the hood's seam bevel. There the two surfaces are 0.41 apart at an edge of 90 degrees, which is the size of a round of 1. The legs of the hood's opening turn 93 degrees, and the distance there is 0.46. The tool counts these points in their own column. The 0.27 of the body is at the top corners of the bezel reveal, where that edge break ends. Before this edge break was added, the largest distance of the body was 0.11. The flat break of the body is 0.12 from R10. The upper edge of the seam bevel is the widest edge of the hood. Its break makes the box of the hood 0.08 narrower on each side and 0.12 shorter at the front.
 
 **Known items.** `tools/face_check.py` has one list (`KNOWN`), with the place, the size and the reason of each item. On each side:
 
@@ -342,20 +343,30 @@ The default build has the edge break on edges that are sharp in R10: the rim of 
 - Foot of the head's rear corner: one patch 1.69 wide, where three rounds of 3 meet.
 - Rail: four edges where the edge radius meets the rail land at 2.5 degrees (older than revision 7).
 - Hood: the corner round runs out on the roof. Its last face is 0.77 wide by the rule, and its tip is 10.7 degrees.
+- Hood: the wall of the front opening has a concave kink of 11.5 degrees at each lower corner. The ball of the edge break turns about that kink. The face of that turn is 0.08 wide by the rule, and the wall beside it has a tip of 3.8 degrees.
 
-**The edge finish.** `tools/edge_finish.py` lists the convex edges that turn more than 45.5 degrees and have no round. Its result is in `cad/out/shell-rev7/edge-finish.md`. An edge in a joint (under a plate, in the seam, against another part) does not show and gets no finish.
+**The edge finish.** `tools/edge_finish.py` lists the convex edges that turn more than 45.5 degrees and have no round. Its result is in `cad/out/shell-rev7/edge-finish.md`. The rule is for the printed and painted parts of the exterior: the deck, the body and the hood. Since unit 3 (2026-11-14), no edge that shows on these parts is sharp.
 
-| Part | Edges with the edge break | Sharp edges that show | Where they are |
+| Part | Class | Edges with the edge break | Sharp edges that show |
 | --- | --- | --- | --- |
-| Deck | 6: the rim of the panel pocket | 0 | |
-| Body | 30: 26 at the rear (10 of them on the rims of the hand-holds), 2 of the rail land along the bezel reveal, 2 floor edges of the sides | 2, each 1.1 long | Where the seam bevel crosses the round of the head's corner. The edge break on this edge is a valid solid in some runs and not in others. The build must be the same in each run, so the edge gets none. |
-| Hood | 0 | 24, 1735 in total | 14 on the rim of the opening and 10 on the seam bevel. The round on the leaning front of the hood is not the same in each run, and the build must be the same in each run. |
-| Marquee lip | 0 | 2, 784 in total | The two front edges. The part is provisional. |
-| Speaker forms | 0 | 8 each, 349 in total each | The front edges and the corners. The parts are provisional. |
-| Logo form | 0 | 8, 472 in total | The front edges and the corners. The part is provisional. |
-| Bezel plate | 0 | 4, 1120 in total | The inner edge of the frame, round the screen. |
+| Deck | printed | 6: the rim of the panel pocket | 0 |
+| Body | printed | 30 with the round: 26 at the rear (10 of them on the rims of the hand-holds), 2 of the rail land along the bezel reveal, 2 floor edges of the sides. 2 with a flat break of 1, each 1.1 long, in the seam groove at the rear corners | 0 |
+| Hood | printed | 26, 2222 in total: 14 on the rim of the front opening, 11 on the seam bevel and its mitres, 1 on the rear wall. A ball at each rear corner, where three of these edges meet | 0 |
+| Control panel | cut plate | 0 | 0 |
+| Marquee lip | provisional, not finished | 0 | 2, 784 in total |
+| Speaker forms | provisional, not finished | 0 | 8 each, 349 in total each |
+| Logo form | provisional, not finished | 0 | 8, 472 in total |
+| Bezel plate | not decided | 0 | 4, 1120 in total: the inner edge of the frame, round the screen |
 
 The deck front, the deck sides, the rail and the soft edge of the hood have rounds of the design.
+
+- **Joints.** A sharp edge in a joint does not show and gets no finish. The tool names each joint: the deck against the body, the deck against the control panel, the body against the deck, the body against the bezel plate, and the body against the screen. A sharp edge of a printed part in a joint with no name is a failure.
+- **The hood.** OpenCascade's round on the leaning front of the hood is not the same in each run. Thus the break of the hood is cut by hand (`solids.round_cutters`). A ball of R 1 rolls along each edge in touch with the two faces of the edge. The tools are prisms along the straight edges and lofts through the sections of the ball along the curved edges. Each piece ends where the ball's point on a face crosses to the next face. Three places are special. At each rear corner, three broken edges meet (the upper edge of the bevel on the side and on the rear, and the mitre of the bevel), and the corner is a ball of R 1. At each lower corner of the front opening, the wall has a concave kink of 11.5 degrees, and the ball turns about that kink. The upper edge of the bevel on the rear wall turns 45 degrees only. It has the break also (465 long), so that the break goes all round the foot.
+- **The same in each run.** Four builds of the hood in a row have 77 faces and 218 edges each, and each passes the strict check. Each face has the same surface in all four builds. The lengths of the edges agree within 0.000003, and the volumes within 0.004 mm3.
+- **The body.** In the seam groove, the break of the bevel's mitre ends on the round of the head's corner. The edge between them is 1.1 long and turns 46.8 degrees. A ball of R 1 cannot roll between a face and a round of R 1. Thus the edge has a flat break of 1, which lies 0.22 under the edge. Each edge of the flat turns less than 45 degrees.
+- **The provisional forms.** The marquee lip, the two speaker forms and the logo form are stand-ins for parts that are not designed. They have no finish, and the list calls them "provisional, not finished".
+- **The bezel plate.** The record does not say how the plate is made. Decision record 0006 does not name the way to cut it. `split.BEZEL_OPTIONS` keeps three ways: two printed halves, four printed bars, or a cut plate with a printed inner frame. Thus the plate has no break, and the list calls it "not decided". Its four sharp edges that show are on the inner frame, which is a printed piece in each of the three ways.
+- **The test.** `tests/test_edge_finish.py` holds the rule. If a printed part has a convex edge that shows and turns more than 45.5 degrees, the edge must have a round of the design or the break. If it has neither, the test fails. If a part of the build is in no class, the test fails also.
 
 **The inside follows the form.** The skin, the fit study, the split and the structure read revision 7 (2026-11-13). The values of the rear have the names of what they are: `rear_shelf_z0` and `rear_shelf_z1` (the creases of the rear shelf), `rear_round_r` (the round of 3), `band_depth`, `band_lean`, `band_lean_y0` (where the line of the lean passes the desk) and `band_foot_y` (the foot of the band at the desk, which is the stub). The names of revision 6 (`rear_step_z0`, `rear_step_z1`, `rear_corner_r`, `step_y0`, `step_in`, `step_lean`) are gone. The door opening is a rule of the form (`door_w`, `door_z0`, `door_z1`): its sides are 4 inside the ends of the cut-ins, and its top is 12 below the crease of the rear shelf. The sections "Hardware in the shell" and "The split" have the results.
 
@@ -363,7 +374,7 @@ The deck front, the deck sides, the rail and the soft edge of the hood have roun
 
 `cad/candybar/shell/fit.py` is a fit study of the hardware in the form of revision 7. It does not change the outer form. Sheet 09 draws it. `cad/out/shell-rev7/fit/report.md` has all the numbers. The study exits 1 when an item does not fit. Result: PASS, with a skin of 4. The test `FitOnTheRealCavityTest` (`cad/tests/test_fit.py`) puts the hardware into the real cavity and checks each rule, so a fit failure shows in the test suite.
 
-- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`. It is thicker where the form turns across the width. Every second slab stands 0.05 farther in (`cavity.RIDGE`): without this step, the skin is not a valid shape. Measured on 2765 points: smallest 4.00, median 4.00, largest 18.84. Examples: 5.6 at the side of the hood, 4.3 at the side of the body below the tuck, 4.5 in the tuck, 12.5 at the rail edge at the middle of the bezel (square to the screen). At a cut-in the wall is 4.0 to 4.9 behind the floor of the groove, and the cavity steps in behind each groove. Round a hand-hold the wall is 4.0 to 5.0, and the cavity ends 30 in front of the rear face. The wall is open under the control panel (inside a ledge of 8, on the outline of the panel). It is open behind the bezel plate, with a ledge of 6 at the top and the bottom only. The body top is open into the hood. The cavity is 56.99 l.
+- **Skin.** `wall_t` (4.0) in `Blueprint`. `cavity.py` makes the cavity from side sections of the built parts, each offset inward by `wall_t`, one each mm across the width. Each slab of the cavity is the common of the offset sections over the slab and `wall_t` on each side. Thus the wall is never thinner than `wall_t`. It is thicker where the form turns across the width. Every second slab stands 0.05 farther in (`cavity.RIDGE`): without this step, the skin is not a valid shape. The cavity reads the hood before its edge break (`cavity.form_parts`). The break of the hood is cut by lofts, and the offset of a section through these lofts fails at some planes. The break is on convex edges, where the wall is thicker than `wall_t`, so the wall is not thinner for it. If a slab loses its cavity, the build stops. Measured on 2765 points: smallest 4.00, median 4.00, largest 18.84. Examples: 5.6 at the side of the hood, 4.3 at the side of the body below the tuck, 4.5 in the tuck, 12.5 at the rail edge at the middle of the bezel (square to the screen). At a cut-in the wall is 4.0 to 4.9 behind the floor of the groove, and the cavity steps in behind each groove. Round a hand-hold the wall is 4.0 to 5.0, and the cavity ends 30 in front of the rear face. The wall is open under the control panel (inside a ledge of 8, on the outline of the panel). It is open behind the bezel plate, with a ledge of 6 at the top and the bottom only. The body top is open into the hood. The cavity is 56.99 l.
 - **Hardware.** The sizes come from `cad/params/*.csv`. The envelopes are those of `candybar/hardware.py` and `candybar/panel.py`. The anchors come from `Blueprint`. The layout choices are the named values of `fit.Layout`. New rows in `hardware.csv`: the USB sockets and the hub, the room for the marquee modules, and the generic monitor.
 - **Floor.** The power supply and the hub stand on the printed floor of 10 (`Layout.floor_t`, decision record 0006). The floor stands on the table on thin non-slip pads (the owner, 2026-11-11). On the floor of 7 of the study everything stood 3 lower: the power supply is now at z 10, the BC-250's lower edge at z 124, the door sill at z 116, the hub at z 10.1.
 - **Compute module.** The BC-250 has a fixed mount behind the rear door (decision record 0005). The door is a cover with the vents and has no cable on it. The fan stands 5 from the door, and the shroud seals the gap. The BC-250 stands 3 above the clear space over the fan of the power supply (`Layout.bc_above_psu`), so that its exhaust duct stays out of that space. Its exhaust duct runs along the door at the height of the cut-ins. The end of the duct stands 8 inside the ends of the cut-ins (`Layout.cut_in_reach`): the wall of 4, one slab of the cavity, and 3 clear. Thus the I/O edge of the BC-250 is at x -158.2 (it was -163.2 in revision 6), and the duct goes from x -207.4 to -101.1. The skin steps in behind the cut-ins from x -211, which is 3.65 from the end of the duct.
@@ -420,14 +431,14 @@ Not modelled yet: the flanges, the keys, the ribs, the carriers and the inlet gr
 | 14, 15 | rear lower R, L | 229 x 228 x 116 | upright | 0.3 each | 24.6 each |
 | 16, 17 | door half R, L | 211 x 165 x 4 | outer face on the bed | 0.0 each | 0.0 each |
 | 18 | hood centre | 148 x 139 x 212 | on a cut face | 0.0 | 0.0 |
-| 19, 20 | hood side R, L | 139 x 129 x 148 | upright | 7.4 each | 16.4 each |
+| 19, 20 | hood side R, L | 139 x 129 x 148 | upright | 7.2 each | 14.4 each |
 | 21, 22 | speaker form R, L | 94 x 76 x 13 | front face on the bed | 0.0 each | 0.0 each |
 | 23 | logo form | 160 x 160 x 5 | front face on the bed | 0.0 | 0.0 |
 | - | floor tiles, front, middle and rear, each side R, centre, side L | 212 x 188 at most | flat | | |
 
-The bezel plate is two halves, bonded and painted black as one plate (223 x 223 x 217 each). It is a finish piece.
+The cut measures the bezel plate as two halves, bonded and painted black as one plate (223 x 223 x 217 each). This is the first of the three ways in `split.BEZEL_OPTIONS`. The owner has not chosen the way.
 
-"Seen face over 45 deg" is the area that a person sees and that faces down more than 45 degrees from upright in the print orientation. It needs support. The total is 23.1 cm2 (it was 63.1 in revision 6, and 362.6 in the first cut of revision 7 with the seams of revision 6). "Seen face at 45 deg" is the area at 45 degrees (within 0.05): the facets of the rear shelf, the roofs of the hand-holds and the base facet, which are 45 degrees by design and print without support. The total is 493.6 cm2.
+"Seen face over 45 deg" is the area that a person sees and that faces down more than 45 degrees from upright in the print orientation. It needs support. The total is 22.7 cm2 (it was 63.1 in revision 6, and 362.6 in the first cut of revision 7 with the seams of revision 6). "Seen face at 45 deg" is the area at 45 degrees (within 0.05): the facets of the rear shelf, the roofs of the hand-holds and the base facet, which are 45 degrees by design and print without support. The total is 489.6 cm2. The edge break of the hood (unit 3) changed the two totals by 0.4 and 4.0: the seam bevel of each hood side is narrower by its break.
 
 ### Seams
 
@@ -690,7 +701,7 @@ The default build is revision 7. It writes to `cad/out/shell-rev7`.
 CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.solids   # one STL and one BREP for each part, a STEP of all parts, the manifest, the cameras, every BREP edge (edges.json), the report
 CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.check_solids      # the solids against the faces; exit status 1 when a distance is more than 0.5 mm
 CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.face_check        # the faces of each part; exit status 1 when a finding is not a reveal, an edge break or a known item
-CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.edge_finish       # the convex edges that are still sharp, by part and by place
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.edge_finish       # the convex edges that are still sharp, by part and by place; exit status 1 when a printed part has one that shows
 CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc   # shell.FCStd with colours, to open in FreeCAD
 cad/.venv-tools/bin/python cad/tools/draw_shell.py render                              # the renders with every edge drawn, in cad/out/shell-rev7/renders
 CANDYBAR_A=cad/out/shell-rev7 CANDYBAR_B=cad/out/shell-bp-rev7/R10 cad/candybar/freecad-run.sh tools.compare_parts   # each part against another build: volume, box, distance

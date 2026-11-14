@@ -92,7 +92,7 @@ One of the two recesses in the rear wall of the head. A person puts the fingers 
 _Avoid_: grip, pocket
 
 **Edge break**:
-A round of about 1 mm on a sharp convex edge. It is the last modelling step, and it does not change the form. Paint holds on an edge that has it.
+A round of about 1 mm on a sharp convex edge. It is the last modelling step, and it does not change the form. Paint holds on an edge that has it. An edge that cannot take the round gets a flat of the same width (a flat break).
 _Avoid_: fillet (for this round), chamfer
 
 **Hood**:
