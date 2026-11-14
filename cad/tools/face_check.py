@@ -11,13 +11,21 @@ It reads solids and reports, for each part:
              not fail
   split      two faces that meet with the same normal and the same curvature on their common edge: one surface cut
              into strips, which the GUI draws as a stack of lines (unmerged faces, rounds made of stacked lofts)
-A finding that lies inside a named reveal of ALLOW (a seam groove, the bezel reveal) is listed as allowed.
+A finding is listed as allowed, and does not fail, in three cases only:
+  reveal       it lies inside a named reveal (a seam groove, the bezel reveal, the panel pocket): these are as narrow
+               as the reveal is by design
+  edge break   it is a narrow face that is a round of the edge break's radius along an edge (the last modelling step
+               of the shell puts one on every sharp convex edge)
+  known item   it is one of KNOWN: the findings of the shell that stay, each with its part, its rule, its place, its
+               size and the reason. A known item holds for the right side and for its mirror image on the left.
+               It is one list, and no entry allows a whole part or a whole rule.
 
 Run headless on a directory of BREP files with manifest.json (as candybar.shell.solids writes it); it writes
-face-check.json and face-check.md there and exits 1 when a finding is not allowed:
+face-check.json and face-check.md there and exits 1 when a finding is not allowed, or when a known item has no
+finding any more:
 
-    CANDYBAR_OUT=cad/out/shell-bp-rev6 cad/candybar/freecad-run.sh tools.face_check
-    CANDYBAR_FACE_PARTS=rear_body,hood ...   (only these parts)
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.face_check
+    CANDYBAR_FACE_PARTS=body,hood ...   (only these parts)
 """
 from __future__ import annotations
 
@@ -64,15 +72,55 @@ class Finding:
     allowed: str = ""
 
 
+@dataclass(frozen=True)
+class Known:
+    """A finding of the shell that stays: the part and the rule, its place on the right side (x >= 0; the same item
+    on the left is its mirror image), its size, and the reason. A finding of that part and rule within `within` of
+    the place is this item."""
+    part: str
+    rule: str
+    at: tuple[float, float, float]
+    size: str
+    reason: str
+    within: float = 1.5
+
+    def holds(self, f: Finding) -> bool:
+        return f.part == self.part and f.rule == self.rule and math.dist((abs(f.at[0]), f.at[1], f.at[2]), self.at) <= self.within
+
+
+# the known items of the default build (candybar.shell.solids, revision 7). Places in the cabinet frame, mm
+HIP_TOP = ("top of the hip: OpenCascade's patch where the round of the hip (made by hand) meets the rounds of the band's level run and "
+           "of the head's lower edge. Three rounds of R 3 meet at this corner; the exact corner is a part of a sphere about 1.0 wide")
+HEAD_FOOT = ("foot of the head's rear corner: OpenCascade's patch where the rounds of the head's corner, of the head's lower edge and of "
+             "the lower edge of the upper rear wall meet (three rounds of R 3 at one corner)")
+RAIL = ("rail: the cut of the edge section stands 0.01 proud of the rail land (solids.OFF_LAND), so that it does not lie on the "
+        "land's tangent, and its radius meets the land at 2.5 degrees. Older than revision 7; a smaller value makes the cut fail")
+RUN_OUT = ("hood: the round of the rear corner runs out on the roof, where the side and the rear turn tangent to each other")
+KNOWN: tuple[Known, ...] = (
+    Known("body", "sliver", (246.8, 549.8, 305.0), "1.20 wide, 4.2 mm2", HIP_TOP, within=0.5),
+    Known("body", "sliver", (246.3, 550.7, 304.9), "0.43 wide, 2.0 mm2", HIP_TOP, within=0.5),
+    Known("body", "split", (246.8, 550.4, 305.0), "the two patches continue each other along 3.7", HIP_TOP, within=0.5),
+    Known("body", "sliver", (245.2, 579.1, 333.4), "1.69 wide, 7.2 mm2", HEAD_FOOT, within=0.8),
+    Known("body", "kink", (234.8, 234.9, 80.5), "2.5 degrees along 59.3, round the sweep", RAIL),
+    Known("body", "kink", (234.8, 297.6, 200.9), "2.5 degrees along 214.5, below the tuck", RAIL),
+    Known("body", "kink", (232.6, 390.2, 357.5), "2.5 degrees along 153.9, in the tuck", RAIL),
+    Known("body", "kink", (223.9, 438.2, 422.4), "2.2 degrees along 4.2, in the seam bevel", RAIL),
+    Known("hood", "sliver", (181.3, 522.6, 572.9), "0.77 wide, 6.4 mm2: the last face of the round, 1.6 wide where it starts, 10 long", RUN_OUT, within=1.0),
+    Known("hood", "needle", (176.5, 520.0, 573.4), "the tip of that face: its two edges meet at 10.7 degrees", RUN_OUT, within=1.0),
+)
+# the parts of the build that are not printed parts: the lit image is a plate of 1 mm for the renders
+NOT_PARTS = ("screen",)
+
+
 def reveals(body_top: float, seam_gap: float, groove: float, bezel: tuple[float, float, float, float, float, float] | None = None,
             panel: tuple[float, float, float, float, float, float] | None = None) -> list[Reveal]:
     """The named reveals of the shell: the seam groove (its bevel faces on the body and the hood, which are as narrow as
     the groove where the outline turns), the reveal round the bezel plate (panel_gap wide) and the pocket of the
     control panel (its walls are deck_top - panel_top high)."""
-    out = [Reveal("seam groove", ("front_body", "rear_body", "body", "hood"), ("sliver", "needle", "crowded"),
+    out = [Reveal("seam groove", ("body", "hood"), ("sliver", "needle", "crowded"),
                   (-1e4, -1e4, body_top - groove - 0.5, 1e4, 1e4, body_top + seam_gap + groove + 0.5))]
     if bezel:
-        out.append(Reveal("bezel reveal", ("front_body", "body", "bezel"), ("sliver", "needle", "crowded"), bezel))
+        out.append(Reveal("bezel reveal", ("body", "bezel"), ("sliver", "needle", "crowded"), bezel))
     if panel:
         out.append(Reveal("panel pocket", ("deck",), ("sliver",), panel))
     return out
@@ -238,18 +286,44 @@ def report_md(found: list[Finding], title: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_dir(out: str, parts: list[str] | None = None, allow: list[Reveal] | None = None) -> list[Finding]:
-    manifest = json.load(open(os.path.join(out, "manifest.json")))
-    if allow is None:
-        allow = default_reveals()
-    found: list[Finding] = []
-    for name, entry in manifest.items():
-        if parts and name not in parts:
+def mark_known(found: list[Finding], known: tuple[Known, ...] = ()) -> list[Known]:
+    """Mark the findings that are known items as allowed, and return the known items that have no finding (a list
+    that names what is no longer there is not honest)."""
+    known = known or KNOWN
+    seen = set()
+    for f in found:
+        if f.allowed or f.rule in INFO:
             continue
+        for k in known:
+            if k.holds(f):
+                f.allowed = f"known item: {k.reason}"
+                seen.add(k)
+                break
+    return [k for k in known if k not in seen]
+
+
+def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -> tuple[list[Finding], list[Known]]:
+    """The face check of the parts of the shell: the findings, with the reveals, the edge breaks and the known items
+    marked as allowed; and the known items that have no finding."""
+    from candybar.shell.dims import Blueprint
+    allow = default_reveals()
+    found: list[Finding] = []
+    for name, shape in shapes.items():
+        if name in NOT_PARTS or (parts and name not in parts):
+            continue
+        found += check(shape, name, allow, break_radius=Blueprint().edge_break)
+    stale = mark_known(found)
+    return found, [k for k in stale if not parts or k.part in parts]
+
+
+def run_dir(out: str, parts: list[str] | None = None) -> tuple[list[Finding], list[Known]]:
+    manifest = json.load(open(os.path.join(out, "manifest.json")))
+    shapes = {}
+    for name, entry in manifest.items():
         s = Part.Shape()
         s.read(os.path.join(out, entry["brep"]))
-        found += check(s, name, allow)
-    return found
+        shapes[name] = s
+    return check_shell(shapes, parts)
 
 
 def default_reveals() -> list[Reveal]:
@@ -265,15 +339,28 @@ def default_reveals() -> list[Reveal]:
     return reveals(d.body_top, d.seam_gap, d.seam_groove, bezel, panel)
 
 
+def known_md(stale: list[Known]) -> str:
+    lines = ["", "## Known items", "", "Each holds for the right side and for its mirror image on the left.", "",
+             "| Part | Rule | At (x, y, z) | Size | Reason | Found |", "| --- | --- | --- | --- | --- | --- |"]
+    for k in KNOWN:
+        lines.append(f"| {k.part} | {k.rule} | {k.at[0]:.1f}, {k.at[1]:.1f}, {k.at[2]:.1f} | {k.size} | {k.reason} | {'NO' if k in stale else 'yes'} |")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
-    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp")
+    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")
     parts = [p for p in os.environ.get("CANDYBAR_FACE_PARTS", "").split(",") if p] or None
-    found = run_dir(out, parts)
-    json.dump({"summary": summary(found), "findings": [asdict(f) for f in found]}, open(os.path.join(out, "face-check.json"), "w"), indent=1)
-    open(os.path.join(out, "face-check.md"), "w").write(report_md(found, out))
+    found, stale = run_dir(out, parts)
+    json.dump({"summary": summary(found), "findings": [asdict(f) for f in found], "known": [asdict(k) for k in KNOWN],
+               "known_without_finding": [asdict(k) for k in stale]}, open(os.path.join(out, "face-check.json"), "w"), indent=1)
+    open(os.path.join(out, "face-check.md"), "w").write(report_md(found, out) + known_md(stale))
     for part, row in summary(found).items():
         print(f"{part:14s} " + "  ".join(f"{r} {row[r]}" for r in (*RULES, "allowed", *INFO)))
-    return 1 if failures(found) else 0
+    for f in failures(found):
+        print(f"FAIL {f.part} {f.rule} at {f.at}: {f.detail}")
+    for k in stale:
+        print(f"known item without a finding: {k.part} {k.rule} at {k.at}")
+    return 1 if failures(found) or stale else 0
 
 
 def failures(found: list[Finding]) -> list[Finding]:

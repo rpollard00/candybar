@@ -28,7 +28,7 @@ V = FreeCAD.Vector
 # distance between two section planes; the first slab spans the centre line
 SLAB = 1.0
 # the outer parts that make the skin; the bezel and the control panel are plates that close openings in it
-SKIN = ("deck", "front_body", "rear_body", "hood", "marquee_lip")
+SKIN = ("deck", "body", "hood", "marquee_lip")
 # the same section when its area and its bounding box agree to this, in mm2 and mm
 SAME = 1e-3
 # the fuzzy tolerance of a boolean that failed without it, mm
@@ -67,8 +67,8 @@ def seam_filler(parts: dict[str, Part.Shape], d: Blueprint) -> Part.Shape:
     """The seam gap between the body top and the foot of the hood, filled, so that the cavity runs on into the hood."""
     e = SAME * 10
     z = d.body_top - e
-    faces = [Part.Face(w) for k in ("front_body", "rear_body") for w in parts[k].slice(V(0, 0, 1), z)]
-    top = faces[0].fuse(faces[1:]).removeSplitter()
+    faces = [Part.Face(w) for w in parts["body"].slice(V(0, 0, 1), z)]
+    top = faces[0].fuse(faces[1:]).removeSplitter() if len(faces) > 1 else faces[0]
     return top.extrude(V(0, 0, d.seam_gap + 2 * e))
 
 

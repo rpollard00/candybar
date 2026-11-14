@@ -1,15 +1,10 @@
-"""Sheets of the detail pass on the outer form (revision 6), for the owner.
+"""A sheet of the detail pass on the outer form, for the owner.
 
-    cad/.venv-tools/bin/python cad/tools/draw_detail.py rear-options   -> cad/out/shell-bp/compare/rear-fillet-options.png
-    cad/.venv-tools/bin/python cad/tools/draw_detail.py before-after   -> cad/out/shell-bp/compare/rear-fillet-before-after.png
     cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options -> cad/out/shell-bp/compare/detail-options.png
 
-rear-options draws the plan outline of the right rear corner at three heights (the lower rear, the upper rear where
-the step runs into the corner, the hood) for three radii of the corner round, from profiles.body_rounds and
-profiles.hood_round, with the outline of revision 5 dashed. before-after puts the renders of revision 5
-(cad/out/shell-bp-rev5/renders) beside those of the build (cad/out/shell-bp/renders). detail-options draws the
-remaining small questions of the form, each at one scale: the present state, the alternatives and the
-recommendation.
+detail-options draws the small questions of the form, each at one scale: the present state, the alternatives and
+the recommendation. The sheets of revision 6's rear corner round (rear-options, before-after) went with that
+construction: revision 7 has the planar rear (decision record 0007).
 
 Needs numpy and matplotlib (cad/.venv-tools).
 """
@@ -24,7 +19,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import Circle, Polygon, Rectangle  # noqa: E402
+from matplotlib.patches import Circle, Polygon  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CAD = os.path.dirname(HERE)
@@ -34,153 +29,7 @@ from candybar.shell.dims import Blueprint  # noqa: E402
 
 COMPARE = os.path.join(CAD, "out", "shell-bp", "compare")
 INK, RED, BLUE, GREY, GREEN = "#1c1c1f", "#b0302a", "#1f4e8c", "#9a9aa0", "#2f7a3a"
-WALL = 4.0
-DOOR_LAND = 4.0  # fit.Layout.door_land
-CLEAR = 5.0      # fit.Layout.corner_clear
 
-
-# ---------- the plan outline of the right rear corner ----------
-
-def body_outline(d: Blueprint, z: float) -> list[tuple[float, float]]:
-    """The plan outline of the body's right rear corner at height z: the side band, the step, the rear body side and
-    the corner round, then the rear wall."""
-    s, y0, yr = d.side_x(min(z, d.body_top)), d.step_y(z), d.rear_y(z)
-    xb, yb = s - d.step_in, y0 + d.step_in
-    if yb >= yr:
-        xb, yb = s - (yr - y0), yr
-    edge, corner = pr.body_rounds(d, z)
-    pts = [(s, y0 - 45.0)]
-    pts += edge.points(12) if edge else [(s, y0)]
-    if corner.a0 < math.pi / 4 - 1e-6:
-        pts.append((xb, yb))
-    pts += corner.points(24)
-    pts.append((corner.c[0] - 60.0, yr))
-    return pts
-
-
-def body_outline_rev5(d: Blueprint, z: float) -> list[tuple[float, float]]:
-    s, y0, yr = d.side_x(z), d.step_y(z), d.rear_y(z)
-    if y0 + d.step_in < yr:
-        return [(s, y0 - 45.0), (s, y0), (s - d.step_in, y0 + d.step_in), (s - d.step_in, yr), (s - d.step_in - 60.0 - d.rear_corner_r, yr)]
-    return [(s, y0 - 45.0), (s, y0), (s - (yr - y0), yr), (s - 80.0, yr)]
-
-
-def hood_outline(d: Blueprint, z: float) -> tuple[list, list]:
-    h = pr.hood(d)
-    back = pr.hood_back(d, h)
-    rd = pr.hood_round(d, h, back, z)
-    x, y = back.x(z), h.origin[1] + back.y(z)
-    new = [(x, y - 45.0)] + rd.points(24) + [(rd.c[0] - 60.0, y)]
-    # revision 5: the plane at 45 degrees in plan through the corner of the step in the body top
-    c = d.side_x(d.body_top) + d.step_y(d.body_top)
-    old = [(x, y - 45.0)]
-    if x + y > c:
-        old += [(x, c - x), (c - y, y)]
-    else:
-        old.append((x, y))
-    old.append((rd.c[0] - 60.0, y))
-    return new, old
-
-
-def draw_corner(ax, new, old, title: str, note_lines: list[str]) -> None:
-    ax.plot(*zip(*old), color=GREY, lw=1.2, ls="--", label="revision 5")
-    ax.plot(*zip(*new), color=INK, lw=1.8, label="this radius")
-    ax.set_aspect("equal")
-    ax.set_title(title, fontsize=9)
-    ax.tick_params(labelsize=7)
-    for k, line in enumerate(note_lines):
-        ax.text(0.02, 0.04 + 0.075 * k, line, transform=ax.transAxes, fontsize=7, color=BLUE)
-
-
-def rear_options() -> None:
-    """Plan outlines of the right rear corner for three radii: a small one, the one built, a large one."""
-    d0 = Blueprint()
-    radii = ((10.0, "small"), (d0.rear_corner_r, "built"), (25.0, "large"))
-    z_lo, z_up = 150.0, 412.0
-    fig, axes = plt.subplots(3, 3, figsize=(17, 16))
-    for col, (r, word) in enumerate(radii):
-        d = replace(d0, rear_corner_r=r)
-        z1, zm = d.runout_z
-        door = d.rear_w / 2 - r - DOOR_LAND
-        psu = min(d.rear_w / 2 - WALL - 8.0, d.rear_w / 2 - r - CLEAR)
-        rb1_foot = d.rear_y(d.rear_step_z0) - (d.step_y(d.rear_step_z0) + d.step_in)
-        # lower rear: the door edge, the power supply's corner and the inner skin
-        ax = axes[0, col]
-        draw_corner(ax, body_outline(d, z_lo), body_outline_rev5(d, z_lo), f"R {r:g} ({word}), lower rear z {z_lo:.0f}", [])
-        corner = pr.body_rounds(d, z_lo)[1]
-        ax.add_patch(Circle(corner.c, r - WALL, fill=False, color=GREY, lw=0.8, ls=":"))
-        ax.axvline(door, color=RED, lw=0.9)
-        ax.text(door - 1, d.body_d + 6, f"door edge x {door:.1f}\n(opening {2 * door:.1f}, was 446.7)", color=RED, fontsize=7, ha="right")
-        ax.add_patch(Rectangle((psu - 40, d.body_d - WALL - 40), 40, 40, fill=False, color=GREEN, lw=1.0))
-        ax.text(psu - 38, d.body_d - WALL - 36, f"power supply, its left face\n at x {-psu:.1f} (was -223.4)", color=GREEN, fontsize=7)
-        ax.set_xlim(d.width / 2 - 75, d.width / 2 + 8)
-        ax.set_ylim(d.body_d - 62, d.body_d + 18)
-        # upper rear: where the step runs into the corner
-        ax = axes[1, col]
-        draw_corner(ax, body_outline(d, z_up), body_outline_rev5(d, z_up), f"R {r:g}, upper rear z {z_up:.0f} (the step runs into the round)", [])
-        gx1 = door
-        ax.axvline(gx1, color=RED, lw=0.9)
-        ax.text(gx1 - 1, d.depth + 4, f"grip pocket ends x {gx1:.1f}", color=RED, fontsize=7, ha="right")
-        ax.set_xlim(d.width / 2 - 75, d.width / 2 + 8)
-        ax.set_ylim(d.depth - 62, d.depth + 14)
-        # hood
-        ax = axes[2, col]
-        new, old = hood_outline(d, 60.0)
-        draw_corner(ax, new, old, f"R {r:g}, hood 60 above its foot", [])
-        ax.set_xlim(new[0][0] - 75, new[0][0] + 8)
-        ax.set_ylim(d.depth - 62, d.depth + 14)
-        psu_move = max(0.0, (d.rear_w / 2 - WALL - 8.0) - (d.rear_w / 2 - r - CLEAR))
-        duct_move = max(0.0, (d.rear_w / 2 - WALL - 4.0) - (d.rear_w / 2 - r - CLEAR))
-        moves = f"power supply {psu_move:+.0f}, BC-250 and its duct {duct_move:+.0f} toward the centre line"
-        limits = {
-            "small": [f"Fits everything: door {2 * door:.1f} ({2 * door - 446.7:+.1f}); {moves}.",
-                      f"But the step reaches the body top {d.depth - d.step_y(d.body_top):.1f} from the rear wall, so it cannot run",
-                      "out into a round this small: the foot of the hood keeps a flat at 45 deg, or the groove jogs.",
-                      "It reads hard next to the hood's top rear R 10 and the deck's front corner R 44.5."],
-            "built": [f"Largest that passes. Limits: the rear body side is {rb1_foot:.1f} long at the foot of the slope (z 310),",
-                      f"and the step must run out into the round inside the seam bevel (R 16.4 to 19.1); here at z {zm:.1f}.",
-                      f"Door {2 * door:.1f} ({2 * door - 446.7:+.1f}); {moves}.",
-                      "Beside the door: 4 flat, then the round. The supply stands 5 inside the start of the round (inner skin R 14)."],
-            "large": [f"The round runs over the step's inner crease at the foot of the slope ({rb1_foot:.1f} long there),",
-                      f"and the step runs out at z {zm:.1f}, {d.body_top - zm:.1f} below the body top: a second blend under the groove.",
-                      f"Door {2 * door:.1f} ({2 * door - 446.7:+.1f}); {moves}: the slot vents lose width.",
-                      "It reads soft, near bulbous where it meets the hood's top rear R 10."],
-        }[word]
-        for k, line in enumerate(limits):
-            axes[0, col].text(0.0, -0.14 - 0.06 * k, line, transform=axes[0, col].transAxes, fontsize=7.5, color=INK)
-    axes[0, 0].legend(fontsize=7, loc="upper left")
-    fig.suptitle("Rear corner round: the plan outline of the right rear corner (x across, y toward the rear), one scale, for three radii.\n"
-                 "Dashed: revision 5 (sharp corners, the step's 45 deg run-out, the flat corner face HC16 on the hood). Dotted: the inner skin (4 mm).",
-                 fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.subplots_adjust(hspace=0.55)
-    os.makedirs(COMPARE, exist_ok=True)
-    fig.savefig(os.path.join(COMPARE, "rear-fillet-options.png"), dpi=110)
-    plt.close(fig)
-
-
-# ---------- before and after ----------
-
-def before_after() -> None:
-    before = os.path.join(CAD, "out", "shell-bp-rev5", "renders")
-    after = os.path.join(CAD, "out", "shell-bp", "renders")
-    views = ("three-quarter-rear-left", "rear", "side-right", "top", "closeup-seam-rear-corner")
-    fig, axes = plt.subplots(2, len(views), figsize=(4.2 * len(views), 9))
-    for k, v in enumerate(views):
-        for row, (folder, word) in enumerate(((before, "revision 5"), (after, "revision 6"))):
-            ax = axes[row, k]
-            ax.axis("off")
-            path = os.path.join(folder, f"{v}.png")
-            if os.path.exists(path):
-                ax.imshow(plt.imread(path))
-            ax.set_title(f"{word}: {v}", fontsize=9)
-    fig.suptitle("The vertical corners of the back: revision 5 (top) and revision 6 with the rear corner round R 18 (bottom)", fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    fig.savefig(os.path.join(COMPARE, "rear-fillet-before-after.png"), dpi=100)
-    plt.close(fig)
-
-
-# ---------- part 2: the rest of the detail pass ----------
 
 def edge_section_points(d: Blueprint) -> list[tuple[float, float]]:
     """The deck's edge section in (in from the side, down from the top), with the side below the crease."""
@@ -229,11 +78,11 @@ def detail_options() -> None:
             "member. Radius only would split the rail from the deck\n(two edge languages at the sweep foot), and the band's\n"
             "10 deg crease is what catches light down the rail.\nCost: none; it is built and checked.", fontsize=8.5, va="top")
 
-    # 2. the crease behind the stripe: plan section of the side band and the step
+    # 2. the crease behind the stripe: plan section of the side band and the band
     def step_plan(depth: float, lean_back: float = 1.0) -> list[tuple[float, float]]:
         return [(0.0, -60.0), (0.0, 0.0), (-depth, depth * lean_back), (-depth, 60.0)]
     for k, (title, pts, rec) in enumerate((
-            ("Q3 now: a step 12 deep, 45 deg in plan", step_plan(12.0), True),
+            ("Q3 now: the band, 12 deep, 45 deg in plan", step_plan(12.0), True),
             ("Q3 alternative: deeper, 20 (as the 3D model)", step_plan(20.0), False),
             ("Q3 alternative: a shallow line, a V 2 deep", [(0.0, -60.0), (0.0, -1.5), (-2.0, 0.0), (0.0, 1.5), (0.0, 60.0)], False))):
         ax = fig.add_subplot(gs[1, k])
@@ -246,10 +95,10 @@ def detail_options() -> None:
         ax.text(-38, 45, "rear body", fontsize=6.5)
     ax = fig.add_subplot(gs[1, 3])
     ax.axis("off")
-    ax.text(0, 0.95, "Q3 recommendation: keep the step of 12.", fontsize=10, color=GREEN, fontweight="bold", va="top")
-    ax.text(0, 0.82, "The rear corner round of revision 6 is sized on it: the\nstep sets R 18 (the rear body side is 18.2 long at the\n"
-            "slope foot). A deeper step (20) cuts the round to about\nR 10 and narrows the rear body by 16; a shallow line\n"
-            "frees the round (R 25 possible) but loses the break\nthat ends the stripe and hides seam S1.", fontsize=8.5, va="top")
+    ax.text(0, 0.95, "Q3: decided. The band is 12 deep.", fontsize=10, color=GREEN, fontweight="bold", va="top")
+    ax.text(0, 0.82, "Revision 7 (decision record 0007) keeps 12: the band's\nlevel run is the side facet of the rear shelf, and the\n"
+            "two facets of the shelf meet on the hip. A deeper band\n(20) narrows the lower body by 16; a shallow line\n"
+            "loses the break that ends the stripe.", fontsize=8.5, va="top")
 
     # 3. legs and top bar of the hood, front elevation of the right half
     for k, (bar, rec) in enumerate(((21.0, True), (18.0, False), (25.0, False))):
@@ -376,4 +225,4 @@ def detail_options() -> None:
 
 
 if __name__ == "__main__":
-    {"rear-options": rear_options, "before-after": before_after, "detail-options": detail_options}[sys.argv[1]]()
+    {"detail-options": detail_options}[sys.argv[1]]()

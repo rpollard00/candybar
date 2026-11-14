@@ -2,32 +2,42 @@
 
 Every part is made from the profile paths of profiles.py and the values of dims.Blueprint, with true curves:
   deck         an evolved solid: the edge section carried round the deck outline in plan (offset curves, so the
-               rounds stay exact round the corners), cut at the foot of the sweep; a pocket for the control panel.
+               rounds stay exact round the corners), cut at the foot of the sweep; a pocket for the control panel;
+               the base facet round its foot.
   body         the side profile extruded across the width, in common with the front outline (with the tuck)
                extruded along the depth. The edge section is cut along the rail: revolutions round the arcs of
                the sweep and of the rail below the tuck; above it, where the section is measured in from the side
-               at each height, a loft between sections, on along the tangent over the top. Then the bevel of the
-               seam groove (a plane along the whole depth), the step to the rear body, and the recess and reveal
-               of the bezel plate. The plane through the outer edge of the step splits front and rear body.
-  hood         an evolved solid: the quarter ellipse of the soft edge carried round the front outline, in common
-               with the side profile extruded across the width; the bevel of the seam groove (a plane along the
-               whole depth), the recess of the opening; the marquee lip and the forms on the hood band as parts
-               of their own.
+               at each height, a loft between sections, on along the tangent over the top. Then the recess and
+               reveal of the bezel plate, and the planar rear (decision record 0007): the band on the rear edge of
+               the side (a cut between two offsets of its stroke: flat facets, true planes), the rear shelf and the upper
+               rear (a cut by the rear profile across the width), the base facet. The lower rear corner, the hip
+               and the mitre of the base facet are rounded by hand (lower_corner_cutter); the other edges of the
+               rear get their round from the edge rule (rear_design_edges). Then the bevel of the seam groove, the
+               cut-ins, the hand-holds, and the edge break as the last step.
+  hood         the front as an evolved solid: the quarter ellipse of the soft edge carried round the front outline,
+               made to lean as the side view draws it; behind the soft edge the cap is the front outline extruded
+               along the depth, in common with the side profile extruded across the width (exact surfaces). Its
+               rear corners have the round of the head's corners. The bevel of the seam groove, the recess of the
+               opening; the marquee lip and the forms on the hood band as parts of their own.
   bezel        the land on a cylinder bezel_drop below the rail arc, a flat back on the screen, the window as a
                ruled loft from the inner edge of the land to the rim and straight on to the screen.
 
 The functions take the profiles as data, so that the same construction can run on offset profiles later.
-Run headless, it writes the parts to CANDYBAR_OUT (default cad/out/shell-bp); tools/check_solids.py compares
-them with profiles.faces():
+Run headless, it writes the parts to CANDYBAR_OUT (default cad/out/shell-rev7): the BREP and STL of each part,
+manifest.json, focus.json (close-up cameras), edges.json (every BREP edge as a polyline, for the edge-drawn renders
+of tools/render_views.py) and report.json. tools/check_solids.py compares the parts with profiles.faces(), and
+tools/face_check.py checks their faces:
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.solids
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.solids
 """
 from __future__ import annotations
 
+import bisect
 import json
 import math
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import FreeCAD
 import MeshPart
@@ -47,7 +57,21 @@ OFF_LAND = 0.01
 BLEND_SECTIONS = 6
 SHEAR_TOL = 1e-3
 BEVEL_STEP = 0.5
-FINISH = {"deck": "white", "control_panel": "black", "front_body": "white", "rear_body": "white", "bezel": "black",
+# a round that is cut by hand along a curved edge (the hood's rear corners): its sections are ROUND_STEP apart or
+# less along the edge, found on ROUND_SAMPLES heights, from ROUND_BELOW under the foot to where the edge turns
+# ROUND_END (radians). Its arc stands ROUND_OFF out from the true round: it then crosses the two faces at 0.5
+# degrees, and it is clear of the edge where the edge turns less than 0.9 degrees
+ROUND_STEP = 0.5
+ROUND_SAMPLES = 4000
+ROUND_BELOW = 5.0
+ROUND_OFF = 1e-4
+ROUND_END = math.radians(0.7)
+# after a cut by several tools, a tool may still hold this share of what it held of the solid, or this volume in mm3
+CUT_LEFT = 0.02
+CUT_LEFT_MM3 = 0.01
+# the edges of the BREP are written to edges.json as polylines with points this far apart
+EDGE_STEP = 0.6
+FINISH = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black",
           "screen": "#3a4250", "hood": "white", "marquee_lip": "white", "speaker_left": "black", "speaker_right": "black",
           "logo_form": "#2f4f3a"}
 
@@ -69,7 +93,8 @@ def edge(seg: pr.Line | pr.Arc | pr.Conic, place: Place, spline: bool = False) -
 
 
 def wire(path: pr.Path, place: Place, spline: bool = False) -> Part.Wire:
-    return Part.Wire([edge(s, place, spline) for s in path])
+    """A path as a wire. An arc of no radius is a sharp corner and makes no edge."""
+    return Part.Wire([edge(s, place, spline) for s in path if not (isinstance(s, pr.Arc) and s.r < 1e-9)])
 
 
 def ends(seg: pr.Line | pr.Arc | pr.Conic) -> tuple[P2, P2]:
@@ -260,17 +285,112 @@ def warped_wire(path: pr.Path, place: Place, flat: Place) -> Part.Wire:
 
 # ---------- deck ----------
 
-def deck(d: Blueprint) -> tuple[Part.Shape, Part.Shape]:
-    """The deck to the foot of the sweep, with the pocket of the control panel; and the control panel plate."""
+def deck(d: Blueprint, log: list[str] | None = None) -> tuple[Part.Shape, Part.Shape]:
+    """The deck to the foot of the sweep, with the pocket of the control panel, the base facet round its foot and the
+    edge break on the rim of the pocket; and the control panel plate."""
+    log = log if log is not None else []
     plan = pr.deck_plan(d)
     first = plan[0]
     plan = [pr.Line((first.p[0], first.p[1] + OVER * 4), first.q)] + plan[1:]
-    solid = evolved(both_sides(plan), edge_profile(d, d.deck_top))
+    solid = evolved(symmetric(plan), edge_profile(d, d.deck_top))
     ya = d.foot_y - d.bend_t
     solid = solid.common(Part.makeBox(BIG, ya + OVER, d.deck_top + OVER, V(-BIG / 2, -OVER, -OVER)))
     pocket = prism(poly(pr.panel_outline(d, d.panel_gap)), xy(d.panel_top), V(0, 0, OVER))
     panel = prism(poly(pr.panel_outline(d)), xy(d.panel_top - d.panel_t), V(0, 0, d.panel_t))
-    return solid.cut([pocket, panel]).removeSplitter(), panel
+    solid = solid.cut([pocket, panel]).removeSplitter()
+    # the facet takes the front edges of the foot; it runs on along the sides, which are tangent to the front corners
+    solid = solid.makeChamfer(d.base_facet, floor_edges(solid, lambda p: p.y < ya - 0.01))
+    # the rim of the pocket: the other sharp edges of the deck lie in its joint with the body or under the panel
+    rim = sharp_edges(solid, d, lambda m: abs(m.z - d.deck_top) < 1e-3 and m.y < ya - 1.0)
+    log.append(f"deck, edge break R {d.edge_break:g}: {len(rim)} edges (the rim of the panel pocket)")
+    return break_edges(solid, [e for e, _ in rim], d.edge_break, log, "deck"), panel
+
+
+# ---------- edges and rounds ----------
+
+def middle(e: Part.Edge) -> FreeCAD.Vector:
+    return e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+
+
+def edges_where(shape: Part.Shape, test: Callable[[FreeCAD.Vector], bool], n: int = 5) -> list[Part.Edge]:
+    """The edges of a shape on which n points, evenly spread from end to end, all pass the test."""
+    at = lambda e, k: e.valueAt(e.FirstParameter + (e.LastParameter - e.FirstParameter) * k / (n - 1))
+    return [e for e in shape.Edges if not e.Degenerated and all(test(at(e, k)) for k in range(n))]
+
+
+def crease_angle(faces: list[Part.Face], p: FreeCAD.Vector) -> float:
+    """Angle in degrees between the normals of two faces at a point of their common edge (0: tangent)."""
+    ns = [f.normalAt(*f.Surface.parameter(p)) for f in faces]
+    return math.degrees(math.acos(max(-1.0, min(1.0, abs(ns[0].dot(ns[1]))))))
+
+
+def edge_turn(shape: Part.Shape, e: Part.Edge) -> tuple[bool, float]:
+    """(convex, turn in degrees) of an edge between two faces of a solid, at its middle: convex when the first face,
+    followed away from the edge, falls behind the second face's outward normal."""
+    fs = shape.ancestorsOfType(e, Part.Face)
+    m = middle(e)
+    t = e.tangentAt((e.FirstParameter + e.LastParameter) / 2)
+    n = [f.normalAt(*f.Surface.parameter(m)) for f in fs]
+    away = n[0].cross(t)
+    away.normalize()
+    if fs[0].distToShape(Part.Vertex(m + away * 0.3))[0] > fs[0].distToShape(Part.Vertex(m - away * 0.3))[0]:
+        away = -away
+    return away.dot(n[1]) < 0, crease_angle(fs, m)
+
+
+def tight(face: Part.Face, limit: float) -> bool:
+    """Whether a face is curved more tightly than the radius `limit` in its middle (a round, not a wall)."""
+    u0, u1, v0, v1 = face.ParameterRange
+    try:
+        k = max(abs(c) for c in face.curvatureAt((u0 + u1) / 2, (v0 + v1) / 2))
+    except Exception:
+        return False
+    return k > 1.0 / limit
+
+
+def fillet(shape: Part.Shape, edges: list[Part.Edge], radius: Callable[[Part.Edge], float]) -> Part.Shape:
+    """A round of radius(edge) on each edge, all in one builder, so that the rounds that meet at a corner are made
+    together (a Part::Fillet feature, which takes a radius for each edge)."""
+    index: dict[int, int] = {}
+    for i, e in enumerate(shape.Edges):
+        index.setdefault(e.hashCode(), i + 1)
+    doc = FreeCAD.newDocument("fillet")
+    try:
+        base = doc.addObject("Part::Feature", "base")
+        base.Shape = shape
+        fl = doc.addObject("Part::Fillet", "fillet")
+        fl.Base = base
+        fl.Edges = [(index[e.hashCode()], radius(e), radius(e)) for e in edges]
+        doc.recompute()
+        out = fl.Shape.copy()
+    finally:
+        FreeCAD.closeDocument(doc.Name)
+    if out.isNull() or not out.isValid():
+        raise Part.OCCError("the rounds failed")
+    return out
+
+
+def edge_round_cutter(p0: FreeCAD.Vector, p1: FreeCAD.Vector, n1: FreeCAD.Vector, n2: FreeCAD.Vector, r: float, ext0: float = 0.0,
+                      ext1: float = 0.0, e: float = 1.0) -> Part.Shape:
+    """What a round of radius r takes off a straight convex edge p0-p1 between two planes with outward normals n1, n2:
+    the region between the edge and the round's cylinder (reaching e out past both faces), a prism along the edge
+    from ext0 before p0 to ext1 past p1. Its walls stand square to the two faces on the lines where the round is
+    tangent to them, so the cut gives an exact cylinder that meets both faces with no step."""
+    t = p1 - p0
+    length = t.Length
+    t.normalize()
+    n1, n2 = V(n1), V(n2)
+    n1.normalize()
+    n2.normalize()
+    b = -(n1 + n2)
+    b.normalize()
+    alpha = math.acos(max(-1.0, min(1.0, -n1.dot(n2))))         # the material's angle at the edge
+    a0 = p0 - t * ext0 + b * (r / math.sin(alpha / 2))
+    t1, t2 = a0 + n1 * r, a0 + n2 * r
+    tip, mid = p0 - t * ext0 - b * e, a0 - b * r
+    w = Part.Wire([Part.LineSegment(t1 + n1 * e, tip).toShape(), Part.LineSegment(tip, t2 + n2 * e).toShape(),
+                   Part.LineSegment(t2 + n2 * e, t2).toShape(), Part.Arc(t2, mid, t1).toShape(), Part.LineSegment(t1, t1 + n1 * e).toShape()])
+    return Part.Face(w).extrude(t * (length + ext0 + ext1))
 
 
 # ---------- body ----------
@@ -282,14 +402,6 @@ def side_path(d: Blueprint, z_top: float) -> pr.Path:
         return [pr.Line((hw, -OVER), (hw, z_top))]
     r = d.tuck_r
     return [pr.Line((hw, -OVER), (hw, d.tuck_z0)), pr.Arc((hw - r, d.tuck_z0), r, 0.0, math.asin((z_top - d.tuck_z0) / r))]
-
-
-def side_profile(d: Blueprint, fr: pr.Front) -> pr.Path:
-    """The body in side view, in (y, z): the sweep, the rail arc, the body top and the rear."""
-    ya = d.foot_y - d.bend_t
-    rear = pr.rear_profile(d)[1:-1] + [(ya, 0.0)]
-    top = fr.rail.at(fr.rail.a1)
-    return [pr.Line((ya, 0.0), (ya, d.deck_top)), fr.sweep, fr.rail] + poly([top] + rear)[:-1]
 
 
 def rail_cutter(d: Blueprint, fr: pr.Front) -> Part.Shape:
@@ -385,77 +497,355 @@ def ring_bevel(loop: Part.Wire, z_edge: float, z_face: float, by: float) -> Part
     return Part.makeBox(BIG, BIG, z1 - z0, V(-BIG / 2, -BIG / 2, z0)).cut(keep)
 
 
-def step_cutter(d: Blueprint) -> Part.Shape:
-    """What the step takes off the right side behind the side band: a 45 degree notch in plan, leaning back."""
+def stroke(d: Blueprint) -> pr.Path:
+    """The outer edge of the band in side view (profiles.band_stroke) as lines, from below the desk to past the rear."""
+    foot, stub, knee, top, end = pr.band_stroke(d)
+    return [pr.Line((foot[0], -OVER), stub), pr.Line(stub, knee), pr.Line(knee, top), pr.Line(top, (d.depth + 3 * OVER, end[1]))]
+
+
+def mitre_offset(path: pr.Path, by: float) -> pr.Path:
+    """A path of lines moved by a distance to the left of its direction of travel (negative: to the right). Each
+    line is moved, and neighbours are cut where they cross (mitre joins)."""
+    moved = [offset_seg(sg, by) for sg in path]
+
+    def cross(l1: pr.Line, l2: pr.Line) -> P2:
+        (x1, y1), (x2, y2), (x3, y3), (x4, y4) = l1.p, l1.q, l2.p, l2.q
+        den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(den) < 1e-12:
+            return l1.q
+        a, c = x1 * y2 - y1 * x2, x3 * y4 - y3 * x4
+        return ((a * (x3 - x4) - (x1 - x2) * c) / den, (a * (y3 - y4) - (y1 - y2) * c) / den)
+
+    pts = [moved[0].p] + [cross(moved[i], moved[i + 1]) for i in range(len(moved) - 1)] + [moved[-1].q]
+    return [pr.Line(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+
+
+def plane_solid(a: list[FreeCAD.Vector], b: list[FreeCAD.Vector]) -> Part.Shape:
+    """The solid between two closed polygons with the same number of corners, whose matching edges are parallel: its
+    ends are the polygons, and each side face is a plane through two matching edges. (A ruled loft between the two
+    gives the same faces as splines of degree 1, on which OpenCascade's rounds become splines with loose curves.)"""
+    ring = lambda pts: Part.Face(Part.makePolygon(pts + pts[:1]))
+    faces = [ring(a), ring(b)] + [ring([a[i], a[(i + 1) % len(a)], b[(i + 1) % len(a)], b[i]]) for i in range(len(a))]
+    shell = Part.makeShell(faces)
+    shell.sewShape()
+    solid = Part.makeSolid(shell)
+    if solid.Volume < 0:
+        solid.reverse()
+    return solid
+
+
+def band_cutter(d: Blueprint) -> Part.Shape:
+    """What the band takes off the right side: the region outside the side of the lower body (x > rear_w / 2) and
+    behind or below the band. That region lies between its sections at x = W + e and x = rear_w / 2 - e: the region
+    behind the stroke, moved by the stroke's offset at that x (the band runs in by one for each one it runs back or
+    down, square to the stroke). Matching edges of the two sections are parallel, so each piece of the band is a
+    plane."""
+    path = stroke(d)
+    hw, a, e = d.width / 2, d.rear_w / 2, OVER / 10
+
+    def section(x: float) -> list[FreeCAD.Vector]:
+        moved = mitre_offset(path, -(hw - x))
+        start, end = ends(moved[0])[0], ends(moved[-1])[1]
+        return [V(x, *p) for p in [start] + [ends(sg)[1] for sg in moved] + [(end[0], -OVER)]]
+
+    behind = plane_solid(section(hw + e), section(a - e))
+    return halfspace(V(a, 0, 0), V(1, 0, 0)).common(behind)
+
+
+def rear_cutter(d: Blueprint) -> Part.Shape:
+    """What the rear profile takes off a plain rear wall at the full depth: the region behind the upper rear wall,
+    the rear facet of the shelf and the lower rear wall, across the whole width."""
+    far, lo, hi = d.depth + 3 * OVER, -3 * OVER, d.body_top + 3 * OVER
+    region = poly([(d.depth, hi), (d.depth, d.rear_step_z1), (d.body_d, d.rear_step_z0), (d.body_d, lo), (far, lo), (far, hi)])
+    return prism(region, yz(-BIG / 2), V(BIG, 0, 0))
+
+
+def sharp_body(d: Blueprint, fr: pr.Front) -> Part.Shape:
+    """The body as one solid with every edge of the rear sharp: the side profile with a plain rear wall, in common
+    with the front outline (with the tuck); less the edge section along the rail, the band, the recess and reveal of
+    the bezel plate, and the rear profile."""
     top = d.body_top + OVER
-    s = d.width / 2 - d.rear_w / 2
-    far = d.width / 2 + s + OVER
     sides = side_path(d, top)
-    outline = sides + poly([ends(sides[-1])[1], (far, top), (far, -OVER), (d.width / 2, -OVER)])[:-1]
-    m = FreeCAD.Matrix()
-    m.A23 = math.tan(math.radians(d.step_lean))
-    m.A24 = d.step_y0
-    leaning = Part.Face(wire(outline, xz(0.0))).transformGeometry(m)
-    return leaning.extrude(V(-s, s, 0)).fuse(leaning.translated(V(-s, s, 0)).extrude(V(0, BIG, 0)))
+    end = ends(sides[-1])[1]
+    ya = d.foot_y - d.bend_t
+    rail_top = fr.rail.at(fr.rail.a1)
+    profile = [pr.Line((ya, 0.0), (ya, d.deck_top)), fr.sweep, fr.rail] + poly([rail_top, (d.depth, d.body_top), (d.depth, 0.0), (ya, 0.0)])[:-1]
+    solid = across(profile).common(along(both_sides(sides + [pr.Line(end, (0.0, end[1]))])))
+    xb = d.bezel_w / 2 + d.panel_gap
+    bw = d.bezel_w / 2
+    plate = bezel_box(d, fr, -bw, bw).cut(behind_screen(d, d.mon_setback))
+    reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(d, fr))
+    cutters = [both(rail_cutter(d, fr)), both(band_cutter(d)), plate, both(reveal), screen(d), rear_cutter(d)]
+    return solid.cut(cutters).removeSplitter()
 
 
-def round_section(rd: pr.Round, z: float, out: float = OVER) -> Part.Wire:
-    """What a round in plan takes off at height z: the region outside its arc, between the radii at its two ends,
-    as a wire that starts at the start of the arc (the same five edges at every height, for a loft). The arc stands
-    OFF_LAND out toward both faces that it rounds, so that it crosses them at a small angle and does not lie on
-    their tangent (a boolean with a tangent face fails)."""
-    a0, a1 = rd.a0, rd.a1
-    n0, n1 = (math.cos(a0), math.sin(a0)), (math.cos(a1), math.sin(a1))
-    rd = pr.Round((rd.c[0] + OFF_LAND * (n0[0] + n1[0]), rd.c[1] + OFF_LAND * (n0[1] + n1[1])), rd.r, a0, a1)
-    p0, p1 = rd.at(a0), rd.at(a1)
-    q0 = (p0[0] + out * n0[0], p0[1] + out * n0[1])
-    q1 = (p1[0] + out * n1[0], p1[1] + out * n1[1])
-    k = (rd.r + out) / math.cos((a1 - a0) / 2)
-    f = (rd.c[0] + k * math.cos((a0 + a1) / 2), rd.c[1] + k * math.sin((a0 + a1) / 2))
-    v = lambda p: V(p[0], p[1], z)
-    arc = Part.Arc(v(p1), v(rd.at((a0 + a1) / 2)), v(p0)).toBSpline().toShape()
-    return Part.Wire([Part.makeLine(v(p0), v(q0)), Part.makeLine(v(q0), v(f)), Part.makeLine(v(f), v(q1)), Part.makeLine(v(q1), v(p1)), arc])
+def floor_edges(shape: Part.Shape, test: Callable[[FreeCAD.Vector], bool]) -> list[Part.Edge]:
+    """The edges of a shape that lie on the desk, where their two ends and their middle pass the test."""
+    return edges_where(shape, lambda p: abs(p.z) < 1e-4 and test(p), 3)
 
 
-def round_cutter(sections: list[tuple[float, pr.Round]], ruled: bool = False, below: float = 0.0, above: float = 0.0) -> Part.Shape:
-    """A loft through the sections of a round at rising heights; the first and the last section carried straight
-    down by `below` and up by `above`."""
-    wires = [round_section(rd, z) for z, rd in sections]
-    pieces = [Part.makeLoft(wires, True, ruled)]
-    if below:
-        pieces.append(Part.Face(wires[0]).extrude(V(0, 0, -below)))
-    if above:
-        pieces.append(Part.Face(wires[-1]).extrude(V(0, 0, above)))
-    return pieces[0].fuse(pieces[1:]).removeSplitter() if len(pieces) > 1 else pieces[0]
+def lower_corner_cutter(d: Blueprint) -> Part.Shape:
+    """What the rounds of the two lower rear corners take off, made by hand so that they meet exactly. The hip
+    (between the two 45 degree facets of the shelf) and the mitre of the base facet (between two faces of the base
+    facet, parallel to those of the shelf) get a round of rear_corner_r (R). Each of these rounds, cut by a level
+    plane, is an ellipse: centre (a - 2 r, y0 - 2 r) with r = R / sqrt(2), semi-axes sqrt(3) R along the diagonal and
+    R across, tangent to both walls at r from the corner. The upright corner between them is that ellipse carried
+    straight up, so it meets the round of the hip and the round of the mitre on the same curve: no ledge and no
+    needle. (A circular round of r there meets the creases at the same points, but it stands up to 0.035 r proud of
+    the hip's round between them.)"""
+    a, y0, zc, ch = d.rear_w / 2, d.body_d, d.rear_step_z0, d.base_facet
+    big, k = 4000.0, math.sqrt(0.5)
+    big_r = d.rear_corner_r
+    rr = big_r / math.sqrt(2)
+    level = lambda z0, z1: Part.makeBox(big, big, z1 - z0, V(-big / 2, -big / 2, z0))
+    out = []
+    for sx in (1, -1):
+        X = lambda p: V(sx * p.x, p.y, p.z)
+        hip_top = V(d.width / 2, y0 + d.width / 2 - a, zc + d.width / 2 - a)
+        hip = edge_round_cutter(X(V(a, y0, zc)), X(hip_top), V(sx * k, 0, -k), V(0, k, -k), big_r, 3.0, 5.0)
+        mitre = edge_round_cutter(X(V(a, y0, ch)), X(V(a - ch, y0 - ch, 0)), V(sx * k, 0, -k), V(0, k, -k), big_r, 3.0, 2.0)
+        o = V(sx * (a - 2 * rr), y0 - 2 * rr, ch)
+        ell = Part.Ellipse(o + V(sx * k, k, 0) * (math.sqrt(3) * big_r), o + V(-sx * k, k, 0) * big_r, o)
+        ps, pr_ = V(sx * a, y0 - rr, ch), V(sx * (a - rr), y0, ch)
+        u0, u1 = sorted((ell.parameter(ps), ell.parameter(pr_)))
+        arc = ell.toShape(u0, u1) if u1 - u0 < math.pi else ell.toShape(u1, u0 + 2 * math.pi)   # the short arc, toward the corner
+        q0, q1 = arc.Vertexes[0].Point, arc.Vertexes[-1].Point
+        out0 = lambda q: q + (V(sx, 0, 0) if abs(abs(q.x) - a) < 1e-6 else V(0, 1, 0))
+        corner = V(sx * (a + 1), y0 + 1, ch)
+        w = Part.Wire([arc, Part.LineSegment(q1, out0(q1)).toShape(), Part.LineSegment(out0(q1), corner).toShape(),
+                       Part.LineSegment(corner, out0(q0)).toShape(), Part.LineSegment(out0(q0), q0).toShape()])
+        column = Part.Face(w).extrude(V(0, 0, zc - ch))
+        out += [column, hip.common(level(zc, big)), mitre.common(level(-OVER, ch))]
+    return out[0].fuse(out[1:]).removeSplitter()
 
 
-def corner_cutter(d: Blueprint) -> Part.Shape:
-    """What the rounds of the right rear corner take off the body (profiles.body_rounds): the corner round from the
-    floor up, on the lower rear wall, the slope and the upper rear wall (a loft in each, as the rear wall turns at the
-    slope's creases), and the round of the step's outer edge from where it starts. Both are carried straight up
-    from the height where the step has run out; the seam bevel takes off what lies above it."""
-    z1, zm = d.runout_z
-    corner = lambda z: pr.body_rounds(d, z)[1]
-    lo, mid = d.rear_step_z0, d.rear_step_z1
-    lower = [(z, corner(z)) for z in (0.0, d.tuck_z0, (d.tuck_z0 + lo) / 2, lo)]
-    slope = [(lo + (mid - lo) * k / 8, corner(lo + (mid - lo) * k / 8)) for k in range(9)]
-    n = 36
-    upper = [(mid + (zm - mid) * k / n, corner(mid + (zm - mid) * k / n)) for k in range(n + 1)]
-    pieces = [round_cutter(lower, True, below=OVER), round_cutter(slope, True), round_cutter(upper, above=OVER)]
-    start = z1 + (zm - z1) / 200
-    edge = [(start + (zm - start) * k / 24, pr.body_rounds(d, start + (zm - start) * k / 24)[0]) for k in range(25)]
-    pieces.append(round_cutter(edge, above=OVER))
-    return pieces[0].fuse(pieces[1:]).removeSplitter()
+def behind_band(d: Blueprint, p: FreeCAD.Vector) -> bool:
+    """Whether a point belongs to the rear of the body: behind the line of the band's lean, or on the rear."""
+    return p.y > d.step_y(p.z) - 1 or p.y > d.body_d - 1
 
 
-def hood_corner_cutter(d: Blueprint, h: pr.Hood) -> Part.Shape:
-    """What the round of the right rear corner takes off the cap (profiles.hood_round), in the cabinet frame: a loft
-    through its sections from the foot to the roof, with the sections closer together toward the roof, where the
-    rear arc and the side blend turn level."""
-    back = pr.hood_back(d, h)
-    zs = [h.height * (1 - (1 - k / 48) ** 2) for k in range(49)]
-    oz = h.origin[2]
-    return round_cutter([(oz + z, pr.hood_round(d, h, back, z)) for z in zs], below=OVER, above=OVER)
+def rear_design_edges(shape: Part.Shape, d: Blueprint) -> list[Part.Edge]:
+    """The edges of the rear that the edge rule gives the design round: convex, a turn of edge_min_turn or more,
+    behind the band or on the rear, above the base facet and below the body top. They are the outer edge of the
+    band, the edge where the rear facet of the shelf ends on the side band, the lower edge of the upper rear wall
+    and the upright rear corners of the head. The lower rear corner is not taken: lower_corner_cutter has made it."""
+    rw, y0, zc = d.rear_w / 2, d.body_d, d.rear_step_z0
+    out = []
+    for e in shape.Edges:
+        if e.Degenerated:
+            continue
+        m, b = middle(e), e.BoundBox
+        if b.ZMax < d.base_facet + 0.01 + 1e-3 or b.ZMin > d.body_top - 0.5 or not behind_band(d, m):
+            continue
+        if abs(abs(m.x) - rw) < 4 and abs(m.y - y0) < 4 and m.z < zc + 0.5:      # the corner column, made by hand
+            continue
+        fs = shape.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2 or crease_angle(fs, m) <= 5.0:
+            continue
+        convex, turn = edge_turn(shape, e)
+        if convex and turn >= d.edge_min_turn:
+            out.append(e)
+    return out
+
+
+def cut_in_cutter(d: Blueprint) -> Part.Shape:
+    """The right row of cut-ins, milled by a ball whose centre keeps one distance dc outside the surface all the way:
+    its path is the offset of the body's plan outline at the groove's height (the rear line, the ellipse of the lower
+    corner's column, the side line). Thus the lips are level lines at sqrt(R^2 - dc^2) = h / 2 above and below the
+    path, on the legs and round the corner alike, and the floor is the outline moved in by the depth.
+
+    Built as a sweep of the groove's own section (the ball's arc inside the wall, closed by a chord 1 outside) along
+    the outline, the section kept upright (binormal z) and square to the outline: the outline sampled every 0.1 and
+    approximated by one B-spline (deviation under 0.002), so each groove is one face from end to end. A sweep of the
+    whole ball along a path twisted on the near-straight parts and crossed itself. The depth must stay under the
+    smallest radius of the outline (the ellipse's R / sqrt(3), 1.73 for R 3), else the floor would cross itself at
+    the corner; the floor turns on that radius minus the depth. A sphere at each end (round ends)."""
+    a, y0, h = d.rear_w / 2, d.body_d, d.cut_in_h
+    dep = d.cut_in_depth
+    dc = (h * h / 4 / dep - dep) / 2                    # the centre's distance outside the surface
+    rho = dc + dep                                      # the ball
+    big_r = d.rear_corner_r
+    rr, k = big_r / math.sqrt(2), math.sqrt(0.5)
+    end = h / 2                                         # the slot reaches this far past the ball's last centre
+    out = []
+    for i in range(d.cut_in_count):
+        z = d.cut_in_z0 + i * d.cut_in_pitch + h / 2
+        o = V(a - 2 * rr, y0 - 2 * rr, z)
+        ell = Part.Ellipse(o + V(k, k, 0) * (math.sqrt(3) * big_r), o + V(-k, k, 0) * big_r, o)
+        u0, u1 = sorted((ell.parameter(V(a, y0 - rr, z)), ell.parameter(V(a - rr, y0, z))))
+        if u1 - u0 > math.pi:
+            u0, u1 = u1, u0 + 2 * math.pi
+        arc = ell.toShape(u0, u1).discretize(Distance=0.05)
+        pr0, pr1 = V(a - d.cut_in_rear + end, y0, z), V(a - rr, y0, z)
+        ps0, ps1 = V(a, y0 - rr, z), V(a, y0 - d.cut_in_side + end, z)
+        if (arc[0] - pr1).Length > 1e-3:
+            arc = arc[::-1]
+        n0, n1 = int((pr1 - pr0).Length / 0.1), int((ps1 - ps0).Length / 0.1)
+        pts = [pr0 + (pr1 - pr0) * (j / n0) for j in range(n0)] + arc[:-1] + [ps0 + (ps1 - ps0) * (j / n1) for j in range(n1 + 1)]
+        sp = Part.BSplineCurve()
+        sp.approximate(Points=pts, DegMin=3, DegMax=5, Tolerance=0.002, Continuity="C2")
+        q0, q1 = sp.value(sp.FirstParameter), sp.value(sp.LastParameter)
+        t0 = sp.tangent(sp.FirstParameter)[0]
+        nrm = V(-t0.y, t0.x, 0)
+        if nrm.y < 0:
+            nrm = -nrm
+        at = lambda n_, dz: q0 + nrm * n_ + V(0, 0, dz)  # noqa: E731
+        cz = math.sqrt(rho * rho - (1 - dc) ** 2)
+        section = Part.Wire([Part.Arc(at(1, cz), at(-dep, 0), at(1, -cz)).toShape(), Part.LineSegment(at(1, -cz), at(1, cz)).toShape()])
+        mk = Part.BRepOffsetAPI.MakePipeShell(Part.Wire([sp.toShape()]))
+        mk.setBiNormalMode(V(0, 0, 1))
+        mk.add(section, False, False)
+        mk.build()
+        mk.makeSolid()
+        groove = mk.shape()
+        groove = groove if groove.ShapeType == "Solid" else groove.Solids[0]
+        out.append(groove.fuse([Part.makeSphere(rho, q0 + nrm * dc), Part.makeSphere(rho, q1 + V(dc, 0, 0))]).removeSplitter())
+    return out[0].fuse(out[1:]).removeSplitter()
+
+
+def hand_hold_cutter(d: Blueprint) -> Part.Shape:
+    """The right hand-hold: in side view an opening of grip_h in the upper rear wall, a roof that runs down inward at
+    45 degrees, a back wall grip_depth in, a level floor; across, from grip_x0 to grip_x1 with round ends of
+    grip_end_r in plan. Every edge of it that lies inside the wall is rounded on the cutter: grip_r, and
+    grip_roof_r on the roof's edges (with R 8 there, the blend of the 45 degree roof and the round end dips to 43.8
+    degrees; with R 3 it holds 45.0). The edges where the cutter passes through the rear wall are not touched: the rim
+    gets the edge break with the rest of the body."""
+    x0, x1, z0 = d.grip_x0, d.grip_x1, d.grip_z0
+    y_out, y_in = d.depth + OVER, d.depth - d.grip_depth
+    zt = z0 + d.grip_h
+    prof = poly([(y_out, z0), (y_in, z0), (y_in, zt - d.grip_depth), (d.depth, zt), (y_out, zt)])
+    block = prism(prof, yz(x0), V(x1 - x0, 0, 0))
+    r, top = d.grip_end_r, d.body_top + OVER
+    plan = Part.makeBox(x1 - x0 - 2 * r, OVER * 4, top, V(x0 + r, y_in - 1, 0)).fuse(
+        [Part.makeCylinder(r, top, V(x0 + r, y_in + r, 0)), Part.makeCylinder(r, top, V(x1 - r, y_in + r, 0)),
+         Part.makeBox(x1 - x0, OVER * 4, top, V(x0, y_in + r, 0))])
+    cutter = block.common(plan).removeSplitter()
+    faces_of = lambda e: cutter.ancestorsOfType(e, Part.Face)
+    inside = [e for e in cutter.Edges if not e.Degenerated and e.BoundBox.YMax < d.depth - 0.5 and len(faces_of(e)) == 2
+              and crease_angle(faces_of(e), middle(e)) > 5.0]
+    on_roof = lambda e: any(isinstance(f.Surface, Part.Plane) and abs(f.normalAt(0, 0).z - math.sqrt(0.5)) < 1e-3 for f in faces_of(e))
+    return fillet(cutter, inside, lambda e: d.grip_roof_r if on_roof(e) else d.grip_r)
+
+
+def hand_hold_rim(shape: Part.Shape, d: Blueprint) -> list[Part.Edge]:
+    """Every edge of the two hand-hold openings on the rear wall of the head."""
+    out = []
+    for e in shape.Edges:
+        b = e.BoundBox
+        if abs(b.YMin - d.depth) < 1e-3 and abs(b.YMax - d.depth) < 1e-3 and d.grip_x0 - 1 < abs(b.Center.x) < d.grip_x1 + 1 \
+                and d.grip_z0 - 1 < b.Center.z < d.grip_z0 + d.grip_h + 1:
+            out.append(e)
+    return out
+
+
+def sharp_edges(shape: Part.Shape, d: Blueprint, where: Callable[[FreeCAD.Vector], bool]) -> list[tuple[Part.Edge, str]]:
+    """Every convex edge of a solid, with its middle where `where` holds, that turns more than edge_break_turn, with
+    its class: "beside a round" when one of its faces is a round (the edge itself is still sharp: where the lip of a
+    cut-in crosses the corner round, where the base facet meets the corner column), else "sharp". The edges that
+    the design rounds are faces now, not in the list. An edge that turns less is blunt and gets no finish."""
+    out = []
+    for e in shape.Edges:
+        if e.Degenerated or not where(middle(e)):
+            continue
+        fs = shape.ancestorsOfType(e, Part.Face)
+        if len(fs) != 2:
+            continue
+        convex, turn = edge_turn(shape, e)
+        if convex and turn > d.edge_break_turn:
+            out.append((e, "beside a round" if any(not isinstance(f.Surface, Part.Plane) and tight(f, 30.0) for f in fs) else "sharp"))
+    return out
+
+
+def rear_break_edges(shape: Part.Shape, d: Blueprint) -> list[tuple[Part.Edge, str]]:
+    """The edges of the rear of the body that get the edge break: every sharp convex edge behind the band or on the
+    rear (sharp_edges), and the rims of the hand-holds all the way round ("rim": the top edge of a rim turns only 45
+    degrees, at the roof, and the edges along the rounds inside border a round but are sharp themselves)."""
+    out = sharp_edges(shape, d, lambda m: behind_band(d, m))
+    seen = {e.hashCode() for e, kind in out if kind == "sharp"}
+    for e in hand_hold_rim(shape, d):
+        if e.hashCode() not in seen:
+            out = [(x, kind) for x, kind in out if not x.isSame(e)] + [(e, "rim")]
+    return out
+
+
+def bevel_crossings(listed: list[tuple[Part.Edge, str]], in_groove: Callable[[FreeCAD.Vector], bool]) -> tuple[list[tuple[Part.Edge, str]], list[Part.Edge]]:
+    """The listed edges without those where the seam bevel crosses a corner round (an edge beside a round, in the seam
+    groove); and those edges, in one order. Such an edge is a few mm long. It continues the upper or lower edge of the
+    bevel, which is blunt on the walls, and turns a little more on the round. The edge break on it is a valid solid in
+    some runs and not in others, so it gets none: the build must be the same in every run."""
+    crossing = [e for e, kind in listed if kind == "beside a round" and in_groove(middle(e))]
+    kept = [(e, kind) for e, kind in listed if not any(e.isSame(x) for x in crossing)]
+    return kept, sorted(crossing, key=lambda e: (round(abs(middle(e).x), 1), middle(e).x < 0))
+
+
+def where(e: Part.Edge) -> str:
+    m = middle(e)
+    return f"({m.x:.1f}, {m.y:.1f}, {m.z:.1f}), {e.Length:.1f} long"
+
+
+def break_edges(shape: Part.Shape, edges: list[Part.Edge], radius: float, log: list[str], what: str) -> Part.Shape:
+    """A round of `radius` on the edges of a symmetric solid: the edge break. All edges in one call, when that gives
+    one valid solid. If not, the edges are taken in groups of edges that touch each other (a chain cannot be made
+    edge by edge). A group that does not build loses the one pair of edges (an edge and the edge that mirrors it, so
+    that both sides stay the same) without which it builds; if no one pair does that, the whole group stays sharp.
+    log names the edges that stay sharp. The rest is made in one call. The number of tries is at most one for each
+    pair of edges and two for each group."""
+    good = lambda s: not s.isNull() and s.isValid() and len(s.Solids) == 1
+
+    def made(units: list[list[Part.Edge]]) -> Part.Shape | None:
+        if not units:
+            return shape
+        try:
+            out = shape.makeFillet(radius, [e for u in units for e in u])
+        except Part.OCCError:
+            return None
+        return out if good(out) else None
+
+    if not edges:
+        return shape
+    # one order of the edges in every run (OpenCascade lists the edges of a shape in an order that changes from run
+    # to run, and the round it makes depends on the order in which it gets them): by place, right side first
+    place = lambda e: (round(middle(e).z, 2), round(middle(e).y, 2), round(abs(middle(e).x), 2), middle(e).x < 0, round(e.Length, 2))
+    edges = sorted(edges, key=place)
+    # an edge and the edge that mirrors it are one unit
+    units: list[list[Part.Edge]] = []
+    for e in edges:
+        m = middle(e)
+        twin = next((u for u in units if abs(m.x) > 0.05 and (middle(u[0]) - V(-m.x, m.y, m.z)).Length < 0.05), None)
+        if twin is not None:
+            twin.append(e)
+        else:
+            units.append([e])
+    out = made(units)
+    if out is not None:
+        return out
+    # the groups: units whose edges share a corner
+    corners = lambda u: {(round(v.Point.x, 3), round(v.Point.y, 3), round(v.Point.z, 3)) for e in u for v in e.Vertexes}
+    groups: list[tuple[set, list[list[Part.Edge]]]] = []
+    for u in units:
+        pts, members = corners(u), [u]
+        for g in [g for g in groups if g[0] & pts]:
+            groups.remove(g)
+            pts |= g[0]
+            members = g[1] + members
+        groups.append((pts, members))
+    kept, sharp = [], []
+    for _, members in groups:
+        if made(members) is not None:
+            kept += members
+            continue
+        one = next((u for u in sorted(members, key=lambda u: u[0].Length) if made([x for x in members if x is not u]) is not None), None)
+        gone = [one] if one is not None else members
+        kept += [u for u in members if not any(u is x for x in gone)]
+        sharp += gone
+    out = made(kept)
+    if out is None:
+        raise Part.OCCError(f"{what}: the edge break of R {radius:g} does not build, also without the {len(sharp)} pairs of edges that fail in their groups")
+    for u in sharp:
+        places = " and ".join(where(e) for e in u)
+        log.append(f"{what}: no edge break at {places}: with it, the round of R {radius:g} on the edges that touch it is not a valid solid; "
+                   f"{'they stay' if len(u) > 1 else 'it stays'} sharp")
+    return out
 
 
 def chord_frame(fr: pr.Front) -> tuple[FreeCAD.Vector, FreeCAD.Vector]:
@@ -500,25 +890,51 @@ def screen(d: Blueprint) -> Part.Shape:
     return slab(o, up, into, (-MON_ACTIVE_W / 2, MON_ACTIVE_W / 2), (cs - MON_ACTIVE_H / 2, cs + MON_ACTIVE_H / 2), (d.mon_setback, d.mon_setback + d.screen_t))
 
 
-def body(d: Blueprint, fr: pr.Front) -> tuple[Part.Shape, Part.Shape]:
-    """The front body and the rear body, split by the plane of the outer edge of the step."""
-    top = d.body_top + OVER
-    sides = side_path(d, top)
-    end = ends(sides[-1])[1]
-    solid = across(side_profile(d, fr)).common(along(both_sides(sides + [pr.Line(end, (0.0, end[1]))])))
-    xb = d.bezel_w / 2 + d.panel_gap
-    bw = d.bezel_w / 2
-    plate = bezel_box(d, fr, -bw, bw).cut(behind_screen(d, d.mon_setback))
-    reveal = bezel_box(d, fr, bw, xb).cut(land_cylinder(d, fr))
-    cutters = [both(rail_cutter(d, fr)), both(step_cutter(d)), both(corner_cutter(d)), plate, both(reveal), screen(d)]
-    solid = solid.cut(cutters).removeSplitter()
+def body(d: Blueprint, fr: pr.Front, log: list[str] | None = None) -> Part.Shape:
+    """The body: the sharp form, the base facet on its sharp corners (it mitres), the lower rear corners by hand, the
+    design round on the edges of the rear (all in one builder, so that the rounds that meet at a corner are made
+    together), the bevel of the seam groove, the cut-ins, the hand-holds, and the edge break last.
+
+    The bevel of the seam groove is the one of the sharp form: it is lofted through points of the outline 3 below
+    the body top, and it cannot follow a small round there. Cut after the rounds, it takes the top of the head's
+    corner rounds, which run out in it."""
+    log = log if log is not None else []
+    ya = d.foot_y - d.bend_t
+    sharp = sharp_body(d, fr)
     g = d.seam_groove
-    solid = solid.cut(ring_bevel(outline_at(solid, d.body_top - g), d.body_top - g, d.body_top, g))
-    t = math.tan(math.radians(d.step_lean))
-    split = V(0, -1, t).normalize()
-    front = solid.common(halfspace(V(0, d.step_y0, 0), split)).removeSplitter()
-    rear = solid.common(halfspace(V(0, d.step_y0, 0), -split)).removeSplitter()
-    return front, rear
+    bevel = ring_bevel(outline_at(sharp, d.body_top - g), d.body_top - g, d.body_top, g)
+    es = floor_edges(sharp, lambda p: p.y > ya + 0.01)
+    log.append(f"body, base facet {d.base_facet:g}: {len(es)} edges")
+    s = sharp.makeChamfer(d.base_facet, es)
+    s = s.cut(lower_corner_cutter(d))
+    r = d.rear_corner_r
+    log.append(f"body, lower rear corners by hand: hip and mitre of the base facet R {r:g}, the column on their ellipse "
+               f"({math.sqrt(3) * r:.2f} x {r:g}, tangent at {r / math.sqrt(2):.2f} from the corner)")
+    es = rear_design_edges(s, d)
+    log.append(f"body, design rounds R {r:g}: {len(es)} edges")
+    s = s.makeFillet(r, es).removeSplitter()
+    s = s.cut(bevel)
+    if not s.isValid():
+        s.fix(1e-7, 1e-7, 1e-7)
+        log.append(f"body, seam bevel: shape fixed (valid {s.isValid()})")
+    s = s.cut(both(cut_in_cutter(d)))
+    s = s.cut(both(hand_hold_cutter(d)))
+    s = s.removeSplitter()
+    listed = rear_break_edges(s, d)
+    count = lambda kind: sum(1 for _, k in listed if k == kind)
+    log.append(f"body, edge break R {d.edge_break:g} at the rear: {len(listed)} edges ({count('rim')} on the rims of the hand-holds, "
+               f"{count('beside a round')} beside a round, {count('sharp')} others)")
+    # in front of the band the sharp edges that show are the two edges of the rail land along the reveal of the bezel
+    # plate, and the floor edge of each side (the base facet does not run there). The others lie in a joint: against
+    # the deck, under the bezel plate, in the seam under the hood
+    xb = d.bezel_w / 2 + d.panel_gap
+    reveal = lambda m: abs(abs(m.x) - xb) < 1e-3 and abs(math.dist((m.y, m.z), fr.rail.c) - fr.rail.r) < 1e-3
+    front = sharp_edges(s, d, lambda m: not behind_band(d, m) and (reveal(m) or (m.z < 1e-3 and m.y > ya + 0.01)))
+    log.append(f"body, edge break R {d.edge_break:g} at the front: {len(front)} edges ({sum(1 for e, _ in front if reveal(middle(e)))} of the rail land "
+               f"along the bezel reveal, {sum(1 for e, _ in front if not reveal(middle(e)))} floor edges of the sides)")
+    listed, crossing = bevel_crossings(listed, lambda m: m.z > d.body_top - g - 0.5)
+    log += [f"body: no edge break at {where(e)}, where the seam bevel crosses the round of the head's corner; it stays sharp" for e in crossing]
+    return break_edges(s, [e for e, _ in listed + front], d.edge_break, log, "body")
 
 
 # ---------- bezel ----------
@@ -593,30 +1009,205 @@ def leaning(shell: Part.Shape, h: pr.Hood, d: Blueprint) -> Part.Shape:
     return lower.fuse([blend, upper]).removeSplitter()
 
 
-def hood(d: Blueprint) -> dict[str, Part.Shape]:
-    """The cap and what stands in its opening, in the cabinet frame."""
-    h = pr.hood(d)
+def symmetric(right: pr.Path) -> pr.Path:
+    """A path whose last segment is a line to the centre line, square to it, followed by its mirror image back out.
+    The two halves of that line are one line, so that the surface made from it is one face across the centre line."""
+    last = right[-1]
+    return right[:-1] + [pr.Line(last.p, (-last.p[0], last.p[1]))] + reverse(mirror(right[:-1]))
+
+
+def cap_outline(d: Blueprint, h: pr.Hood) -> pr.Path:
+    """The cap seen from the front, in (x, z), from below its foot: both sides, the top corners and the top."""
     side, corner, top = pr.hood_outline(d, h.height, h.half_base)
     lean = side.a0 if isinstance(side, pr.Arc) else math.atan2(side.p[0] - side.q[0], side.q[1] - side.p[1])
     drop = OVER * 2
     foot = (h.half_base + drop * math.tan(lean), -drop)
-    outline = both_sides([pr.Line(foot, (h.half_base, 0.0)), side, corner, top])
-    profile = [pr.Conic((d.hood_edge_in, 0.0), (0.0, 0.0), (0.0, d.hood_edge_back)), pr.Line((0.0, d.hood_edge_back), (0.0, h.depth + OVER))]
-    shell = evolved(outline, profile)
+    return symmetric([pr.Line(foot, (h.half_base, 0.0)), side, corner, top])
+
+
+def lean_line(h: pr.Hood, back: float, z0: float, z1: float) -> pr.Path:
+    """The front of the cap in side view, in (y, z), moved back by `back`: its lower line from z0, the blend, its
+    upper line to z1."""
+    def moved(seg: pr.Line | pr.Arc) -> pr.Line | pr.Arc:
+        if isinstance(seg, pr.Line):
+            return pr.Line((seg.p[0] + back, seg.p[1]), (seg.q[0] + back, seg.q[1]))
+        return pr.Arc((seg.c[0] + back, seg.c[1]), seg.r, seg.a0, seg.a1)
+
+    low, blend, up = (moved(s) for s in h.front)
+    at = lambda s, z: (s.p[0] + (s.q[0] - s.p[0]) * (z - s.p[1]) / (s.q[1] - s.p[1]), z)
+    return [pr.Line(at(low, z0), low.q), blend, pr.Line(up.p, at(up, z1))]
+
+
+def cap_front(d: Blueprint, h: pr.Hood) -> Part.Shape:
+    """The front of the cap, to the line where its soft edge ends on the sides and the roof (hood_edge_back behind
+    the leaning front): the quarter ellipse of the soft edge carried round the front outline as an evolved solid,
+    made to lean, and cut on that line."""
+    eb = d.hood_edge_back
+    profile = [pr.Conic((d.hood_edge_in, 0.0), (0.0, 0.0), (0.0, eb)), pr.Line((0.0, eb), (0.0, eb + OVER / 2))]
     turn = FreeCAD.Matrix(-1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0)
-    shell = leaning(shell.transformed(turn), h, d)
-    side_view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
-    side_view = [pr.Line((-OVER, 0.0), (-OVER, h.height)), pr.Line((-OVER, h.height), side_view[4].q)] + side_view[5:] + [pr.Line((h.depth, 0.0), (-OVER, 0.0))]
-    cap = shell.common(across(side_view))
-    cap = cap.cut(both(hood_corner_cutter(d, h)).translated(V(0, -h.origin[1], -h.origin[2])))
+    shell = leaning(evolved(cap_outline(d, h), profile).transformed(turn), h, d)
+    z0, z1 = -3 * OVER, h.height + OVER
+    line = lean_line(h, eb, z0, z1)
+    return shell.common(across(line + poly([ends(line[-1])[1], (-3 * OVER, z1), (-3 * OVER, z0), ends(line[0])[0]])[:-1]))
+
+
+def cap_rear(d: Blueprint, h: pr.Hood) -> Part.Shape:
+    """The cap behind its soft edge, with exact surfaces: the front outline extruded along the depth, in common with
+    the side profile (the roof, the round in the crease, the rear arc, the rear wall) extruded across the width.
+    It starts on the line where the soft edge ends, and it runs on below the foot."""
+    view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
+    z0, z1 = -2 * OVER, h.height + OVER
+    line = lean_line(h, d.hood_edge_back, z0, z1)
+    far = h.depth + 3 * OVER
+    behind = across(line + poly([ends(line[-1])[1], (far, z1), (far, z0), ends(line[0])[0]])[:-1])
+    rear = view[5:-1] + [pr.Line(view[-1].p, (h.depth, z0))]
+    profile = across(poly([(h.depth, z0), (-3 * OVER, z0), (-3 * OVER, h.height), view[4].q])[:-1] + rear)
+    block = prism(cap_outline(d, h), xz(-3 * OVER), V(0, h.depth + 6 * OVER, 0))
+    return block.common(profile).common(behind)
+
+
+@dataclass(frozen=True)
+class Station:
+    """One section of a round along an edge between two surfaces: the centre of the rolling ball, and the outward
+    unit normals of the two surfaces at the points where the ball touches them."""
+    c: FreeCAD.Vector
+    n1: FreeCAD.Vector
+    n2: FreeCAD.Vector
+
+    @property
+    def turn(self) -> float:
+        """The angle through which the edge turns here, radians."""
+        return math.acos(max(-1.0, min(1.0, self.n1.dot(self.n2))))
+
+
+def hood_corner_stations(d: Blueprint, h: pr.Hood, r: float) -> list[list[Station]]:
+    """The round of the cap's right rear corner (profiles.hood_corner) as stations along its edge, in the hood's
+    frame, from ROUND_BELOW under the foot to the roof.
+
+    The stations come in four pieces, one for each part of the edge on which both outlines keep their kind of curve.
+    A piece ends where an outline changes its curvature, so that each piece is a smooth surface. In a piece the
+    stations are ROUND_STEP apart or less along the centre line, at one spacing (a loft through sections that are
+    not equally spaced swings far off). The last station is where the edge turns ROUND_END: near the roof the side
+    and the rear turn tangent to each other, and the round runs out."""
+    rd = pr.hood_corner(d, h, r)
+    station = lambda zc: Station(*(V(*v) for v in rd.station(zc)))
+    z_lo, z_end = -ROUND_BELOW, rd.end(ROUND_END)
+    at = lambda u: z_lo + (z_end - z_lo) * (1.0 - (1.0 - u) ** 2)        # the heights closer together toward the roof
+    heights = [at(k / ROUND_SAMPLES) for k in range(ROUND_SAMPLES + 1)]
+    along = [0.0]
+    for p, q in zip(heights, heights[1:]):
+        along.append(along[-1] + (station(q).c - station(p).c).Length)
+
+    def length_at(z: float) -> float:
+        k = min(max(bisect.bisect_right(heights, z) - 1, 0), ROUND_SAMPLES - 1)
+        return along[k] + (along[k + 1] - along[k]) * (z - heights[k]) / (heights[k + 1] - heights[k])
+
+    def height_at(length: float) -> float:
+        k = min(max(bisect.bisect_right(along, length) - 1, 0), ROUND_SAMPLES - 1)
+        return heights[k] + (heights[k + 1] - heights[k]) * (length - along[k]) / (along[k + 1] - along[k])
+
+    pieces = []
+    marks = [z_lo, *rd.marks, z_end]
+    for za, zb in zip(marks, marks[1:]):
+        la, lb = length_at(za), length_at(zb)
+        n = max(2, math.ceil((lb - la) / ROUND_STEP))
+        pieces.append([station(za)] + [station(height_at(la + (lb - la) * k / n)) for k in range(1, n)] + [station(zb)])
+    return pieces
+
+
+def round_section(st: Station, r: float, off: float, e: float = 1.0) -> Part.Wire:
+    """What a round takes off at one station, as a wire in the plane of the two normals: the region between the
+    edge and the round's arc, reaching e out past both surfaces. The walls stand square to the two surfaces where
+    the arc meets them. The arc stands `off` out from the true round, so that it crosses the two surfaces at a small
+    angle and does not lie on their tangent (a boolean with a tangent face fails, or leaves faces of no width).
+    Where the edge turns so little that the round is less than `off` deep, the arc is clear of the edge: the round
+    ends there in a point on the edge."""
+    b = st.n1 + st.n2
+    b.normalize()
+    p1, p2, mid = st.c + st.n1 * (r + off), st.c + st.n2 * (r + off), st.c + b * (r + off)
+    apex = st.c + (st.n1 + st.n2) * (r / (1.0 + st.n1.dot(st.n2)))      # where the two tangents meet: the edge, or outside it
+    tip, q1, q2 = apex + b * e, p1 + st.n1 * e, p2 + st.n2 * e
+    return Part.Wire([Part.LineSegment(q1, tip).toShape(), Part.LineSegment(tip, q2).toShape(), Part.LineSegment(q2, p2).toShape(),
+                      Part.Arc(p2, mid, p1).toShape(), Part.LineSegment(p1, q1).toShape()])
+
+
+def hood_corner_cutter(d: Blueprint, h: pr.Hood) -> list[Part.Shape]:
+    """What the round of the right rear corner takes off the cap, in the hood's frame: for each piece of the edge
+    (hood_corner_stations) a loft of degree 3 through the sections of the round at its stations. It is the round that
+    a ball of rear_corner_r makes when it rolls along the edge in touch with the side and the rear. OpenCascade's own
+    round of this edge builds on the right side only, and on the cap of revision 6 not in every run."""
+    r = d.rear_corner_r
+    return [Part.makeLoft([round_section(st, r, ROUND_OFF) for st in piece], True, False, False, 3) for piece in hood_corner_stations(d, h, r)]
+
+
+def cut_checked(solid: Part.Shape, tools: list[Part.Shape], what: str) -> Part.Shape:
+    """A solid less some tools that do not overlap. A cut by lofts can come back with the work of one tool missing,
+    or with material added, and no error. So the result is checked: it is one valid solid, it is not larger than the
+    solid was, and no tool still holds more of it than CUT_LEFT of what that tool held of the solid (or CUT_LEFT_MM3).
+    When the cut by all tools at once does not pass, the tools are cut one after the other; when that does not pass,
+    it is an error."""
+    due = [solid.common(t).Volume for t in tools]
+
+    def left(s: Part.Shape) -> str:
+        if not s.isValid() or len(s.Solids) != 1:
+            return f"not one valid solid (valid {s.isValid()}, {len(s.Solids)} solids)"
+        if s.Volume > solid.Volume + CUT_LEFT_MM3:
+            return f"{s.Volume - solid.Volume:.2f} mm3 larger than before the cut"
+        for k, (t, v) in enumerate(zip(tools, due)):
+            rest = s.common(t).Volume
+            if rest > max(CUT_LEFT * v, CUT_LEFT_MM3):
+                return f"tool {k} still holds {rest:.3f} mm3 of {v:.3f}"
+        return ""
+
+    out = solid.cut(tools)
+    if not left(out):
+        return out
+    out = solid
+    for t in tools:
+        out = out.cut(t)
+    why = left(out)
+    if why:
+        raise Part.OCCError(f"{what}: {why}")
+    return out
+
+
+def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shape]:
+    """The cap in the hood's own frame, and its opening as a prism (for the marquee lip): the front and the rear
+    joined on the line where the soft edge ends, cut level at the foot, the bevel of the seam groove, the recess of
+    the opening, and the round of the two rear corners."""
+    view = pr.hood_side_profile(d, h.height, h.depth, d.hood_h - d.seam_gap)
+    solid = cap_front(d, h).fuse(cap_rear(d, h)).removeSplitter()
+    solid = solid.common(across(poly([(h.depth, 0.0), (-OVER, 0.0), (-OVER, h.height), view[4].q])[:-1] + view[5:]))
     g = d.seam_groove
-    cap = cap.cut(ring_bevel(outline_at(cap, g), g, 0.0, g))
+    solid = solid.cut(ring_bevel(outline_at(solid, g), g, 0.0, g))
     opening = prism(both_sides(opening_path(d, h)), xz(-OVER), V(0, BIG / 4, 0))
-    recess = opening.common(across(poly(recess_profile(d, h))))
-    cap = cap.cut(recess).removeSplitter()
+    solid = solid.cut(opening.common(across(poly(recess_profile(d, h))))).removeSplitter()
+    right = hood_corner_cutter(d, h)
+    solid = cut_checked(solid, right + [c.mirror(V(0, 0, 0), V(1, 0, 0)) for c in right], "the round of the hood's rear corners")
+    pieces = hood_corner_stations(d, h, d.rear_corner_r)
+    log.append(f"hood, rear corners R {d.rear_corner_r:g} by hand: {len(pieces)} lofts through {sum(len(p) for p in pieces)} sections on each side, "
+               f"from below the foot to where the edge turns {math.degrees(pieces[-1][-1].turn):.1f} degrees")
+    # The cap gets no edge break. Its sharp edges are the rim of the opening and the upper edge of the seam bevel (which
+    # turns more than 45 degrees, because the sides and the front of the cap lean). The leaning front is a sheared
+    # spline surface with a tolerance of 0.001, and OpenCascade's round on an edge of it is a valid solid that is not
+    # the same in every run: the rim alone has two outcomes, the bevel alone two, both together three, and the strict
+    # check of one of those does not end. The build must be the same in every run, so these edges stay sharp until the
+    # front of the cap is made of exact surfaces
+    listed = sharp_edges(solid, d, lambda m: m.z > 0.05)
+    bevel = [e for e, _ in listed if middle(e).z < g + 0.5]
+    log.append(f"hood: no edge break ({len(listed) - len(bevel)} edges on the rim of the opening, {len(bevel)} on the seam bevel, "
+               f"{sum(e.Length for e, _ in listed):.0f} mm): the round on the leaning front is not the same in every run; they stay sharp")
+    return solid, opening
+
+
+def hood(d: Blueprint, log: list[str] | None = None) -> dict[str, Part.Shape]:
+    """The cap and what stands in its opening, in the cabinet frame."""
+    log = log if log is not None else []
+    h = pr.hood(d)
+    solid, opening = cap(d, h, log)
     xr = h.half_open(h.z_band_top, d) + OVER
     lip = Part.makeBox(2 * xr, d.hood_rail_proud, h.z_rail_top - h.z_band_top, V(-xr, h.y_band_top - d.hood_rail_proud, h.z_band_top)).common(opening)
-    out = {"hood": cap, "marquee_lip": lip.removeSplitter()}
+    out = {"hood": solid, "marquee_lip": lip.removeSplitter()}
     out.update(band_forms(d, h))
     return {k: hood_frame(h)(s) for k, s in out.items()}
 
@@ -640,13 +1231,15 @@ def band_forms(d: Blueprint, h: pr.Hood) -> dict[str, Part.Shape]:
 
 # ---------- all parts ----------
 
-def build(d: Blueprint) -> dict[str, Part.Shape]:
-    """Every part of the outer form, by name, in the cabinet frame."""
+def build(d: Blueprint, log: list[str] | None = None) -> dict[str, Part.Shape]:
+    """Every part of the outer form, by name, in the cabinet frame. log takes one line for each step that finds its
+    edges on the solid (how many it found)."""
+    log = log if log is not None else []
     fr = pr.front(d)
     out: dict[str, Part.Shape] = {}
-    out["deck"], out["control_panel"] = deck(d)
-    out["front_body"], out["rear_body"] = body(d, fr)
-    out.update(hood(d))
+    out["deck"], out["control_panel"] = deck(d, log)
+    out["body"] = body(d, fr, log)
+    out.update(hood(d, log))
     out["bezel"] = bezel(d, fr)
     out["screen"] = screen(d)
     return {k: s.Solids[0] if len(s.Solids) == 1 else s for k, s in out.items()}
@@ -659,46 +1252,76 @@ def focus(d: Blueprint) -> dict[str, dict]:
     p = fr.rail.at(a)
     crease = (d.side_x(p[1]), p[0] - math.cos(a) * d.deck_lean_h, p[1] - math.sin(a) * d.deck_lean_h)
     foot = fr.sweep.at(fr.sweep.a1)
+    hw, rw, zc = d.width / 2, d.rear_w / 2, d.rear_step_z0
+    mitre = pr.band_stroke(d)[3]
     cam = lambda target, radius, az, el: {"target": [round(v, 1) for v in target], "radius": radius, "az": az, "el": el}
-    return {"closeup-cheek-foot": cam((d.width / 2 - 6, *foot), 70, 45, 12),
+    return {"closeup-cheek-foot": cam((hw - 6, *foot), 70, 45, 12),
             "closeup-rail-tuck": cam(crease, 40, 70, 10),
             "closeup-rail-top": cam((d.side_x(d.body_top) - 6, d.seam_y + 15, d.body_top - 10), 45, 55, 12),
             "closeup-hood-foot": cam((h.half_base - 5, h.origin[1] + 25, h.origin[2]), 40, 60, 8),
-            "closeup-step-top": cam((d.side_x(d.body_top) - d.seam_groove - 6, d.depth - 8, d.body_top - 8), 40, 140, 20),
-            "closeup-deck-front": cam((d.width / 2 - 30, 10.0, d.deck_top - 10), 60, -40, 24),
+            "closeup-deck-front": cam((hw - 30, 10.0, d.deck_top - 10), 60, -40, 24),
+            "closeup-deck-front-low": cam((hw - 60, 0.0, 6.0), 70, -20, 4),
             "closeup-seam-corner-left": cam((-(d.side_x(d.body_top) - 8), d.seam_y + 6, d.body_top), 35, -42, 6),
             "closeup-front-seam": cam((d.width / 4, d.seam_y, d.body_top - 4), 45, -15, 12),
             "closeup-seam-rear-corner": cam((d.side_x(d.body_top) - 8, d.depth - 8, d.body_top), 45, 140, 14),
-            "closeup-step-runout": cam((d.side_x(415.0) - 8, d.step_y(415.0) + 4, 410.0), 40, 125, 14),
-            "closeup-rear-corner-slope": cam((d.rear_w / 2 - 6, d.body_d + 14, d.rear_step_z0 + 14), 55, 140, 12),
+            "closeup-rear-corner": cam((hw - 20, d.body_d + 5, 375.0), 95, 128, 14),
+            "closeup-base-corner": cam((rw - 10, d.body_d - 10, 10.0), 45, 135, 20),
+            "closeup-hip-foot": cam((rw - 1, d.body_d - 1, zc + 1), 18, 135, 8),
+            "closeup-hip-top": cam((hw - 2, d.body_d + 10, zc + 12), 18, 125, 15),
+            "closeup-head-foot": cam((hw - 2, d.depth - 2, d.rear_step_z1 + 1), 18, 125, 15),
+            "closeup-top-mitre": cam((hw - 2, mitre[0] + 2, mitre[1] - 2), 20, 100, 10),
+            "closeup-band-foot": cam((hw - 30, 420.0, 140.0), 210, 140, 14),
+            "closeup-cut-ins": cam((rw - d.rear_corner_r / 2, d.body_d - d.rear_corner_r / 2, d.cut_in_z0 + d.cut_in_pitch * (d.cut_in_count - 1) / 2), 60, 145, 10),
+            "closeup-cut-in-corner": cam((rw - 2, d.body_d - 2, d.cut_in_z0 + 5), 22, 135, 6),
+            "closeup-cut-in-straight": cam((rw - 1, d.body_d - 1, d.cut_in_z0 + d.cut_in_pitch + d.cut_in_h / 2), 30, 135, 0),
+            "closeup-hand-hold": cam(((d.grip_x0 + d.grip_x1) / 2, d.depth, d.grip_z0 + d.grip_h / 2), 65, 165, 12),
+            "closeup-hood-corner-above": cam((hw - 18, d.depth - 18, d.body_top + 8), 75, 135, 38),
+            "closeup-hood-corner-side": cam((hw - 12, d.depth - 12, d.body_top + 25), 90, 90, 5),
+            "closeup-hood-corner-rear": cam((hw - 12, d.depth - 12, d.body_top + 25), 90, 180, 5),
+            "closeup-hood-roof-end": cam((h.half_top + 6, h.origin[1] + h.depth - 58, h.origin[2] + h.height - 1), 40, 135, 45),
             "closeup-hood-rear-top": cam((h.half_top - 4, d.depth - 30, h.origin[2] + h.height - 12), 60, 135, 28),
             "closeup-hood-band": cam((d.logo_w / 2 + d.logo_gap + 40, h.origin[1] + 20, h.origin[2] + (h.z_sill + h.z_rail_top) / 2), 100, 40, 10)}
 
 
-def export(out: str, parts: dict[str, Part.Shape], d: Blueprint) -> dict:
+def edge_polylines(shape: Part.Shape, step: float = EDGE_STEP) -> list[list[list[float]]]:
+    """Every edge of a shape as a polyline (the face boundaries that the FreeCAD GUI draws)."""
+    out = []
+    for e in shape.Edges:
+        if e.Degenerated or e.Length < 1e-6:
+            continue
+        n = max(2, math.ceil(e.Length / step) + 1)
+        out.append([[round(p.x, 3), round(p.y, 3), round(p.z, 3)] for p in e.discretize(Number=n)])
+    return out
+
+
+def export(out: str, parts: dict[str, Part.Shape], d: Blueprint, log: list[str] | None = None) -> dict:
     os.makedirs(out, exist_ok=True)
     manifest = {}
     for k, s in parts.items():
-        MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.02).write(os.path.join(out, f"{k}.stl"))
+        MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.05).write(os.path.join(out, f"{k}.stl"))
         s.exportBrep(os.path.join(out, f"{k}.brep"))
         manifest[k] = {"file": f"{k}.stl", "finish": FINISH[k], "brep": f"{k}.brep"}
-    Part.makeCompound(list(parts.values())).exportStep(os.path.join(out, "shell-bp.step"))
+    Part.makeCompound(list(parts.values())).exportStep(os.path.join(out, "shell.step"))
     json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), indent=1)
     json.dump(focus(d), open(os.path.join(out, "focus.json"), "w"), indent=1)
+    json.dump({k: edge_polylines(s) for k, s in parts.items()}, open(os.path.join(out, "edges.json"), "w"))
     bb = Part.makeCompound(list(parts.values())).BoundBox
     report = {"outside": [round(bb.XLength, 2), round(bb.YLength, 2), round(bb.ZLength, 2)],
               "parts": {k: {"valid": s.isValid(), "solids": len(s.Solids), "volume_mm3": round(s.Volume, 1), "faces": len(s.Faces),
                             "surfaces": sorted({type(f.Surface).__name__ for f in s.Faces})} for k, s in parts.items()},
-              "dims": {k: getattr(d, k) for k in d.__dataclass_fields__}}
+              "log": log or [], "dims": {k: getattr(d, k) for k in d.__dataclass_fields__}}
     json.dump(report, open(os.path.join(out, "report.json"), "w"), indent=1)
     return report
 
 
 def main() -> int:
-    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp")
+    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")
     d = Blueprint()
-    report = export(out, build(d), d)
+    log: list[str] = []
+    report = export(out, build(d, log), d, log)
+    for line in log:
+        print(line)
     for k, r in report["parts"].items():
-        print(f"{k:14s} valid {r['valid']}  solids {r['solids']}  volume {r['volume_mm3']:>12.1f}  {', '.join(r['surfaces'])}")
+        print(f"{k:14s} valid {r['valid']}  solids {r['solids']}  faces {r['faces']:4d}  volume {r['volume_mm3']:>12.1f}  {', '.join(r['surfaces'])}")
     print("outside", " x ".join(f"{v:.1f}" for v in report["outside"]))
     return 0 if all(r["valid"] and r["solids"] == 1 for r in report["parts"].values()) else 1

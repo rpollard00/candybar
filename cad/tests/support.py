@@ -14,6 +14,8 @@ import FreeCAD as App
 import Part
 
 from candybar import build, check, model, params
+from candybar.shell import solids as shell_solids
+from candybar.shell.dims import Blueprint
 
 CAD = Path(__file__).resolve().parents[1]
 PARAMS = CAD / "params"
@@ -34,6 +36,15 @@ def remove_temp_dirs() -> None:
     """Called by the runner: the launcher ends the process with os._exit, which skips atexit hooks."""
     while _temp_dirs:
         shutil.rmtree(_temp_dirs.pop(), ignore_errors=True)
+
+
+@functools.cache
+def shell() -> tuple[Blueprint, dict[str, Part.Shape], tuple[str, ...]]:
+    """The default build of the shell (candybar.shell.solids), made once for all the tests that read it: the
+    dimensions, the parts by name, and the lines of the build's log."""
+    d = Blueprint()
+    log: list[str] = []
+    return d, shell_solids.build(d, log), tuple(log)
 
 
 @functools.cache

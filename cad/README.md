@@ -40,20 +40,22 @@ The build has two steps. The first step runs `freecadcmd`: it generates the docu
 
 ## The blueprint shell: split, structure, joints, coupon and width
 
-The blueprint shell (`candybar/shell/`) is a second model beside the older generator. `docs/blueprint/index.md` describes it, and its section "How to build and check the solids" gives the commands for the solids and the fit study. These commands make the split, the structure, the joint coupon and the width study. Run one FreeCAD or Blender process at a time.
+The blueprint shell (`candybar/shell/`) is a second model beside the older generator. `docs/blueprint/index.md` describes it, and its section "How to build and check the solids" gives the commands for the solids, their checks and the fit study. The default build is revision 7 of the outer form (decision record 0007), and it writes to `cad/out/shell-rev7`. These commands make the split, the structure, the joint coupon and the width study. Run one FreeCAD or Blender process at a time.
+
+The fit study, the split and the structure are those of revision 6. They run on revision 7, but their layout, their seams and their door are not yet changed for it (see `docs/roadmap.md`).
+
+CAUTION: Do not start the split or the structure on revision 7 without the skin files in `cad/out/shell-rev7/split/cache`. The step "making the skin" of `split.py` used 12.8 GB of memory for revision 7 and did not end. The skin files in that cache come from a scratch run that cut the cavity away in steps (`docs/roadmap.md`, step 9). They apply only while `dims.py`, `profiles.py`, `solids.py` and `cavity.py` do not change.
 
 ```sh
 # the split: cut the skin into pieces for each seam option and measure them (the skin is cached: about 12 minutes when it changes)
-CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split
+CANDYBAR_OUT=cad/out/shell-rev7 CANDYBAR_SPLIT_CACHE=cad/out/shell-rev7/split/cache cad/candybar/freecad-run.sh candybar.shell.split
 # the structure: place the frame of option C in the skin, against the hardware of the fit study (split/structure.json)
-CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.structure
+CANDYBAR_OUT=cad/out/shell-rev7 CANDYBAR_SPLIT_CACHE=cad/out/shell-rev7/split/cache cad/candybar/freecad-run.sh candybar.shell.structure
 # the sheets and proposal.md (without "proposal": also the elevations of each option, which take minutes)
 cad/.venv-tools/bin/python cad/tools/draw_split.py proposal
 cad/.venv-tools/bin/python cad/tools/draw_split.py render       # renders of the chosen layout (Blender)
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
-# the detail pass (revision 6): the rear corner round for three radii, the renders before and after, the open small questions
-cad/.venv-tools/bin/python cad/tools/draw_detail.py rear-options
-cad/.venv-tools/bin/python cad/tools/draw_detail.py before-after
+# the detail pass: the open small questions of the form
 cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options
 # the joint coupon: printable parts, checks and README.md in cad/out/coupon; then its drawing and renders
 CANDYBAR_OUT=cad/out/coupon cad/candybar/freecad-run.sh candybar.shell.coupon

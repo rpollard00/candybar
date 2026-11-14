@@ -52,9 +52,7 @@ class Dims:
     bend_r: float = 50.0
     body_d: float = 540.0
     rear_w: float = 430.0
-    step_y0: float = 380.0
     step_lean: float = 28.0
-    rear_facet: float = 14.0
     # hood: the cap (an arch of a top bar, two legs and a sill, standing on the body top)
     hood_h_ratio: float = 0.32
     seam_gap: float = 1.5
@@ -66,7 +64,6 @@ class Dims:
     hood_edge_in: float = 16.0
     hood_edge_back: float = 32.0
     hood_rim_r: float = 4.0
-    hood_rear_r: float = 20.0
     hood_wall: float = 4.0
     hood_sill_h: float = 17.0
     hood_sill_corner_r: float = 8.0
@@ -186,24 +183,72 @@ class Blueprint(Dims):
 
     The deck and the bezel window keep the values of Dims; the flat screen stands nearer the bezel, and the control
     panel's front follows the deck's front contour (profiles.panel_outline). The blueprint
-    changes the rail (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands
-    proud) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves of the form
-    as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in front view,
-    the side and top corner of the hood, and the lines that the references draw straight (crown, bow), which are
-    zero. profiles.py turns these into profiles and faces.
+    changes the rail (one edge section from the hood seam to the front of the deck), the rear (planar, revision 7:
+    decision record 0007) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves
+    of the form as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in
+    front view, the side and top corner of the hood, and the lines that the references draw straight (crown, bow),
+    which are zero. profiles.py turns these into profiles and faces.
     """
-    # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk
-    step_y0: float = 345.0
+    # the rear, revision 7: planar. The lower body is rear_w wide behind the band; the head (the body above the rear
+    # shelf) and the hood have the full width back to the rear, and stand rear_proud behind the lower rear wall
     rear_w: float = 470.7
-    # rear: the lower rear wall stays at body_d; the upper rear and the hood stand proud of it
     rear_proud: float = 40.0
-    rear_step_z0: float = 310.0
-    rear_step_z1: float = 350.0
-    # the vertical corners of the back (lower rear, upper rear, hood) are one round of this radius in plan. Two limits
-    # from the step: the rear body side is 18.2 long at the foot of the rear slope, and the step must run out into
-    # the round inside the seam bevel (16.4 to 19.1), so that the foot of the hood keeps the outline of the body top.
-    # Near the body top the outer edge of the step gets a round of its own that grows from nothing to this radius.
-    rear_corner_r: float = 18.0
+    # the rear shelf under the head: two flat facets of 45 degrees that meet on the hip. Its inner crease is level at
+    # rear_step_z0, on the lower rear wall and on the side of the lower body; the rear facet ends on the upper rear
+    # wall at rear_step_z1 (rear_proud higher), the side facet on the side band step_in higher
+    rear_step_z0: float = 293.0
+    rear_step_z1: float = 333.0
+    # the band: the facet of 45 degrees, step_in deep, on the rear edge of the side band. Its outer edge in side view
+    # (the stroke) is four straight lines: an upright stub of band_stub at the desk, a kick that leans band_kick to
+    # the rear of upright on its way down, the lean (step_lean, as on the reference), and the level run that is the
+    # side facet of the rear shelf. The line of the lean passes the desk band_flare in front of the stub, and it
+    # would reach the body top at band_seam_y
+    band_seam_y: float = 530.0
+    band_stub: float = 20.0
+    band_flare: float = 80.0
+    band_kick: float = 28.0
+    # the edge finish. No outside edge stays fully sharp, and the form is not rounded off: a convex edge of the rear
+    # design that turns edge_min_turn or more has a round of rear_corner_r (the band's outer edge, the hip, the
+    # edges of the head, the rear corners of the head and of the hood); every other convex edge that turns more than
+    # edge_break_turn gets a break of edge_break as the last modelling step. Concave creases and blunt mitres stay sharp
+    rear_corner_r: float = 3.0
+    edge_min_turn: float = 40.0
+    edge_break: float = 1.0
+    edge_break_turn: float = 45.5
+    # the facet round the foot of the cabinet (deck front and sides, the band's foot, the lower body)
+    base_facet: float = 5.0
+    # the crease between the centre face and each flank of the deck front (it turns deck_flank, 8 degrees) is sharp: a
+    # blunt mitre. The round of 6 that Dims has there is an arc 0.84 long, which stands 0.015 off the sharp crease and
+    # makes faces under 1 mm wide down the front of the deck
+    deck_crease_r: float = 0.0
+    # the rear door, as a marking on the lower rear wall: by the rule of the rear study it stays 4 clear of the
+    # cut-ins and 12 below the rear shelf. Provisional: the fit study sets the door
+    door_w: float = 424.4
+    door_z0: float = 116.0
+    door_z1: float = 281.0
+    # the cut-ins at each lower rear corner: cut_in_count level grooves that turn the corner, the lowest lip at
+    # cut_in_z0, cut_in_pitch apart. A ball mills each groove along the true offset of the plan outline, so that the
+    # slot is cut_in_h high and cut_in_depth deep all the way; it runs cut_in_side along the side and cut_in_rear
+    # along the rear, to round ends
+    cut_in_count: int = 4
+    cut_in_z0: float = 126.0
+    cut_in_pitch: float = 22.0
+    cut_in_h: float = 10.0
+    cut_in_depth: float = 1.5
+    cut_in_side: float = 30.0
+    cut_in_rear: float = 20.0
+    # the hand-holds: two recesses in the rear wall of the head, from grip_x0 to grip_x1 each side of the centre
+    # line, grip_h high from grip_z0, grip_depth deep, with ends of grip_end_r in plan. The roof falls 45 degrees
+    # toward the inside (a hook for the fingers that prints without support). The edges inside are rounds of grip_r,
+    # those of the roof grip_roof_r; the rim has the edge break
+    grip_x0: float = 70.0
+    grip_x1: float = 170.0
+    grip_z0: float = 349.05
+    grip_h: float = 62.0
+    grip_depth: float = 26.0
+    grip_end_r: float = 10.0
+    grip_r: float = 8.0
+    grip_roof_r: float = 3.0
     # curves of the body
     rail_sagitta_ratio: float = 0.035
     body_tuck_ratio: float = 0.023
@@ -274,29 +319,29 @@ class Blueprint(Dims):
 
     @property
     def step_in(self) -> float:
-        """How far the rear body side stands in from the side band."""
+        """How far the side of the lower body stands in from the side band: the depth of the band."""
         return self.width / 2 - self.rear_w / 2
 
+    @property
+    def step_y0(self) -> float:
+        """Y of the line of the band's lean at the desk."""
+        return self.band_seam_y - self.body_top * math.tan(math.radians(self.step_lean))
+
     def step_y(self, z: float) -> float:
-        """Y of the outer edge of the step at height z (it leans back)."""
+        """Y of the line of the band's lean at height z (it leans back)."""
         return self.step_y0 + z * math.tan(math.radians(self.step_lean))
 
     def rear_y(self, z: float) -> float:
-        """Y of the rear wall at height z: the lower rear wall, the slope, the upper rear wall."""
+        """Y of the rear at height z on the centre line: the lower rear wall, the rear facet of the shelf, the upper
+        rear wall."""
         if z <= self.rear_step_z0:
             return self.body_d
         return min(self.depth, self.body_d + (z - self.rear_step_z0) * (self.depth - self.body_d) / (self.rear_step_z1 - self.rear_step_z0))
 
     @property
-    def runout_z(self) -> tuple[float, float]:
-        """Where the step meets the rear corner round: from the first height, where the round reaches the inner
-        crease of the step, the outer edge of the step gets a round that grows to rear_corner_r at the second
-        height, where the step line touches the round of the full width and runs out into it."""
-        t = math.tan(math.radians(self.step_lean))
-        r = self.rear_corner_r
-        z1 = (self.depth - r - self.step_in - self.step_y0) / t
-        zm = (self.depth - (2 - math.sqrt(2)) * r - self.step_y0) / t
-        return z1, zm
+    def band_top_z(self) -> float:
+        """Height of the outer edge of the band's level run: the side facet of the rear shelf ends there on the side band."""
+        return self.rear_step_z0 + self.step_in
 
     @property
     def tuck(self) -> float:

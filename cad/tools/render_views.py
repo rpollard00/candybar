@@ -9,7 +9,7 @@ Each view writes <out>/<view>.png on a light-grey background. Each orthographic 
 <view>-mask.png (the object mask) and every view writes its projection to <out>/views.json, so that
 silhouette_iou.py and compose_sheet.py can work in millimetres. A model directory with focus.json adds
 close-up views to the standard set. A model directory with edges.json ({part: [polyline of [x, y, z], ...]}: every
-BREP edge, as candybar.shell.rear_study writes it) draws all face boundaries over the render, as the FreeCAD GUI does:
+BREP edge, as candybar.shell.solids writes it) draws all face boundaries over the render, as the FreeCAD GUI does:
 each point of an edge is tested for visibility by a ray cast against the meshes, and the visible runs are drawn; the
 image-space feature edges are then reduced to the outline. An entry {view: [x, y, z, radius]} is one of the three fixed close-ups
 (closeup-cheek-foot, closeup-hood-corner, closeup-deck-front). An entry {view: {"target": [x, y, z],

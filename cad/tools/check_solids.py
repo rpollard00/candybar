@@ -10,13 +10,17 @@ The reference is profiles.faces(Blueprint()): the labelled faces as flat polygon
                direction. The parts of each of GROUPS are fused first, as the faces draw them as one skin; the
                forms on the hood band are cut on their own, as the faces draw the band under them.
 
+The faces draw the form. The edge break (a round of 1 mm, the last modelling step) is not in them: at an edge of 90
+degrees it stands 0.4 off the sharp edge, inside the tolerance, and no plane is put where it would cut a break at a
+small angle.
+
 Where the faces leave out a short wall, a point of a solid's cut does not count when it lies in a gap between two
 loose ends of the faces' cut: inside a disc over a gap of at most BRIDGE, or on the straight line over a gap of at
 most CHORD. The report counts these points. The faces MARKS are drawn 0.5 proud as markings and are not compared.
 
 Run headless (exit status 1 when a tolerance is exceeded):
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh tools.check_solids
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.check_solids
 """
 from __future__ import annotations
 
@@ -42,7 +46,7 @@ PX_PER_MM = 6.0
 STEP = 0.2
 MARKS = {"RB6", "MQ2", "SP2", "LG2"}
 VIEWS = {"front": (0, 2), "right side": (1, 2), "top": (0, 1)}
-GROUPS = (("deck", "control_panel", "front_body", "rear_body", "bezel", "screen"), ("hood", "marquee_lip"))
+GROUPS = (("deck", "control_panel", "body", "bezel", "screen"), ("hood", "marquee_lip"))
 
 
 def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
@@ -51,9 +55,10 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
     hw = d.width / 2
     return {"X 0": (0, 0.0),
             "X rail land": (0, (d.bezel_w / 2 + d.panel_gap + hw - d.edge_in) / 2),
-            "X side band": (0, hw - 1.0),
+            "X band": (0, hw - d.step_in / 2),
             "Z deck": (2, d.deck_top - d.deck_lean_h / 2),
             "Z panel pocket": (2, (d.panel_top + d.deck_top) / 2),
+            "Z cut-in": (2, d.cut_in_z0 + d.cut_in_h / 2),
             "Z mid body": (2, (d.deck_top + d.body_top) / 2),
             "Z tuck": (2, (d.tuck_z0 + d.body_top) / 2),
             "Z seam, body": (2, d.body_top - d.seam_groove / 2),
@@ -63,8 +68,12 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
             "X hood, off centre": (0, h.half_top / 2),
             "X seam corner": (0, d.side_x(d.body_top) - d.edge_in / 2),
             "X speaker": (0, d.logo_w / 2 + d.logo_gap + 40.0),
-            "Y seam corner": (1, h.origin[1] + d.hood_edge_back / 2),
+            # through the seam at the front corners, where it cuts the leaning front of the hood half way up the sill: a
+            # plane that cuts the front where it meets the opening goes through the edge break of the rim at a small
+            # angle, which the faces do not draw
+            "Y seam corner": (1, h.origin[1] + 0.5 * d.hood_sill_h * math.tan(math.radians(d.hood_front_lean_low))),
             "Y rear corner": (1, d.depth - 4.0 / 3.0 * d.seam_groove),
+            "Y rear shelf": (1, d.body_d + d.rear_proud / 2),
             "Y body top": (1, (d.seam_y + d.depth) / 2)}
 
 
@@ -159,8 +168,8 @@ def bridged(points: np.ndarray, ends: np.ndarray) -> np.ndarray:
 
 def skins(parts: dict[str, Part.Shape]) -> list[Part.Shape]:
     """The parts as the faces draw them: each of GROUPS fused, the others alone. The faces of the fuse are not merged
-    (removeSplitter): merging the halves of a face that the front and rear body share can leave an edge with a
-    tolerance of millimetres, and the cuts are the same without it."""
+    (removeSplitter): merging the halves of a face that two parts share can leave an edge with a tolerance of
+    millimetres, and the cuts are the same without it."""
     out = []
     for group in GROUPS:
         shapes = [parts[k] for k in group if k in parts]
@@ -298,7 +307,7 @@ def table(r: dict) -> str:
 
 
 def main() -> int:
-    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp")
+    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")
     manifest = json.load(open(os.path.join(out, "manifest.json")))
     parts = {k: Part.read(os.path.join(out, v["brep"])) for k, v in manifest.items()}
     r = run(parts, Blueprint())
