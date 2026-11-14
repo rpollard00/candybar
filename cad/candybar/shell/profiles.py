@@ -336,18 +336,45 @@ def refine(poly: list[P3], step: float = 1.0) -> list[P3]:
 def rear_profile(d: Blueprint) -> list[P2]:
     """Centre-line profile of the body behind the screen face in (y, z): body top, upper rear wall, rear facet of the
     shelf, lower rear wall, floor."""
-    return [d.face(d.top_s), (d.depth, d.body_top), (d.depth, d.rear_step_z1), (d.body_d, d.rear_step_z0), (d.body_d, 0.0), (0.0, 0.0)]
+    return [d.face(d.top_s), (d.depth, d.body_top), (d.depth, d.rear_shelf_z1), (d.body_d, d.rear_shelf_z0), (d.body_d, 0.0), (0.0, 0.0)]
 
 
 def band_stroke(d: Blueprint) -> list[P2]:
     """The outer edge of the band in side view (the stroke), in (y, z) on the side band, from the desk up: the foot
     and the top of the upright stub, the knee (where the kick meets the lean), the top mitre (where the lean meets
     the level run), and the end of the run at the rear. Straight lines only."""
-    t, k = math.tan(math.radians(d.step_lean)), math.tan(math.radians(d.band_kick))
-    y0, yf, zs = d.step_y0, d.step_y0 + d.band_flare, d.band_stub
+    t, k = math.tan(math.radians(d.band_lean)), math.tan(math.radians(d.band_kick))
+    y0, yf, zs = d.band_lean_y0, d.band_foot_y, d.band_stub
     zk = (yf + zs * k - y0) / (t + k)
     zo = d.band_top_z
     return [(yf, 0.0), (yf, zs), (y0 + zk * t, zk), (y0 + zo * t, zo), (d.depth, zo)]
+
+
+def band_crease(d: Blueprint) -> list[P2]:
+    """The inner crease of the band in side view, in (y, z) on the side of the lower body, from the desk up: the
+    stroke moved band_depth toward the rear on mitres, and the level run's crease to the lower rear wall (it is the
+    crease of the rear shelf, at rear_shelf_z0)."""
+    return mitre_offset(band_stroke(d), -d.band_depth)[:-1] + [(d.body_d, d.rear_shelf_z0)]
+
+
+def crease_y(d: Blueprint, z: float) -> float:
+    """Y of the band's inner crease at height z, from the desk to the level run."""
+    pts = band_crease(d)[:4]
+    for (y0, z0), (y1, z1) in zip(pts, pts[1:]):
+        if z0 <= z <= z1:
+            return y0 if z1 == z0 else y0 + (y1 - y0) * (z - z0) / (z1 - z0)
+    raise ValueError(f"the band's crease has no point at z {z:g}: it runs from the desk to z {pts[-1][1]:g}")
+
+
+def stroke_y(d: Blueprint, z: float) -> float:
+    """Y of the stroke (the outer edge of the band on the side band) at height z, from the desk to the level run."""
+    pts = band_stroke(d)[:4]
+    if not 0.0 <= z <= pts[-1][1]:
+        raise ValueError(f"the stroke has no point at z {z:g}: it runs from the desk to z {pts[-1][1]:g}")
+    for (y0, z0), (y1, z1) in zip(pts, pts[1:]):
+        if z0 <= z <= z1:
+            return y0 if z1 == z0 else y0 + (y1 - y0) * (z - z0) / (z1 - z0)
+    return pts[-1][0]
 
 
 def deck_front_section(d: Blueprint) -> list[P2]:
@@ -766,22 +793,22 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
             "panel_gap 1 wide at the sides, bezel_drop 2 deep from the rail land to the bezel land", SINGLE, "recess cut in the front body; the plate fills it below the bezel land"),
     "BZ3": ("bezel rim wall", "bezel", "faces the centre of the screen", "BZ2, SC1", "bezel_rim 2 deep", FLAT, "extrusion"),
     "SC1": ("screen", "bezel", "faces the player, flat, reclined 30 deg", "BZ3", "344.7 x 215.4; mon_setback 7.2 behind the chord of the rail, 14.0 to 20.2 behind the rail land", FLAT, "the monitor"),
-    "RB1": ("side of the lower body", "rear body", "faces sideways, vertical", "RB2, RB9, RB11, RB12", "step_in 12 in from the side band (rear_w 470.7); below the rear shelf and behind the band",
+    "RB1": ("side of the lower body", "rear body", "faces sideways, vertical", "RB2, RB9, RB11, RB12", "band_depth 12 in from the side band (rear_w 470.7); below the rear shelf and behind the band",
             FLAT, "a plane cut with the band"),
     "RB2": ("band", "rear body", "faces out and back or down, 45 deg to the side band", "RL4, RB1, RB9, RB11",
-            "step_in 12 deep; its outer edge (the stroke) is four straight lines: a stub of band_stub 20 at the desk, a kick of band_kick 28 deg to the knee at z 85.2, the lean of step_lean 28 deg, one mitre into the level run at z 305; the run is the side facet of the rear shelf",
+            "band_depth 12 deep; its outer edge (the stroke) is four straight lines: a stub of band_stub 20 at the desk, a kick of band_kick 28 deg to the knee at z 85.2, the lean of band_lean 28 deg, one mitre into the level run at z 305; the run is the side facet of the rear shelf",
             "flat: four facets that meet on mitres", "a ruled cut between two offsets of the stroke; each piece is a plane"),
-    "RB3": ("lower rear wall", "rear body", "faces the rear, vertical", "RB4, RB9, RB11, RB12, RB6", "body_d 540, up to the crease of the rear shelf at rear_step_z0 293", FLAT, "extrusion"),
+    "RB3": ("lower rear wall", "rear body", "faces the rear, vertical", "RB4, RB9, RB11, RB12, RB6", "body_d 540, up to the crease of the rear shelf at rear_shelf_z0 293", FLAT, "extrusion"),
     "RB4": ("rear shelf, rear facet", "rear body", "faces the rear and down, 45 deg", "RB3, RB5, RB9, RB10", "z 293 to 333, rear_proud 40 deep; it meets the band's level run on the hip",
             FLAT, "extrusion of the rear profile across the width"),
     "RB5": ("upper rear wall", "rear body", "faces the rear, vertical", "RB4, RB7, RB13, FB5", "rear_proud 40 behind the lower wall, at the full width (the rear of the head)", FLAT, "extrusion"),
     "RB7": ("rear corner round, head", "rear body", "turns from the side band to the upper rear wall, upright", "RL4, RB5, RB10, FB5",
-            "rear_corner_r 3, from the rear shelf to the seam bevel; the hood's corner round HC16 stands on the same line",
+            "rear_round_r 3, from the rear shelf to the seam bevel; the hood's corner round HC16 stands on the same line",
             "single-curved", "a true round (makeFillet) after the seam bevel"),
     "RB9": ("lower rear corner and hip", "rear body", "turns from the side of the lower body to the lower rear wall; on the hip from the band's run to the rear facet", "RB1, RB2, RB3, RB4, RB11, RB12",
-            "the hip (the line where the two facets of the rear shelf meet) has rear_corner_r 3; the upright corner below it is the ellipse of that round in plan (5.2 x 3, tangent at 2.1 from the corner), so both meet on one curve",
+            "the hip (the line where the two facets of the rear shelf meet) has rear_round_r 3; the upright corner below it is the ellipse of that round in plan (5.2 x 3, tangent at 2.1 from the corner), so both meet on one curve",
             "single-curved: a cylinder on the hip, an elliptic cylinder below it", "cut by hand (lower_corner_cutter), so that the surfaces are exact"),
-    "RB10": ("round of the head's lower edge", "rear body", "turns from the side band to the rear facet of the shelf", "RL4, RB4, RB7, RB9", "rear_corner_r 3, on the edge where the rear facet ends on the side band",
+    "RB10": ("round of the head's lower edge", "rear body", "turns from the side band to the rear facet of the shelf", "RL4, RB4, RB7, RB9", "rear_round_r 3, on the edge where the rear facet ends on the side band",
              "single-curved", "a true round (Part::Fillet) with the other edges of the rear that the edge rule rounds"),
     "RB11": ("base facet, body", "rear body", "faces out and down, 45 deg", "RB1, RB2, RB3, RB9, FL1", "base_facet 5, along the lower rear wall, the side of the lower body and the foot of the band; the side band has none",
              FLAT, "a 45 degree cut on the floor edges (makeChamfer)"),
@@ -791,7 +818,7 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "RB13": ("hand-holds", "rear body", "two recesses in the upper rear wall", "RB5",
              "x 70 to 170 each side, z 349 to 411, 26 deep; a level floor, a roof that falls 45 deg toward the inside, ends R 10 in plan, rounds R 8 inside and R 3 on the roof's edges",
              "flat faces with rounds", "cut by a solid whose inside edges are rounded; the rim gets the edge break"),
-    "RB6": ("rear door", "rear body", "faces the rear, vertical", "RB3", "424.4 x 165 by the rule of the rear study (4 clear of the cut-ins, 12 below the shelf); the fit study sets it", FLAT, "plate"),
+    "RB6": ("rear door", "rear body", "faces the rear, vertical", "RB3", "door_w 422.7 x 165: door_land 4 inside the ends of the cut-ins, door_frame 12 below the crease of the rear shelf, sill door_z0 116; the fit study checks it", FLAT, "plate"),
     "FL1": ("underside", "floor", "faces down", "DK9, RL4, RB11", "on the desk (the floor stands on thin pads)", FLAT, "extrusion"),
     "HC1": ("hood leg, front face", "hood cap", "faces the player; leans back 16 deg below the bend, 2 deg above it", "HC4, HC11, HC3, HC15",
             "hood_bar 21 less the soft edge; its outline follows the side", SINGLE, "the front outline carried along the front of the side view"),
@@ -816,7 +843,7 @@ FACES: dict[str, tuple[str, str, str, str, str, str, str]] = {
     "HC13": ("marquee lip", "hood cap", "faces the player; its top and bottom face up and down", "MQ1, HB1, HC11", "hood_rail_h 6 high, hood_rail_proud 5 proud: its front is flush with the hood front; its top is an edge of hood_marquee_edge 5 in front of the marquee; ends on the legs",
              FLAT, "extrusion across the width, cut by the opening"),
     "HC16": ("hood rear corner round", "hood cap", "turns from the side to the rear, then to the rear arc and the roof", "HC5, HC6, HC7, HC8, HC9, HC15",
-             "rear_corner_r 3, as on the head's corners RB7: the round that a ball makes when it rolls up the edge where the side meets the rear; near the roof the two turn tangent and the round runs out",
+             "rear_round_r 3, as on the head's corners RB7: the round that a ball makes when it rolls up the edge where the side meets the rear; near the roof the two turn tangent and the round runs out",
              "single-curved on the rear wall; double-curved round the rear arc",
              "cut by hand through sections of the rolling ball (hood_corner_cutter); print the cap on its rear face"),
     "HC14": ("hood foot", "hood cap", "faces down", "HC1, HC3, HC4, HC9, HC15", "seam_gap 1.5 above the body top FB4", FLAT, "plane cut"),
@@ -984,9 +1011,9 @@ def faces(d: Blueprint) -> dict[str, Face]:
     # the rear (revision 7): the side band back to the rear at the head, the band on its rear edge, the lower body,
     # the rear shelf under the head, the upper rear wall; every side face follows the tuck of the body toward the hood
     ys = d.seam_y
-    rw, sd = d.rear_w / 2, d.step_in
-    zc, z1, zo, yb, yd = d.rear_step_z0, d.rear_step_z1, d.band_top_z, d.body_d, d.depth
-    ch, rr_ = d.base_facet, d.rear_corner_r
+    rw, sd = d.rear_w / 2, d.band_depth
+    zc, z1, zo, yb, yd = d.rear_shelf_z0, d.rear_shelf_z1, d.band_top_z, d.body_d, d.depth
+    ch, rr_ = d.base_facet, d.rear_round_r
     crease = sorted({(round(z, 6), y) for _, y, z in crease_a})
 
     def y_front(z: float) -> float:
@@ -999,7 +1026,7 @@ def faces(d: Blueprint) -> dict[str, Face]:
         return crease[-1][1]
 
     stroke = band_stroke(d)                                  # (y, z) on the side band
-    inner = mitre_offset(stroke, -sd)[:-1] + [(yb, zc)]       # the band's inner crease, on the side of the lower body
+    inner = band_crease(d)                                   # the band's inner crease, on the side of the lower body
     yf = stroke[0][0]
 
     def y_stroke(z: float) -> float:
@@ -1238,7 +1265,7 @@ def faces(d: Blueprint) -> dict[str, Face]:
     hood_loop = section([p for k in ("HC1", "HC3", "HC4", "HC5", "HC9") for p in out[k].polys], oz + g)
     # the round of the rear corners of the cap (HC16): the ball of the head's corner round, rolled up the edge where
     # the side meets the rear, from the bevel of the seam groove to the roof, where it runs out
-    rd = hood_corner(d, h, d.rear_corner_r)
+    rd = hood_corner(d, h, d.rear_round_r)
     zc_end = rd.end(math.radians(1.0))
     heights = [-rd.r + (zc_end + rd.r) * (1 - (1 - k / 600) ** 2) for k in range(601)]
     balls = [rd.station(zc) for zc in heights]

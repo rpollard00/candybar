@@ -1,13 +1,13 @@
-"""The structure sheets, the sheet of cable routes and air path, the joint sheet, and the width study of the seam
-proposal. draw_split.py calls these; they read what candybar.shell.split and candybar.shell.structure wrote.
+"""The structure sheet, the sheet of cable routes and air path, and the joint sheet of the split.
+draw_split.py calls these; they read what candybar.shell.split, candybar.shell.structure and the fit study wrote.
 
     cad/.venv-tools/bin/python cad/tools/draw_split.py   (draws these too)
 
-structure-<option>.png  a side view and a plan of the cavity with the hardware boxes of the fit study, and the
-                        floor, ring frames, cross-members, ribs, frame members and mounts in colour
-services.png            the cable routes and the air path, with the plugs at the parts that open
-joints.png              dimensioned sections of the joints, and the coupon pair; every value from
-                        candybar.shell.joints (also docs/blueprint/11-joints: draw_split.py blueprint)
+structure.png  a side view and a plan of the cavity with the hardware boxes of the fit study, and the floor, ring
+               frames, cross-members, ribs and mounts in colour
+services.png   the cable routes and the air path, with the plugs at the parts that open
+joints.png     dimensioned sections of the joints, and the coupon pair; every value from candybar.shell.joints
+               (also docs/blueprint/11-joints: draw_split.py blueprint)
 """
 from __future__ import annotations
 
@@ -34,9 +34,9 @@ from candybar.shell import split as sp  # noqa: E402
 from candybar.shell import structure as st  # noqa: E402
 from candybar.shell.dims import Blueprint  # noqa: E402
 
-SHELL = os.path.join(CAD, "out", "shell-bp")
+SHELL = os.path.join(CAD, "out", "shell-rev7")
 OUT = os.path.join(SHELL, "split")
-KIND_COLOUR = {"floor": "#1f77b4", "ring": "#ff7f0e", "cross": "#2ca02c", "rib": "#9467bd", "mount": "#8c564b", "frame": "#d62728"}
+KIND_COLOUR = {"floor": "#1f77b4", "ring": "#ff7f0e", "cross": "#2ca02c", "rib": "#9467bd", "mount": "#8c564b"}
 LABELLED = {"Monitor_Body": "monitor", "MonitorAny_Cradle": "monitor room", "Compute_Heatsink": "BC-250", "Compute_FanShroud": "fan, shroud",
             "Compute_ExhaustDuct": "exhaust duct", "PSU_Body": "power supply", "Hub_Body": "hub", "SpeakerR_Driver": "speaker",
             "Marquee_Modules": "marquee", "Lever_Body": "lever", "CableBundle_Body": "cables", "USB_C4_Body": "USB"}
@@ -44,6 +44,12 @@ LABELLED = {"Monitor_Body": "monitor", "MonitorAny_Cradle": "monitor room", "Com
 
 def sections() -> dict:
     return json.load(open(os.path.join(SHELL, "fit", "sections.json")))
+
+
+def board_x() -> tuple[float, float]:
+    """The x range of the BC-250's board in the fit study."""
+    boxes = [it["box"] for it in sections()["rear"]["items"] if it["solid"].startswith("Compute_PCB")]
+    return min(b[0] for b in boxes), max(b[2] for b in boxes)
 
 
 def outline(ax, sec: dict, axes: tuple[int, int] | None = None) -> None:
@@ -102,15 +108,15 @@ def frame_ax(ax, title: str, xlim, ylim) -> None:
     ax.grid(True, color="#eee", lw=0.4, zorder=0)
 
 
-def structure_sheet(key: str, opt: sp.Option, d: Blueprint) -> str:
+def structure_sheet(lay: sp.Layout, d: Blueprint) -> str:
     sec = sections()["sections"]
-    members = st.frame_c(d) if key == "C" else st.skin_members(d, key)
+    members = st.members(d, board_x())
     fig, (a1, a2, a3) = plt.subplots(1, 3, figsize=(24, 9), gridspec_kw={"width_ratios": [1.15, 1.0, 0.75]})
     outline(a1, sec["side, centre line"])
     items(a1, "side")
     outline(a2, sec["plan, compute module"])
     items(a2, "plan")
-    seams = json.load(open(os.path.join(OUT, key, "seams.json")))
+    seams = json.load(open(os.path.join(OUT, lay.key, "seams.json")))
     for s in seams.values():
         if s["side"] == "L" or s["module"] != "body":
             continue
@@ -131,21 +137,21 @@ def structure_sheet(key: str, opt: sp.Option, d: Blueprint) -> str:
     frame_ax(a1, "side (y, z): centre-line section, members projected", (-20, 620), (-20, 600))
     frame_ax(a2, f"plan (x, y): section at z {sec['plan, compute module']['at']:.0f}, members projected", (-270, 270), (-20, 600))
     a3.axis("off")
-    rows = [f"{opt.title}: structure", ""]
-    for kind in ("floor", "ring", "cross", "rib", "mount", "frame"):
+    rows = ["The structure of the shell", ""]
+    for kind in ("floor", "ring", "cross", "rib", "mount"):
         names = [m.name for m in members if m.kind == kind]
         if names:
             rows.append(f"{st.KIND_WORDS[kind]}: {', '.join(names)}")
     rows += ["", "mounts:"]
-    for i, mt in enumerate(st.mounts(key), 1):
+    for i, mt in enumerate(st.mounts(), 1):
         rows.append(f"{i:>2}. {mt.item}: on {mt.on}")
     a3.text(0, 1, "\n".join(rows), fontsize=7.5, va="top", family="DejaVu Sans Mono", transform=a3.transAxes, wrap=True)
     for i, (kind, c) in enumerate(KIND_COLOUR.items()):
         a3.add_patch(Rectangle((0.0, 0.02 + i * 0.035), 0.05, 0.022, fc=c, alpha=0.5, transform=a3.transAxes))
         a3.text(0.07, 0.031 + i * 0.035, st.KIND_WORDS[kind], fontsize=7.5, va="center", transform=a3.transAxes)
-    fig.suptitle(f"Structure of option {opt.title} (mm). Grey: hardware of the fit study; dashed: keep-out zones; light "
+    fig.suptitle("Structure of the shell: a stressed skin (mm). Grey: hardware of the fit study; dashed: keep-out zones; light "
                  "orange lines: the bonded seams, each with an inside flange", fontsize=11)
-    path = os.path.join(OUT, f"structure-{key}.png")
+    path = os.path.join(OUT, "structure.png")
     fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -168,9 +174,9 @@ AIR_PLAN = (  # (x, y)
     ((48, 610), (48, 540), "#1f77b4", False), ((48, 530), (48, 495), "#1f77b4", False), ((40, 480), (-150, 480), "#d62728", False),
     ((-175, 490), (-175, 560), "#d62728", False), ((-150, 380), (-150, 560), "#d62728", False), ((0, 150), (-120, 360), "#1f77b4", False),
 )
-PLUGS = ((56.0, 470.0, 320.0, "PCIe plug at the board + 150 loop"), (-188.0, 330.0, 215.0, "monitor plugs (right angle) + slack"),
+PLUGS = ((58.0, 470.0, 320.0, "PCIe plug at the board + 150 loop"), (-188.0, 330.0, 215.0, "monitor plugs (right angle) + slack"),
          (-165.0, 180.0, 22.0, "panel USB plug + 200 loop"), (120.0, 470.0, 432.0, "hood plug + loop"))
-DUCT_FAN = (-174.0, 130.0, 182.0, 92.0)  # x centre, z centre... (x, z, y face, size)
+DUCT_FAN = (-172.0, 130.0, 182.0, 92.0)  # x centre, z centre... (x, z, y face, size)
 
 
 def services_sheet() -> str:
@@ -481,73 +487,3 @@ def joints_sheet(out: str = OUT, name: str = "joints", svg: bool = False) -> str
 
 
 # ---------- the width study ----------
-
-def hull_points(p: np.ndarray) -> np.ndarray:
-    from scipy.spatial import ConvexHull
-
-    if len(p) < 8:
-        return p
-    try:
-        return p[ConvexHull(p).vertices]
-    except Exception:  # noqa: BLE001 - flat piece: keep the points
-        return p
-
-
-def width_study(meas: dict, step: float = 0.5) -> dict:
-    """Each option's pieces with the cabinet wider by dW, the growth put into the rails (the agent that studies width
-    adds it beside the bezel; candidates 514.7 and 533.2): every point outside x = +-218.3 of the body and the floor, and outside x = +-174 of the
-    hood (the top flat), moves out by dW / 2. The centre seam of the hood halves then grows with them. Gives the
-    largest dW at which every piece still fits, and the result at +20 and +38."""
-    lim = sp.Printer(**{k: meas["printer"][k] for k in ("xy", "z", "bed", "source")})
-    out = {}
-    for key in sp.ALL:
-        man = json.load(open(os.path.join(OUT, key, "manifest.json")))
-        rows = meas["options"][key]["pieces"]
-        parts = {}
-        for name, m in man.items():
-            module = rows[name]["module"]
-            if module in ("bezel", "speaker_right", "speaker_left", "logo_form"):
-                continue
-            t = 174.0 if module == "hood" else 218.3
-            p = db.load_stl(os.path.join(OUT, key, m["file"])).reshape(-1, 3)
-            p = np.unique(np.round(p, 2), axis=0)
-            groups = [hull_points(p[p[:, 0] > t]), hull_points(p[p[:, 0] < -t]), hull_points(p[np.abs(p[:, 0]) <= t])]
-            parts[name] = (groups, rows[name]["up"])
-
-        def fails(dw: float) -> list[str]:
-            bad = []
-            for name, (g, up) in parts.items():
-                q = [g[0] + (dw / 2, 0, 0), g[1] - (dw / 2, 0, 0), g[2]]
-                q = np.concatenate([x for x in q if len(x)])
-                if not sp.print_box(q, tuple(up), lim, step=1.0)["fits"]:
-                    bad.append(name)
-            return bad
-
-        lo, hi = 0.0, 80.0
-        if fails(hi):
-            while hi - lo > step:
-                mid = (lo + hi) / 2
-                lo, hi = (mid, hi) if not fails(mid) else (lo, mid)
-        else:
-            lo = hi
-        out[key] = {"max_dw": lo, "at_20": fails(20.0), "at_38": fails(38.5), "first": fails(hi) if hi < 80 else []}
-    return out
-
-
-def panel_seam(x: float = -41.2) -> dict:
-    """A seam across a printed control panel plate at x: its clearance to every control under the plate, and the width
-    of the larger half."""
-    d = Blueprint()
-    from candybar.shell import profiles as pr
-
-    out = pr.panel_outline(d)
-    near = []
-    for it in sections()["rear"]["items"]:
-        if it["group"] != "Panel" or it["role"] != "hardware":
-            continue
-        x0, _, x1, _ = it["box"]
-        gap = x0 - x if x0 > x else (x - x1 if x1 < x else -1.0)
-        near.append((gap, it["solid"]))
-    near.sort()
-    xs = [p[0] for p in out]
-    return {"x": x, "halves": (round(x - min(xs), 1), round(max(xs) - x, 1)), "nearest": near[:3]}

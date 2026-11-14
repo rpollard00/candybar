@@ -14,6 +14,7 @@ import FreeCAD as App
 import Part
 
 from candybar import build, check, model, params
+from candybar.shell import cavity as shell_cavity
 from candybar.shell import solids as shell_solids
 from candybar.shell.dims import Blueprint
 
@@ -45,6 +46,14 @@ def shell() -> tuple[Blueprint, dict[str, Part.Shape], tuple[str, ...]]:
     d = Blueprint()
     log: list[str] = []
     return d, shell_solids.build(d, log), tuple(log)
+
+
+@functools.cache
+def cavity() -> shell_cavity.Cavity:
+    """The cavity of the default build (candybar.shell.cavity), made once for all the tests that read it. It takes
+    some minutes to make."""
+    d, parts, _ = shell()
+    return shell_cavity.build(parts, d)
 
 
 @functools.cache

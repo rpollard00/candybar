@@ -42,18 +42,19 @@ The build has two steps. The first step runs `freecadcmd`: it generates the docu
 
 The blueprint shell (`candybar/shell/`) is a second model beside the older generator. `docs/blueprint/index.md` describes it, and its section "How to build and check the solids" gives the commands for the solids, their checks and the fit study. The default build is revision 7 of the outer form (decision record 0007), and it writes to `cad/out/shell-rev7`. These commands make the split, the structure, the joint coupon and the width study. Run one FreeCAD or Blender process at a time.
 
-The fit study, the split and the structure are those of revision 6. They run on revision 7, but their layout, their seams and their door are not yet changed for it (see `docs/roadmap.md`).
-
-CAUTION: Do not start the split or the structure on revision 7 without the skin files in `cad/out/shell-rev7/split/cache`. The step "making the skin" of `split.py` used 12.8 GB of memory for revision 7 and did not end. The skin files in that cache come from a scratch run that cut the cavity away in steps (`docs/roadmap.md`, step 9). They apply only while `dims.py`, `profiles.py`, `solids.py` and `cavity.py` do not change.
+The fit study, the split and the structure follow revision 7. The skin (the outer form less the cavity) takes about 20 minutes to make and needs 6 GB of memory. The split keeps it in `cad/out/shell-rev7/split/cache`, under a fingerprint of `dims.py`, `profiles.py`, `solids.py` and `cavity.py`. When one of them changes, the next run makes the skin again.
 
 ```sh
-# the split: cut the skin into pieces for each seam option and measure them (the skin is cached: about 12 minutes when it changes)
-CANDYBAR_OUT=cad/out/shell-rev7 CANDYBAR_SPLIT_CACHE=cad/out/shell-rev7/split/cache cad/candybar/freecad-run.sh candybar.shell.split
-# the structure: place the frame of option C in the skin, against the hardware of the fit study (split/structure.json)
-CANDYBAR_OUT=cad/out/shell-rev7 CANDYBAR_SPLIT_CACHE=cad/out/shell-rev7/split/cache cad/candybar/freecad-run.sh candybar.shell.structure
-# the sheets and proposal.md (without "proposal": also the elevations of each option, which take minutes)
-cad/.venv-tools/bin/python cad/tools/draw_split.py proposal
-cad/.venv-tools/bin/python cad/tools/draw_split.py render       # renders of the chosen layout (Blender)
+# the fit study: the hardware in the cavity (about 30 minutes); exit status 1 when an item does not fit
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit
+# the split: cut the skin into the pieces of the layout and measure them
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.split
+# the structure: move the hardware of the fit study in the skin, measure the walls of the hand-holds (split/structure.json)
+CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.structure
+# the sheets and report.md (with "report": without the elevations, which take minutes)
+cad/.venv-tools/bin/python cad/tools/draw_split.py
+cad/.venv-tools/bin/python cad/tools/draw_split.py render       # renders of the pieces (Blender)
+cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit      # docs/blueprint/09-hardware
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
 # the detail pass: the open small questions of the form
 cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options
@@ -66,7 +67,7 @@ cad/.venv-tools/bin/python cad/tools/draw_widths.py options          # cad/out/s
 cad/.venv-tools/bin/python cad/tools/draw_widths.py table cad/out/probe   # the numbers as Markdown
 ```
 
-`CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_OPTIONS` (for example `A,bezel`) limits a split run to some options. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.
+`CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.
 
 Large outputs go under `cad/out/`, which git ignores. Do not write them to `/tmp`: on this machine `/tmp` is memory. Scratch files go under `cad/out/_scratch/`.
 

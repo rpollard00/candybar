@@ -89,6 +89,61 @@ class FitChecksTest(unittest.TestCase):
         self.assertEqual(len([n for n in names if n.startswith("USB_")]), len(fit.USB_ORDER))
 
 
+class FitOnTheRealCavityTest(unittest.TestCase):
+    """The fit study on the default build and its real cavity: the hardware at its anchors, every rule of the study.
+    A hardware item in the skin of the real form fails here (in unit 1 of revision 7 the exhaust duct lay in the skin
+    behind the cut-ins, and no test saw it)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.d, cls.parts, _ = support.shell()
+        cls.cav = support.cavity()
+        cls.fitted = fit.place(cls.d, fit.Layout(), support.PARAMS, cls.parts, cls.cav)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.fitted.close()
+
+    def box(self, name: str) -> App.BoundBox:
+        return next(s.world.BoundBox for it in self.fitted.found for s in it.solids if s.name == name)
+
+    def test_no_rule_of_the_study_fails(self) -> None:
+        self.assertEqual(self.fitted.failures, [])
+
+    def test_every_rule_ran(self) -> None:
+        for title in ("R1 interference", "R2 keep-out", "containment in the cavity", "R2b air zones", "door service"):
+            self.assertTrue(self.fitted.rules[title], title)
+
+    def test_the_door_is_inside_the_cut_ins_and_below_the_rear_shelf(self) -> None:
+        d, door = self.d, self.fitted.door
+        self.assertAlmostEqual(d.cut_in_x - door["x1"], d.door_land)
+        self.assertAlmostEqual(d.rear_shelf_z0 - door["z1"], d.door_frame)
+
+    def test_the_exhaust_duct_is_inside_the_door_and_clear_of_the_cut_ins(self) -> None:
+        duct, door = self.box("Compute_ExhaustDuct"), self.fitted.door
+        self.assertGreaterEqual(duct.XMin, door["x0"])
+        self.assertGreaterEqual(self.d.cut_in_x - abs(duct.XMin), fit.Layout().cut_in_reach(self.d) - 1e-6)
+
+    def test_the_power_supply_is_below_the_cut_ins(self) -> None:
+        self.assertLessEqual(self.box("PSU_Body").ZMax, self.d.cut_in_z0 - fit.Layout().cut_in_reach(self.d))
+
+    def test_the_study_notices_the_duct_behind_the_cut_ins(self) -> None:
+        """The duct moved out to where it stood in unit 1 (its end 8 inside the corner, with each rule of the layout
+        that holds it back set aside): it lies in the skin behind the cut-ins, and it is outside the door."""
+        d = self.d
+        end = d.rear_w / 2 - 8.0
+        far = fit.Layout(duct_in_door=d.door_w / 2 - end, cut_in_clear=d.cut_in_x - end - d.wall_t - cavity.SLAB)
+        moved = fit.place(d, far, support.PARAMS, self.parts, self.cav)
+        try:
+            at = next(s.world.BoundBox.XMin for it in moved.found for s in it.solids if s.name == "Compute_ExhaustDuct")
+            failed = "\n".join(moved.failures)
+        finally:
+            moved.close()
+        self.assertAlmostEqual(at, -end)
+        self.assertIn("containment in the cavity: Compute_ExhaustDuct", failed)
+        self.assertIn("door service: Compute_ExhaustDuct", failed)
+
+
 class SpeakerSearchTest(unittest.TestCase):
     def test_largest_circle_in_a_square_touches_all_four_sides(self) -> None:
         x, z, r = fit.largest_circle([(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (0.0, 40.0)])

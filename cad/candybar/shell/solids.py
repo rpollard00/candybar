@@ -556,7 +556,7 @@ def rear_cutter(d: Blueprint) -> Part.Shape:
     """What the rear profile takes off a plain rear wall at the full depth: the region behind the upper rear wall,
     the rear facet of the shelf and the lower rear wall, across the whole width."""
     far, lo, hi = d.depth + 3 * OVER, -3 * OVER, d.body_top + 3 * OVER
-    region = poly([(d.depth, hi), (d.depth, d.rear_step_z1), (d.body_d, d.rear_step_z0), (d.body_d, lo), (far, lo), (far, hi)])
+    region = poly([(d.depth, hi), (d.depth, d.rear_shelf_z1), (d.body_d, d.rear_shelf_z0), (d.body_d, lo), (far, lo), (far, hi)])
     return prism(region, yz(-BIG / 2), V(BIG, 0, 0))
 
 
@@ -587,15 +587,15 @@ def floor_edges(shape: Part.Shape, test: Callable[[FreeCAD.Vector], bool]) -> li
 def lower_corner_cutter(d: Blueprint) -> Part.Shape:
     """What the rounds of the two lower rear corners take off, made by hand so that they meet exactly. The hip
     (between the two 45 degree facets of the shelf) and the mitre of the base facet (between two faces of the base
-    facet, parallel to those of the shelf) get a round of rear_corner_r (R). Each of these rounds, cut by a level
+    facet, parallel to those of the shelf) get a round of rear_round_r (R). Each of these rounds, cut by a level
     plane, is an ellipse: centre (a - 2 r, y0 - 2 r) with r = R / sqrt(2), semi-axes sqrt(3) R along the diagonal and
     R across, tangent to both walls at r from the corner. The upright corner between them is that ellipse carried
     straight up, so it meets the round of the hip and the round of the mitre on the same curve: no ledge and no
     needle. (A circular round of r there meets the creases at the same points, but it stands up to 0.035 r proud of
     the hip's round between them.)"""
-    a, y0, zc, ch = d.rear_w / 2, d.body_d, d.rear_step_z0, d.base_facet
+    a, y0, zc, ch = d.rear_w / 2, d.body_d, d.rear_shelf_z0, d.base_facet
     big, k = 4000.0, math.sqrt(0.5)
-    big_r = d.rear_corner_r
+    big_r = d.rear_round_r
     rr = big_r / math.sqrt(2)
     level = lambda z0, z1: Part.makeBox(big, big, z1 - z0, V(-big / 2, -big / 2, z0))
     out = []
@@ -621,7 +621,7 @@ def lower_corner_cutter(d: Blueprint) -> Part.Shape:
 
 def behind_band(d: Blueprint, p: FreeCAD.Vector) -> bool:
     """Whether a point belongs to the rear of the body: behind the line of the band's lean, or on the rear."""
-    return p.y > d.step_y(p.z) - 1 or p.y > d.body_d - 1
+    return p.y > d.band_lean_y(p.z) - 1 or p.y > d.body_d - 1
 
 
 def rear_design_edges(shape: Part.Shape, d: Blueprint) -> list[Part.Edge]:
@@ -629,7 +629,7 @@ def rear_design_edges(shape: Part.Shape, d: Blueprint) -> list[Part.Edge]:
     behind the band or on the rear, above the base facet and below the body top. They are the outer edge of the
     band, the edge where the rear facet of the shelf ends on the side band, the lower edge of the upper rear wall
     and the upright rear corners of the head. The lower rear corner is not taken: lower_corner_cutter has made it."""
-    rw, y0, zc = d.rear_w / 2, d.body_d, d.rear_step_z0
+    rw, y0, zc = d.rear_w / 2, d.body_d, d.rear_shelf_z0
     out = []
     for e in shape.Edges:
         if e.Degenerated:
@@ -664,7 +664,7 @@ def cut_in_cutter(d: Blueprint) -> Part.Shape:
     dep = d.cut_in_depth
     dc = (h * h / 4 / dep - dep) / 2                    # the centre's distance outside the surface
     rho = dc + dep                                      # the ball
-    big_r = d.rear_corner_r
+    big_r = d.rear_round_r
     rr, k = big_r / math.sqrt(2), math.sqrt(0.5)
     end = h / 2                                         # the slot reaches this far past the ball's last centre
     out = []
@@ -907,7 +907,7 @@ def body(d: Blueprint, fr: pr.Front, log: list[str] | None = None) -> Part.Shape
     log.append(f"body, base facet {d.base_facet:g}: {len(es)} edges")
     s = sharp.makeChamfer(d.base_facet, es)
     s = s.cut(lower_corner_cutter(d))
-    r = d.rear_corner_r
+    r = d.rear_round_r
     log.append(f"body, lower rear corners by hand: hip and mitre of the base facet R {r:g}, the column on their ellipse "
                f"({math.sqrt(3) * r:.2f} x {r:g}, tangent at {r / math.sqrt(2):.2f} from the corner)")
     es = rear_design_edges(s, d)
@@ -1134,9 +1134,9 @@ def round_section(st: Station, r: float, off: float, e: float = 1.0) -> Part.Wir
 def hood_corner_cutter(d: Blueprint, h: pr.Hood) -> list[Part.Shape]:
     """What the round of the right rear corner takes off the cap, in the hood's frame: for each piece of the edge
     (hood_corner_stations) a loft of degree 3 through the sections of the round at its stations. It is the round that
-    a ball of rear_corner_r makes when it rolls along the edge in touch with the side and the rear. OpenCascade's own
+    a ball of rear_round_r makes when it rolls along the edge in touch with the side and the rear. OpenCascade's own
     round of this edge builds on the right side only, and on the cap of revision 6 not in every run."""
-    r = d.rear_corner_r
+    r = d.rear_round_r
     return [Part.makeLoft([round_section(st, r, ROUND_OFF) for st in piece], True, False, False, 3) for piece in hood_corner_stations(d, h, r)]
 
 
@@ -1184,8 +1184,8 @@ def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shap
     solid = solid.cut(opening.common(across(poly(recess_profile(d, h))))).removeSplitter()
     right = hood_corner_cutter(d, h)
     solid = cut_checked(solid, right + [c.mirror(V(0, 0, 0), V(1, 0, 0)) for c in right], "the round of the hood's rear corners")
-    pieces = hood_corner_stations(d, h, d.rear_corner_r)
-    log.append(f"hood, rear corners R {d.rear_corner_r:g} by hand: {len(pieces)} lofts through {sum(len(p) for p in pieces)} sections on each side, "
+    pieces = hood_corner_stations(d, h, d.rear_round_r)
+    log.append(f"hood, rear corners R {d.rear_round_r:g} by hand: {len(pieces)} lofts through {sum(len(p) for p in pieces)} sections on each side, "
                f"from below the foot to where the edge turns {math.degrees(pieces[-1][-1].turn):.1f} degrees")
     # The cap gets no edge break. Its sharp edges are the rim of the opening and the upper edge of the seam bevel (which
     # turns more than 45 degrees, because the sides and the front of the cap lean). The leaning front is a sheared
@@ -1252,7 +1252,7 @@ def focus(d: Blueprint) -> dict[str, dict]:
     p = fr.rail.at(a)
     crease = (d.side_x(p[1]), p[0] - math.cos(a) * d.deck_lean_h, p[1] - math.sin(a) * d.deck_lean_h)
     foot = fr.sweep.at(fr.sweep.a1)
-    hw, rw, zc = d.width / 2, d.rear_w / 2, d.rear_step_z0
+    hw, rw, zc = d.width / 2, d.rear_w / 2, d.rear_shelf_z0
     mitre = pr.band_stroke(d)[3]
     cam = lambda target, radius, az, el: {"target": [round(v, 1) for v in target], "radius": radius, "az": az, "el": el}
     return {"closeup-cheek-foot": cam((hw - 6, *foot), 70, 45, 12),
@@ -1268,10 +1268,10 @@ def focus(d: Blueprint) -> dict[str, dict]:
             "closeup-base-corner": cam((rw - 10, d.body_d - 10, 10.0), 45, 135, 20),
             "closeup-hip-foot": cam((rw - 1, d.body_d - 1, zc + 1), 18, 135, 8),
             "closeup-hip-top": cam((hw - 2, d.body_d + 10, zc + 12), 18, 125, 15),
-            "closeup-head-foot": cam((hw - 2, d.depth - 2, d.rear_step_z1 + 1), 18, 125, 15),
+            "closeup-head-foot": cam((hw - 2, d.depth - 2, d.rear_shelf_z1 + 1), 18, 125, 15),
             "closeup-top-mitre": cam((hw - 2, mitre[0] + 2, mitre[1] - 2), 20, 100, 10),
             "closeup-band-foot": cam((hw - 30, 420.0, 140.0), 210, 140, 14),
-            "closeup-cut-ins": cam((rw - d.rear_corner_r / 2, d.body_d - d.rear_corner_r / 2, d.cut_in_z0 + d.cut_in_pitch * (d.cut_in_count - 1) / 2), 60, 145, 10),
+            "closeup-cut-ins": cam((rw - d.rear_round_r / 2, d.body_d - d.rear_round_r / 2, d.cut_in_z0 + d.cut_in_pitch * (d.cut_in_count - 1) / 2), 60, 145, 10),
             "closeup-cut-in-corner": cam((rw - 2, d.body_d - 2, d.cut_in_z0 + 5), 22, 135, 6),
             "closeup-cut-in-straight": cam((rw - 1, d.body_d - 1, d.cut_in_z0 + d.cut_in_pitch + d.cut_in_h / 2), 30, 135, 0),
             "closeup-hand-hold": cam(((d.grip_x0 + d.grip_x1) / 2, d.depth, d.grip_z0 + d.grip_h / 2), 65, 165, 12),

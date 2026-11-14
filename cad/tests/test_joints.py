@@ -1,5 +1,5 @@
 """The joint values have one source: candybar.shell.joints (Joint and OtherJoints). A second module that sets a joint
-value as a literal number fails here, so that the joint sheet, the proposal and the coupon cannot drift apart again.
+value as a literal number fails here, so that the joint sheet, the split report and the coupon cannot drift apart again.
 """
 from __future__ import annotations
 

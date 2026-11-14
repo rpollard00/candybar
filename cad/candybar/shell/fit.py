@@ -2,7 +2,7 @@
 
 Run headless. It exits 1 when an item fails a check:
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.fit
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.fit
 
 It builds the outer form (solids.build), the cavity inside its skin (cavity.build) and the hardware. Every hardware
 size comes from cad/params/*.csv through params.load, and the envelopes and keep-out zones are those of
@@ -52,8 +52,11 @@ RAY = 300.0
 # gaps are first looked for among the pieces this near
 GAP_NEAR = 30.0
 # an item that is fixed to the skin stands this far off it, so that a face on a face of the cavity does not count
-# as a clash
+# as a clash. It is more than cavity.RIDGE, by which every second slab of the cavity stands farther in
 SEAT = 0.1
+assert SEAT > cavity.RIDGE
+# the report lists every solid that stands nearer than this to the skin
+TIGHT = 3.0
 # a point on the face of a cavity piece counts as inside it
 SAME_POINT = 1e-6
 # a sight line ends this far in front of the image, so that it does not touch the glass; hidden bands to this step
@@ -68,18 +71,23 @@ FINISH = {"skin": "white", "plate": "black", "Monitor": "#3a4250", "Compute": "#
 @dataclass(frozen=True)
 class Layout:
     """Positions and gaps that nothing fixes yet."""
-    # power supply: its left face this far from the inner side wall of the rear body (as in the earlier layout), and
-    # at least corner_clear inside the line where the round of the rear corner starts on the rear wall. 5, because
-    # in the round the slab cavity of this study is up to 4 narrower than a true offset (as behind the step); the
-    # duct then also stands 1 inside the door opening
+    # power supply: its left face this far from the inner face of the side of the lower body. Its rear face stands
+    # on the lower rear wall, below the cut-ins (the rule "door service" checks that it lies on the plain wall)
     psu_side_gap: float = 8.0
-    corner_clear: float = 5.0
+    # a solid against the lower rear wall keeps this far from the skin behind the cut-ins. The skin steps in there:
+    # wall_t round the floor of each groove, and one slab more, because the cavity is made of slabs (cut_in_reach)
+    cut_in_clear: float = 3.0
     # stowed cables: this far right of the power supply, against the rear wall (as in the earlier layout)
     bundle_gap: float = 6.0
-    # BC-250: the DisplayPort plug space ends this far from the inner side wall (3 in the earlier layout; 4 here,
-    # because behind the step the cavity of this study is up to 3.4 narrower than a true offset); its exhaust duct,
-    # which runs along the rear door, also keeps corner_clear inside the start of the rear corner's round
+    # BC-250: its exhaust duct runs along the rear door, at the height of the cut-ins. The duct's outer end (the end
+    # of the DisplayPort plug space) stands cut_in_reach inside the ends of the cut-ins; and at least duct_in_door
+    # inside the side of the door opening and bc_side_gap from the inner face of the side
+    duct_in_door: float = 1.0
     bc_side_gap: float = 4.0
+
+    def cut_in_reach(self, d: Blueprint) -> float:
+        """How far from the slot of a cut-in (its end, or its lip) a solid against the lower rear wall must stay."""
+        return d.wall_t + cavity.SLAB + self.cut_in_clear
     # BC-250: its lower edge this far above the clear space over the supply's fan; 3 so that its exhaust duct, which
     # starts 3 below the board, stays out of that space (2 in the earlier layout gave 7.2 cm3 of overlap)
     bc_above_psu: float = 3.0
@@ -101,16 +109,14 @@ class Layout:
     # USB row in the right side of the deck: the first pocket this far behind the end of the deck's front corner, so
     # that the row (147.6 long) ends before the joint of the deck and the body, 153 behind the corner
     usb_front_gap: float = 0.0
-    # hub: on the floor behind the USB row, this far from the side wall of the narrower rear body (its rear plugs
-    # reach behind the step) and this far behind the last socket
+    # hub: on the floor behind the USB row, this far inside the inner face of the side of the lower body (the
+    # width behind the band, so that its rear plugs can reach behind the band's foot) and this far behind the last socket
     hub_side_gap: float = 10.0
     hub_back_gap: float = 10.0
     # speaker: the frame of the driver stays this far inside the outline of the speaker form
     speaker_frame_margin: float = 2.0
-    # rear door: the rear wall keeps a frame this high above it; at its sides a flat land this wide between the door
-    # and the start of the rear corner's round; its lower edge this far below the board
-    door_frame: float = 12.0
-    door_land: float = 4.0
+    # rear door: the form sets its opening (Blueprint.door_w, door_z0, door_z1); its sill stands at least this far
+    # below the lower edge of the board
     door_overlap: float = 8.0
     # monitor cables: the channels run back from the plug space at the height of the middle of the BC-250, to the
     # air space in front of its backplate
@@ -160,19 +166,20 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
     the inner face of the deck's right side at the USB row, as the cavity has it."""
     w = d.wall_t
     o = cavity.Openings()
-    rear_y = d.body_d - w
+    rear_y = d.body_d - w - SEAT  # a solid against the lower rear wall
     rear_x = d.rear_w / 2 - w
     bottom = so.on_screen(d, 0.0, d.image_s - v("mon_active_h") / 2 - v("mon_bezel_bottom"), d.mon_setback)
     psu_z0 = max(w + v("psu_raise"), lay.floor_t)
-    flat_x = d.rear_w / 2 - d.rear_corner_r - lay.corner_clear  # the rear wall is flat inside this half width
-    psu_x0 = max(-rear_x + lay.psu_side_gap, -flat_x)
+    psu_x0 = -rear_x + lay.psu_side_gap
+    # the outer end of the exhaust duct
+    duct_x0 = max(-rear_x + lay.bc_side_gap, -d.door_w / 2 + lay.duct_in_door, -(d.cut_in_x - lay.cut_in_reach(d)))
     bc_bottom = psu_z0 + v("psu_h") + v("psu_fan_clear") + lay.bc_above_psu
     open_x = d.panel_w / 2 - o.panel_ledge
     out = {"recline": d.recline, "mon_bottom_y": bottom.y, "mon_bottom_z": bottom.z,
            "psu_x0": psu_x0, "psu_y0": rear_y - v("psu_d_max"), "psu_z0": psu_z0,
            "bundle_x0": psu_x0 + v("psu_w") + lay.bundle_gap, "bundle_y0": rear_y - v("psu_bundle_d"),
-           "bc_x0": max(-rear_x + lay.bc_side_gap, -flat_x) + v("bc_dp_clear") + v("bc_io_overhang"),
-           "bc_top_z": bc_bottom + v("bc_pcb_w_pwr"), "bc_pcb_y": rear_y - SEAT - v("bc_gap_door") - v("bc_shroud_h"),
+           "bc_x0": duct_x0 + v("bc_dp_clear") + v("bc_io_overhang"),
+           "bc_top_z": bc_bottom + v("bc_pcb_w_pwr"), "bc_pcb_y": rear_y - v("bc_gap_door") - v("bc_shroud_h"),
            "panel_y0": d.deck_nose + d.panel_gap, "cp_top_z": d.panel_top, "deck_t": d.panel_t, "panel_d": d.panel_d, "panel_w": d.panel_w,
            "stick_x": lay.stick_x, "stick_y": lay.stick_y_share * d.panel_d,
            "enc_x": -open_x + lay.enc_edge_gap + v("enc_w") / 2, "enc_y": d.panel_d / 2}
@@ -183,7 +190,7 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
     out["fit_usb_y0"] = usb_row_start(d, lay, v)
     out["fit_usb_z"] = usb_row_z(d)
     row_end = out["fit_usb_y0"] + (len(USB_ORDER) - 1) * v("usb_pitch") + v(f"usb_{USB_ORDER[-1].lower()}_back_w") / 2
-    out["fit_hub_x0"] = rear_x - lay.hub_side_gap - v("usb_hub_w")
+    out["fit_hub_x0"] = rear_x - lay.hub_side_gap - v("usb_hub_w")  # inside the lower body's width, so that its rear plugs can reach behind the band
     out["fit_hub_y0"] = row_end + lay.hub_back_gap + v("usb_hub_plug_clear")
     out["fit_hub_z0"] = max(w, lay.floor_t) + SEAT
     out["fit_flange_w"] = lay.carrier_flange
@@ -606,6 +613,13 @@ def hits_line(seg: Part.Shape, obstacles: list[Part.Shape]) -> bool:
     return any(seg.common(o).Length > SAME_POINT for o in near(seg, obstacles))
 
 
+def side_band_y(d: Blueprint, z: float, share: float = 0.7) -> float:
+    """A y on the plain side band at height z: this share of the way from the screen face to the stroke of the band."""
+    su, cu = d.u
+    face_y = d.foot_y + (z - d.deck_top) / cu * su
+    return face_y + share * (pr.stroke_y(d, z) - face_y)
+
+
 def wall_probes(d: Blueprint, h: pr.Hood) -> list[tuple[str, App.Vector, App.Vector]]:
     """Named rays through the skin, each about square to the outer face it enters."""
     hw = d.width / 2
@@ -617,13 +631,13 @@ def wall_probes(d: Blueprint, h: pr.Hood) -> list[tuple[str, App.Vector, App.Vec
             ("deck front, centre", V(0, -RAY, (d.deck_top - d.deck_lean_h) / 2), V(0, 1, 0)),
             ("deck side at the USB row", V(hw + RAY, deck_side_start(d) + d.panel_d / 2, (d.deck_top - d.deck_lean_h) / 2), V(-1, 0, 0)),
             ("deck top, beside the panel", V(hw - d.rail_t, d.deck_nose + d.panel_d / 2, d.deck_top + RAY), V(0, 0, -1)),
-            ("side, below the tuck", V(hw + RAY, (d.foot_y + d.step_y0) / 2, d.tuck_z0 / 2), V(-1, 0, 0)),
+            ("side, below the tuck", V(hw + RAY, side_band_y(d, d.tuck_z0 / 2), d.tuck_z0 / 2), V(-1, 0, 0)),
             ("side, in the tuck", V(hw + RAY, (d.seam_y + d.body_d) / 2, (d.tuck_z0 + d.body_top) / 2), V(-1, 0, 0)),
             ("rail edge at the middle of the bezel, square to the screen", on(d.image_s, hw - d.edge_in / 2), into),
             ("apron, below the bezel", on(d.bend_t + d.band_len / 2), into),
             ("brow, above the bezel", on(d.bezel_s1 + d.brow_ledge / 2), into),
-            ("lower rear wall", V(0, d.body_d + RAY, d.rear_step_z0 / 2), V(0, -1, 0)),
-            ("upper rear wall", V(0, d.depth + RAY, (d.rear_step_z1 + d.body_top) / 2), V(0, -1, 0)),
+            ("lower rear wall", V(0, d.body_d + RAY, d.rear_shelf_z0 / 2), V(0, -1, 0)),
+            ("upper rear wall", V(0, d.depth + RAY, (d.rear_shelf_z1 + d.body_top) / 2), V(0, -1, 0)),
             ("hood top", V(0, oy + h.depth / 2, oz + h.height + RAY), V(0, 0, -1)),
             ("hood rear arc", V(0, oy + h.depth - d.hood_rear_arc_d / 3 + RAY * rear_arc, oz + h.height - d.hood_rear_arc_h / 3 + RAY * rear_arc),
              V(0, -rear_arc, -rear_arc)),
@@ -717,22 +731,22 @@ def rear_view(parts: dict[str, Part.Shape], found: list[Item], d: Blueprint, doo
     return out
 
 
-def door_outline(d: Blueprint, lay: Layout, v) -> dict:
-    """A proposed opening in the lower rear wall for the rear door, which carries the BC-250: as wide as the rear wall
-    allows: a flat land of door_land beside it before the round of the rear corner starts, from just below the board
-    to door_frame below the slope of the upper rear."""
-    x = d.rear_w / 2 - d.rear_corner_r - lay.door_land
-    z0 = v("bc_top_z") - v("bc_pcb_w_pwr") - lay.door_overlap
-    z1 = d.rear_step_z0 - lay.door_frame
-    return {"x0": -x, "x1": x, "z0": z0, "z1": z1, "w": 2 * x, "h": z1 - z0}
+def door_outline(d: Blueprint) -> dict:
+    """The opening of the rear door in the lower rear wall, as the form sets it (Blueprint): its sides door_land
+    inside the ends of the cut-ins, its top door_frame below the crease of the rear shelf, its sill at door_z0."""
+    x = d.door_w / 2
+    return {"x0": -x, "x1": x, "z0": d.door_z0, "z1": d.door_z1, "w": 2 * x, "h": d.door_z1 - d.door_z0}
 
 
-def door_service(found: list[Item], door: dict, d: Blueprint) -> list[tuple[str, str, str]]:
+def door_service(found: list[Item], door: dict, d: Blueprint, lay: Layout) -> list[tuple[str, str, str]]:
     """The rear door serves the compute module: its board, heatsink, shroud and exhaust duct, seen from behind, lie
-    inside the door opening. The power supply's rear face stands below the door on the flat of the rear wall, where
-    its grille goes (the corner round starts rear_w / 2 - rear_corner_r from the centre line)."""
+    inside the door opening, and the sill of the opening is at least door_overlap below the lower edge of the board.
+    The duct, which stands against the door, keeps cut_in_reach from the ends of the cut-ins. The power supply's
+    rear face stands below the door, where its grille goes: on the flat of the lower rear wall (inside the upright
+    corners, above the base facet) and cut_in_reach from the cut-ins (below their lowest lip, or inside their ends)."""
     rows = []
-    flat = d.rear_w / 2 - d.rear_corner_r
+    flat, clear = d.rear_flat_x, lay.cut_in_reach(d)
+    board = math.inf
     for it in found:
         for s in it.solids:
             bb = s.world.BoundBox
@@ -740,10 +754,24 @@ def door_service(found: list[Item], door: dict, d: Blueprint) -> list[tuple[str,
                 ok = door["x0"] <= bb.XMin and bb.XMax <= door["x1"] and door["z0"] <= bb.ZMin and bb.ZMax <= door["z1"]
                 rows.append((check.PASS if ok else check.FAIL, s.name, f"x {bb.XMin:.1f} to {bb.XMax:.1f}, z {bb.ZMin:.1f} to {bb.ZMax:.1f}; "
                              f"door x {door['x0']:.1f} to {door['x1']:.1f}, z {door['z0']:.1f} to {door['z1']:.1f}"))
+            if s.name.startswith("Compute_PCB"):
+                board = min(board, bb.ZMin)
+            if s.name == "Compute_ExhaustDuct":
+                room = d.cut_in_x - max(abs(bb.XMin), abs(bb.XMax))
+                rows.append((check.PASS if room >= clear - 1e-6 else check.FAIL, "duct at the cut-ins",
+                             f"its end at x {min(bb.XMin, bb.XMax, key=lambda x: -abs(x)):.1f} stands {room:.1f} inside the ends of the cut-ins (x {d.cut_in_x:.1f}); "
+                             f"at least {clear:g}: the wall of {d.wall_t:g}, one slab, and {lay.cut_in_clear:g} clear"))
             if s.name == "PSU_Body":
-                ok = -flat <= bb.XMin and bb.XMax <= flat and bb.ZMax <= door["z0"]
+                on_flat = -flat <= bb.XMin and bb.XMax <= flat and bb.ZMin >= d.base_facet
+                off_cut_ins = bb.ZMax <= d.cut_in_z0 - clear or (-(d.cut_in_x - clear) <= bb.XMin and bb.XMax <= d.cut_in_x - clear)
+                ok = on_flat and off_cut_ins and bb.ZMax <= door["z0"]
                 rows.append((check.PASS if ok else check.FAIL, s.name, f"rear face x {bb.XMin:.1f} to {bb.XMax:.1f}, z {bb.ZMin:.1f} to {bb.ZMax:.1f}: "
-                             f"on the flat of the rear wall (x within {flat:.1f}), below the door (z {door['z0']:.1f})"))
+                             f"on the flat of the rear wall (x within {flat:.1f}, z from {d.base_facet:g}), {d.cut_in_z0 - bb.ZMax:.1f} below the "
+                             f"lowest cut-in (z {d.cut_in_z0:g}), below the door (z {door['z0']:.1f})"))
+    if board < math.inf:
+        ok = board - door["z0"] >= lay.door_overlap - 1e-6
+        rows.append((check.PASS if ok else check.FAIL, "door sill", f"z {door['z0']:.1f}: {board - door['z0']:.1f} below the lower edge of the board "
+                     f"(z {board:.1f}); at least {lay.door_overlap:g}"))
     return rows
 
 
@@ -779,6 +807,9 @@ def markdown(rep: dict) -> str:
              "## Clearance table", "", "Gaps in mm. Skin: from the item and its keep-out zones to the inner skin. Neighbour: from its hardware to the nearest other item's hardware (or room, for an item that is only room).", "",
              "| Item | Skin gap | Nearest neighbour | Gap | Result |", "| --- | --- | --- | --- | --- |"]
     lines += [f"| {r['item']} | {r['skin_gap']:.1f} | {r['neighbour']} | {r['neighbour_gap']:.1f} | {r['result']} |" for r in rep["clearances"]]
+    lines += ["", f"## Solids nearer than {TIGHT:g} to the skin", "", "Hardware and keep-out zones, each solid by itself. A solid that is fixed to the skin stands "
+              f"{SEAT:g} off it.", "", "| Item | Solid | Role | Skin gap | At (x, y, z) |", "| --- | --- | --- | --- | --- |"]
+    lines += [f"| {r['item']} | {r['solid']} | {r['role']} | {r['skin_gap']:.2f} | {r['at']} |" for r in rep["tight"]]
     lines += ["", "## Findings", "", "| Rule | Level | Subject | Detail |", "| --- | --- | --- | --- |"]
     lines += [f"| {k} | {lv} | {s} | {dt} |" for k, rows in rep["rules"].items() for lv, s, dt in rows]
     lines += ["", "## Wall", "", f"Measured on {rep['wall']['points']} points of the cavity's side faces: smallest {rep['wall']['min']:.2f}, "
@@ -813,7 +844,7 @@ def markdown(rep: dict) -> str:
 def main() -> int:
     root = Path(os.environ.get("CANDYBAR_ROOT", Path(__file__).resolve().parents[2]))
     params_dir = Path(os.environ.get("CANDYBAR_PARAMS") or root / "params")
-    out = Path(os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp")) / FIT
+    out = Path(os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")) / FIT
     d = Blueprint()
     parts = so.build(d)
     rep = study(d, Layout(), params_dir, out, parts, cavity.build(parts, d))
@@ -821,9 +852,30 @@ def main() -> int:
     return 1 if rep["result"] == check.FAIL else 0
 
 
-def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[str, Part.Shape], cav: cavity.Cavity) -> dict:
-    """The whole study on built parts and their cavity; writes its files into out and returns the report."""
-    out.mkdir(parents=True, exist_ok=True)
+@dataclass
+class Fitted:
+    """The hardware placed in the cavity, and the result of every rule."""
+    doc: App.Document
+    base: App.Document
+    found: list[Item]
+    values: dict[str, float]
+    rules: dict[str, list[tuple[str, str, str]]]
+    door: dict
+    marquee: dict[str, float]
+    speaker: dict[str, float]
+
+    @property
+    def failures(self) -> list[str]:
+        return [f"{title}: {subject}: {detail}" for title, rows in self.rules.items() for level, subject, detail in rows if level == check.FAIL]
+
+    def close(self) -> None:
+        for doc in (self.doc, self.base):
+            App.closeDocument(doc.Name)
+
+
+def place(d: Blueprint, lay: Layout, params_dir: Path, parts: dict[str, Part.Shape], cav: cavity.Cavity) -> Fitted:
+    """The hardware at its anchors in the cavity of the built parts, and every rule of the study checked on it: R1,
+    R2, R5, containment in the cavity, the air zones and the door service. It writes no file."""
     h = pr.hood(d)
     base = sheet(params.load(params_dir), "FitBase")
     v = lambda name: params.value(base, name)
@@ -835,21 +887,49 @@ def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[st
     speaker = speaker_room(d, lay, h, cav.walls, v("mq_led_depth"))
     values.update({k: marquee[k] for k in ("fit_mq_w", "fit_mq_h", "fit_mq_y", "fit_mq_z0")}, **speaker)
     doc = build_items(sheet_rows(params_dir, values))
-    pv = lambda name: params.value(doc, name)
     found = items(doc)
     rules = run_checks(doc, found, cav, parts["bezel"], parts["control_panel"])
+    door = door_outline(d)
+    rules["door service"] = door_service(found, door, d, lay)
+    return Fitted(doc, base, found, values, rules, door, marquee, speaker)
+
+
+def tight(found: list[Item], cav: cavity.Cavity, limit: float) -> list[dict]:
+    """Each solid of the hardware and each keep-out zone that stands nearer than limit to the skin: its gap and the
+    two nearest points."""
+    rows = []
+    for it in found:
+        for s in it.solids:
+            if s.role not in ENVELOPE:
+                continue
+            best = (math.inf, None, None)
+            for wall in near(s.world, cav.walls, limit):  # only the prisms of the skin whose box is within limit
+                dist, pairs, _ = s.world.distToShape(wall)
+                if dist < best[0]:
+                    best = (dist, pairs[0][0], pairs[0][1])
+            dist, pa, pb = best
+            if dist < limit:
+                rows.append({"item": it.name, "solid": s.name, "role": s.role, "skin_gap": round(dist, 2),
+                             "at": [round(c, 1) for c in pa], "skin_at": [round(c, 1) for c in pb]})
+    return sorted(rows, key=lambda r: r["skin_gap"])
+
+
+def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[str, Part.Shape], cav: cavity.Cavity) -> dict:
+    """The whole study on built parts and their cavity; writes its files into out and returns the report."""
+    out.mkdir(parents=True, exist_ok=True)
+    h = pr.hood(d)
+    run = place(d, lay, params_dir, parts, cav)
+    doc, found, rules, values, door, marquee, speaker = run.doc, run.found, run.rules, run.values, run.door, run.marquee, run.speaker
+    pv = lambda name: params.value(doc, name)
     reach = d.width
     table = clearances(found, cav, rules, reach)
     measured = sorted(t for t, _ in cavity.measure_wall(parts, cav, cavity.seam_filler(parts, d), WALL_STEP, WALL_EVERY))
     wall = {"points": len(measured), "min": measured[0], "median": measured[len(measured) // 2], "max": measured[-1],
             "probes": {name: ray_wall(parts, cav, p, n) for name, p, n in wall_probes(d, h)}}
-    door = door_outline(d, lay, pv)
-    rules["door service"] = door_service(found, door, d)
     margins = monitor_margins(doc, found, cav, d, pv)
     sight = sight_lines(d, parts, pv)
-    failed = any(lv == check.FAIL for rows in rules.values() for lv, _, _ in rows)
-    rep = {"result": check.FAIL if failed else check.PASS, "wall_t": d.wall_t, "layout": asdict(lay), "anchors": values,
-           "openings": asdict(cavity.Openings()), "clearances": table, "rules": rules, "wall": wall, "air": air_path(pv),
+    rep = {"result": check.FAIL if run.failures else check.PASS, "wall_t": d.wall_t, "layout": asdict(lay), "anchors": values,
+           "openings": asdict(cavity.Openings()), "clearances": table, "tight": tight(found, cav, TIGHT), "rules": rules, "wall": wall, "air": air_path(pv),
            "psu_fan_clear": pv("psu_fan_clear"), "speaker": speaker, "marquee": marquee, "door": door, "print": print_table(parts, pv),
            "cavity_volume_l": sum(p.Volume for p in cav.pieces) / 1e6, "monitor": margins, "sight": sight,
            "seat": {"desk_h": DESK_H, "chair_h": CHAIR_H, "slump": SLUMP}}

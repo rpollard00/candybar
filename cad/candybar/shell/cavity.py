@@ -11,6 +11,16 @@ and bevels of the hood, the corners of the deck) the wall comes out thicker than
 Two openings go through the skin, because a plate closes them: under the control panel, inside a ledge of
 panel_ledge on which the plate rests (the outline of the plate, profiles.panel_outline, moved in), and behind the bezel plate, inside a ledge of bezel_ledge. The body top is
 open into the hood: the seam gap is filled before the offset.
+
+The skin is the outer form less the cavity (hollow). Two things make that cut work:
+  RIDGE     Where the form does not turn across X, two neighbour slabs have the same section, and where it starts to
+            turn, their outlines part on a tangent. The face of the step between them then ends in a point of zero
+            angle, or its outline goes through one point twice, and OpenCascade cannot orient such a face: the skin
+            is not a valid shape. Thus every second slab stands RIDGE farther in. Two neighbour outlines then cross
+            at an angle or do not meet, and the step between them is a ring. The wall of every second slab is RIDGE
+            thicker than wall_t.
+  CUT_STEP  One boolean with all the prisms of the cavity (255 on the body) took 12.8 GB of memory and did not end.
+            The prisms are cut away CUT_STEP at a time; the result is the same solid.
 """
 from __future__ import annotations
 
@@ -35,6 +45,11 @@ SAME = 1e-3
 FUZZY = 1e-3
 # a section whose offset fails is offset again as a polygon that stands at most this far off its edges, mm
 POLY_DEFLECTION = 0.02
+# every second slab of the cavity stands this far inside the offset by wall_t, so that no two neighbour slabs share
+# a part of their outline (see the module text), mm
+RIDGE = 0.05
+# the prisms of the cavity are cut from a solid this many at a time
+CUT_STEP = 12
 
 
 @dataclass(frozen=True)
@@ -147,7 +162,8 @@ def openings(d: Blueprint, o: Openings) -> list[Part.Shape]:
     bx = d.bezel_w / 2 - o.bezel_side_ledge
     s0, s1 = d.bezel_s0 + o.bezel_ledge, d.bezel_s1 - o.bezel_ledge
     origin, up, into = so.screen_frame(d)
-    bezel = so.slab(origin, up, into, (-bx, bx), (s0, s1), (d.mon_setback, d.mon_setback + w + SLAB))
+    # the face of the body behind the plate lies screen_t behind the screen face; the opening goes SLAB into the cavity
+    bezel = so.slab(origin, up, into, (-bx, bx), (s0, s1), (d.mon_setback, d.mon_setback + d.screen_t + w + SLAB))
     return [panel, bezel]
 
 
@@ -184,6 +200,18 @@ def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) 
         if rows[i][1] is not None:
             slabs.append((i * SLAB, (j + 1) * SLAB, *rows[i]))
         i = j + 1
+    # every second slab stands RIDGE farther in (see the module text): its region comes from the same sections,
+    # offset by w + RIDGE
+    far: dict[int, Part.Shape | None] = {}
+
+    def ridge(i: int) -> Part.Shape | None:
+        window = [abs(j) for j in range(i - reach, i + reach + 2)]
+        for j in window:
+            if j not in far:
+                far[j] = inner(outer[j], j * SLAB, w + RIDGE)
+        return common([far[j] for j in window])
+
+    slabs = [(x0, x1, ridge(round(x0 / SLAB)) if k % 2 and region is not None else region, face) for k, (x0, x1, region, face) in enumerate(slabs)]
     cut = openings(d, o)
     pieces = [p for x0, x1, region, _ in slabs if region is not None for p in prisms(region, x0, x1)] + cut
     walls = []
@@ -192,6 +220,21 @@ def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) 
             tools = [c for c in cut if c.BoundBox.intersect(p.BoundBox)]
             walls.append(p.cut(tools) if tools else p)
     return Cavity(pieces, walls, slabs)
+
+
+def hollow(outer: Part.Shape, cav: Cavity, step: int = CUT_STEP) -> Part.Shape:
+    """A solid of the outer form less the cavity: its skin. The prisms of the cavity that reach the solid are cut
+    away `step` at a time (see CUT_STEP). A skin that is not a valid shape is an error."""
+    box = outer.BoundBox
+    tools = [p for p in cav.pieces if p.BoundBox.intersect(box)]
+    skin = outer
+    for i in range(0, len(tools), step):
+        skin = skin.cut(tools[i:i + step])
+    if not skin.isValid():
+        bad = [f for f in skin.Faces if not f.isValid()]
+        where = "; ".join(f"({c.x:.1f}, {c.y:.1f}, {c.z:.1f})" for c in (f.BoundBox.Center for f in bad[:6]))
+        raise RuntimeError(f"the skin is not a valid shape: {len(bad)} of its {len(skin.Faces)} faces are not valid, at {where}")
+    return skin
 
 
 def outer_faces(parts: dict[str, Part.Shape], filler: Part.Shape) -> Part.Shape:

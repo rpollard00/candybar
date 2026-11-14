@@ -6,7 +6,7 @@ clearances, and the flat plaque for the primer tests of docs/research/petg-finis
 Shape. The wall is curved in plan on a radius of 300 (convex outside, like a rounded corner of the body) and the
 seam is a level line along it, as L1 runs round the body. Each half is 130 along the arc and 60 from the seam to its
 free edge, so the pair is 130 x 120 across the seam: the 120 long coupon of the research note, with two screws at the
-real pitch of 60. Print orientation: the orientation of the wall pieces of the proposal (all upright). The lower half
+real pitch of 60. Print orientation: the orientation of the wall pieces of the split (all upright). The lower half
 is the piece below L1 (lower R or L, piece 5 or 6), printed upright with the seam at its top: its level flange stands
 on the 45 degree gusset. The upper half is the piece above L1 (middle R or L, piece 7 or 8), printed upright with the
 seam on the bed. The lower half stands on a joint 3 foot flange (12 x 4) at its free edge, as a lower piece stands
@@ -42,7 +42,7 @@ DOT_PITCH = 5.0
 DOT_Z = 36.0
 PLAQUE = (120.0, 60.0, 4.0)   # long, high, thick; printed upright on a long edge
 PLAQUE_FOOT = (8.0, 4.0)      # on the back at the bed: depth, height
-OVERHANG_LIMIT = 45.0         # degrees from vertical; the proposal prints 45 degree gussets and slopes with no support
+OVERHANG_LIMIT = 45.0         # degrees from vertical; the split prints 45 degree gussets and slopes with no support
 ASSEMBLED_C = 0.2
 MESH_LINEAR, MESH_ANGULAR = 0.02, 0.1
 
@@ -358,7 +358,7 @@ def readme(j: Joint, checks: dict, parts: dict) -> str:
         "cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupon   # coupon.png and renders/",
         "```",
         "",
-        "The coupon tests joint 1 of the seam proposal (`cad/out/shell-bp/split/proposal.md`, \"Joints\") before the cabinet is printed. "
+        "The coupon tests joint 1 of the split (`cad/out/shell-rev7/split/report.md`, \"Joints\") before the cabinet is printed. "
         "The joint values are in `cad/candybar/shell/joints.py`. The tests and the pass rules are in "
         "`docs/research/petg-finishing.md`, section 4.",
         "",

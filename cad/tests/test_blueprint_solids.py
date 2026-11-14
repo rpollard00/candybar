@@ -79,7 +79,7 @@ class BlueprintSolidsTest(unittest.TestCase):
         self.assertIn("Z panel pocket", failing(changed))
 
     def test_check_notices_a_higher_rear_shelf(self) -> None:
-        self.assert_check_notices(rear_step_z0=self.d.rear_step_z0 + 6.0, rear_step_z1=self.d.rear_step_z1 + 6.0)
+        self.assert_check_notices(rear_shelf_z0=self.d.rear_shelf_z0 + 6.0, rear_shelf_z1=self.d.rear_shelf_z1 + 6.0)
 
     def test_check_notices_a_steeper_kick(self) -> None:
         self.assert_check_notices(band_kick=self.d.band_kick - 18.0)
@@ -129,9 +129,9 @@ class PlanarRearTest(unittest.TestCase):
         self.assertAlmostEqual(stub[1], d.band_stub)
         self.assertAlmostEqual(math.degrees(math.atan2(stub[0] - knee[0], knee[1] - stub[1])), d.band_kick)
         self.assertAlmostEqual(knee[1], 85.2, delta=0.1)
-        self.assertAlmostEqual(math.degrees(math.atan2(top[0] - knee[0], top[1] - knee[1])), d.step_lean)
+        self.assertAlmostEqual(math.degrees(math.atan2(top[0] - knee[0], top[1] - knee[1])), d.band_lean)
         self.assertAlmostEqual(top[1], end[1])                               # the run is level
-        self.assertAlmostEqual(top[1], d.rear_step_z0 + d.step_in)
+        self.assertAlmostEqual(top[1], d.rear_shelf_z0 + d.band_depth)
 
     def test_each_piece_of_the_band_is_a_plane(self) -> None:
         d, hw = self.d, self.d.width / 2
@@ -141,13 +141,13 @@ class PlanarRearTest(unittest.TestCase):
             ty, tz = (y1 - y0) / length, (z1 - z0) / length
             if z1 == z0:                                                     # the run: its facet ends on the hip
                 y1 = d.body_d
-            u = d.step_in / 2                                                # half way in, square to the stroke
+            u = d.band_depth / 2                                                # half way in, square to the stroke
             point = V(hw - u, (y0 + y1) / 2 + u * tz, (z0 + z1) / 2 - u * ty)
             with self.subTest(at=(round(point.y), round(point.z))):
                 self.assertIsInstance(face_at(self.body, point).Surface, Part.Plane)
 
     def test_the_two_facets_of_the_shelf_are_planes_at_45_degrees(self) -> None:
-        d, rw, zc = self.d, self.d.rear_w / 2, self.d.rear_step_z0
+        d, rw, zc = self.d, self.d.rear_w / 2, self.d.rear_shelf_z0
         for point, normal in ((V(rw + 6, d.body_d - 20, zc + 6), V(1, 0, -1)), (V(0, d.body_d + 20, zc + 20), V(0, 1, -1))):
             normal.normalize()
             surface = face_at(self.body, point).Surface
@@ -156,21 +156,21 @@ class PlanarRearTest(unittest.TestCase):
 
     def test_the_rear_goes_straight_across(self) -> None:
         d = self.d
-        for z, y in ((150.0, d.body_d), (d.rear_step_z1 + 10.0, d.depth)):
+        for z, y in ((150.0, d.body_d), (d.rear_shelf_z1 + 10.0, d.depth)):
             pts = plan_points(self.body, z, lambda p: abs(p.x) < 60 and p.y > d.body_d - 5, 1.0)
             self.assertTrue(pts)
             self.assertLess(max(abs(p.y - y) for p in pts), 1e-6, msg=f"z {z}")
 
     def test_the_head_has_the_full_width(self) -> None:
         d = self.d
-        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + d.rear_step_z1) / 2):
+        for z in (d.body_top - d.seam_groove - 0.5, (d.body_top + d.rear_shelf_z1) / 2):
             width = max(abs(p.x) for p in plan_points(self.body, z, lambda p: p.y >= d.body_d, 0.2))
             self.assertAlmostEqual(width, d.side_x(z), delta=0.05, msg=f"z {z:.1f}")
 
     def test_the_lower_rear_corner_is_the_ellipse_of_the_hip(self) -> None:
         """At a height below the cut-ins, the plan section leaves the side at r from the corner and the rear at r
         from it (r = R / sqrt(2)), and on the diagonal it stands (2 - sqrt(3)) R inside the sharp corner."""
-        d, rw, big = self.d, self.d.rear_w / 2, self.d.rear_corner_r
+        d, rw, big = self.d, self.d.rear_w / 2, self.d.rear_round_r
         r = big / math.sqrt(2)
         pts = plan_points(self.body, d.cut_in_z0 - 20.0, lambda p: p.x > rw - 8 and p.y > d.body_d - 8)
         self.assertAlmostEqual(max(p.y for p in pts if abs(p.x - rw) < 1e-4), d.body_d - r, delta=0.06)
@@ -182,7 +182,7 @@ class PlanarRearTest(unittest.TestCase):
         """On a line 0.002 inside the surface, at two places on each leg and five round the corner's ellipse: one
         slot, its lips cut_in_h / 2 above and below the middle of the groove."""
         d = self.d
-        rw, y0, big, h = d.rear_w / 2, d.body_d, d.rear_corner_r, d.cut_in_h
+        rw, y0, big, h = d.rear_w / 2, d.body_d, d.rear_round_r, d.cut_in_h
         r, k = big / math.sqrt(2), math.sqrt(0.5)
         o = V(rw - 2 * r, y0 - 2 * r, 0)
         ell = Part.Ellipse(o + V(k, k, 0) * (math.sqrt(3) * big), o + V(-k, k, 0) * big, o)
@@ -244,11 +244,11 @@ class PlanarRearTest(unittest.TestCase):
         self.assertGreaterEqual(worst, 45.0 - 0.01)
 
     def round_area(self, shape: Part.Shape, keep) -> tuple[float, float]:
-        """The area of the faces of a solid that are rounds of rear_corner_r and pass keep(): right side, left side."""
+        """The area of the faces of a solid that are rounds of rear_round_r and pass keep(): right side, left side."""
         def tight(f: Part.Face) -> bool:
             u0, u1, v0, v1 = f.ParameterRange
             try:
-                return abs(max(abs(k) for k in f.curvatureAt((u0 + u1) / 2, (v0 + v1) / 2)) - 1 / self.d.rear_corner_r) < 0.02
+                return abs(max(abs(k) for k in f.curvatureAt((u0 + u1) / 2, (v0 + v1) / 2)) - 1 / self.d.rear_round_r) < 0.02
             except Exception:
                 return False
         rounds = [f for f in shape.Faces if tight(f) and keep(f)]

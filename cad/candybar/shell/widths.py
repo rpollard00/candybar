@@ -2,12 +2,12 @@
 
 Blueprint() does not change. widened(extra) returns a copy in which the growth goes into the rails: the land
 (Dims.land, so rail_t and the derived width) grows by extra / 2 on each side; the bezel, the window, the screen and
-the monitor keep their size and stay centred. Depth and height stay: the rear body grows with the width so that the
-step stays 12 deep, and hood_h_ratio is set so that the top of the hood's rear arc (hood_h) stays in mm. The deck's
+the monitor keep their size and stay centred. Depth and height stay: the lower body grows with the width so that the
+band stays 12 deep, and hood_h_ratio is set so that the top of the hood's rear arc (hood_h) stays in mm. The deck's
 front corner keeps its radius in mm (44.5), because the USB row in the deck's side starts where that corner ends and
 must end before the joint of the deck and the body (fit.Layout.usb_front_gap). All other values keep their meaning:
 the ratios of W (tuck, hood corner, deck centre face) scale with W, and the
-values in mm (control panel, logo, door, speaker gaps, step_y0) stay. The speaker forms follow from the hood's
+values in mm (control panel, logo, speaker gaps, the band's stroke) stay; the door follows the lower rear wall. The speaker forms follow from the hood's
 opening, so they grow. The marquee window is a whole number of light modules (module_window): 11 x 32 = 352 up to
 about +43, where 12 (384) fit.
 

@@ -315,8 +315,9 @@ PROPORTIONS = [
     ("Rail land / W", "0.016", "0.05 +-0.015 (estimated)", "not read", "{land_r:.3f}", "what the bezel leaves, less the edge section; {land_top:.1f} at the bezel top (the tuck)"),
     ("Rail edge, in x back / W", "0.039 x 0.039 (45 deg facet)", "0.03 x 0.12 (band 10 to 18 deg)", "not read", "{edge_in_r:.3f} x {edge_back_r:.3f}",
      "the deck's own edge section (10 deg band), so the edge follows through"),
-    ("Side band depth at the desk / W", "0.277", "0.27 (estimated)", "not read", "{band_r:.3f}", "follows both references; the built model has 0.35"),
-    ("Rear body narrower, each side / W", "0.074", "0.01 to 0.03 (uncertain)", "not read", "{step_r:.3f}", "a shallow step behind the side band"),
+    ("Side band depth at the desk / W", "0.277", "0.27 (estimated)", "not read", "{band_r:.3f}",
+     "revision 7: the stub of the band stands 80 behind the line of its lean; that line passes the desk at {lean_r:.3f} W; the built model has 0.35"),
+    ("Rear body narrower, each side / W", "0.074", "0.01 to 0.03 (uncertain)", "not read", "{step_r:.3f}", "the band: a facet of 45 degrees behind the side band"),
     ("Hood foot width / W", "0.990", "0.94 to 0.96 (measured)", "0.95 (measured)", "{hood_foot_r:.3f}", "the outline of the body top: no shoulder, a groove at the seam"),
     ("Hood side lean, seam to top corner, deg", "13.5 to 22 (one arc)", "about 6, then one long blend (estimated)", "11 to 19 (measured +-3)",
      "{lean0:.1f} to {lean1:.1f}", "tangent to the tuck, then near straight (R {side_r:.1f} W), as on the real cabinet"),
@@ -340,7 +341,8 @@ def proportions(d: Blueprint) -> list[tuple[str, str, str, str, str, str]]:
     v = dict(width=w, depth_r=d.depth / w, height_r=(h.origin[2] + h.height) / w, apron=d.band_len, brow=d.brow_ledge,
              hood_bezel_r=(h.origin[2] + h.height - d.face(d.bezel_s1)[1]) / w, deck_r=d.deck_top / w, foot_r=d.foot_y / w, recline=d.recline,
              seam_r=d.body_top / w, hood_r=(h.origin[2] + h.height - d.body_top) / w, hood_d_r=h.depth / w, bezel_r=d.bezel_w / w, land_r=d.rail_land / w,
-             edge_in_r=d.edge_in / w, edge_back_r=d.deck_lean_h / w, step_r=(w - d.rear_w) / 2 / w, band_r=(d.step_y0 - d.foot_y + d.bend_t) / w,
+             edge_in_r=d.edge_in / w, edge_back_r=d.deck_lean_h / w, step_r=d.band_depth / w, band_r=(d.band_foot_y - d.foot_y + d.bend_t) / w,
+             lean_r=(d.band_lean_y0 - d.foot_y + d.bend_t) / w,
              hood_foot_r=2 * h.half_base / w, top_flat_r=2 * h.half_top / w, rail_k=d.rail_sagitta_ratio, rail_s=fr.sagitta, rail_turn=d.rail_turn,
              bow=d.body_bow_ratio, tuck=d.body_tuck_ratio, tuck_from=d.body_tuck_from, tuck_lean=d.tuck_lean, crown=d.hood_crown_ratio,
              inset_r=(d.mon_setback + fr.rise(d, d.image_s)) / w, setback=d.mon_setback, depth_top=d.mon_setback + fr.rise(d, d.image_s + MON_ACTIVE_H / 2),
@@ -379,7 +381,7 @@ def sheet_elevations(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(a, (d.depth + 30, 0), (d.depth + 30, top), f"height {top:.1f}", (12, 0), turn=90)
     y, z = pr.front(d).on_rail(d, (d.bezel_s0 + d.bezel_s1) / 2)
     note(a, (y - 190, z + 40), f"rail: a convex arc, chord reclined {d.recline:.0f} deg", to=(y - 6, z))
-    note(a, (385, 345), f"upper rear {d.rear_proud:.0f} proud", to=(d.depth - 1, d.rear_step_z1 + 12))
+    note(a, (385, 345), f"upper rear {d.rear_proud:.0f} proud", to=(d.depth - 1, d.rear_shelf_z1 + 12))
     a = axes[1, 0]
     dim(a, (-hw, -30), (hw, -30), f"{w:.1f}", (0, -12))
     dim(a, (-d.rear_w / 2, d.depth + 55), (d.rear_w / 2, d.depth + 55), f"rear body {d.rear_w:.0f}", (0, 11))
@@ -389,8 +391,8 @@ def sheet_elevations(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     a = axes[1, 1]
     dim(a, (-hw, -30), (hw, -30), f"{w:.1f}", (0, -12))
     dim(a, (-d.rear_w / 2, -52), (d.rear_w / 2, -52), f"rear body {d.rear_w:.0f}", (0, -11))
-    dim(a, (hw + 22, 0), (hw + 22, d.rear_step_z0), f"{d.rear_step_z0:.0f}", (16, 0))
-    dim(a, (hw + 22, d.rear_step_z1), (hw + 22, d.body_top), f"{d.body_top - d.rear_step_z1:.1f}", (18, 0))
+    dim(a, (hw + 22, 0), (hw + 22, d.rear_shelf_z0), f"{d.rear_shelf_z0:.0f}", (16, 0))
+    dim(a, (hw + 22, d.rear_shelf_z1), (hw + 22, d.body_top), f"{d.body_top - d.rear_shelf_z1:.1f}", (18, 0))
     fig.suptitle("Blueprint 02: elevations of the target, one scale (mm)", fontsize=14, y=0.995)
     fig.tight_layout()
     save(fig, "02-elevations")
@@ -532,8 +534,8 @@ def sheet_side_section(d: Blueprint, faces: dict[str, pr.Face]) -> None:
     dim(ax, (-62, d.deck_top), (-62, d.body_top), f"body top {d.body_top:.1f}", (-9, 0), turn=90)
     dim(ax, (-62, d.body_top), (-62, top), f"hood {d.hood_h:.1f}", (-9, 0), turn=90)
     dim(ax, (d.depth + 52, 0), (d.depth + 52, top), f"height {top:.1f}", (9, 0), turn=90)
-    dim(ax, (d.depth + 22, 0), (d.depth + 22, d.rear_step_z0), f"{d.rear_step_z0:.0f}", (10, 0), turn=90)
-    dim(ax, (d.depth + 22, d.rear_step_z1), (d.depth + 22, d.body_top), f"{d.body_top - d.rear_step_z1:.1f}", (10, 0), turn=90)
+    dim(ax, (d.depth + 22, 0), (d.depth + 22, d.rear_shelf_z0), f"{d.rear_shelf_z0:.0f}", (10, 0), turn=90)
+    dim(ax, (d.depth + 22, d.rear_shelf_z1), (d.depth + 22, d.body_top), f"{d.body_top - d.rear_shelf_z1:.1f}", (10, 0), turn=90)
     for s0, s1, text in ((d.bend_t, d.bezel_s0, f"apron {d.band_len:.0f}"), (d.bezel_s0, d.bezel_s1, f"bezel {d.bezel_len:.1f}"), (d.bezel_s1, d.top_s, f"{d.brow_ledge:.0f}")):
         (y0, z0), (y1, z1) = d.face(s0), d.face(s1)
         o = (-34 * d.u[1], 34 * d.u[0])
@@ -986,7 +988,7 @@ def screen_drop_options() -> None:
 
 # ---------- sheet 09: the hardware in the shell (from the fit study) ----------
 
-FIT_DATA = os.path.join(CAD, "out", "shell-bp", "fit", "sections.json")
+FIT_DATA = os.path.join(CAD, "out", "shell-rev7", "fit", "sections.json")
 FIT_COLOUR = {"Monitor": "#3a4f80", "MonitorRoom": "#7a8fc0", "Cables": "#d07020", "Compute": "#2f7a3a", "PSU": "#6b6f78", "CableBundle": "#a07020",
               "Hub": "#6a4fa0", "Speaker": "#c04040", "Marquee": "#c08a10", "USB": "#2070c0", "Panel": "#202020"}
 FIT_LABEL = {"MonitorRoom": "any 16:10 monitor", "Cables": "monitor cables", "Panel": "control panel", "CableBundle": "stowed cables",
@@ -1085,10 +1087,24 @@ def sheet_fit() -> None:
     door = rear["door"]
     ax.plot([-door["x0"], -door["x1"], -door["x1"], -door["x0"], -door["x0"]], [door["z0"], door["z0"], door["z1"], door["z1"], door["z0"]],
             color=RED, lw=1.4, ls="-.", zorder=50)
-    dim(ax, (-door["x0"], door["z1"] + 12), (-door["x1"], door["z1"] + 12), f"door opening {door['w']:.0f} wide (proposed)", (0, 7))
+    dim(ax, (-door["x0"], door["z1"] + 12), (-door["x1"], door["z1"] + 12), f"door opening {door['w']:.1f} wide", (0, 7))
     dim(ax, (-door["x1"] - 14, door["z0"]), (-door["x1"] - 14, door["z1"]), f"{door['h']:.0f}", (-12, 0), turn=90)
+    d = Blueprint()
+    rw = d.rear_w / 2
+    for k in range(d.cut_in_count):
+        z0 = d.cut_in_z0 + k * d.cut_in_pitch
+        for sx in (1.0, -1.0):
+            ax.plot([sx * d.cut_in_x, sx * rw, sx * rw, sx * d.cut_in_x, sx * d.cut_in_x], [z0, z0, z0 + d.cut_in_h, z0 + d.cut_in_h, z0],
+                    color=BLUE, lw=0.8, zorder=45)
+    for sx in (1.0, -1.0):
+        ax.plot([sx * d.grip_x0, sx * d.grip_x1, sx * d.grip_x1, sx * d.grip_x0, sx * d.grip_x0], [d.grip_z0, d.grip_z0, d.grip_z1, d.grip_z1, d.grip_z0],
+                color=BLUE, lw=0.8, zorder=45)
+    ax.text(rw + 6, d.cut_in_z1 + 4, "cut-ins", fontsize=7, color=BLUE, ha="left", va="bottom")
+    ax.text(d.grip_x1 + 4, d.grip_z1 + 3, "hand-hold", fontsize=7, color=BLUE, ha="left", va="bottom")
+    dim(ax, (door["x1"], door["z0"] - 10), (d.cut_in_x, door["z0"] - 10), f"{d.door_land:g}", (0, -7), size=6.5)
+    dim(ax, (door["x1"] - 30, door["z1"]), (door["x1"] - 30, d.rear_shelf_z0), f"{d.door_frame:g}", (10, 0), size=6.5)
     allp = np.concatenate([np.array(l) for ls_ in rear["outer"].values() for l in ls_])
-    frame(ax, "rear view, seen from behind: the lower rear wall (black), the upper rear (grey), the items\nnear the rear as boxes (BC-250, power supply, cables, speakers, marquee), the proposed door opening (red)",
+    frame(ax, "rear view, seen from behind: the lower rear wall (black), the upper rear (grey), the items near the rear as boxes\n(BC-250, power supply, cables, speakers, marquee), the door opening (red: inside the cut-ins, below the rear shelf), the cut-ins and the hand-holds (blue)",
           (-allp[:, 0].max() - 30, -allp[:, 0].min() + 30), (allp[:, 1].min() - 15, allp[:, 1].max() + 15), "x, seen from behind (mm)", "z, above the desk (mm)")
     fig.suptitle(f"Blueprint 09: the hardware in the shell, with a skin of {data['wall_t']:g} (fit study). Hardware solid, keep-out zones dashed, the cavity shaded;\n"
                  f"the clearances of {FIT_DIM_MAX:.0f} mm and less are dimensioned in the view nearest to them", fontsize=13, y=0.995)

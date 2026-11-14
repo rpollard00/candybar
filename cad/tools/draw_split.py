@@ -1,12 +1,15 @@
-"""Draw the seam proposal from what candybar.shell.split wrote, and write proposal.md.
+"""Draw the split from what candybar.shell.split wrote, and write report.md.
 
-    cad/.venv-tools/bin/python cad/tools/draw_split.py            -> cad/out/shell-bp/split/options.png, option-*.png, proposal.md
-    cad/.venv-tools/bin/python cad/tools/draw_split.py proposal   -> the same without the elevations (they take minutes)
-    cad/.venv-tools/bin/python cad/tools/draw_split.py render     -> cad/out/shell-bp/split/renders/<option>/*.png (Blender)
-    cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint  -> docs/blueprint/10-split.svg, .png (the chosen layout)
+    cad/.venv-tools/bin/python cad/tools/draw_split.py            -> cad/out/shell-rev7/split/split.png, split-front.png,
+                                                                     split-rear.png, split-side.png, structure.png,
+                                                                     services.png, joints.png, report.md
+    cad/.venv-tools/bin/python cad/tools/draw_split.py report     -> the same without the elevations (they take minutes)
+    cad/.venv-tools/bin/python cad/tools/draw_split.py render     -> cad/out/shell-rev7/split/renders/*.png (Blender)
+    cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint  -> docs/blueprint/10-split.svg, .png (the layout)
                                                                      and 11-joints.svg, .png (the joint sheet)
 
-Run the cut first (CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split). The elevations
+Run the fit study, the cut and the structure first (candybar.shell.fit, candybar.shell.split and
+candybar.shell.structure, with cad/candybar/freecad-run.sh). The elevations
 are z-buffer pictures of the pieces (the STL files of the cut), each piece in its soft tint, with the bezel plate,
 the control panel and the screen as dark context. The seams are the 3D lines of seams.json, drawn where the
 picture shows the surface they lie on: blue in a design line, red on an open face. The faces that a seam crosses
@@ -38,7 +41,7 @@ from candybar.shell import profiles as pr  # noqa: E402
 from candybar.shell import split as sp  # noqa: E402
 from candybar.shell.dims import Blueprint  # noqa: E402
 
-SHELL = os.path.join(CAD, "out", "shell-bp")
+SHELL = os.path.join(CAD, "out", "shell-rev7")
 OUT = os.path.join(SHELL, "split")
 CLASS_COLOUR = {sp.HIDDEN: "#1565c0", sp.FACE: "#d62718"}
 CONTEXT = {"~bezel": ("bezel.stl", (0.12, 0.12, 0.13)), "~panel": ("control_panel.stl", (0.22, 0.22, 0.24)),
@@ -188,10 +191,10 @@ def piece_numbers(rows: dict) -> dict:
     return {n: i + 1 for i, n in enumerate(names)}
 
 
-def option_sheet(key: str, meas: dict, opt: sp.Option, path: str | None = None, svg: bool = False,
-                 title: str | None = None) -> str:
-    manifest, seams, tri, ids = load(key)
-    rows = meas["options"][key]["pieces"]
+def layout_sheet(meas: dict, lay: sp.Layout, path: str | None = None, svg: bool = False, title: str | None = None) -> str:
+    manifest, seams, tri, ids = load(lay.key)
+    res = meas[lay.key]
+    rows = res["pieces"]
     numbers = piece_numbers(rows)
     fig = plt.figure(figsize=(25, 8.6))
     grid = fig.add_gridspec(1, 5, width_ratios=[1, 1.05, 1, 1, 1.05], wspace=0.03)
@@ -199,12 +202,11 @@ def option_sheet(key: str, meas: dict, opt: sp.Option, path: str | None = None, 
         draw_view(fig.add_subplot(grid[0, i]), view, manifest, seams, tri, ids, numbers)
     ax = fig.add_subplot(grid[0, 4])
     ax.axis("off")
-    res = meas["options"][key]
     printed = {n: r for n, r in rows.items() if r["module"] != "base"}  # the floor tiles are module base
     big = max(printed.items(), key=lambda kv: max(kv[1]["x"], kv[1]["z"]))
     face = sorted({s["label"] for s in seams.values() if s["cls"] == sp.FACE and s["module"] != "base" and s["joint"] != "service"})
     service = sorted({s["label"] for s in seams.values() if s["joint"] == "service"} | {e[0] for e in sp.EXISTING})
-    text = [f"{opt.title}", "", f"pieces printed: {len(printed)} (+ {len(rows) - len(printed)} printed floor tiles)",
+    text = ["The split of the shell", "", f"pieces printed: {len(printed)} (+ {len(rows) - len(printed)} printed floor tiles)",
             f"all pieces fit {meas['printer']['xy']:.0f} x {meas['printer']['xy']:.0f} x {meas['printer']['z']:.0f}: "
             f"{'yes' if res['fits'] else 'NO'}",
             f"largest: {big[0]}, {big[1]['x']:.0f} x {big[1]['y']:.0f} x {big[1]['z']:.0f}", "",
@@ -217,8 +219,8 @@ def option_sheet(key: str, meas: dict, opt: sp.Option, path: str | None = None, 
     ax.text(0.12, 0.04, "seam in a design line", fontsize=7.5, va="center", transform=ax.transAxes)
     ax.plot([0.02, 0.1], [0.015, 0.015], color=CLASS_COLOUR[sp.FACE], lw=2, transform=ax.transAxes)
     ax.text(0.12, 0.015, "seam on an open face (dashed: behind)", fontsize=7.5, va="center", transform=ax.transAxes)
-    fig.suptitle(title or f"Seam proposal {opt.title}  (mm; the numbers are the pieces in the list)", fontsize=13, y=0.99)
-    path = path or os.path.join(OUT, f"option-{key}.png")
+    fig.suptitle(title or f"{lay.title}  (mm; the numbers are the pieces in the list)", fontsize=13, y=0.99)
+    path = path or os.path.join(OUT, "split.png")
     fig.savefig(path, dpi=115, bbox_inches="tight")
     if svg:
         fig.savefig(os.path.splitext(path)[0] + ".svg", dpi=115, bbox_inches="tight")
@@ -227,18 +229,19 @@ def option_sheet(key: str, meas: dict, opt: sp.Option, path: str | None = None, 
     return path
 
 
-def stack(paths: list[str], out: str) -> None:
-    from PIL import Image
-
-    ims = [Image.open(p).convert("RGB") for p in paths]
-    w = max(i.width for i in ims)
-    canvas = Image.new("RGB", (w, sum(i.height for i in ims)), "white")
-    y = 0
-    for im in ims:
-        canvas.paste(im, (0, y))
-        y += im.height
-    canvas.save(out)
-    print("draw_split:", os.path.relpath(out, REPO))
+def view_pictures(meas: dict, lay: sp.Layout) -> None:
+    """One large picture for each of the front, the rear and the side, with the seams on the form."""
+    manifest, seams, tri, ids = load(lay.key)
+    numbers = piece_numbers(meas[lay.key]["pieces"])
+    for view in ("front", "rear", "side"):
+        fig, ax = plt.subplots(figsize=(11, 11))
+        draw_view(ax, view, manifest, seams, tri, ids, numbers)
+        ax.set_title(f"The split, {VIEW_NAMES[view]}: blue seams lie in a design line, red seams on an open face (dashed: behind); "
+                     "the numbers are the pieces of report.md", fontsize=9)
+        path = os.path.join(OUT, f"split-{view}.png")
+        fig.savefig(path, dpi=130, bbox_inches="tight")
+        plt.close(fig)
+        print("draw_split:", os.path.relpath(path, REPO))
 
 
 # ---------- the faces a seam crosses, and the hardware near it ----------
@@ -293,64 +296,51 @@ def near_hardware(lines: list, boxes: list[dict]) -> list[str]:
     return sorted(out)
 
 
-# ---------- proposal.md ----------
+# ---------- report.md ----------
 
 def measurements() -> dict:
-    """The per-option files of the cut, merged."""
-    out = None
-    for key in (*sp.ALL, "bezel"):
-        one = json.load(open(os.path.join(OUT, f"measurements-{key}.json")))
-        if out is None:
-            out = one
-        else:
-            out["options"].update(one["options"])
-    return out
+    return json.load(open(os.path.join(OUT, "measurements.json")))
 
 
 def main(elevations: bool = True) -> None:
     import draw_structure as ds
-    import split_proposal
+    import split_report
 
     meas = measurements()
     d = Blueprint()
-    opts = {o.key: o for o in sp.options(d, meas["door"])}
+    lay = sp.layout(d)
     if elevations:
-        paths = [option_sheet(k, meas, opts[k]) for k in sp.OPTIONS_ORDER]
-        stack(paths, os.path.join(OUT, "options.png"))
-    if elevations or not os.path.exists(os.path.join(OUT, "chosen.png")):
-        os.replace(option_sheet(sp.CHOSEN, meas, opts[sp.CHOSEN]), os.path.join(OUT, "chosen.png"))
-        print("draw_split:", os.path.relpath(os.path.join(OUT, "chosen.png"), REPO))
-    for k in sp.ALL:
-        print("draw_split:", os.path.relpath(ds.structure_sheet(k, opts[k], d), REPO))
+        layout_sheet(meas, lay)
+        view_pictures(meas, lay)
+    print("draw_split:", os.path.relpath(ds.structure_sheet(lay, d), REPO))
     print("draw_split:", os.path.relpath(ds.services_sheet(), REPO))
     print("draw_split:", os.path.relpath(ds.joints_sheet(), REPO))
-    text = split_proposal.write(meas, opts, d, face_cloud, crossed, near_hardware, hardware_boxes())
-    with open(os.path.join(OUT, "proposal.md"), "w", encoding="utf-8") as fh:
+    text = split_report.write(meas, lay, d, face_cloud, crossed, near_hardware, hardware_boxes())
+    with open(os.path.join(OUT, "report.md"), "w", encoding="utf-8") as fh:
         fh.write(text)
-    print("draw_split:", os.path.relpath(os.path.join(OUT, "proposal.md"), REPO))
+    print("draw_split:", os.path.relpath(os.path.join(OUT, "report.md"), REPO))
 
 
 def blueprint() -> None:
-    """The tracked sheets of the split: the chosen layout (10) and the joints (11), from the cut and joints.py."""
+    """The tracked sheets of the split: the layout (10) and the joints (11), from the cut and joints.py."""
     import draw_structure as ds
 
     meas = measurements()
-    opt = next(o for o in sp.options(Blueprint(), meas["door"]) if o.key == sp.CHOSEN)
-    option_sheet(sp.CHOSEN, meas, opt, os.path.join(db.OUT, "10-split.png"), svg=True,
-                 title=f"Blueprint 10: the split that the owner chose on 2026-11-11, {opt.title} (mm; the numbers are the "
-                       "pieces in the list; the nine floor tiles have no number). Flanges, keys, ribs, carriers and grips are not "
+    lay = sp.layout(Blueprint())
+    layout_sheet(meas, lay, os.path.join(db.OUT, "10-split.png"), svg=True,
+                 title="Blueprint 10: the split of the shell, the owner's choice of 2026-11-11 on revision 7 (mm; the numbers are the "
+                       "pieces in the list; the nine floor tiles have no number). Flanges, keys, ribs and carriers are not "
                        "modelled yet.")
     print("draw_split:", os.path.relpath(ds.joints_sheet(db.OUT, "11-joints", svg=True), REPO))
 
 
-def render(keys=(sp.CHOSEN,)) -> None:
-    for key in keys:
-        out = os.path.join(OUT, "renders", key)
-        cmd = [sys.executable, os.path.join(HERE, "render_views.py"), out, os.path.join(OUT, key),
-               os.path.join(SHELL, "bezel.stl") + "=black", os.path.join(SHELL, "control_panel.stl") + "=black",
-               os.path.join(SHELL, "screen.stl") + "=#3a4250", "--views", "three-quarter-front-left,three-quarter-rear-left",
-               "--size", "1300"]
-        subprocess.run(cmd, check=True)
+def render() -> None:
+    out = os.path.join(OUT, "renders")
+    cmd = [sys.executable, os.path.join(HERE, "render_views.py"), out, os.path.join(OUT, sp.SHELL),
+           os.path.join(SHELL, "bezel.stl") + "=black", os.path.join(SHELL, "control_panel.stl") + "=black",
+           os.path.join(SHELL, "screen.stl") + "=#3a4250", "--views", "three-quarter-front-left,three-quarter-rear-left,rear,side-right",
+           "--size", "1300"]
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":
@@ -359,4 +349,4 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "blueprint":
         blueprint()
     else:
-        main(elevations=not (len(sys.argv) > 1 and sys.argv[1] == "proposal"))
+        main(elevations=not (len(sys.argv) > 1 and sys.argv[1] == "report"))

@@ -116,7 +116,7 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
 def table(rows: dict, d: Blueprint) -> str:
     lines = ["# Edge finish of the shell", "",
              f"Convex edges that turn more than {d.edge_break_turn:g} degrees and have no round. "
-             f"The edge break is R {d.edge_break:g}; the design round of the rear is R {d.rear_corner_r:g}.", "",
+             f"The edge break is R {d.edge_break:g}; the design round of the rear is R {d.rear_round_r:g}.", "",
              "| Part | Faces of the edge break | Faces of design rounds | Sharp edges, outside | Sharp edges, in a joint |", "| --- | --- | --- | --- | --- |"]
     for part, r in rows.items():
         count = lambda shows: sum(g["edges"] for g in r["sharp"] if g["shows"] == shows)

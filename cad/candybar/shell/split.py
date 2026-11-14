@@ -1,21 +1,28 @@
-"""Seam proposals: where the printed shell divides into pieces for the bed of the printer.
+"""The split: where the printed shell divides into pieces for the bed of the printer.
 
-Each option holds its seams once, as data. A seam is a set of flat polygons in the cabinet frame with a name, a
+There is one layout: the owner's choice of 2026-11-11 (decision record 0006), the seams of the study's option B with
+the hood of its option A, on the form of revision 7. The options that the owner did not choose are not in the code.
+The layout holds its seams once, as data. A seam is a set of flat polygons in the cabinet frame with a name, a
 class (hidden in a line that the design already has, or on an open face), the joint it gets, and whether it
 opens again. A piece is a name, a seed point in it, and the direction that points up on the printer. The same data
 drive the cut (main, under FreeCAD), the drawing (tools/draw_split.py) and the test (tests/test_split.py).
 
-The cut divides the 4 mm skin of the outer form: the solids of solids.py less the cavity of cavity.py. The skin
-takes about 12 minutes to make, so it is kept in cad/out/shell-bp/split/cache under a fingerprint of everything
-that makes it (the values of dims.Blueprint, the openings and the source of dims, profiles, solids and cavity).
-The cut itself runs every time: it splits the skin with the seam polygons, names each piece by its seed, and
-measures it in its print orientation (the box after a turn on the bed that makes it smallest) against the usable
-volume of params/printer.csv.
+The seams follow the form. No seam goes through a hand-hold or a cut-in. The seams of the sides lie in the inner
+crease of the band and in the crease of the rear shelf; the seams of the back lie on the centre line and on the
+lines of the door's sides.
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh candybar.shell.split
+The cut divides the 4 mm skin of the outer form: the solids of solids.py less the cavity of cavity.py
+(cavity.hollow). The skin takes about 20 minutes to make, so it is kept in cad/out/shell-rev7/split/cache (binary
+BREP) under a fingerprint of
+everything that makes it (the values of dims.Blueprint, the openings and the source of dims, profiles, solids and
+cavity). The cut itself runs every time: it splits the skin with the seam polygons, names each piece by its seed,
+and measures it in its print orientation (the box after a turn on the bed that makes it smallest) against the
+usable volume of params/printer.csv.
 
-writes split/<option>/ (one STL for each piece, manifest.json, seams.json) and split/measurements.json. This
-module has no FreeCAD at import: the drawing tool imports it for the data and the words.
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh candybar.shell.split
+
+writes split/shell/ and split/bezel/ (one STL for each piece, manifest.json, seams.json) and
+split/measurements.json. This module has no FreeCAD at import: the drawing tool imports it for the data and the words.
 """
 from __future__ import annotations
 
@@ -37,15 +44,19 @@ Poly = tuple[P3, ...]
 HIDDEN, FACE = "hidden", "face"
 PETG_G_PER_CM3 = 1.27
 CAD = Path(__file__).resolve().parents[2]
-OPTIONS_ORDER = ("A", "B", "C")
-# the layout that the owner chose on 2026-11-11: B, with the hood of A
-CHOSEN = "chosen"
-ALL = OPTIONS_ORDER + (CHOSEN,)
+# the two things that are cut: the shell (the layout), and the bezel plate
+SHELL, PLATE = "shell", "bezel"
+# a seen face overhangs when it faces down more than OVERHANG from upright on the printer. A face within
+# OVERHANG_BAND of that angle is at the limit: the facets of the rear shelf, the roofs of the hand-holds and the base
+# facet are 45 degrees by design, and they print without support. The band is for the rounding of the mesh only
+# (the facets come out within 0.001 of 45): a face at 45.1 counts as an overhang
+OVERHANG = 45.0
+OVERHANG_BAND = 0.05
 # what each class means in the tables and on the drawings
 CLASS_WORDS = {HIDDEN: "in a design line", FACE: "on an open face"}
 
 
-# the seams that the outer form already has: no cut is needed for them, and every option keeps them
+# the seams that the outer form already has: no cut is needed for them
 EXISTING = (
     ("G", "hood on the body: the level groove FB5 / HC15", "service",
      "The hood lifts off. Two pins at the front of the body top, two M4 screws through the foot of the hood's rear "
@@ -53,7 +64,7 @@ EXISTING = (
     ("BZ4", "bezel plate in its reveal", "service",
      "The plate lifts out to the front. It rests on the ledge below it and is held by magnets and two pins (trim: no "
      "load). With the plate out, the opening behind it (422.7 x 293.4) is the service path of the monitor."),
-    ("DK8", "control panel in its pocket", "service", "The panel latch is not designed yet (roadmap step 9)."),
+    ("DK8", "control panel in its pocket", "service", "The panel latch is not designed yet (roadmap step 11)."),
     ("USB", "USB socket plate in the right side of the deck", "service",
      "A removable printed plate (fit study). Its outline is a seam of its own and ends 5 mm in front of D2."),
 )
@@ -96,16 +107,16 @@ class Piece:
 
 
 @dataclass(frozen=True)
-class Option:
+class Layout:
+    """A set of seams and the pieces that they make."""
     key: str
     title: str
     idea: str
     seams: tuple[Seam, ...]
     pieces: tuple[Piece, ...]
-    door: str
-    service: str
-    assembly: tuple[str, ...]
-    against: str
+    door: str = ""
+    service: str = ""
+    assembly: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -151,7 +162,7 @@ def mirror_point(p: P3) -> P3:
     return (-p[0], p[1], p[2])
 
 
-def expanded(opt: Option) -> tuple[list[Seam], list[Piece]]:
+def expanded(opt: Layout) -> tuple[list[Seam], list[Piece]]:
     """The seams and pieces of both sides: a mirrored item becomes a right one and a left one."""
     seams: list[Seam] = []
     for s in opt.seams:
@@ -174,7 +185,7 @@ def expanded(opt: Option) -> tuple[list[Seam], list[Piece]]:
 
 @dataclass(frozen=True)
 class Lines:
-    """Named positions on the outer form, from dims.Blueprint and the proposed rear door of the fit study."""
+    """Named positions on the outer form, from dims.Blueprint."""
     hw: float           # half the width
     y_foot: float       # the foot of the sweep: the deck ends here
     y_open: float       # just inside the back edge of the opening under the control panel
@@ -183,21 +194,22 @@ class Lines:
     flank: tuple[P2, P2]  # the bisector of the deck front's flank break: crease point, pocket corner
     z_crease: float     # the crease of the deck's edge section
     z_low: float        # level of the bezel's bottom corner on the rail land
-    z_belt: float       # the lower crease of the rear slope
+    z_sill: float       # the sill of the rear door
+    z_belt: float       # the crease of the rear shelf: on the lower rear wall and on the side of the lower body
     z_top: float        # the body top
     y_rear: float       # the lower rear wall
     y_back: float       # the upper rear wall (the back of the cabinet)
-    step_y0: float      # the step's outer edge at the desk
-    step_in: float      # how far the inner edge of the step is behind the outer one
-    step_t: float       # tan of the step's lean
+    crease: tuple[P2, ...]  # the inner crease of the band in side view (y, z), from below the desk up to z_low
+    y_crease_sill: float    # the band's inner crease at the height of the door sill
     x_bay: float        # the gap between the logo form and the speaker forms on the hood band
-    rear_half: float    # half the width of the rear body
+    rear_half: float    # half the width of the lower body
     door: tuple[float, float, float]  # half width, z of its lower and upper edge
+    grip: tuple[float, float, float, float]  # the hand-holds: x from, x to (right side), z from, z to
+    cut_in: tuple[float, float, float, float]  # the cut-ins: x from (rear wall), y from (side), z from, z to
     chord_up: P3        # up the chord of the apron's centre piece (shelf to the bezel's bottom edge)
-    crease_path: tuple[P2, ...]  # the crease of the rail's edge section in side view, from the deck to z_belt
 
 
-def lines(d: Blueprint, door: dict) -> Lines:
+def lines(d: Blueprint) -> Lines:
     fr = pr.front(d)
     hw = d.width / 2
     y_foot = d.foot_y - d.bend_t
@@ -211,24 +223,19 @@ def lines(d: Blueprint, door: dict) -> Lines:
     mid = crease.at((crease.a0 + crease.a1) / 2)
     flank = (mid, pocket[2])
     z_low = fr.on_rail(d, d.bezel_s0)[1] + 0.3
-    t = math.tan(math.radians(d.step_lean))
     # the apron's centre piece: from the back of the ledge under the panel to the bezel's bottom edge on the rail
     a = (y_open, d.panel_top - d.panel_t - d.wall_t)
     b = fr.on_rail(d, d.bezel_s0)
     n = math.dist(a, b)
     chord_up = (0.0, (b[0] - a[0]) / n, (b[1] - a[1]) / n)
-    # the crease of the edge section: round the sweep (24 below its surface) and down the rail arc (24 inside it)
-    sw, rl = fr.sweep, fr.rail
-    path = [(sw.c[0] + (sw.r + d.deck_lean_h) * math.cos(sw.a0 + (sw.a1 - sw.a0) * k / 24),
-             sw.c[1] + (sw.r + d.deck_lean_h) * math.sin(sw.a0 + (sw.a1 - sw.a0) * k / 24)) for k in range(25)]
-    r_in = rl.r - d.deck_lean_h
-    z_end = d.rear_step_z0
-    a_end = math.pi - math.asin((z_end - rl.c[1]) / r_in)
-    path += [(rl.c[0] + r_in * math.cos(rl.a0 + (a_end - rl.a0) * k / 40), rl.c[1] + r_in * math.sin(rl.a0 + (a_end - rl.a0) * k / 40))
-             for k in range(1, 41)]
-    return Lines(hw, y_foot, y_open, x_jog, pocket[2][0], flank, d.deck_top - d.deck_lean_h, z_low, d.rear_step_z0, d.body_top,
-                 d.body_d, d.depth, d.step_y0, hw - d.rear_w / 2, t, d.logo_w / 2 + d.logo_gap, d.rear_w / 2,
-                 (door["x1"], door["z0"], door["z1"]), chord_up, tuple(path))
+    # the band's inner crease from the desk up to z_low: the stub, the kick, and the lean as far as L1
+    band = pr.band_crease(d)
+    low = [p for p in band if p[1] < z_low] + [(pr.crease_y(d, z_low), z_low)]
+    low[0] = (low[0][0], -1.0)
+    return Lines(hw, y_foot, y_open, x_jog, pocket[2][0], flank, d.deck_top - d.deck_lean_h, z_low, d.door_z0, d.rear_shelf_z0, d.body_top,
+                 d.body_d, d.depth, tuple(low), pr.crease_y(d, d.door_z0), d.logo_w / 2 + d.logo_gap, d.rear_w / 2,
+                 (d.door_w / 2, d.door_z0, d.door_z1), (d.grip_x0, d.grip_x1, d.grip_z0, d.grip_z1),
+                 (d.cut_in_x, d.cut_in_y, d.cut_in_z0, d.cut_in_z1), chord_up)
 
 
 def along(a: P2, b: P2, t0: float, t1: float) -> list[P2]:
@@ -236,7 +243,7 @@ def along(a: P2, b: P2, t0: float, t1: float) -> list[P2]:
     return [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (t0, t1)]
 
 
-# ---------- the seams that more than one option uses ----------
+# ---------- the seams ----------
 
 def deck_seams(L: Lines) -> list[Seam]:
     (cx, cy), (kx, ky) = L.flank
@@ -262,6 +269,51 @@ def deck_seams(L: Lines) -> list[Seam]:
         Seam("P1", "body", top([(L.x_kink, L.y_open - 1.0), (L.x_kink, 300.0)], 60.0, 200.0), FACE, "bond-fill",
              "Up the shelf, the sweep and the apron to the bezel's bottom edge, in line with the panel's front "
              "corner and F1. Two upright lines below the screen, 273 mm apart: they frame the centre of the panel.", mirror=True),
+    ]
+
+
+def side_seams(L: Lines) -> list[Seam]:
+    """The seams of the sides and of the lower rear corners. They follow the band and the rear shelf."""
+    x = L.door[0]
+    y_low = L.crease[-1][0]
+    return [
+        Seam("L1", "body", level([(L.x_kink, 250.0), (300.0, 250.0), (300.0, y_low), (L.x_kink, y_low)], L.z_low)
+             + level([(x, L.y_crease_sill), (300.0, L.y_crease_sill), (300.0, 600.0), (x, 600.0)], L.z_sill),
+             FACE, "bond-fill",
+             "Level line in two parts, with its step hidden in the crease of the band (S1). In front of the band it "
+             "lies at the bezel's bottom corner: across the rail land and its edge and along the side band to the "
+             "band. From the seat it continues the bezel's bottom edge to the outer edge. Behind the band it lies at "
+             f"the height of the door sill (z {L.z_sill:.0f}): along the side of the lower body, round the rear corner and "
+             f"on the lower rear wall to the door's side. It continues the line of the sill, {L.cut_in[2] - L.z_sill:.0f} mm below the "
+             "lowest cut-in.", mirror=True),
+        Seam("B1", "body", level([(200.0, 250.0), (300.0, 250.0), (300.0, 600.0), (x, 600.0), (x, 530.0), (200.0, 530.0)], L.z_belt),
+             FACE, "bond-fill",
+             f"Belt line in the crease of the rear shelf (z {L.z_belt:.0f}). On the back it lies in the crease under the "
+             "head, from the rear corner to the line of the door's side. On each side it lies in the crease of the "
+             "band's level run; in front of that it crosses the band and the side band to the rail. From the seat a "
+             "short level line on the rail land; from the side one level line under the head.", mirror=True),
+        Seam("S1", "body", side(list(L.crease), -300.0, 300.0), HIDDEN, "bond-line",
+             "Front to rear body below L1: in the inner crease of the band (its stub, its kick and its lean)."),
+    ]
+
+
+def rear_seams(L: Lines) -> list[Seam]:
+    """The seams of the back: the door, the centre line, and the lines of the door's sides. The hand-holds lie
+    between the centre line and the door's sides; the cut-ins lie outside the door's sides, above L1."""
+    x, z0, z1 = L.door
+    return [
+        door_outline(L),
+        Seam("R1", "body", front([(x, z1), (x, L.z_belt)], 520.0, 560.0), FACE, "bond-fill",
+             f"{L.z_belt - z1:.0f} mm on the back, from the door's top corner up to the crease of the rear shelf, on the line of the door's side.",
+             mirror=True),
+        Seam("R2", "body", front([(0.0, -1.0), (0.0, z0)], 520.0, 560.0), FACE, "bond-fill", "On the centre line of the back, below the door."),
+        Seam("R3", "body", front([(x, L.z_belt), (x, 440.0)], 520.0, 600.0), FACE, "bond-fill",
+             "On the back above the crease of the rear shelf, on the line of the door's side: up the rear facet and "
+             f"the upper rear wall to the groove. It continues R1. It is {x - L.grip[1]:.0f} mm outside the hand-hold.", mirror=True),
+        Seam("R4", "body", front([(0.0, z0), (0.0, z1)], 520.0, 560.0), FACE, "bond-fill", "On the centre line of the door: two halves bonded into one."),
+        Seam("R5", "body", front([(0.0, z1), (0.0, 440.0)], 520.0, 600.0), FACE, "bond-fill",
+             "On the centre line of the back above the door: up the frame above the door, the rear facet and the "
+             f"upper rear wall to the groove. It continues R4 and R2. It is {L.grip[0]:.0f} mm from each hand-hold."),
     ]
 
 
@@ -296,7 +348,7 @@ def base_pieces() -> list[Piece]:
 def door_outline(L: Lines) -> Seam:
     x, z0, z1 = L.door
     return Seam("DR", "body", front([(-x, z0), (x, z0), (x, z1), (-x, z1), (-x, z0)], 520.0, 560.0), HIDDEN, "service",
-                f"The rear door: its own gap (the fit study's opening, {2 * x:.1f} x {z1 - z0:.0f}).")
+                f"The rear door: its own gap (the opening of dims.Blueprint, {2 * x:.1f} x {z1 - z0:.0f}).")
 
 
 def trim_pieces() -> list[Piece]:
@@ -317,26 +369,24 @@ WHY = {
     "deck side": ("upright", "Upright. Front, corner and side are walls; the border and the edge radius are the top."),
     "apron": ("on its rear edge, on the bed diagonal", "On its rear edge with the chord from the shelf to the bezel's bottom edge upright, along the bed "
              "diagonal (it is 273 long). The concave sweep then faces sideways; only its lower end overhangs more "
-             "than 45 degrees (about 19 cm2: a support there, sanded before primer). Layer lines run across the width."),
-    "lower": ("upright", "Upright. The side, the rail's foot and the sweep are walls or face up."),
-    "middle": ("upright, on the bed diagonal", "Upright, along the bed diagonal: it is a thin wall. The side is a wall with level layer lines. The rail "
-              "land is reclined 25 to 33 degrees and shows fine layer steps; they sand out under primer."),
-    "upper": ("upright", "Upright: the tuck leans in (no overhang), the seam bevel and the brow are on top."),
+             "than 45 degrees (about 3 cm2: a support there, sanded before primer). The rear wall of the panel pocket "
+             "overhangs 45.5 degrees; the control panel hides it. Layer lines run across the width."),
+    "lower": ("upright", "Upright. The side, the rail's foot, the sweep and the foot of the band are walls or face up; the base facet is 45 degrees."),
+    "middle": ("upright, on the bed diagonal", "Upright, along the bed diagonal: it is a thin wall with a short return on the back. The side and the "
+              "band are walls with level layer lines. The rail land is reclined 25 to 33 degrees and shows fine "
+              "layer steps; they sand out under primer. The four cut-ins are in this piece: the upper half of each "
+              "groove faces down 33 degrees at its lip, less than the limit."),
+    "upper": ("upright", "Upright: the tuck leans in (no overhang), the seam bevel and the brow are on top. The side facet of the "
+             "rear shelf is under the head: it is 45 degrees, at the limit, and prints without support."),
     "brow": ("upright", "Upright: the brow faces up and forward."),
-    "upper rear": ("upright", "Upright: the rear slope is 45 degrees, at the limit; the upper rear is a wall."),
-    "rear lower": ("upright", "Upright: rear wall and side are walls."),
+    "upper rear": ("upright", "Upright: the rear facet of the rear shelf and the roof of the hand-hold are 45 degrees, at the limit; "
+                  "the upper rear wall is a wall. The hand-hold is whole in this piece."),
+    "rear lower": ("upright", "Upright: rear wall and side are walls; the base facet is 45 degrees."),
     "door": ("outer face on the bed", "Outer face on the bed: the door is a flat cover, so this gives the smoothest face and the best strength in its plane."),
     "hood centre": ("on a cut face", "On its cut face: inside the top flat the hood is a straight extrusion, so every face prints as a wall "
                    "and the rear arc and the front lean are smooth. No support, no layer steps."),
     "hood side": ("upright", "Upright: the side and the leg are near-upright walls; the top corner steps near the roof and the "
                  "end of the soffit needs a small support inside the marquee opening."),
-    "hood half": ("upright", "Upright: the side and the leg are near-upright walls. The top bar spans 214 mm over the marquee "
-                 "opening, so its soffit needs support across the opening."),
-    "side panel": ("outer face on the bed", "Outer face on the bed: the flat side band prints flat and smooth, without layer lines on it. The arc "
-                  "of its front edge lies in the layer plane."),
-    "rail": ("upright", "Upright: the land faces up and forward, the edge is a wall."),
-    "rear side panel": ("outer face on the bed", "Outer face on the bed, like the side panel; the step face rises at 45 degrees."),
-    "frame lower": ("upright", "Upright, like the lower piece of A."),
 }
 
 
@@ -345,202 +395,49 @@ def piece(name: str, module: str, seed: P3, up: P3, key: str, mirror: bool = Fal
     return Piece(name, module, seed, up, why, mirror, bed=bed)
 
 
-# ---------- the options ----------
+# ---------- the layout ----------
 
-def option_a(d: Blueprint, L: Lines) -> Option:
-    x, z0, z1 = L.door
+def layout(d: Blueprint) -> Layout:
+    """The split that the owner chose on 2026-11-11 (decision record 0006), on the form of revision 7."""
+    L = lines(d)
     bay = L.x_bay
-    seams = deck_seams(L) + [
-        Seam("L1", "body", level([(L.x_kink, 250.0), (300.0, 250.0), (300.0, 600.0), (x, 600.0), (x, 530.0), (L.x_kink, 530.0)], L.z_low),
-             FACE, "bond-fill",
-             "Level line at the bezel's bottom corner: across the rail land and its edge, along the side band, over the "
-             "step and the rear side to the rear corner. From the seat it continues the bezel's bottom edge to the "
-             "outer edge; from the side it is a level line 134 mm above the desk, parallel to the deck top.", mirror=True),
-        Seam("B1", "body", level([(200.0, 250.0), (300.0, 250.0), (300.0, 600.0), (x, 600.0), (x, 530.0), (200.0, 530.0)], L.z_belt),
-             FACE, "bond-fill",
-             "Belt line at the lower crease of the rear slope (z 310), carried forward along the rear side, over the "
-             "step and the side band to the rail; on the rear corner it lies in the crease. From the seat a short "
-             "level line on the rail land two thirds up the bezel; from the side one level line round the body, "
-             "parallel to the groove 114 mm above it.", mirror=True),
-        Seam("S1", "body", side([(L.step_y0 + L.step_in + z * L.step_t, z) for z in (-1.0, L.z_low)], -300.0, 300.0), HIDDEN, "bond-line",
-             "Front to rear body below L1: in the inner crease of the step."),
-        door_outline(L),
-        Seam("R1", "body", front([(x, z1), (x, L.z_belt)], 520.0, 560.0), FACE, "bond-fill",
-             "12 mm on the back, from the door's top corner up to the slope crease, on the line of the door's side.", mirror=True),
-        Seam("R2", "body", front([(bay, -1.0), (bay, z0)], 520.0, 560.0), FACE, "bond-fill",
-             "On the back below the door, in line with H1: the three bays of the hood carried down the back.", mirror=True),
-        Seam("R3", "body", front([(bay, z1), (bay, 440.0)], 520.0, 600.0), FACE, "bond-fill",
-             "On the back above the door, through the slope and the upper rear to the groove, in line with H1.", mirror=True),
-        Seam("R4", "body", front([(bay, z0), (bay, z1)], 520.0, 560.0), FACE, "bond-fill",
-             "In the door, in line with R2 and R3: the door is three pieces bonded into one.", mirror=True),
-        brow(L, bay),
-    ] + hood_bays(L, bay) + base_seams(L)
+    seams = deck_seams(L) + side_seams(L) + rear_seams(L) + [brow(L, bay)] + hood_bays(L, bay) + base_seams(L)
+    x_wall = L.rear_half - 2.0
     pieces = [
         piece("deck nose", "body", (0.0, 2.0, 30.0), UP, "deck nose"),
         piece("deck side", "body", (L.hw - 2.0, 120.0, 20.0), UP, "deck side", mirror=True),
         piece("apron", "body", (0.0, 243.8, 85.2), L.chord_up, "apron"),
         piece("lower", "body", (L.hw - 2.0, 300.0, 60.0), UP, "lower", mirror=True),
-        piece("middle", "body", (L.hw - 2.0, 420.0, 220.0), UP, "middle", mirror=True),
+        piece("middle", "body", (L.hw - 2.0, 380.0, 220.0), UP, "middle", mirror=True),
         piece("upper", "body", (d.side_x(380.0) - 2.0, 500.0, 380.0), UP, "upper", mirror=True),
         piece("brow", "body", (0.0, 432.0, 408.7), UP, "brow"),
-        piece("upper rear", "body", (0.0, L.y_back - 2.0, 400.0), UP, "upper rear"),
-        piece("rear lower centre", "body", (0.0, L.y_rear - 2.0, 50.0), UP, "rear lower"),
-        piece("rear lower", "body", (L.rear_half - 2.0, 450.0, 60.0), UP, "rear lower", mirror=True),
-        piece("door centre", "body", (0.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door"),
-        piece("door side", "body", (160.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door", mirror=True),
+        piece("upper rear", "body", ((L.grip[1] + L.door[0]) / 2, L.y_back - 2.0, 380.0), UP, "upper rear", mirror=True),
+        piece("rear lower", "body", (x_wall, 450.0, 60.0), UP, "rear lower", mirror=True),
+        piece("door half", "body", (110.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door", mirror=True),
         piece("hood centre", "hood", (0.0, 520.0, 571.0), (1.0, 0.0, 0.0), "hood centre"),
         piece("hood side", "hood", (219.0, 520.0, 500.0), UP, "hood side", mirror=True),
     ] + trim_pieces() + base_pieces()
-    return Option(
-        "A", "A: design-line seams",
-        "Every seam either lies in a line that the form has, or carries such a line on: the deck's flank break and "
-        "the panel's front corner (x = +-137), the bezel's bottom corner (L1), the slope crease (B1), the inner crease "
-        "of the step, the bays of the hood band (x = +-106) down the brow and the back, and the door's edges. No seam "
-        "on the centre line. Three pieces across every full-width part.",
+    return Layout(
+        SHELL, "The split of the shell (the owner's choice of 2026-11-11, on revision 7)",
+        "Every seam lies in a line that the form has, or carries such a line on: the deck's flank break and the "
+        "panel's front corner (x = +-137), the bezel's bottom corner and the door sill (L1), the crease of the rear "
+        "shelf (B1), the inner crease of the band (S1), the bays of the hood band (x = +-106) on the brow and the "
+        "hood, the door's edges, and on the back the centre line and the lines of the door's sides. The hand-holds "
+        "and the cut-ins are whole in one piece each.",
         tuple(seams), tuple(pieces),
-        "Three pieces at x = +-106, in line with the bay lines of the back, bonded into one cover with the fan vent "
-        "and the slot vents in it and nothing wired to it. It lifts off; its own gap (DR) is the service joint.",
+        "Two halves on the centre line, bonded into one cover with the fan vent and the slot vents in it and nothing "
+        "wired to it. It lifts off; its own gap (DR) is the service joint. The seam runs into the left end of the "
+        "fan vent, between two of its bars.",
         "The hood (groove G), the rear door (DR), the control panel (pocket), the bezel plate (reveal; the monitor "
         "comes out behind it) and the USB plate. Every other seam is bonded for good, the floor tiles too.",
         ("Bond and screw the nine floor tiles; stick the non-slip pads under them.",
-         "Bond the rear: rear lower centre and the two rear lower pieces, on the floor.",
+         "Bond the rear: the two rear lower pieces, on the floor (R2).",
          "Bond the deck: deck nose and deck sides; then the apron and the two lower pieces (D1, D2, P1, S1).",
-         "Bond the two middle pieces (L1), then the brow, the two upper pieces and the upper rear (B1, W1, R1, R3).",
-         "Bond the three door pieces into one cover; bond the three hood pieces and the lip.",
-         "Dry assembly with all hardware (brief, section 4): power supply and hub on the floor, compute module on its "
+         "Bond the two middle pieces (L1), then the brow, the two upper pieces and the two upper rear pieces (B1, W1, R1, R3, R5).",
+         "Bond the two door halves into one cover; bond the three hood pieces and the lip.",
+         "Dry assembly with all hardware: power supply and hub on the floor, compute module on its "
          "carrier through the door opening, monitor on its carrier from the front through the bezel opening.",
-         "Take the hardware out, fill and paint the permanent seams (brief, section 5), and assemble again."),
-        "The most pieces of the three printed parts that are not trim: 24. Two vertical lines on the apron and two on "
-        "the hood top bar are on open faces; if a filled seam ghosts through the paint, those four are the ones a "
-        "player sees.")
-
-
-def option_b(d: Blueprint, L: Lines) -> Option:
-    a = option_a(d, L)
-    x, z0, z1 = L.door
-    keep = [s for s in a.seams if s.label not in ("R2", "R4", "H1")]
-    seams = keep + [
-        Seam("R2", "body", front([(0.0, -1.0), (0.0, z0)], 520.0, 560.0), FACE, "bond-fill", "On the centre line of the back, below the door."),
-        Seam("R4", "body", front([(0.0, z0), (0.0, z1)], 520.0, 560.0), FACE, "bond-fill", "On the centre line of the door: two halves bonded into one."),
-        Seam("H1", "hood", top([(0.0, 420.0), (0.0, 600.0)], 420.0, 600.0), FACE, "bond-fill",
-             "Hood on the centre line: up the sill and the ledge, behind the logo form, over the lip and the marquee "
-             "opening, across the top bar (21 mm) and the soft edge on the centre of the front, over the roof, down "
-             "the rear arc and the rear wall. From the seat one upright line in the middle of the top bar, right "
-             "above the marquee."),
-    ]
-    drop = ("rear lower centre", "rear lower", "door centre", "door side", "hood centre", "hood side")
-    pieces = [p for p in a.pieces if p.name not in drop] + [
-        piece("rear lower", "body", (L.rear_half - 2.0, 450.0, 60.0), UP, "rear lower", mirror=True),
-        piece("door half", "body", (110.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door", mirror=True),
-        piece("hood half", "hood", (219.0, 520.0, 500.0), UP, "hood half", mirror=True),
-    ]
-    return Option(
-        "B", "B: fewest pieces",
-        "As A, with a seam on the centre line wherever it saves a piece: the hood, the rear wall below the door and "
-        "the door are halves. Halves of 247.4 do not fit the usable 240, so every other full-width part still needs "
-        "three pieces across, and the centre line saves only three pieces.",
-        tuple(seams), tuple(pieces),
-        "Two halves on the centre line, bonded into one cover. The seam runs 12 mm into the left end of the fan vent, "
-        "between two of its bars.",
-        a.service,
-        ("As A. The hood is two halves; the rear lower and the door are halves.",) + a.assembly[5:],
-        "21 printed pieces. The centre seam is visible in one place that counts: the middle of the hood's top bar, right "
-        "above the marquee. The hood halves print with a support under the soffit across the marquee opening, where "
-        "A's centre piece prints with no support at all.")
-
-
-def option_c(d: Blueprint, L: Lines) -> Option:
-    x_m = L.rear_half
-    bay = L.x_bay
-    x, z0, z1 = L.door
-    # the mitre at each rear corner: upright, through the corner edge at 45 degrees in plan
-    m = 18.0
-    mitre_x = lambda y: x_m + (y - L.y_rear)
-    crease = list(L.crease_path)
-    seams = deck_seams(L) + [
-        Seam("K1", "body", side(crease, 241.0, 300.0), HIDDEN, "bond-line",
-             "The crease of the rail's edge section: from the deck's crease at the foot of the sweep, round the sweep "
-             "and up the rail 24 mm behind the land, to the belt. It divides the flat side band from the rail.", mirror=True),
-        Seam("L1", "body", level([(L.x_kink, 250.0), (300.0, 250.0), (300.0, L.y_rear + 300.0 - x_m), (mitre_x(530.0), 530.0), (L.x_kink, 530.0)], L.z_low),
-             FACE, "bond-fill",
-             "As L1 of A: level at the bezel's bottom corner, round the side to the rear corner. On the flat side "
-             "panels it is the joint between two panels.", mirror=True),
-        Seam("B1", "body", level([(200.0, 250.0), (300.0, 250.0), (300.0, 600.0), (-300.0, 600.0), (-300.0, 250.0), (-200.0, 250.0),
-                                  (-200.0, 530.0), (200.0, 530.0)], L.z_belt), FACE, "bond-fill",
-             "As B1 of A, and on across the back in the slope crease: the top edge of the door."),
-        Seam("S1", "body", side([(L.step_y0 + z * L.step_t, z) for z in (-1.0, L.z_belt)], -300.0, 300.0), HIDDEN, "bond-line",
-             "Front to rear body in the outer crease of the step, up to the belt."),
-        Seam("M1", "body", top([(x_m - m, L.y_rear - m), (x_m + m, L.y_rear + m)], -1.0, L.z_belt), HIDDEN, "bond-line",
-             "A mitre in the rear corner, up to the belt.", mirror=True),
-        Seam("DB", "body", level([(-mitre_x(530.0), 530.0), (mitre_x(530.0), 530.0), (mitre_x(560.0), 560.0), (-mitre_x(560.0), 560.0)], z0),
-             FACE, "service",
-             "The door's bottom edge on the back (z 112), from corner to corner. The door's sides are the corner "
-             "mitres and its top is the slope crease, so this is the only edge of the door that is not in a crease."),
-        Seam("R2", "body", front([(0.0, -1.0), (0.0, L.z_belt)], 520.0, 560.0), FACE, "bond-fill",
-             "On the centre line of the back: the rear wall below the door and the door are halves."),
-        Seam("R3", "body", front([(bay, L.z_belt), (bay, 440.0)], 520.0, 600.0), FACE, "bond-fill",
-             "On the back above the door, through the slope and the upper rear, in line with H1.", mirror=True),
-        brow(L, bay),
-    ] + hood_bays(L, bay) + base_seams(L)
-    flat = (-1.0, 0.0, 0.0)
-    pieces = [
-        piece("deck nose", "body", (0.0, 2.0, 30.0), UP, "deck nose"),
-        piece("deck side", "body", (L.hw - 2.0, 120.0, 20.0), UP, "deck side", mirror=True),
-        piece("apron", "body", (0.0, 243.8, 85.2), L.chord_up, "apron"),
-        piece("frame lower", "body", (180.0, 243.8, 85.2), UP, "frame lower", mirror=True),
-        piece("side panel lower", "body", (L.hw - 2.0, 330.0, 60.0), flat, "side panel", mirror=True),
-        piece("rail", "body", (226.0, 311.0, 218.0), UP, "rail", mirror=True),
-        piece("side panel upper", "body", (L.hw - 2.0, 440.0, 230.0), flat, "side panel", mirror=True),
-        piece("rear side panel lower", "body", (x_m - 2.0, 460.0, 60.0), flat, "rear side panel", mirror=True),
-        piece("rear side panel upper", "body", (x_m - 2.0, 515.0, 220.0), flat, "rear side panel", mirror=True),
-        piece("rear lower", "body", (110.0, L.y_rear - 2.0, 50.0), (0.0, -1.0, 0.0), "door", mirror=True),
-        piece("door half", "body", (110.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door", mirror=True),
-        piece("upper", "body", (d.side_x(380.0) - 2.0, 500.0, 380.0), UP, "upper", mirror=True),
-        piece("brow", "body", (0.0, 432.0, 408.7), UP, "brow"),
-        piece("upper rear", "body", (0.0, L.y_back - 2.0, 400.0), UP, "upper rear"),
-        piece("hood centre", "hood", (0.0, 520.0, 571.0), (1.0, 0.0, 0.0), "hood centre"),
-        piece("hood side", "hood", (219.0, 520.0, 500.0), UP, "hood side", mirror=True),
-    ] + trim_pieces() + base_pieces()
-    return Option(
-        "C", "C: flat side panels on an inner frame",
-        "A different build: a chassis of 2020 aluminium extrusion on the printed floor carries the hardware and the "
-        "loads and stands without the shell; the shell hangs on it and carries no load. The flat side band is a separate panel on each side, cut "
-        "out along the crease of the rail's edge section (K1), the step and the belt, and printed with its outer face "
-        "on the bed. The rear door runs from corner to corner, so three of its four edges are creases. The front, the "
-        "top tier and the hood are as in A.",
-        tuple(seams), tuple(pieces),
-        "Two halves on the centre line, bonded into one cover. It is the whole rear wall from z 112 to the slope "
-        "crease, between the two corner mitres, so the opening is wider than the fit study's (470.7 less the mitres) and "
-        "the frame of C has no post at the rear corners.",
-        "As A, and every panel can come off the frame: the seams can stay dry (screwed to the frame, a shadow gap of "
-        "0.5 mm) instead of bonded and filled. Then the side panels and the rails come off for service too.",
-        ("Bond the floor tiles and build the frame on them: the two inclined side rails, the top beam, the two "
-         "monitor beams, the rear arms and the rear beam, the deck beam.",
-         "Fit the hardware to the frame.",
-         "Screw on the deck pieces, the apron and the two frame lower pieces, then the rails and the four side panels.",
-         "Screw on the rear side panels and the rear lower halves, then the top tier (upper pieces, brow, upper rear).",
-         "Hood, door, control panel and bezel plate as in A.",
-         "Finish: each panel can be finished off the cabinet. Fill nothing, or bond and fill as in A."),
-        "The most pieces (30) and a frame of 3.1 m of 2020 extrusion to buy, cut and drill. In return the biggest face that is seen from the side "
-        "prints flat on the bed, most seams lie in creases, and nothing needs filler.")
-
-
-def option_chosen(d: Blueprint, L: Lines) -> Option:
-    """The owner's choice (2026-11-11): the seams of B, and the hood of A in three pieces at x = +-106."""
-    a, b = option_a(d, L), option_b(d, L)
-    seams = tuple(x for x in b.seams if x.label != "H1") + tuple(x for x in a.seams if x.label == "H1")
-    pieces = tuple(p for p in b.pieces if p.module != "hood") + tuple(p for p in a.pieces if p.module == "hood")
-    return Option(
-        CHOSEN, "Chosen: B with the hood of A",
-        "Decided by the owner on 2026-11-11. The seams of B (the fewest pieces) with the hood of A: three pieces at "
-        "x = +-106, whose centre piece prints as a straight extrusion. The centre seams of B lie on the back (rear "
-        "wall below the door, the door). The width stays 494.7.",
-        seams, pieces, b.door, b.service, b.assembly, "")
-
-
-def options(d: Blueprint, door: dict) -> list[Option]:
-    L = lines(d, door)
-    return [option_a(d, L), option_b(d, L), option_c(d, L), option_chosen(d, L)]
+         "Take the hardware out, fill and paint the permanent seams, and assemble again."))
 
 
 BEZEL_OPTIONS = (
@@ -561,12 +458,12 @@ BEZEL_OPTIONS = (
 )
 BEZEL_RECOMMENDED = "1"
 # option 1, measured: the plate cut on the centre line, each half on its cut face
-BEZEL = Option("bezel", "bezel plate in two halves", "",
+BEZEL = Layout(PLATE, "bezel plate in two halves", "",
                (Seam("Z1", "bezel", front([(0.0, 0.0), (0.0, 600.0)], 0.0, 700.0), FACE, "bond-fill",
                      "On the centre line of the plate: over the land and the inner frame at the top and the bottom."),),
                (Piece("bezel half", "bezel", (100.0, 276.0, 141.0), (1.0, 0.0, 0.0),
                       "On its cut face: the land's arc and the inner frame lie in the layer plane and print smooth.",
-                      mirror=True, bed="on its cut face, the profile on the bed diagonal"),), "", "", (), "")
+                      mirror=True, bed="on its cut face, the profile on the bed diagonal"),))
 
 
 # ---------- the inputs of the skin, for the cache ----------
@@ -583,7 +480,8 @@ def fingerprint(d: Blueprint) -> str:
 
 
 def cache_dir() -> Path:
-    return Path(os.environ.get("CANDYBAR_SPLIT_CACHE", CAD / "out" / "shell-bp" / "split" / "cache"))
+    """Where the skin is kept: beside the default build, for every run and for the tests."""
+    return Path(os.environ.get("CANDYBAR_SPLIT_CACHE") or CAD / "out" / "shell-rev7" / "split" / "cache")
 
 
 # ---------- the print box: pure numpy, so that the test can use it on its own ----------
@@ -626,21 +524,9 @@ def print_box(points, up: P3, lim: Printer, step: float = 0.5) -> dict:
 # ---------- the cut, under FreeCAD ----------
 
 def door_of(d: Blueprint) -> dict:
-    """The proposed rear door of the fit study, from the parameter sheets."""
-    from . import fit  # noqa: PLC0415
-    from candybar import params  # noqa: PLC0415
-
-    import FreeCAD as App  # noqa: PLC0415
-
-    lay = fit.Layout()
-    base = fit.sheet(params.load(CAD / "params"), "SplitBase")
-    v = lambda name: params.value(base, name)
-    values = fit.anchors(d, lay, v, d.width / 2 - d.wall_t)
-    z0 = values["bc_top_z"] - v("bc_pcb_w_pwr") - lay.door_overlap
-    App.closeDocument(base.Name)
-    x = d.rear_w / 2 - d.rear_corner_r - lay.door_land
-    z1 = d.rear_step_z0 - lay.door_frame
-    return {"x0": -x, "x1": x, "z0": z0, "z1": z1, "w": 2 * x, "h": z1 - z0}
+    """The opening of the rear door, as the form sets it (dims.Blueprint): inside the cut-ins and below the rear shelf."""
+    x = d.door_w / 2
+    return {"x0": -x, "x1": x, "z0": d.door_z0, "z1": d.door_z1, "w": 2 * x, "h": d.door_z1 - d.door_z0}
 
 
 @dataclass
@@ -653,7 +539,26 @@ class Modules:
     key: str
 
 
-def build_modules(d: Blueprint, log=print) -> Modules:
+SKIN_MODULES = ("body", "base", "hood")
+
+
+def skin_files(d: Blueprint) -> dict[str, Path]:
+    """The cache file of each module of the skin, for the fingerprint of d and the source."""
+    key = fingerprint(d)
+    return {k: cache_dir() / f"{k}-{key}.bin" for k in SKIN_MODULES}
+
+
+def skin_cached(d: Blueprint) -> bool:
+    return all(f.exists() for f in skin_files(d).values())
+
+
+def build_modules(d: Blueprint, log=print, parts: dict | None = None, cav=None) -> Modules:
+    """The modules of the built parts (built here when not given). The skin comes from the cache when its
+    fingerprint is there; else it is made (with the cavity `cav` when given) and written to the cache. In both cases
+    the skin that the seams cut is the one read from the cache files, so that every run cuts the same shapes.
+
+    The cache files are binary BREP, which keeps every number as it is. The text BREP keeps 15 digits, and the
+    narrow step faces of the skin are not valid when they come back from it."""
     import FreeCAD as App  # noqa: PLC0415
     import Part  # noqa: PLC0415
 
@@ -662,39 +567,32 @@ def build_modules(d: Blueprint, log=print) -> Modules:
 
     key = fingerprint(d)
     cache = cache_dir()
-    parts = so.build(d)
+    parts = parts or so.build(d)
     outer_body = so.unsplit(parts["deck"].fuse(parts["body"]))
     outer_hood = so.unsplit(parts["hood"].fuse(parts["marquee_lip"]))
-    files = {k: cache / f"{k}-{key}.brep" for k in ("body", "base", "hood")}
-    skin = {}
-    if all(f.exists() for f in files.values()):
-        for k, f in files.items():
-            s = Part.Shape()
-            s.read(str(f))
-            skin[k] = s
+    files = skin_files(d)
+    if skin_cached(d):
         log(f"split: skin from the cache {key}")
     else:
-        log("split: making the skin (about 12 minutes)")
-        cav = cavity.build(parts, d)
+        log("split: making the skin (about 20 minutes)")
+        cav = cav or cavity.build(parts, d)
         slabs = [p for p in cav.pieces if p.BoundBox.ZMin < d.wall_t + 1.0]
         z = d.wall_t + 0.5
         floor = [Part.Face(w) for p in slabs for w in p.slice(App.Vector(0, 0, 1), z)]
         region = floor[0].fuse(floor[1:]).removeSplitter() if len(floor) > 1 else floor[0]
         region = region.translated(App.Vector(0, 0, -z - 1.0)).extrude(App.Vector(0, 0, z + 1.0))
-        body = outer_body.cut(cav.pieces)
-        skin["base"] = body.common(region)
-        skin["body"] = body.cut(region)
-        skin["hood"] = outer_hood.cut(cav.pieces)
+        body = cavity.hollow(outer_body, cav)
+        made = {"base": body.common(region), "body": body.cut(region), "hood": cavity.hollow(outer_hood, cav)}
         cache.mkdir(parents=True, exist_ok=True)
         for k, f in files.items():
-            skin[k].exportBrep(str(f))
-    for k, shape in list(skin.items()):
-        if not shape.isValid():  # the cut of the stepped cavity can leave faces the booleans reject: ShapeFix them
-            fixed = shape.copy()
-            fixed.fix(1e-4, 1e-4, 1e-3)
-            if fixed.isValid():
-                skin[k] = fixed
-            log(f"split: the skin of {k} is not valid; after ShapeFix: {fixed.isValid()}")
+            made[k].exportBinary(str(f))
+    skin = {}
+    for k, f in files.items():
+        skin[k] = Part.Shape()
+        skin[k].importBinary(str(f))
+        if not skin[k].isValid():
+            bad = [face for face in skin[k].Faces if not face.isValid()]
+            raise RuntimeError(f"split: the skin of {k} ({f.name}) is not a valid shape: {len(bad)} of its {len(skin[k].Faces)} faces are not valid")
     outer = {"body": outer_body, "base": outer_body, "hood": outer_hood}
     for k in TRIMS:
         skin[k] = outer[k] = parts[k]
@@ -777,15 +675,39 @@ def cover_shapes(d: Blueprint):
     bw = d.bezel_w / 2 + d.panel_gap + 0.5
     origin, up, into = so.screen_frame(d)
     plate = so.slab(origin, up, into, (-bw, bw), (d.bezel_s0 - 0.5, d.bezel_s1 + 0.5), (-30.0, d.mon_setback + d.wall_t + 2.0))
-    pocket = so.prism(so.poly(pr.panel_outline(d, d.panel_gap + 0.5)), so.xy(d.panel_top - d.panel_t - 9.0), App.Vector(0, 0, 12.0))
+    # the control panel in its pocket: from below the ledge up to where the edge break of the pocket's rim starts, so
+    # that the whole upright wall of the pocket is under the plate (a box that ended lower counted that wall as
+    # seen on one side of the cabinet and as hidden on the other)
+    z0 = d.panel_top - d.panel_t - 9.0
+    pocket = so.prism(so.poly(pr.panel_outline(d, d.panel_gap + 0.5)), so.xy(z0), App.Vector(0, 0, d.panel_top - d.edge_break - z0))
     return [plate, pocket]
 
 
-def faces_of(piece, outer, covers, d: Blueprint):
+def seam_planes(seams: list[Seam], module: str) -> list[tuple]:
+    """The plane of each seam polygon of a module: a point on it and its unit normal."""
+    import numpy as np  # noqa: PLC0415
+
+    out = []
+    for s in seams:
+        if s.module != module:
+            continue
+        for poly in s.polys:
+            p = np.array(poly, float)
+            n = np.cross(p[1] - p[0], p[2] - p[0])
+            out.append((p[0], n / np.linalg.norm(n)))
+    return out
+
+
+def faces_of(piece, outer, covers, d: Blueprint, planes=()):
     """Each face of a piece with its triangles (outward normals) and its kind: 'seen' (outer face that a person sees),
-    'hidden' (outer face under a plate, under the hood or on the desk) or 'inside' (cavity or cut face)."""
+    'hidden' (outer face under a plate, under the hood or on the desk) or 'inside' (cavity or cut face).
+
+    A cut face is a flat face that lies KERF / 2 from the plane of a seam (planes: seam_planes of the piece's
+    module). It is known by that, not by a point beside it: a cut face that ends in the gap round the control panel
+    has such points outside the form, and it then counted as seen on one side of the cabinet and not on the other."""
     import FreeCAD as App  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
+    import Part  # noqa: PLC0415
 
     out = []
     for f in piece.Faces:
@@ -807,7 +729,10 @@ def faces_of(piece, outer, covers, d: Blueprint):
             n = -n
         unit = n / (np.linalg.norm(n, axis=1, keepdims=True) + 1e-12)
         q = App.Vector(*(c + unit[k] * 0.3))
-        if outer.isInside(q, 1e-3, True):
+        flat = isinstance(f.Surface, Part.Plane)
+        if flat and any(abs(abs(float(unit[k] @ pn)) - 1.0) < 1e-6 and abs(abs(float((c - pp) @ pn)) - KERF / 2) < 1e-3 for pp, pn in planes):
+            kind = "inside"
+        elif outer.isInside(q, 1e-3, True):
             kind = "inside"
         else:
             centre = App.Vector(*c)
@@ -820,10 +745,11 @@ def faces_of(piece, outer, covers, d: Blueprint):
     return out
 
 
-def measure(piece, up: P3, lim: Printer, outer, covers, d: Blueprint, detail: bool = True) -> dict:
+def measure(piece, up: P3, lim: Printer, outer, covers, d: Blueprint, detail: bool = True, planes=()) -> dict:
     """The box in the print orientation, the mass of the skin, and what the orientation does to the faces that are
-    seen: area that overhangs more than 45 degrees, area of shallow tops that show layer terraces, area on the bed.
-    Without detail, only the box and the mass."""
+    seen: area that overhangs more than OVERHANG (by more than OVERHANG_BAND), area at that limit (within the band:
+    the 45 degree facets of the design), area of shallow tops that show layer terraces, area on the bed. Without
+    detail, only the box and the mass."""
     import numpy as np  # noqa: PLC0415
 
     if not detail:
@@ -831,24 +757,26 @@ def measure(piece, up: P3, lim: Printer, outer, covers, d: Blueprint, detail: bo
         box = print_box([(v.x, v.y, v.z) for v in pts], up, lim)
         return {**box, "up": [round(v, 3) for v in up], "volume_cm3": round(piece.Volume / 1000, 1),
                 "mass_g": round(piece.Volume / 1000 * PETG_G_PER_CM3)}
-    faces = faces_of(piece, outer, covers, d)
+    faces = faces_of(piece, outer, covers, d, planes)
     pts = np.concatenate([tri.reshape(-1, 3) for _, tri, _, _ in faces])
     box = print_box(pts, up, lim)
     u = np.array(up, float)
     u /= np.linalg.norm(u)
     h = pts @ u
     z0 = h.min()
-    acc = {"seen": 0.0, "overhang_seen": 0.0, "terrace_seen": 0.0, "overhang_inside": 0.0, "bed": 0.0}
+    acc = {"seen": 0.0, "overhang_seen": 0.0, "limit_seen": 0.0, "terrace_seen": 0.0, "overhang_inside": 0.0, "bed": 0.0}
+    over, limit = -math.sin(math.radians(OVERHANG + OVERHANG_BAND)), -math.sin(math.radians(OVERHANG - OVERHANG_BAND))
     for kind, tri, unit, area in faces:
         nz = unit @ u
         zc = tri.mean(axis=1) @ u
         at_bed = zc < z0 + 0.5
         if kind == "seen":
             acc["seen"] += area.sum()
-            acc["overhang_seen"] += area[(nz < -math.sqrt(0.5)) & ~at_bed].sum()
+            acc["overhang_seen"] += area[(nz < over) & ~at_bed].sum()
+            acc["limit_seen"] += area[(nz >= over) & (nz <= limit) & ~at_bed].sum()
             acc["terrace_seen"] += area[(nz > math.cos(math.radians(25))) & (nz < 0.9998)].sum()
         elif kind == "inside":
-            acc["overhang_inside"] += area[(nz < -math.sqrt(0.5)) & ~at_bed].sum()
+            acc["overhang_inside"] += area[(nz < over) & ~at_bed].sum()
         acc["bed"] += area[(nz < -0.9998) & at_bed].sum()
     bb = piece.BoundBox
     return {**box, "up": [round(v, 3) for v in up], "volume_cm3": round(piece.Volume / 1000, 1),
@@ -903,61 +831,66 @@ def tints(shapes: dict) -> dict:
     return {n: colour[pair(n)] for n in names}
 
 
-def run(option_keys=ALL, out: Path | None = None, mods: Modules | None = None, lim: Printer | None = None,
+def mirror_gaps(rows: dict) -> list[dict]:
+    """Where a right piece and its left twin are not alike: the print box and the mass, and with detail the areas."""
+    out = []
+    for name, r in rows.items():
+        if not name.endswith(" R") or name[:-1] + "L" not in rows:
+            continue
+        left = rows[name[:-1] + "L"]
+        for k, tol in (("x", 1.0), ("y", 1.0), ("z", 1.0), ("mass_g", 2.0), ("seen", 1.0), ("overhang_seen", 1.0), ("limit_seen", 1.0), ("terrace_seen", 1.0)):
+            if k in r and abs(r[k] - left[k]) > tol:
+                out.append({"problem": "mirrored pieces differ", "piece": name[:-2], "value": k, "right": r[k], "left": left[k]})
+    return out
+
+
+def run(out: Path | None = None, mods: Modules | None = None, lim: Printer | None = None,
         log=print, write: bool = True, detail: bool = True, bezel: bool = True) -> dict:
-    """Cut and measure each option. Writes split/<option>/ and split/measurements.json when write is True; without
-    detail it measures only the print boxes (for the test)."""
+    """Cut and measure the shell and the bezel plate. Writes split/shell/, split/bezel/ and split/measurements.json
+    when write is True; without detail it measures only the print boxes and the masses (for the test)."""
     import MeshPart  # noqa: PLC0415
 
     d = Blueprint()
     lim = lim or printer()
     mods = mods or build_modules(d, log)
-    door = door_of(d)
     covers = cover_shapes(d)
-    result = {"printer": vars(lim), "skin_key": mods.key, "door": door, "options": {}}
-    opts = {o.key: o for o in options(d, door)}
-    for key in tuple(option_keys) + (("bezel",) if bezel else ()):
-        if key == "bezel":
-            seams, pieces = expanded(BEZEL)
-        else:
-            seams, pieces = expanded(opts[key])
+    result = {"printer": vars(lim), "skin_key": mods.key, "door": door_of(d)}
+    root = (out or Path(os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7"))) / "split"
+    for opt in (layout(d),) + ((BEZEL,) if bezel else ()):
+        seams, pieces = expanded(opt)
         shapes, problems = cut(seams, pieces, mods)
         rows = {}
         for p in pieces:
             if p.full not in shapes:
                 continue
-            rows[p.full] = {"module": p.module, **measure(shapes[p.full], p.up, lim, mods.outer[p.module], covers, d, detail)}
-        lines_ = seam_lines(seams, mods, covers) if write else {}
+            rows[p.full] = {"module": p.module, **measure(shapes[p.full], p.up, lim, mods.outer[p.module], covers, d, detail, seam_planes(seams, p.module))}
+        problems += mirror_gaps(rows)
         res = {"pieces": rows, "problems": problems, "count": len(rows), "fits": all(r["fits"] for r in rows.values()) and not
                [q for q in problems if q["problem"] != "debris"]}
-        result["options"][key] = res
-        log(f"split: {key}: {len(rows)} pieces, fits {res['fits']}, problems {problems}")
+        result[opt.key] = res
+        log(f"split: {opt.key}: {len(rows)} pieces, fits {res['fits']}, problems {problems}")
         if write:
-            here = (out or Path(os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp"))) / "split" / key
+            here = root / opt.key
             here.mkdir(parents=True, exist_ok=True)
             colour = tints(shapes)
             manifest = {}
-            for name, s in shapes.items():
+            for name, shape in shapes.items():
                 f = name.replace(" ", "_") + ".stl"
-                MeshPart.meshFromShape(Shape=s, LinearDeflection=0.3, AngularDeflection=0.15).write(str(here / f))
+                MeshPart.meshFromShape(Shape=shape, LinearDeflection=0.3, AngularDeflection=0.15).write(str(here / f))
                 manifest[name] = {"file": f, "finish": colour[name]}
             (here / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+            lines_ = seam_lines(seams, mods, covers)
             (here / "seams.json").write_text(json.dumps(lines_), encoding="utf-8")
             res["seams"] = {k: {kk: vv for kk, vv in v.items() if kk != "lines"} for k, v in lines_.items()}
-        if write:
-            one = {**{k: v for k, v in result.items() if k != "options"}, "options": {key: res}}
-            (here.parent / f"measurements-{key}.json").write_text(json.dumps(one, indent=1), encoding="utf-8")
+    if write:
+        (root / "measurements.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
     return result
 
 
 def main() -> int:
-    """CANDYBAR_SPLIT_OPTIONS (for example "A" or "A,B,bezel") limits the run, so that options can run side by side;
-    each option writes split/measurements-<option>.json."""
-    keys = os.environ.get("CANDYBAR_SPLIT_OPTIONS", "")
-    picked = tuple(k for k in keys.split(",") if k and k != "bezel")
-    res = run(option_keys=picked if keys else ALL, bezel=not keys or "bezel" in keys)
-    bad = [k for k, v in res["options"].items() if not v["fits"]]
-    for k, v in res["options"].items():
+    res = run()
+    for k in (SHELL, PLATE):
+        v = res[k]
         big = max(v["pieces"].items(), key=lambda kv: max(kv[1]["x"], kv[1]["y"], kv[1]["z"]))
         print(f"{k}: {v['count']} pieces, fits {v['fits']}, largest {big[0]} {big[1]['x']} x {big[1]['y']} x {big[1]['z']}")
-    return 1 if bad else 0
+    return 0 if all(res[k]["fits"] for k in (SHELL, PLATE)) else 1

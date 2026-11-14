@@ -55,7 +55,7 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
     hw = d.width / 2
     return {"X 0": (0, 0.0),
             "X rail land": (0, (d.bezel_w / 2 + d.panel_gap + hw - d.edge_in) / 2),
-            "X band": (0, hw - d.step_in / 2),
+            "X band": (0, hw - d.band_depth / 2),
             "Z deck": (2, d.deck_top - d.deck_lean_h / 2),
             "Z panel pocket": (2, (d.panel_top + d.deck_top) / 2),
             "Z cut-in": (2, d.cut_in_z0 + d.cut_in_h / 2),

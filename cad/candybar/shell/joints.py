@@ -1,11 +1,11 @@
-"""The joints of the seam proposal: the one definition of their dimensions, and the functions that make joint 1 on
+"""The joints of the split: the one definition of their dimensions, and the functions that make joint 1 on
 the edge of a wall.
 
 Joint holds joint 1 (skin to skin on a wall or a curved face). The coupon (candybar.shell.coupon) is modelled from it
 and proves it before the cabinet is printed. OtherJoints holds joints 2 to 7 (floor tiles, wall foot, node, service
 seam, hood on the body top) and the cones that locate a seam along its length: concept values, not modelled yet.
-The joint sheet (tools/draw_structure.py, joints_sheet) and the joint table of the proposal (tools/split_proposal.py,
-cad/out/shell-bp/split/proposal.md, "Joints") read both. Later part modelling imports them and the builders from
+The joint sheet (tools/draw_structure.py, joints_sheet) and the joint table of the split report (tools/split_report.py,
+cad/out/shell-rev7/split/report.md, "Joints") read both. Later part modelling imports them and the builders from
 here, so that every seam and the coupon have one set of values. tests/test_joints.py fails when a joint value is
 defined in a second place.
 
@@ -41,7 +41,7 @@ class Joint:
     gusset_angle: float = 45.0       # from the wall; at 45 the gusset prints with no support (the printer's limit)
     key_proj: float = 1.5            # the key stands this far out of the flange face (into the groove)
     key_w: float = 4.0               # key width, along the flange height
-    key_u0: float = 4.0              # the key starts this far inward of the inner face (proposal: 8 to 12 from outside)
+    key_u0: float = 4.0              # the key starts this far inward of the inner face (the study of 2026-11-11: 8 to 12 from outside)
     key_gap: float = 7.0             # the key stops this far each side of a screw axis, so that the holes miss it
     key_end_margin: float = 5.0      # the key stops this far from a free end of the seam
     groove_clearance: float = 0.2    # per side, at the sides and the ends of the key; the coupon sets it (0.1 to 0.3)
@@ -104,7 +104,7 @@ JOINT = Joint()
 
 @dataclass(frozen=True)
 class OtherJoints:
-    """Joints 2 to 7 of the seam proposal and the cones, mm. Concept values: none of these is modelled yet, and the
+    """Joints 2 to 7 of the split and the cones, mm. Concept values: none of these is modelled yet, and the
     coupon of each joint sets its clearances. Joint 3 uses the foot flange of Joint (foot_h x foot_t)."""
     # the cone that locates a seam along its length (at the ends of a joint 1 seam, in the floor laps, in a node,
     # on the top ring under the hood); its socket is the cone with the clearance on each side
