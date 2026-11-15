@@ -190,6 +190,8 @@ The spring of the button moves the striker and the rod back. The option is in `c
 - The tip of the rod goes on past the striker by the travel. The guide has a pocket for it in its back wall. Without this pocket the rod stopped on the back wall after about 1.2 of its travel, so the striker reached the button but pressed it by about 0.2 only. This was a fault of the first design.
 - The guide has a lip of 1.0 across the upper half of its open end. The upper half of the striker is cut back near its nose, so that its step stops on the lip just past the travel. The lower half of the striker still reaches the button.
 
+**The sheet for the owner** (`cad/out/push-rod-mark/push-rod-mark.png`, made by `candybar.shell.rod_mark` and `tools/draw_push_rod.py`): the front of the cabinet with the printed bezel plate, without the rod and with it, from one camera 1.0 m in front of the screen; the same place of the two views at the size of the render (3.5 pixels for each mm); and a close view of the right bar with the mark and a ruler of 1 mm ticks. Every face edge is drawn.
+
 `tests/test_cradle.py` holds the stop: the rod cannot go out to the front, the full travel of the rod and of the striker is free, and each one is stopped 0.5 past its travel and the fit.
 
 ## The bezel plate as a printed part

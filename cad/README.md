@@ -110,6 +110,8 @@ CANDYBAR_OUT=cad/out/control-panel/parts cad/candybar/freecad-run.sh tools.face_
 CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh candybar.shell.cradle                        # parts, checks, report.md
 CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh --gui candybar.shell.cradle_view             # shell.FCStd
 cad/.venv-tools/bin/python cad/tools/draw_cradle.py                                                  # the sheets
+CANDYBAR_OUT=cad/out/push-rod-mark cad/candybar/freecad-run.sh candybar.shell.rod_mark               # the sheet of the push rod's mark: scenes
+cad/.venv-tools/bin/python cad/tools/draw_push_rod.py cad/out/push-rod-mark                          # renders and push-rod-mark.png
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.edge_finish                      # the edge rule on its print parts
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.face_check                       # the face check on its print parts
 # the front socket plate, four variants (about 20 minutes; not in the default build; docs/design/front-socket-plate.md)
