@@ -81,6 +81,19 @@ cad/.venv-tools/bin/python cad/tools/draw_widths.py options          # cad/out/s
 cad/.venv-tools/bin/python cad/tools/draw_widths.py table cad/out/probe   # the numbers as Markdown
 ```
 
+### The parts of the work packages
+
+Each package has its own module, its own output folder under `cad/out/` and a design document in `docs/design/`. None of them changes the default build of the outer form. Each needs the default build in `cad/out/shell-rev7` with its fit study, and the skin in the cache of the split.
+
+```sh
+# the print pieces with joint 1, the floor tiles and the ribs (about 20 minutes; docs/design/print-pieces.md)
+CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces
+CANDYBAR_PIECES=check CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the checks again, on the files
+CANDYBAR_PIECES=views CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the folders for the sheets
+cad/.venv-tools/bin/python cad/tools/draw_pieces.py                                                  # the sheets and report.md
+CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc                 # shell.FCStd
+```
+
 `CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.
 
 Large outputs go under `cad/out/`, which git ignores. Do not write them to `/tmp`: on this machine `/tmp` is memory. Scratch files go under `cad/out/_scratch/`.

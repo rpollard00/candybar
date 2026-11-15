@@ -79,3 +79,23 @@ class OneSourceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InsertHoleTest(unittest.TestCase):
+    """The hole of a heat-set insert is deeper than the insert, and the deeper hole leaves material behind it."""
+
+    def setUp(self) -> None:
+        self.o = joints.OTHER_JOINTS
+
+    def test_the_hole_is_deeper_than_the_insert(self) -> None:
+        self.assertGreaterEqual(self.o.insert_hole_depth, self.o.insert_l + 1.0)
+
+    def test_the_top_ring_keeps_a_floor_under_the_hole(self) -> None:
+        self.assertGreaterEqual(self.o.ring_h - self.o.insert_hole_depth, self.o.insert_floor)
+
+    def test_the_boss_is_wider_than_the_hole_by_a_wall_on_each_side(self) -> None:
+        wall = (self.o.service_boss - max(self.o.insert_hole_trials)) / 2
+        self.assertGreaterEqual(wall, 3.5)
+
+    def test_the_trial_holes_start_at_the_table_value(self) -> None:
+        self.assertEqual(min(self.o.insert_hole_trials), self.o.insert_hole_d)

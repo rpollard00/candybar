@@ -374,14 +374,14 @@ def joint_service(ax) -> None:
     box(ax, -40, 0, 39.5, w, LOWER)
     box(ax, 0.5, 0, 39.5, w, UPPER)
     box(ax, -0.5 - b, w, b, w, LOWER)                                   # flange of the part that opens
-    box(ax, 0.5, w, b, O.insert_l + 1, UPPER)                           # boss of the fixed part
+    box(ax, 0.5, w, b, O.insert_hole_depth + O.insert_floor, UPPER)                           # boss of the fixed part
     xc = 0.5 + b / 2
-    box(ax, xc - O.insert_hole_d / 2, w + 1, O.insert_hole_d, O.insert_l, "#c0c0c0")
-    ax.plot([xc, xc], [-4, w + O.insert_l + 1], color="#333", lw=1.6, zorder=6)
+    box(ax, xc - O.insert_hole_d / 2, w + O.insert_floor, O.insert_hole_d, O.insert_hole_depth, "#c0c0c0")
+    ax.plot([xc, xc], [-4, w + O.insert_hole_depth + O.insert_floor], color="#333", lw=1.6, zorder=6)
     ax.add_patch(Polygon([(-0.5, 0), (0.5, 0), (0, O.service_chamfer)], fc="white", ec="#333", lw=0.6, zorder=4))
-    dim(ax, (0.5, w + O.insert_l + 4), (0.5 + b, w + O.insert_l + 4), f"boss {g(b)}", (0, 3))
-    note(ax, (-40, 26), f"{O.insert} heat-set insert ({g(O.insert_hole_d)} hole, {g(O.insert_l)} deep) in the fixed part; "
-         f"{O.insert} screw every {g(O.service_pitch_min)} to {g(O.service_pitch_max)}", (xc, w + O.insert_l))
+    dim(ax, (0.5, w + O.insert_hole_depth + 4), (0.5 + b, w + O.insert_hole_depth + 4), f"boss {g(b)}", (0, 3))
+    note(ax, (-40, 26), f"{O.insert} heat-set insert ({g(O.insert_hole_d)} hole, {g(O.insert_hole_depth)} deep) in the fixed part; "
+         f"{O.insert} screw every {g(O.service_pitch_min)} to {g(O.service_pitch_max)}", (xc, w + O.insert_hole_depth))
     note(ax, (-40, 32), f"two pins {g(O.pin_d)} dia, +{g(O.pin_clearance)}, for the place; chamfer {g(O.service_chamfer)} "
          "on both edges; never glued or filled", (0, 2))
     note(ax, (-40, -10), "rear door: a lip and two quarter-turn fasteners (rear.py)", None)
@@ -427,8 +427,8 @@ def joint_hood(ax, d: Blueprint) -> None:
     cx = w + 0.4 * O.ring_w
     ax.add_patch(Polygon([(cx - O.cone_d / 2, 0), (cx + O.cone_d / 2, 0), (cx, O.cone_h)], fc=LOWER, ec="#333", lw=0.8, zorder=4))
     ix = w + O.ring_w - O.insert_hole_d / 2 - 0.5
-    box(ax, ix - O.insert_hole_d / 2, -O.insert_l - 1, O.insert_hole_d, O.insert_l, "#c0c0c0")
-    ax.plot([ix, ix], [-O.insert_l, gap + O.hood_foot_t + 4], color="#333", lw=1.6, zorder=6)
+    box(ax, ix - O.insert_hole_d / 2, -O.insert_hole_depth, O.insert_hole_d, O.insert_hole_depth, "#c0c0c0")
+    ax.plot([ix, ix], [-O.insert_hole_depth, gap + O.hood_foot_t + 4], color="#333", lw=1.6, zorder=6)
     dim(ax, (-6, gap), (-6, 0), g(gap), (-5, 0))
     dim(ax, (w, -O.ring_h - 4), (w + O.ring_w, -O.ring_h - 4), f"ring {g(O.ring_w)}", (0, -3))
     note(ax, (-40, 30), f"cone {g(O.cone_d)} x {g(O.cone_h)} on the ring, socket in the hood: two at the front, two at the "
