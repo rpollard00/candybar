@@ -406,6 +406,8 @@ The deck front, the deck sides, the rail and the soft edge of the hood have roun
 - **The seals.** Foam between the compute module and the door: 7.0 on the collar and the face of the fan, 5.1 on the rim of the duct. The door lifts off free. Their push is 31 N at 5 kPa and 125 N at 20 kPa. The head of the door then bows 0.4 or 1.5 between the fasteners. Use soft foam.
 - **The edge finish.** The edge break of R 1 is on the rim of the door and on the rim of its opening (sill, sides, head). It is also on the rim of each slot and each opening. `rear.edge_rows` and `rear.face_rows` check the door and the pieces that the rear changes. `tools/edge_finish.py` does not read them: the build of the outer form has no door.
 
+**What holds the hardware** (2026-11-14, proposals): the mounts of the compute module, the power supply, the hub and the small items are in `docs/design/hardware-mounts.md` (sheets in `cad/out/mounts/sheets`); the monitor cradle and the printed bezel plate in `docs/design/monitor-cradle-and-bezel.md`; the control panel and its frame in `docs/design/control-panel.md`; the front socket plate in `docs/design/front-socket-plate.md`. The rear door, the shroud and the duct are in `cad/candybar/shell/rear.py` (step 11 of the roadmap). The compute module's printed parts screw to the four inserts of its tray (`rear.carrier_points`).
+
 ## The split
 
 Sheet 10 draws the split. `cad/candybar/shell/split.py` holds the seams as data and cuts the skin into pieces. There is one layout: the owner's choice of 2026-11-11 (decision record 0006), on the form of revision 7. `cad/out/shell-rev7/split/report.md` has all the numbers (a build output). The study of 2026-11-11 also had the options that the owner did not choose; they are not in the code.

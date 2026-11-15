@@ -86,7 +86,7 @@ A price is in the list only where a source gave it. The source and the date are 
 | Encoder screws and inserts | M3 heat-set inserts, M3 x 6 screws | 4 for each panel | The board holes are 3.6 mm (controls, 4.1) | Printed posts with thread-forming screws | None |
 | Button wires | Wires with 2.8 mm (#110) female terminals, and a ground chain | 11 signal wires and the ground chain for each panel | The Sanwa terminals are 2.8 mm tabs (controls, 2.1) | A bought 20-pin harness for the encoder | None |
 | USB cable, panel to cabinet | USB-C or USB-B to USB-A, with a loop of 200 mm | 1 for each panel | Split report, "Cable routes" | A panel-mount socket on each panel | The connector on the encoder |
-| Top plate | 5052-H32 aluminium, 2.03 mm, cut by a service | 1 | Panel and USB, B3 and B4 | 3.18 mm aluminium with no cover. A printed PETG plate comes first (roadmap). | The plate stack (roadmap, "The arcade plate stack") |
+| Top plate | 5052-H32 aluminium, 2.03 mm, cut by a service | 1 | Panel and USB, B3 and B4 | 3.18 mm aluminium with no cover. A printed plate (ABS) comes first (roadmap). | The plate stack (roadmap, "The arcade plate stack") |
 | Clear cover | Polycarbonate or acrylic, 1.5 mm, cut from the same drawing | 1 | The owner wants a cover with art under it | None | Confirm 2.0 + 1.5 mm with snap-in buttons |
 | What holds the panel | Two pins at the front and a latch or screws at the back | See 2.3 | Split report. The latch is not designed (roadmap step 12). | See 2.3 | The latch |
 
@@ -142,7 +142,7 @@ The values are those of joints. The quantities are estimates: the flanges are no
 | Screws for joint 2 (floor tile to tile) | Thread-forming, 3.5 mm x 12 mm, from below | About 40 | Pitch 50 mm in the half-laps | None | None |
 | Screws for joint 3 (wall foot to floor) | Thread-forming, 3.5 mm x 16 mm, up from below | About 25 | Pitch 80 mm | None | None |
 | Screws for the coupons | 3.0 mm x 16 mm | 50 | The coupon README: "Buy 50" | None | None |
-| Adhesive, filler, primer, paint | The classes of finishing, section 5 | See that list | The coupon proves them | The second candidate system of that note | The coupon decides |
+| Weld, filler, primer, paint | ABS: a solvent cement or ABS dissolved in acetone for the seams, ABS slurry or a putty that names ABS in the groove (`docs/research/abs-on-the-q2.md`, section 4) | See that note | The weld coupon (plate 5) and the finish coupons (plates 8 and 9) prove them | The methacrylate adhesive of the PETG plan, as the control | The coupons decide |
 
 Method of the estimates: the seen length of the bonded seams in the split report is 4.3 m. With the
 hidden part of seam D1 the total is about 4.7 m. At a pitch of 60 mm this gives about 80 screws. The
@@ -180,13 +180,13 @@ the supply (4), the BC-250 carrier (4 to 6), the duct fan (4). ESTIMATED: these 
 | Cable tie mounts and ties | Adhesive or screwed mounts, reusable ties | As necessary | The brief: "strain relief, guarded fans, secured wiring" | Printed clips on the flanges | Places, after the carriers are designed |
 | Wire for the button, the LED and the speakers | 0.25 mm2 to 0.5 mm2 stranded wire | A few metres | Low current | None | None |
 | Small connectors | 2-pin and 4-pin connectors that lock | A few | For each part that comes out: the compute module, the hood, the socket plate | None | The type |
-| Filament | PETG, 1.75 mm | See `docs/design/print-plan.md` | The brief | ABS on an enclosed printer (the owner examines this) | The coupons decide the material |
+| Filament | ABS, 1.75 mm (decision record 0008) | See `docs/design/print-plan-abs.md` and the coupons (`docs/design/coupons.md`) | The owner chose ABS on a Qidi Q2 (2026-11-14) | PolyLite ABS (1.12 g/cm3) | Which ABS filament; the coupons are printed with it |
 
 ---
 
 ## Part 2. Research for what is not fixed
 
-### 2.1 Heat-set inserts in printed PETG
+### 2.1 Heat-set inserts in printed PETG (the cabinet is now ABS: `docs/research/abs-on-the-q2.md` gives the iron at 265 C, the hole depth of 9.5 and the boss of 13)
 
 Sizes from two makers of inserts for 3D prints (CNC Kitchen and ruthex), as a retailer shows them [H1][H2]:
 
@@ -222,7 +222,7 @@ What this means for the design:
 4. No maker's table names PETG. The pull-out test was in PLA. The insert coupon of the brief must
    prove the hold in PETG.
 
-### 2.2 Screws into printed PETG
+### 2.2 Screws into printed PETG (for ABS the pilot hole of 2.4, 0.8 d, is the first candidate)
 
 The joints use thread-forming screws for plastics with a 30 degree thread. `joints.py` gives the
 source of the pilot holes: an EJOT distributor table, with 0.75 d for PET and 0.8 d for ABS. PETG is

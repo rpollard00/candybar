@@ -121,6 +121,15 @@ The strip across the front of the hood that holds the two speaker grilles and th
 **Marquee**:
 The display in the middle of the hood band.
 
+**Pod**:
+A raised frame round a speaker on the hood band, with a grille in it (band A). Band B has no pod, band C a low frame.
+
+**Logo field**:
+The raised plate between the two pods of band A, with a recess for the badge.
+
+**Taller hood**:
+A study of the hood made higher by 20 or 46, for a display in the marquee. It is not the default.
+
 **Rear door**:
 The removable panel in the rear wall. It carries the vents and nothing else. The compute module stands behind it on a fixed mount.
 
@@ -215,6 +224,16 @@ A solid that is added to a print piece or a floor tile and that prints with it: 
 
 **Place** (of a small item):
 The room that the model keeps clear for a small bought item, such as the DisplayPort to HDMI adapter or the charging hub of the monitor, with its tie point.
+
+### The print checks
+
+**Coupon**:
+A small test print that proves one thing the design rests on (a fit, a weld, a hole, the shrink, a print of a face of 45 degrees) before the print pieces are printed.
+_Avoid_: test piece, sample
+
+**Plate** (of the coupons):
+The parts that print together on the bed of the printer in one run. The coupon set has nine plates.
+_Avoid_: plate alone for the bezel plate or a cut plate
 
 ### The layout study
 
