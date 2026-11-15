@@ -176,6 +176,10 @@ A printed channel on the inner face of a side, beside an edge of the monitor, th
 **Push rod**:
 The option that reaches the monitor's power button through the right bar of the bezel plate: a rod in the plate and a striker behind it.
 
+**Socket plate**:
+The removable printed plate in the right side of the deck that carries the front USB sockets, the everyday power button and the volume knob.
+_Avoid_: USB plate, I/O panel
+
 ### The print pieces and the mounts
 
 **Print piece**:
