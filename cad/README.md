@@ -108,6 +108,11 @@ CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh --gui candybar.shell.cra
 cad/.venv-tools/bin/python cad/tools/draw_cradle.py                                                  # the sheets
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.edge_finish                      # the edge rule on its print parts
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.face_check                       # the face check on its print parts
+# the front socket plate, four variants (about 20 minutes; not in the default build; docs/design/front-socket-plate.md)
+CANDYBAR_SHELL=cad/out/shell-rev7 CANDYBAR_OUT=cad/out/socket-plate cad/candybar/freecad-run.sh candybar.shell.socket_plate
+cad/.venv-tools/bin/python cad/tools/draw_socket_plate.py all                                        # shell.FCStd, renders, sheets
+CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.edge_finish               # the edge rule on the default variant
+CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.face_check                # the face check on it
 ```
 
 `CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.

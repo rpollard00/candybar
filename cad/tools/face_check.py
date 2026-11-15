@@ -335,8 +335,10 @@ def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -
     from candybar.shell.dims import Blueprint
     allow = default_reveals()
     found: list[Finding] = []
+    from candybar.shell import socket_plate as spm
     for name, shape in shapes.items():
-        if name in NOT_PARTS or (parts and name not in parts):
+        # the bought parts in the folder of a work package are not printed: their faces are not ours to judge
+        if name in NOT_PARTS or name in spm.BOUGHT or (parts and name not in parts):
             continue
         found += check(shape, name, allow, break_radius=Blueprint().edge_break)
     stale = mark_known(found)
@@ -372,7 +374,10 @@ def default_reveals() -> list[Reveal]:
     # the reveals of the printed parts of the work packages: the corner balls of the control panel's plates
     from candybar.shell import panel_frame as pf
     tiles = tuple(k for k in pf.PARTS if pf.kind(k) == "tile")
-    return reveals(d.body_top, d.seam_gap, d.seam_groove, bezel, panel) + pf.corner_balls(d, pf.Interface(), tiles)
+    # and the socket openings and the back pockets of the front socket plate
+    from candybar.shell import socket_plate as spm
+    return (reveals(d.body_top, d.seam_gap, d.seam_groove, bezel, panel) + pf.corner_balls(d, pf.Interface(), tiles)
+            + [spm.face_reveal(spm.SocketPlate(), d)])
 
 
 def known_md(stale: list[Known]) -> str:

@@ -96,7 +96,7 @@ class EdgeRuleTest(unittest.TestCase):
         self.assertIn("in no class", found[0])
 
     def test_each_part_is_in_one_class_only(self) -> None:
-        names = list(ef.PRINTED) + list(ef.CUT_PLATES) + list(ef.PROVISIONAL) + list(ef.NOT_DECIDED) + list(ef.INSIDE)
+        names = list(ef.PRINTED) + list(ef.CUT_PLATES) + list(ef.PROVISIONAL) + list(ef.NOT_DECIDED) + list(ef.INSIDE) + list(ef.BOUGHT)
         self.assertEqual(len(names), len(set(names)))
 
 
@@ -223,8 +223,10 @@ class ShellEdgeFinishTest(unittest.TestCase):
     def test_every_named_joint_holds_a_sharp_edge(self) -> None:
         """A list that names a joint with nothing in it is not honest."""
         used = {(part, g["against"]) for part, r in self.rows.items() if r["class"] == "printed" for g in r["sharp"] if g["against"]}
-        # the joints of the parts of this build; those of a work package are held on its own parts (test_panel_frame)
-        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in self.rows})
+        # the joints of this build: a part of it against another part or the seam. The joints of a work package (its
+        # parts, and the deck behind the socket plate) are held on its own parts (test_panel_frame, test_cradle,
+        # test_socket_plate)
+        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in self.rows and (j[1] in self.parts or j[1] == ef.SEAM_NAME)})
 
     def test_the_hood_has_no_sharp_edge_at_all(self) -> None:
         """The rim of the opening and the seam bevel have the break; the foot of the hood is blunt."""

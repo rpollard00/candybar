@@ -10,6 +10,7 @@ in one class, by name:
   PROVISIONAL   a stand-in for a part that is not designed yet: "provisional, not finished"
   NOT_DECIDED   the record does not say how the part is made: the rule waits for the owner's choice
   INSIDE        a printed part inside the shell that is not painted: the rule does not apply
+  BOUGHT        a bought part in the build folder of a work package: not a printed part
 A part of the build that is in no class is a failure: no part passes because nobody named it.
 
 This tool reads the parts of a build and lists, for each part, the convex edges that turn more than
@@ -37,6 +38,7 @@ import Part
 
 from candybar.shell import cradle as cr
 from candybar.shell import panel_frame as pf
+from candybar.shell import socket_plate as spm
 from candybar.shell import solids as so
 from candybar.shell.dims import Blueprint
 from tools import face_check
@@ -48,9 +50,13 @@ SEAM = 0.2
 SEAM_NAME = "the seam between the body and the hood"
 
 # the printed parts of the shell, and of the work packages by the module that makes them
-PRINTED = ("deck", "body", "hood") + pf.PARTS + cr.HALVES
+PRINTED = ("deck", "body", "hood") + pf.PARTS + cr.HALVES + ("socket_plate",)
 # printed parts inside the shell that are not painted: the edge rule is for the painted outside (decision record 0007)
 INSIDE = {name: "A printed part of the monitor cradle, inside the shell behind the bezel plate. It is not painted." for name in cr.INSIDE}
+# a sharp edge of these parts is hidden when its middle lies under one of the named parts (socket_plate.covered)
+UNDER = {"socket_plate": spm.BOUGHT}
+# bought parts in a build folder of a work package: not printed
+BOUGHT = {name: "A bought part of the front socket plate (docs/design/front-socket-plate.md)." for name in spm.BOUGHT}
 CUT_PLATES = {"control_panel": "The top of a control panel is a cut plate (roadmap, settled by the owner)."}
 PROVISIONAL = {
     "marquee_lip": "A stand-in for the lower frame of the marquee window. The marquee is not designed yet.",
@@ -74,6 +80,11 @@ JOINTS = {
     **{(part, cover): pf.JOINTS[cover] for part in pf.PARTS for cover in pf.joints_of(part)},
     # the bezel plate of the cradle (docs/design/monitor-cradle-and-bezel.md), in its two printed halves
     **{(part, cover): cr.EDGE_JOINTS[cover] for part in cr.HALVES for cover in ("screen", "the other half")},
+    # the front socket plate (docs/design/front-socket-plate.md) in its seat in the deck, and the bought parts on it
+    ("socket_plate", "the inside of the shell, behind the web"): "The back of the socket plate, inside the shell: not painted.",
+    ("deck", "the inside of the shell, behind the plate"): "The ledge and the window of the seat behind the socket plate, inside the shell.",
+    **{("socket_plate", part): "The rim of a round hole of the plate, under the rim of the button, the nut of the knob or the head of a screw."
+       for part in ("screws", "knob", "power_button")},
 }
 
 
@@ -86,7 +97,11 @@ def covers_of(name: str, parts: dict[str, Part.Shape], d: Blueprint) -> tuple[di
         return {**{"the other tile": parts[k] for k in pf.twins(name, parts)}, **pf.covers(d, pf.Interface())}, pf.ON_TOP
     if name in cr.HALVES:
         return {**{"the other half": parts[k] for k in cr.HALVES if k != name and k in parts}, **cr.edge_covers(d)}, ()
-    return {k: s for k, s in parts.items() if k != name}, ()
+    others = {k: s for k, s in parts.items() if k != name}
+    if "socket_plate" in parts and name in ("socket_plate", "deck"):
+        # the inside of the shell behind the socket plate (socket_plate.inside_covers)
+        others.update(spm.inside_covers(spm.SocketPlate(), d)[name])
+    return others, ()
 
 
 def finish_class(part: str) -> str:
@@ -101,6 +116,8 @@ def finish_class(part: str) -> str:
         return "not decided"
     if part in INSIDE:
         return "inside, not painted"
+    if part in BOUGHT:
+        return "bought"
     return ""
 
 
@@ -175,6 +192,9 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
                 continue
             m = so.middle(e)
             hidden = [lies[f.hashCode()] for f in fs if lies[f.hashCode()]]
+            if not hidden and name in UNDER:
+                # the rim of a round hole of the socket plate under a bought part (socket_plate.covered)
+                hidden = [k for k in UNDER[name] if k in parts and parts[k].distToShape(Part.Vertex(m))[0] < spm.COVER][:1]
             if on_top and abs(m.z - d.panel_top) < 1e-6:
                 hidden = [j for j in hidden if j in on_top]
             joint = hidden[0] if hidden else ""
@@ -197,7 +217,7 @@ def failures(rows: dict) -> list[str]:
     out = []
     for part, r in rows.items():
         if not r["class"]:
-            out.append(f"{part}: the part is in no class (printed, cut plate, provisional, not decided, inside)")
+            out.append(f"{part}: the part is in no class (printed, cut plate, provisional, not decided, inside, bought)")
         if r["class"] != "printed":
             continue
         for g in r["sharp"]:
@@ -239,7 +259,7 @@ def table(rows: dict, d: Blueprint) -> str:
             lines.append(f"| {part} | {g['zone']} | {shows(r['class'], g['against'])} | {g['edges']} | {g['length']} | {g['turn'][0]:g} to {g['turn'][1]:g} | "
                          f"{'; '.join(str(tuple(a)) for a in g['at'][:3])} |")
     lines += ["", "The parts that are not printed and painted parts of the exterior:", ""]
-    lines += [f"- `{part}`: {why}" for group in (CUT_PLATES, PROVISIONAL, NOT_DECIDED, INSIDE) for part, why in group.items() if part in rows]
+    lines += [f"- `{part}`: {why}" for group in (CUT_PLATES, PROVISIONAL, NOT_DECIDED, INSIDE, BOUGHT) for part, why in group.items() if part in rows]
     lines += ["", "The joints in which a sharp edge of a printed part lies:", ""]
     used = sorted({(part, g["against"]) for part, r in rows.items() if r["class"] == "printed" for g in r["sharp"] if g["against"]})
     lines += [f"- `{part}` against {joint}: {JOINTS.get((part, joint), 'NOT A NAMED JOINT')}" for part, joint in used]

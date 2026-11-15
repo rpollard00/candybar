@@ -24,6 +24,7 @@ Triple = tuple[str, str, str]
 Axis = tuple[float, float, float]
 ORIGIN: Triple = (ZERO, ZERO, ZERO)
 X_AXIS: Axis = (1.0, 0.0, 0.0)
+Y_AXIS: Axis = (0.0, 1.0, 0.0)
 Z_AXIS: Axis = (0.0, 0.0, 1.0)
 
 _UNITS = frozenset({"mm", "deg"})
