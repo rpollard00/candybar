@@ -92,6 +92,10 @@ CANDYBAR_PIECES=check CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh ca
 CANDYBAR_PIECES=views CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the folders for the sheets
 cad/.venv-tools/bin/python cad/tools/draw_pieces.py                                                  # the sheets and report.md
 CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc                 # shell.FCStd
+# the mounts of the hardware: tray, docks, fence, saddle, tie points, places (2 minutes; docs/design/hardware-mounts.md)
+CANDYBAR_OUT=cad/out/mounts cad/candybar/freecad-run.sh candybar.shell.mounts                        # CANDYBAR_MOUNT_SCENES=0: no scenes
+cad/.venv-tools/bin/python cad/tools/draw_mounts.py cad/out/mounts                                   # the sheets
+CANDYBAR_OUT=cad/out/mounts cad/candybar/freecad-run.sh --gui candybar.shell.mounts_scenes           # shell.FCStd
 ```
 
 `CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.

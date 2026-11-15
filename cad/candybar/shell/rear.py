@@ -125,13 +125,14 @@ class Rear:
     # seen from behind: u to the right from its lower left corner, v up ----
     low_v0: float = 10.5         # every opening of the lower wall stands between these two lines; the supply's screws
     low_v1: float = 75.5         # are 4.5 below and 4.5 above them
-    grille_u0: float = 7.0
+    grille_u0: float = 10.0      # 4 from the screw hole at (6, 16) of the ATX pattern
     grille_slots: int = 7
     socket_u: P2 = (84.0, 122.0)
     socket_cut: P2 = (0.0, 10.0)  # the corner cuts at the sill and at the head (the head bridges 20 on the printer)
     switch_u: P2 = (125.0, 145.0)
     switch_cut: P2 = (0.0, 0.0)  # none: its head bridges 14
-    psu_screws: tuple[P2, ...] = ((6.0, 6.0), (144.0, 6.0), (6.0, 80.0), (144.0, 80.0))
+    # the screw pattern of the ATX12V rear face (hardware-envelopes.md, section 6); the mounts read it from here
+    psu_screws: tuple[P2, ...] = ((6.0, 80.0), (144.0, 80.0), (6.0, 16.0), (120.0, 6.0))
     psu_screw_hole: float = 4.0
     inlet_slots: int = 13
     # ---- the shroud and the duct ----
@@ -146,8 +147,14 @@ class Rear:
     fence_t: float = 2.0
     fan_post: float = 9.6        # the post of a fan screw: an insert of joints.insert_hole_d and 2 of wall
     fan_post_web: float = 16.0   # the corner plate that ties a post to the walls
-    ear: tuple[float, float, float] = (10.0, 8.0, 6.0)  # the ears to the carrier: along, out, thick
-    ear_x: P2 = (180.0, 270.0)
+    # the carrier of the compute module is the tray of candybar.shell.mounts. Its four M3 inserts are the one
+    # interface of the shroud and the duct: two at each end of the board, carrier_x outside the board's end (the
+    # middle of the tray's upright: 1.5 from the board and 12 wide) and carrier_inset inside the long sides of the
+    # fin block. The duct's floor lies on the left upright and takes the two left screws. The shroud has two ears at
+    # its right end, at the plane of its seat, that lie on two posts of the right upright
+    carrier_x: float = 7.5
+    carrier_inset: float = 4.0
+    ear: P2 = (12.0, 6.0)        # an ear of the shroud: wide, thick
     ear_hole: float = 3.4
     duct_floor_gap: float = 0.3  # the duct's floor to the edge of the board
     cable_notch: tuple[float, float, float] = (-45.0, -5.0, 16.0)  # in the lower wall of the duct: x' from, to, and its height
@@ -492,9 +499,31 @@ def fan_holes(p: Place) -> list[P2]:
     return [(p.v["bc_fan_cx"] + a * h, p.v["bc_fan_cy"] + b * h) for a in (-1, 1) for b in (-1, 1)]
 
 
+def carrier_points(r: Rear, p: Place) -> dict[str, list[tuple[float, float, float]]]:
+    """The four points of the interface to the tray, in the cabinet: the axis of each screw (along y) at the face
+    where the part lies on the tray. "duct": under the duct's floor; "shroud": under the ears of the shroud."""
+    v, s = p.v, shroud_lines(r, p)
+    zs = [p.z(v["bc_fin_y0"] + r.carrier_inset), p.z(v["bc_fin_y0"] + v["bc_fin_w"] - r.carrier_inset)]
+    left, right = p.x(-r.carrier_x), p.x(v["bc_pcb_l"] + r.carrier_x)
+    return {"duct": [(left, p.y(-r.shell_t), z) for z in zs], "shroud": [(right, p.y(s["seat0"] - r.ear[1]), z) for z in zs]}
+
+
+def ear_boxes(r: Rear, p: Place) -> list[Part.Shape]:
+    """The two ears of the shroud: from its right end wall out past the screw of the tray's post."""
+    s = shroud_lines(r, p)
+    wide, thick = r.ear
+    x1 = p.v["bc_pcb_l"] + r.carrier_x + wide / 2
+    out = []
+    for x, y, z in carrier_points(r, p)["shroud"]:
+        zp = z - p.bc_z0
+        out.append(p.box(s["x1"] - INTO, x1, zp - wide / 2, zp + wide / 2, s["seat0"] - thick, s["seat0"]))
+    return out
+
+
 def shroud_base(r: Rear, p: Place) -> Part.Shape:
     """The lower part of the shroud: the walls beside and behind the fin block, the wall over the fins on the side
-    of the exhaust, the fence round the corner with no fins, the posts of the fan screws and the ears to the carrier."""
+    of the exhaust, the fence round the corner with no fins, the posts of the fan screws and the two ears to the
+    tray (carrier_points)."""
     s, oj = shroud_lines(r, p), joints.OTHER_JOINTS
     t = r.shell_t
     y0, y1 = s["cy0"] - t, s["cy1"] + t
@@ -512,14 +541,11 @@ def shroud_base(r: Rear, p: Place) -> Part.Shape:
         cx = s["cx0"] if hx < p.v["bc_fan_cx"] else s["cx1"] - web
         cy = s["cy0"] if hy < p.v["bc_fan_cy"] else s["cy1"] - web
         parts.append(p.box(cx, cx + web, cy, cy + web, top - r.seat_t, top))
-    along, out, thick = r.ear
-    for ex in r.ear_x:
-        parts += [p.box(ex - along / 2, ex + along / 2, y0 - out, y0 + INTO, top - thick, top),
-                  p.box(ex - along / 2, ex + along / 2, y1 - INTO, y1 + out, top - thick, top)]
+    parts += ear_boxes(r, p)
     base = parts[0].fuse(parts[1:]).removeSplitter()
     holes = [p.rod(hx, hy, post0 - PAST, top + PAST, oj.insert_hole_d) for hx, hy in fan_holes(p)]
-    for ex in r.ear_x:
-        holes += [p.rod(ex, y0 - out / 2, top - thick - PAST, top + PAST, r.ear_hole), p.rod(ex, y1 + out / 2, top - thick - PAST, top + PAST, r.ear_hole)]
+    thick = r.ear[1]
+    holes += [p.rod(x - p.bc_x0, z - p.bc_z0, top - thick - PAST, top + PAST, r.ear_hole) for x, _, z in carrier_points(r, p)["shroud"]]
     return base.cut(holes)
 
 
@@ -565,6 +591,8 @@ def duct_body(r: Rear, p: Place) -> Part.Shape:
     end = p.box(k["x0"], k["x0"] + t, k["y0"], k["y1"], -t, k["top"])
     sides = [p.box(k["x0"], k["x1"], k["y0"], k["y0"] + t, -t, k["top"]), p.box(k["x0"], k["x1"], k["y1"] - t, k["y1"], -t, k["top"])]
     body = floor.fuse([end, *sides]).removeSplitter()
+    # the two screws into the left upright of the tray, through the floor
+    body = body.cut([p.rod(x - p.bc_x0, z - p.bc_z0, -t - PAST, PAST, r.ear_hole) for x, _, z in carrier_points(r, p)["duct"]])
     nx0, nx1, nh = r.cable_notch
     c = r.cable_notch_cut
     notch = [(nx0, 0.0), (nx1, 0.0), (nx1, nh - c), (nx1 - c, nh), (nx0 + c, nh), (nx0, nh - c)]
@@ -754,7 +782,7 @@ def fit_rows(d: Blueprint, lay, found: list, walls: list[Part.Shape]) -> list[tu
     buried = [(n, v) for n in hard if (v := fit.in_skin(parts[n], walls)) > fit.TOL]
     rows += [(check.FAIL, n, f"{v:.0f} mm3 lies in the skin") for n, v in buried] or [(check.PASS, "shroud, fan and duct", "no volume in the skin")]
     boxes = {s.name: s.world.BoundBox for it in found for s in it.solids if s.name in REPLACED}
-    ears = 4 * r.ear[0] * r.ear[1] * r.ear[2]
+    ears = sum(e.Volume for e in ear_boxes(r, p))
     clear = (-f.x_ring, f.x_ring, f.z_lip, f.z_rail0)
     for box_name, names in REPLACED.items():
         if box_name not in boxes:

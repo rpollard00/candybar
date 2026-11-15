@@ -209,7 +209,7 @@ def grip_box(d: Blueprint) -> tuple[float, ...]:
 # and the cut-ins (from z 126, x 215), and right of the stowed cables (x up to 73); far from the power supply's grille
 # at the left. It is the inlet of candybar.shell.rear (13 slots of 8 with bars of 2.5: the mirror of the field of the
 # supply's openings), copied here because this module has no FreeCAD at import; tests/test_rear.py holds the two equal
-INLET = (80.35, 214.35, 536.0, 540.0, 20.5, 85.5)
+INLET = (83.35, 217.35, 536.0, 540.0, 20.5, 85.5)
 INLET_OPEN = 0.756  # the open share of the field: 65.8 cm2 of slots in 87.1 cm2
 
 
@@ -283,15 +283,16 @@ class Mount:
 
 def mounts() -> list[Mount]:
     return [
-        Mount("power supply", "Stands on rubber pads in a printed saddle screwed to the floor; two straps over it. Its four "
-              "rear screws only locate it on the rear wall; no weight hangs on the wall.", "floor"),
-        Mount("BC-250", "On its long edge in a printed carrier: two uprights and two rails that hold the board's edges. "
-              "Right upright on the floor, left upright on the door sill and the flanges round the door opening.",
-              "floor and door sill"),
+        Mount("power supply", "Stands on the floor in a fence of two rails and a front stop (candybar.shell.mounts); the four "
+              "6-32 screws of the ATX pattern hold its rear face to the lower rear wall; no weight hangs on the wall.", "floor"),
+        Mount("BC-250", "On its long edge in a printed tray of two halves on its four backplate standoffs (candybar.shell.mounts). "
+              "The tray hangs on two docks, one on each side wall of the lower body, and two screws hold the right half to "
+              "its dock.", "the side walls of the lower body"),
         Mount("fan shroud and exhaust duct", "Printed (candybar.shell.rear): a shroud base and a shroud top that the four fan "
-              "screws hold together, a duct body and its back wall. Four ears of the shroud take screws into the carrier. The "
+              "screws hold together, a duct body and its back wall. The duct's floor and two ears of the shroud take four M3 "
+              "screws into the inserts of the tray (rear.carrier_points). The "
               "fan's face stands 7 mm and the duct's rim 5 mm short of the door, and foam closes the gaps, so that the door "
-              "lifts off free.", "BC-250 carrier"),
+              "lifts off free.", "the tray of the BC-250"),
         Mount("optional duct fan, 92 mm", "Four screws into bosses on the duct, in front of the slot vents.", "exhaust duct"),
         Mount("monitor", "A removable carrier with clamps on the top and bottom edges of the monitor and slots for 8 mm of "
               "adjustment each way, set from the front with the bezel plate off; it slides out forward through the opening. "
