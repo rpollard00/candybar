@@ -184,7 +184,13 @@ The option has three printed parts, and they leave with the plate:
 
 The spring of the button moves the striker and the rod back. The option is in `cradle.button_option`. It is not in the default plate. The rod and the striker follow the button: with the measured height of 63.5 they stand 2.5 lower than with the estimate of 66. At that height the checks find no clash with the monitor, the jaws, the skin, the right channel, the lugs, and the pins and the magnets of the plate, and the striker is 1.0 from the button.
 
-Not designed: a stop that keeps the rod and the striker in the guide when the plate is off.
+**The stop** (2026-11-15). When the plate is off, the rod and the striker stay in their places:
+
+- The rod has a collar behind the plate, 1.5 wider than the rod on each side and 1.0 thick. The collar rests on the back of the plate, so the rod cannot go out to the front. It travels in a pocket of the guide, which stops it after its travel of 2.0 (and the fit of 0.2).
+- The tip of the rod goes on past the striker by the travel. The guide has a pocket for it in its back wall. Without this pocket the rod stopped on the back wall after about 1.2 of its travel, so the striker reached the button but pressed it by about 0.2 only. This was a fault of the first design.
+- The guide has a lip of 1.0 across the upper half of its open end. The upper half of the striker is cut back near its nose, so that its step stops on the lip just past the travel. The lower half of the striker still reaches the button.
+
+`tests/test_cradle.py` holds the stop: the rod cannot go out to the front, the full travel of the rod and of the striker is free, and each one is stopped 0.5 past its travel and the fit.
 
 ## The bezel plate as a printed part
 
@@ -335,7 +341,6 @@ The brow is "upright" in the split. In that position the top lugs hang 11.1 belo
 - No real test of the magnets, the pads and the lock screws.
 - No printed stop under the bottom jaws.
 - No plate for 16:9, 4:3 or vertical.
-- No stop for the rod and the striker of the power-button option.
 - No mount for the DisplayPort to HDMI adapter, the USB-C power board or the amplifier. The channels end at the cable zones of the fit study.
 - The lugs and the bosses are not in the pieces of the split. `split.py` does not know them.
 

@@ -292,6 +292,21 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertGreater(section, 4 * leads)
         del f
 
+    def test_the_rod_and_the_striker_stay_in_their_places_when_the_plate_is_off(self) -> None:
+        """The collar of the rod rests on the back of the plate and stops the rod both ways; the lip of the guide stops
+        the striker just past its travel. The full travel is free."""
+        f = cr.Frame(D)
+        p = parts()
+        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate"])
+        rod, striker, guide, plate = (option[k] for k in ("button_rod", "button_striker", "button_guide", "bezel_plate_button"))
+        travel = C.striker_gap + 1.0
+        self.assertLess(cr.gap(rod, plate), C.rod_fit + 1e-3)                    # the collar lies on the back of the plate
+        self.assertGreater(cr.volume_in(rod.translated(f.into * -0.5), plate), 1.0)      # it cannot go out to the front
+        self.assertLess(cr.volume_in(rod.translated(f.into * travel), guide), cr.TOL_VOLUME)   # the travel is free
+        self.assertGreater(cr.volume_in(rod.translated(f.into * (travel + C.rod_fit + 0.5)), guide), 1.0)
+        self.assertLess(cr.volume_in(striker.translated(V(-travel, 0, 0)), guide), cr.TOL_VOLUME)
+        self.assertGreater(cr.volume_in(striker.translated(V(-(travel + C.rod_fit + 0.5), 0, 0)), guide), 1.0)
+
     def test_the_tools_of_the_shell_pass_on_the_print_parts(self) -> None:
         """tools/edge_finish.py and tools/face_check.py as they run on cad/out/cradle/print: the halves of the plate are
         printed parts with no sharp edge that shows, each named joint of the halves holds a sharp edge, the inside
@@ -338,7 +353,8 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertLess(cr.gap(moved, button), 1e-3)
         self.assertLess(cr.volume_in(moved, guide), cr.TOL_VOLUME)
         # the rod shows on the face of the plate
-        self.assertAlmostEqual(cr.gap(rod, plate), C.rod_fit, delta=1e-3)
+        shank = rod.common(f.box((C.rod_x - 10.0, C.rod_x + 10.0), (v - 10.0, v + 10.0), (-40.0, f.t0 - 0.01)))  # in front of the collar
+        self.assertAlmostEqual(cr.gap(shank, plate), C.rod_fit, delta=1e-3)
 
 
 def built() -> bool:

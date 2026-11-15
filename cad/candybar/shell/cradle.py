@@ -172,6 +172,12 @@ class Cradle:
     striker: float = 6.0
     striker_gap: float = 1.0                            # from its nose to the button
     guide_wall: float = 2.5
+    # the stop of the option, so that the rod and the striker stay in their places when the plate is off: a collar on
+    # the rod behind the plate (it rests on the back of the plate and travels in a pocket of the guide), and a lip
+    # across the upper half of the open end of the guide, on which a step of the striker stops
+    rod_collar: float = 1.5                             # each side of the rod
+    collar_t: float = 1.0
+    stop_lip: float = 1.0                               # along x
     # loads
     lock_torque: float = 0.4        # N m on an M4 lock screw
     lock_keep: float = 0.4          # share of the preload that is left after the plastic relaxes (an estimate for PETG; kept for ABS)
@@ -558,7 +564,8 @@ def clamp_rows(d: Blueprint, c: Cradle, u: Unit) -> list[dict]:
 def button_option(d: Blueprint, c: Cradle, u: Unit, plate: Part.Shape) -> dict[str, Part.Shape]:
     """The option for the power button on the right edge: the plate with a square hole in its inner frame, a push
     rod in the hole, a striker that the rod moves across onto the button, and the guide of the striker on the back
-    of the plate. The three parts leave with the plate."""
+    of the plate. The three parts leave with the plate. A collar on the rod and a lip of the guide keep the rod and
+    the striker in their places when the plate is off."""
     f = Frame(d)
     x_btn, v = sockets(d, c, u)["power button"]
     tb = glass_t(d, c) + u.t / 2                       # the button is in the middle of the edge
@@ -573,9 +580,20 @@ def button_option(d: Blueprint, c: Cradle, u: Unit, plate: Part.Shape) -> dict[s
     top = tb - s
     striker = f.prism_xt([(nose, top), (top + k - fit, top), (tb + s + k - fit, tb + s), (nose, tb + s)], (v - s, v + s))
     g0, g1 = nose + 1.0, c.rod_x + r + c.guide_wall + 2.0
+    travel = c.striker_gap + 1.0
+    # the stop: the collar of the rod rests on the back of the plate; the step of the striker is travel (and the fit)
+    # from the lip at the open end of the guide
+    cw = r + c.rod_collar
+    rod = rod.fuse(f.box((c.rod_x - cw, c.rod_x + cw), (v - cw, v + cw), (f.t0, f.t0 + c.collar_t))).removeSplitter()
+    step = g0 + c.stop_lip + travel + fit
+    striker = striker.cut(f.box((nose - 1.0, step), (v - s - 1.0, v + s + 1.0), (tb - fit, tb + s + 1.0)))
     guide = f.box((g0, g1), (v - s - fit - c.guide_wall, v + s + fit + c.guide_wall), (f.t0, tb + s + fit + c.guide_wall))
     guide = guide.cut([f.box((g0 - 1.0, g1 - c.guide_wall), (v - s - fit, v + s + fit), (top - fit, tb + s + fit)),
-                       f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (f.t0 - 1.0, top))])
+                       f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (f.t0 - 1.0, top)),
+                       f.box((c.rod_x - cw - fit, c.rod_x + cw + fit), (v - cw - fit, v + cw + fit), (f.t0 - 1.0, f.t0 + c.collar_t + travel + fit)),
+                       # the tip of the rod goes on past the striker by the travel: a pocket in the back wall of the guide
+                       f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (top, c.rod_x + r - k + travel + fit))])
+    guide = guide.fuse(f.box((g0, g0 + c.stop_lip), (v - s - fit, v + s + fit), (tb, tb + s + fit))).removeSplitter()
     hole = f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (-40.0, f.t0 + 1.0))
     return {"bezel_plate_button": one(plate.cut(hole)), "button_rod": one(rod), "button_striker": one(striker), "button_guide": one(guide)}
 
