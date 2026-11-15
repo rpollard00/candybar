@@ -113,6 +113,10 @@ CANDYBAR_SHELL=cad/out/shell-rev7 CANDYBAR_OUT=cad/out/socket-plate cad/candybar
 cad/.venv-tools/bin/python cad/tools/draw_socket_plate.py all                                        # shell.FCStd, renders, sheets
 CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.edge_finish               # the edge rule on the default variant
 CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.face_check                # the face check on it
+# the hood band: bands A (the owner's choice), B and C, and the studies of a taller hood (7 minutes; not in the default build; docs/design/hood-band.md)
+CANDYBAR_OUT=cad/out/hood-band cad/candybar/freecad-run.sh candybar.shell.hood_band                  # HOOD_BAND_VARIANTS=A, HOOD_BAND_TALL=
+CANDYBAR_OUT=cad/out/hood-band/A cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc            # shell.FCStd of one variant
+cad/.venv-tools/bin/python cad/tools/draw_hood_band.py                                               # the sheets
 ```
 
 `CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.
