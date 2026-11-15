@@ -77,7 +77,7 @@ The goal is a cabinet that can be printed in ABS on a Qidi Q2 (decision record 0
    - **The hood band** (a study, not in the default build; `docs/design/hood-band.md`). Bands A, B and C, and two taller hoods. The owner chose band A on the present hood. The taller hoods keep their findings (a sharp edge at the top of the larger opening, narrow faces at its corners).
    - **The coupons** (done as models; `docs/design/coupons.md`). 37 parts on nine plates for ABS on the Q2, 1697 g, about 76 h. Each STL is a closed mesh. The set for the printer is in `cad/out/coupons/`.
    - **The tools.** `tools/edge_finish.py` and `tools/face_check.py` know the printed parts of the control panel, the cradle and the socket plate, with their named joints and reveals, and pass on their folders. The mounts, the pieces, the hood band and the coupons are not registered: their modules run the checks with the functions of the tools.
-   - **Tests.** See `cad/out/_scratch/integrate/final.suite.log` for the last full run.
+   - **Tests.** `cad/test.sh` runs 432 tests, and each one passes (84 minutes with the skin in the cache, 2026-11-15). The new modules: `test_pieces` 43, `test_mounts` 13, `test_panel_frame` 31, `test_cradle` 41, `test_socket_plate` 29, `test_hood_band` 28, `test_coupons` 26, `test_build_entry` 11, `test_outputs` 11.
 13. Next: the owner's review of the proposals of step 12 and the coupons on the printer. Then the hood ring, the node plates and the cut plates of the control panel.
 
 Modelling and iteration run on Opus subagents. The main session writes the brief and reviews. The owner asked for a Fable agent on the hood; that agent now makes the blueprint.
