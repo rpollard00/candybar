@@ -109,7 +109,7 @@ The display in the middle of the hood band.
 The removable panel in the rear wall. It carries the vents and nothing else. The compute module stands behind it on a fixed mount.
 
 **Compute module**:
-The BC-250 with its heatsink, fan and shroud, handled as one unit on a fixed mount behind the rear door.
+The BC-250 with its heatsink, fan, shroud, exhaust duct and tray, handled as one unit on a fixed mount behind the rear door. It goes in and out as one unit.
 _Avoid_: compute assembly, compute tray
 
 **Land** (of the rear door):
@@ -143,6 +143,42 @@ _Avoid_: tilt (that word is for the hood face)
 
 **Sight line**:
 The line from the player's eye to the center of the screen. The sight angle is how far this line points below horizontal.
+
+### The print pieces and the mounts
+
+**Print piece**:
+One printed part of the shell, as the split cuts it: 23 wall and hood pieces and 9 floor tiles, 32 in all.
+_Avoid_: segment, panel (a panel is a control panel)
+
+**Seam**:
+The plane where two print pieces meet. A bonded seam is welded and filled for good. A service seam is screwed and is never bonded.
+
+**Flange**:
+The strip on the inside of a piece along a bonded seam, with a gusset of 45 degrees under it. The flanges of the two pieces lie on each other, and the screws and the weld join them.
+_Avoid_: lip (that is the land on the door sill), land (that is where the rear door lies)
+
+**Key**:
+A low ridge on the flange of one piece that goes into a groove in the flange of the other piece, so that the pieces locate each other across the wall.
+
+**Floor tile**:
+One of the nine printed pieces of the floor. The tiles join with half-laps, and the walls stand round them on foot flanges.
+_Avoid_: tile (alone: that is a piece of a control panel)
+
+**Foot flange**:
+The flange along the foot of a wall piece that lies on the table under the edge of the floor. It carries the floor when a person lifts the cabinet.
+
+**Tray**:
+The printed part on the back of the BC-250, in two halves, one at each end of the board. Its four inserts are the interface to the shroud and the exhaust duct.
+_Avoid_: carrier (the word of the earlier study), cradle (that holds the monitor)
+
+**Dock**:
+The printed plate on a side wall of the lower body that a half of the tray hangs on.
+
+**Boss**:
+A solid that is added to a print piece or a floor tile and that prints with it: the bracket of a dock, the fence of the power supply, a tie staple.
+
+**Place** (of a small item):
+The room that the model keeps clear for a small bought item, such as the DisplayPort to HDMI adapter or the charging hub of the monitor, with its tie point.
 
 ### The layout study
 
