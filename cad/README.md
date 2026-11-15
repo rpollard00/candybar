@@ -102,6 +102,12 @@ CANDYBAR_OUT=cad/out/control-panel cad/candybar/freecad-run.sh --gui candybar.sh
 cad/.venv-tools/bin/python cad/tools/draw_panel.py                                                   # renders and sheets
 CANDYBAR_OUT=cad/out/control-panel/parts cad/candybar/freecad-run.sh tools.edge_finish               # the edge rule on its parts
 CANDYBAR_OUT=cad/out/control-panel/parts cad/candybar/freecad-run.sh tools.face_check                # the face check on its parts
+# the monitor cradle and the printed bezel plate (4 minutes; docs/design/monitor-cradle-and-bezel.md)
+CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh candybar.shell.cradle                        # parts, checks, report.md
+CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh --gui candybar.shell.cradle_view             # shell.FCStd
+cad/.venv-tools/bin/python cad/tools/draw_cradle.py                                                  # the sheets
+CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.edge_finish                      # the edge rule on its print parts
+CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.face_check                       # the face check on its print parts
 ```
 
 `CANDYBAR_WIDEN_STEP` is `solids`, `check`, `probe` or `fit`. `CANDYBAR_SPLIT_CACHE` sets another directory for the skin. `candybar/shell/joints.py` is the one source of the joint values; `tests/test_joints.py` fails when a second module sets one.

@@ -340,6 +340,11 @@ def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -
             continue
         found += check(shape, name, allow, break_radius=Blueprint().edge_break)
     stale = mark_known(found)
+    # the known items of the printed parts of the monitor cradle: candybar.shell.cradle.face_known gives the reason
+    from candybar.shell import cradle as cr
+    for f in found:
+        if not f.allowed and f.rule not in INFO and f.part in cr.HALVES + cr.INSIDE + cr.PRINTED:
+            f.allowed = cr.face_known(Blueprint(), f.part, f.rule, f.at, f.detail) and "known item: " + cr.face_known(Blueprint(), f.part, f.rule, f.at, f.detail)
     # a known item of a part that is not in this set has nothing to be found in
     return found, [k for k in stale if k.part in shapes and (not parts or k.part in parts)]
 

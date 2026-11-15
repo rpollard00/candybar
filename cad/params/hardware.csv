@@ -4,7 +4,7 @@ mon_h,230,mm,sourced,"Body height, including the rubber feet on the bottom edge"
 mon_t,10,mm,sourced,Body thickness at the thickest point,uperfect.com BE16CU product size,Monitor body thickness
 mon_active_w,344.678,mm,sourced,,uperfect.com viewable area,Lit image width
 mon_active_h,215.424,mm,sourced,,uperfect.com viewable area,Lit image height
-mon_bezel_bottom,9.6,mm,provisional,"Bottom body edge up to the first lit pixel row, with the screen on",estimate from a manufacturer render,Bottom bezel height
+mon_bezel_bottom,8.9,mm,measured,"Bottom body edge up to the first lit pixel row, with the screen on","the owner, 2026-11-14 (the estimate was 9.6)",Bottom bezel height
 mon_vesa,75,mm,sourced,Hole centre to hole centre,uperfect.com (75 x 75 M4),VESA pattern pitch
 mon_vesa_cz,116,mm,provisional,Bottom body edge up to the centre of the VESA pattern,estimate from a manufacturer render,VESA pattern centre above the bottom edge
 mon_vesa_thread_depth,4,mm,sourced,Usable thread depth of one VESA hole,uperfect.com (M4 x 4),Screw engagement limit

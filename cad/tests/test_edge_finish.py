@@ -96,7 +96,7 @@ class EdgeRuleTest(unittest.TestCase):
         self.assertIn("in no class", found[0])
 
     def test_each_part_is_in_one_class_only(self) -> None:
-        names = list(ef.PRINTED) + list(ef.CUT_PLATES) + list(ef.PROVISIONAL) + list(ef.NOT_DECIDED)
+        names = list(ef.PRINTED) + list(ef.CUT_PLATES) + list(ef.PROVISIONAL) + list(ef.NOT_DECIDED) + list(ef.INSIDE)
         self.assertEqual(len(names), len(set(names)))
 
 
@@ -305,6 +305,7 @@ class ShellEdgeFinishTest(unittest.TestCase):
                 self.assertTrue(any(not g["against"] for g in self.rows[part]["sharp"]))
                 self.assertIn(f"| {part} | all | provisional, not finished |", text)
 
-    def test_the_bezel_plate_waits_for_the_owners_choice(self) -> None:
-        self.assertEqual(self.rows["bezel"]["class"], "not decided")
+    def test_the_bezel_plate_of_the_build_stands_in_for_the_printed_plate(self) -> None:
+        # the owner chose a printed plate (2026-11-14); the plate with the edge break is that of candybar.shell.cradle
+        self.assertEqual(self.rows["bezel"]["class"], "provisional, not finished")
         self.assertEqual(sum(g["edges"] for g in self.rows["bezel"]["sharp"] if not g["against"]), 4)
