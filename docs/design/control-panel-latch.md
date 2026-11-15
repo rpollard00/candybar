@@ -110,7 +110,7 @@ Printed ABS is taken as 35 MPa along the layers and 15 MPa across them. The weak
 | Part | Weakest section | Capacity |
 | --- | --- | --- |
 | Rear hook | The stem, 14 x 6, in tension and bending across the layers (the tile prints top face down, so the stem stands upright) | 175 N |
-| Strike of B | The lips, 4 x 2.3, in bending along the layers (the legs: 154 N; the cover of the housing: 241 N) | 145 N |
+| Strike of B | The lips, 4 x 2.3, in bending along the layers (the legs: 154 N, the cover of the housing: 241 N) | 145 N |
 | Cam of Q | The tongue, 8 x 3.8, in bending along the layers (the shank: 754 N) | 135 N |
 
 ### The results
