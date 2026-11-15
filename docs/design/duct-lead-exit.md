@@ -59,6 +59,16 @@ C. It is one opening for every lead of the I/O end, so the present fault (leads 
 
 The place of the adapter on the left dock is 52.43 high, the length of the adapter, with its DisplayPort plug at the lower end (z 128). An extension lead ends in a DisplayPort socket of about 25 to 35 (ESTIMATED), in line with the adapter's plug. Below the place there are 7 to the top of the clear space over the fan of the supply (z 121), and above it the cable channel of the monitor starts at z 186. The place is thus about 20 to 30 too short for the adapter and the socket of the lead in line. Way 2 needs one of these: the adapter turned over (the plug up and the HDMI lead down and round), a lead with a right-angle socket, or the place moved. Measure the extension lead that the owner buys before the place is changed.
 
+## The sheets
+
+The owner asked for pictures (2026-11-15). `candybar.shell.duct_lead` writes the scenes from the real parts (the board's socket, the duct, the left dock and tray, the skin, the clear space over the fan of the supply), and `tools/draw_duct_lead.py` writes three sheets in `cad/out/duct-lead/`, each with a view from above and one in perspective, every face edge drawn, and the key numbers:
+
+1. `1-way-1.png`: the adapter straight in the board's socket. Its body ends 1.87 before the end wall, in the hot air. A right-angle HDMI plug (ESTIMATED 14 x 21 x 12) passes an opening in the end wall and leaves 16.92 to the side wall in the room of 26.65.
+2. `2-way-2.png`: a short extension lead out through place C, and the adapter on the left dock. It shows the finding: an in-line socket (ESTIMATED 30 long) reaches down to z 107, and 2800 mm3 of it is in the clear space over the fan of the supply (z 96 to 121).
+3. `3-places.png`: A, B and C marked on the duct, C recommended, and the present notch.
+
+The sizes of the plugs, the socket and the leads are estimates. The scenes are not parts of the build.
+
 ## Not done
 
 Nothing is modelled. The sizes of the extension's plug and socket are estimates. The leak is an estimate from areas; no air flow was calculated.
