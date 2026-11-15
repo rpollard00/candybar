@@ -248,12 +248,18 @@ def to_bed(shape):
     is, and ShapeFix does not mend it; transformGeometry moves them as valid shapes (the volume changes by less than
     0.05 mm3). It is used only when the translation is not valid."""
     b = tight_box(shape)
-    moved = shape.translated(V(-b.XMin, -b.YMin, -b.ZMin))
-    if moved.isValid() or not shape.isValid():
-        return moved
+    return moved(shape, V(-b.XMin, -b.YMin, -b.ZMin))
+
+
+def moved(shape, by):
+    """The shape moved by the vector `by`: a translation, or transformGeometry when the translation is not valid
+    (see to_bed)."""
+    out = shape.translated(by)
+    if out.isValid() or not shape.isValid():
+        return out
     import FreeCAD as App
     m = App.Matrix()
-    m.move(V(-b.XMin, -b.YMin, -b.ZMin))
+    m.move(by)
     return shape.transformGeometry(m)
 
 
@@ -556,6 +562,40 @@ def edge_bar():
     body = body.makeFillet(d.rear_round_r, at(0.0, 16.0))
     at = lambda y, z: edges_on(body, lambda e: all(abs(v.Point.y - y) < 1e-6 and abs(v.Point.z - z) < 1e-6 for v in e.Vertexes))
     return body.makeFillet(d.edge_break, at(22.0, 24.0) + at(30.0, 10.0))
+
+
+# the coupons that test the edge finish and the 45 degree faces of the cabinet (plate 6): the edge rule holds on them.
+# The others are test prints: of a fit, a hole, a weld, the shrink, or of the weld, the filler and the paint on a face
+# (the finish pairs and the plaques), whose own edges are those of a test piece
+PAINTED = ("facet45", "cut-in", "hand-hold", "edges")
+# the boxes that cut the real skin, by coupon
+CUT_BOXES = {"facet45": FACET_BOX, "cut-in": CUT_IN_BOX, "hand-hold": HAND_HOLD_BOX}
+# the coupons whose sharp edge is the control of the paint test (EDGE_NAMES)
+CONTROL = ("edges-level", "edges-upright")
+
+
+def bar_frame(name: str, shape):
+    """A shape in the frame of the edge bar (the section in y, z, along x 0 to EDGE_L) moved into the frame of the
+    coupon `name` (stl/, brep/), as the bar is."""
+    bar = edge_bar()
+    if name == "edges-upright":
+        shape, bar = turned(shape, (0, 1, 0), -90), turned(bar, (0, 1, 0), -90)
+    b = tight_box(bar)
+    return shape.translated(V(-b.XMin, -b.YMin, -b.ZMin))
+
+
+def untested(name: str):
+    """What lies outside the faces that the paint test of an edge bar looks at: beyond its two ends and below its bed
+    face. A sharp edge there is an edge of the test piece, not one of the six edges of EDGE_NAMES."""
+    import Part
+    big = box(-100.0, EDGE_L + 100.0, -100.0, 130.0, -100.0, 124.0)
+    return bar_frame(name, big.cut(box(0.01, EDGE_L - 0.01, -1.0, 31.0, 0.01, 25.0)))
+
+
+def control_edge(name: str):
+    """The sharp edge of 90 degrees that the paint test keeps as its control, in the frame of the coupon (stl/, brep/)."""
+    import Part
+    return bar_frame(name, Part.makeLine(V(0, 0, 24.0), V(EDGE_L, 0, 24.0)))
 
 
 # ---------- cut from the real skin ----------
@@ -988,9 +1028,13 @@ def main() -> int:
             old.unlink()
     lim = bed()
     its = items()
-    shapes, rows = {}, []
+    shapes, rows, cabinet = {}, [], {}
     for it in its:
-        shapes[it.name] = to_bed(it.make())
+        made = it.make()
+        if it.real:  # where the cut was in the cabinet: the corner of its box
+            b = tight_box(made)
+            cabinet[it.name] = (b.XMin, b.YMin, b.ZMin)
+        shapes[it.name] = to_bed(made)
         rows.append(check_item(it, shapes[it.name], lim))
         r = rows[-1]
         r["face_check"] = face_findings(shapes[it.name], it.name)
@@ -1019,12 +1063,17 @@ def main() -> int:
         print(f"plate {key} ({title}): {'fits' if layout[key] else 'DOES NOT FIT'}, {len(layout[key] or {})} parts")
         for copy, (x, y) in (layout[key] or {}).items():
             part = copy.split("#")[0]
-            s = shapes[part].translated(V(ox + x, oy + y, 0))
+            s = moved(shapes[part], V(ox + x, oy + y, 0))
             stem = f"p{key}-{copy.replace('#', '-')}"
             s.exportBrep(str(out / "layout" / f"{stem}.brep"))
             MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.2, Relative=False).write(str(out / "layout" / f"{stem}.stl"))
             name = stem.replace("-", "_")
-            manifest[name] = {"file": f"layout/{stem}.stl", "finish": TINT[by[part]["coupon"]], "brep": f"layout/{stem}.brep"}
+            manifest[name] = {"file": f"layout/{stem}.stl", "finish": TINT[by[part]["coupon"]], "brep": f"layout/{stem}.brep",
+                              # for the tools: the coupon, the move from its own frame (stl/, brep/) to the plate, and for a
+                              # cut from the real skin the move from the plate back into the cabinet
+                              "coupon": part, "group": by[part]["coupon"], "offset": [round(ox + x, 6), round(oy + y, 6), 0.0]}
+            if part in cabinet:
+                manifest[name]["to_cabinet"] = [round(c - o, 6) for c, o in zip(cabinet[part], (ox + x, oy + y, 0.0))]
             edges[name] = edge_polylines(s)
             places[copy] = {"plate": key, "x": round(x, 1), "y": round(y, 1)}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1))

@@ -121,6 +121,19 @@ class MountsTest(unittest.TestCase):
         thin = mounts.loads(self.design, replace(self.m, arm_t=1.5), self.v)
         self.assertEqual([r["what"].split(" (")[0] for r in thin if not r["ok"]], ["the longest arm of a tray"])
 
+    def test_the_tools_of_the_shell_pass_on_the_solids_of_the_mounts(self) -> None:
+        """tools/edge_finish.py and tools/face_check.py as they run on cad/out/mounts/parts: each solid is in a class
+        (inside parts and places), and the findings of the face check are listed, not failed."""
+        from tools import edge_finish as ef, face_check as fc
+
+        shapes = {s.name: s.whole for s in self.design.solids}
+        rows = ef.survey(shapes, self.d)
+        self.assertEqual(ef.failures(rows), [])
+        self.assertEqual({r["class"] for r in rows.values()}, {"inside, not painted", "a place"})
+        found, stale = fc.check_shell(shapes)
+        self.assertEqual(fc.failures(found), [])
+        self.assertEqual(stale, [])
+
     def test_the_interfaces(self) -> None:
         from candybar.shell import rear
 

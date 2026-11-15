@@ -311,3 +311,48 @@ class ShellEdgeFinishTest(unittest.TestCase):
         # the owner chose a printed plate (2026-11-14); the plate with the edge break is that of candybar.shell.cradle
         self.assertEqual(self.rows["bezel"]["class"], "provisional, not finished")
         self.assertEqual(sum(g["edges"] for g in self.rows["bezel"]["sharp"] if not g["against"]), 4)
+
+
+class WorkPackageClassesTest(unittest.TestCase):
+    """The parts of the work packages are in their classes by name (or by the coupon of a layout entry), and the
+    covers of the coupons hold what they name."""
+
+    def test_each_kind_of_part_has_its_class(self) -> None:
+        cases = {"TrayL": "inside, not painted", "HubSaddle": "inside, not painted", "TieLead1": "inside, not painted",
+                 "PlaceCharger": "a place", "speaker_pod_right": "printed", "logo_field": "printed", "marquee_lip_left": "printed",
+                 "grille_left": "printed, not painted", "marquee_front_right": "printed, not painted",
+                 "driver_seat_right": "inside, not painted", "driver_left": "bought", "led_strip": "bought",
+                 "deck_side_R": "printed", "socket_plate": "printed", "upright": "inside, not painted"}
+        for name, cls in cases.items():
+            with self.subTest(part=name):
+                self.assertEqual(ef.finish_class(name), cls)
+        self.assertTrue(ef.FLOOR_TILES)
+        self.assertEqual({ef.finish_class(n) for n in ef.FLOOR_TILES}, {"inside, not painted"})
+        self.assertEqual(ef.finish_class("p6_cut_in", {"group": "cut-in"}), "printed")
+        self.assertEqual(ef.finish_class("p8_finish_lower_c02_1", {"group": "finish"}), "a test print")
+        self.assertEqual(ef.finish_class("p4_joint1_lower_c01", {"group": "joint1"}), "a test print")
+        self.assertEqual(ef.finish_class("marquee_lip"), "provisional, not finished")
+
+    def test_the_control_edge_and_the_untested_faces_of_an_edge_bar(self) -> None:
+        from candybar.shell import coupons as cp
+
+        for name in cp.CONTROL:
+            bar = cp.to_bed(cp.turned(cp.edge_bar(), (0, 1, 0), -90) if name == "edges-upright" else cp.edge_bar())
+            line = cp.control_edge(name)
+            m = line.valueAt((line.FirstParameter + line.LastParameter) / 2)
+            sharp = [e for e, _ in solids.sharp_edges(bar, Blueprint(), lambda q: True) if e.distToShape(Part.Vertex(m))[0] < 1e-6]
+            self.assertEqual(len(sharp), 1, name)
+            cover = cp.untested(name)
+            for y, z in cp.EDGE_NAMES:
+                inside = cp.bar_frame(name, Part.Vertex(V(30.0, y, z)))
+                self.assertFalse(cover.isInside(inside.Point, 1e-6, True), (name, y, z))
+            end = cp.bar_frame(name, Part.Vertex(V(cp.EDGE_L + 0.05, 10.0, 10.0)))
+            self.assertTrue(cover.isInside(end.Point, 1e-6, True), name)
+
+    def test_a_point_on_the_cut_of_a_coupon(self) -> None:
+        from candybar.shell import coupons as cp
+
+        x0, x1, y0, y1, z0, z1 = cp.CUT_BOXES["cut-in"]
+        self.assertTrue(fc.on_cut(V(x0, (y0 + y1) / 2, (z0 + z1) / 2), "cut-in"))
+        self.assertFalse(fc.on_cut(V((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), "cut-in"))
+        self.assertFalse(fc.on_cut(V(x0 - 5.0, (y0 + y1) / 2, (z0 + z1) / 2), "cut-in"))

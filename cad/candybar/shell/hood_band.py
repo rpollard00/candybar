@@ -116,6 +116,8 @@ class Band:
     field_half_w: float = 21.0      # the holes and the upright slots lie within this of the driver's centre
     screw_x: float = 29.0           # the two screws of a grille, left and right of the driver's centre
     screw_hole: float = 3.4
+    head_d: float = 5.7             # the head of an M3 button-head screw (ISO 7380, ESTIMATED: the screw is not bought)
+    head_h: float = 1.65
     insert_hole: float = 4.0        # for an M3 heat-set insert
     insert_depth: float = 5.65
     bar_w: float = 8.0              # the clamp bar behind a grille that stands in a pod
@@ -252,6 +254,7 @@ PARTS = {
     "logo_field": ("white", "painted"), "grille": ("black", "black"), "logo_badge": ("#2f4f3a", "plate"),
     "marquee_front": ("#e9dca6", "translucent"), "light_box": ("#2a2a30", "inside"), "driver_seat": ("#2a2a30", "inside"),
     "speaker_enclosure": ("#3a3a44", "inside"), "logo_backer": ("#2a2a30", "inside"), "driver": ("#5a5a5c", "hardware"), "led_strip": ("#d8c060", "hardware"),
+    "grille_screw_inner": ("#1a1a1a", "hardware"), "grille_screw_outer": ("#1a1a1a", "hardware"),
 }
 BASE = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black", "screen": "#3a4250"}
 PRINT = {
@@ -522,7 +525,21 @@ def grille(b: Band, v: Variant, pl: Places) -> Part.Shape:
             solid = solid.fuse(box(x0, x0 + b.bar_w, y1, y_frame, pl.zc - b.bar_half_h, pl.zc + b.bar_half_h))
         solid = solid.removeSplitter()
     cutters = grille_cutters(b, v, pl, y0 - 1, y1 + 0.001) + [hole(x, z, b.screw_hole, y0 - 1, y_frame + 1) for x, z in screws(pl, b)]
-    return one(solid.cut(cutters), "the grille")
+    solid = one(solid.cut(cutters), "the grille")
+    if v.grille == "holes":
+        return solid   # the webs are too narrow for the edge break: OPEN_EDGES
+    # the front face shows: each edge on it (the rim of the plate, the mouth of each slot) has the break. The mouth of a
+    # screw hole lies under the head of its screw (grille_screws), and the bar between two slots leaves no room for it
+    off_screws = lambda p: all(math.hypot(p.x - x, p.z - z) > b.screw_hole / 2 + 0.01 for x, z in screws(pl, b))
+    return rounded(solid, b.edge_break, lambda p: abs(p.y - y0) < 1e-6 and off_screws(p), "the edge break of the grille's front")
+
+
+def grille_screws(b: Band, pl: Places) -> dict[str, Part.Shape]:
+    """The heads of the two screws of the right grille, on its front face: the inner one is nearer the centre line."""
+    y0 = pl.y_grille
+    (xi, zi), (xo, zo) = sorted(screws(pl, b), key=lambda q: abs(q[0]))
+    head = lambda x, z: Part.makeCylinder(b.head_d / 2, b.head_h, V(x, y0 - b.head_h, z), V(0, 1, 0))
+    return {"grille_screw_inner": head(xi, zi), "grille_screw_outer": head(xo, zo)}
 
 
 def box_low(d: Blueprint, h: pr.Hood, b: Band) -> float:
@@ -648,6 +665,8 @@ def marquee_front(d: Blueprint, h: pr.Hood, b: Band) -> dict[str, Part.Shape]:
     nose = box(hx - b.hook_w / 2, hx + b.hook_w / 2, y_back, y_back + b.hook_nose, hz - b.hook_h / 2 - b.hook_nose - b.hook_hold, hz - b.hook_h / 2)
     hook = stem.fuse(nose)
     solid = solid.fuse([hook, hook.mirror(*MIRROR)]).removeSplitter()
+    # the front face shows in the window: its edges have the break, before the split, so that the two halves agree
+    solid = rounded(solid, b.edge_break, lambda p: abs(p.y - (yb - b.mq_front_t)) < 1e-6, "the edge break of the marquee front")
     ym = yb - b.mq_front_t / 2
     right_half = box(b.mq_lap, 400.0, -50.0, 50.0, 0.0, 200.0).fuse(box(-b.mq_lap, b.mq_lap + 1.0, ym, 50.0, 0.0, 200.0))
     right = one(solid.common(right_half).removeSplitter(), "the right half of the marquee front")
@@ -699,8 +718,10 @@ def logo_field(b: Band, yb: float) -> Part.Shape:
 
 
 def logo_badge(b: Band, y_floor: float) -> Part.Shape:
-    """The badge: a plate that lies on the floor of the recess, 1 below its rim."""
-    return plate(grow(logo_recess(b), -b.badge_gap), b.logo_r - b.logo_inset + 2.0 - b.badge_gap, y_floor - b.badge_t, y_floor)
+    """The badge: a plate that lies on the floor of the recess, 1 below its rim. Its front edges have the break."""
+    y0 = y_floor - b.badge_t
+    solid = plate(grow(logo_recess(b), -b.badge_gap), b.logo_r - b.logo_inset + 2.0 - b.badge_gap, y0, y_floor)
+    return rounded(solid, b.edge_break, lambda p: abs(p.y - y0) < 1e-6, "the edge break of the badge")
 
 
 def logo_backer(b: Band, yb: float) -> Part.Shape:
@@ -769,6 +790,8 @@ def build(d: Blueprint, b: Band, drv: Driver, v: Variant, cap_solid: Part.Shape,
     if v.pod_proud:
         out.update(right_and_left("speaker_pod", pod(b, v, pl)))
     out.update(right_and_left("grille", grille(b, v, pl)))
+    for k, s in grille_screws(b, pl).items():
+        out.update(right_and_left(k, s))
     if v.logo == "raised":
         out["logo_field"] = logo_field(b, pl.yb)
         out["logo_badge"] = logo_badge(b, pl.yb - b.logo_proud + b.logo_recess)
@@ -832,12 +855,30 @@ def in_joint(shape: Part.Shape, e: Part.Edge, others: list[Part.Shape]) -> bool:
     return False
 
 
+SHOWN = ("painted", "black", "translucent", "plate")   # the classes of the parts that show: the edge rule holds on them
+
+
+def open_edges(v: Variant) -> dict[str, str]:
+    """The parts of a variant whose sharp edges that show are an open item for the owner, not a fault of the build."""
+    if v.grille == "holes":
+        why = ("OPEN: the field of holes (3.8 at a pitch of 5.2) leaves webs of 1.4 on the front, and the edge break of R 1 "
+               "needs 2 on each web. The owner chooses: larger holes at a larger pitch (6 at 9 keeps 40% open), slots, or "
+               "sharp hole rims on a black part (docs/design/hood-band.md).")
+    elif v.grille == "upright slots":
+        why = ("OPEN: the rear rims of the upright slots show through the slots, because the frame leaves the room behind "
+               "the grille open. A break on the rear face too leaves 0.4 of wall in a grille of 2.4. The owner chooses: a "
+               "grille of 3.4 with a break on both faces, or sharp rear rims on a black part (docs/design/hood-band.md).")
+    else:
+        return {}
+    return {f"grille_{s}": why for s in ("right", "left")}
+
+
 def sharp_edges_that_show(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Blueprint, scene: Scene) -> list[dict]:
-    """The edge rule on the painted parts: each convex edge that turns more than edge_break_turn, has no round and
-    shows. An edge in a joint does not show, and an edge behind another part does not show."""
+    """The edge rule on the parts that show (SHOWN): each convex edge that turns more than edge_break_turn, has no
+    round and shows. An edge in a joint does not show, and an edge behind another part does not show."""
     out = []
     for name, shape in parts.items():
-        if PARTS[kind(name)][1] != "painted":
+        if PARTS[kind(name)][1] not in SHOWN:
             continue
         others = [s for k, s in parts.items() if k != name] + [base_parts[k] for k in BASE]
         where = (lambda m: m.z > d.body_top + d.seam_gap + 0.05) if name == "hood" else (lambda m: True)
@@ -854,7 +895,7 @@ def face_findings(parts: dict[str, Part.Shape], d: Blueprint, scene: Scene) -> t
     findings that fail and do not show, and the known items of the hood that have no finding."""
     from tools import face_check  # noqa: PLC0415
 
-    allow = face_check.default_reveals()
+    allow = face_check.default_reveals() + face_check.band_reveals(parts)
     found = []
     for name, shape in parts.items():
         if PARTS[kind(name)][1] in ("inside", "hardware"):
@@ -916,6 +957,8 @@ def check(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Bl
     pl = places(d, h, b, v)
     scene = Scene({**parts, **{k: base_parts[k] for k in BASE}})
     sharp = sharp_edges_that_show(parts, base_parts, d, scene)
+    held = open_edges(v)
+    sharp, open_ = [e for e in sharp if e["part"] not in held], [e for e in sharp if e["part"] in held]
     shown, hidden, stale = face_findings(parts, d, scene)
     rm = room(parts, skin)
     boxes = print_boxes(parts)
@@ -930,7 +973,8 @@ def check(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Bl
     failures += [f"print: {k} does not fit the printer ({x['box']})" for k, x in boxes.items() if not x["fits"]]
     if area["share"] < 0.4:
         failures.append(f"grille: the open area is {area['share']:.0%} of the cone, less than 40%")
-    return {"variant": asdict(v), "sharp_edges_that_show": sharp,
+    return {"variant": asdict(v), "sharp_edges_that_show": sharp, "sharp_edges_open": open_,
+            "open": sorted(set(held[e["part"]] for e in open_)),
             "face_findings_that_show": [asdict(f) for f in shown], "face_findings_hidden": [asdict(f) for f in hidden],
             "room": rm, "print": boxes, "open_area": area, "enclosure": encl, "skin_checked": skin is not None, "failures": failures}
 
@@ -938,7 +982,8 @@ def check(parts: dict[str, Part.Shape], base_parts: dict[str, Part.Shape], d: Bl
 def check_md(rep: dict) -> str:
     v = rep["variant"]
     lines = [f"# Hood band {v['key']} ({v['name']}): checks", "", v["text"], "",
-             f"- Sharp convex edges of painted parts that show: {len(rep['sharp_edges_that_show'])}",
+             f"- Sharp convex edges that show, on the parts that show: {len(rep['sharp_edges_that_show'])}",
+             f"- Sharp convex edges that show and are an open item for the owner: {len(rep.get('sharp_edges_open', []))}",
              f"- Face-check findings that show: {len(rep['face_findings_that_show'])}",
              f"- Face-check findings on faces that do not show (in a joint or behind a part): {len(rep['face_findings_hidden'])}",
              f"- Open area of the grille in front of the cone: {rep['open_area']['open_mm2']} mm2 of {rep['open_area']['cone_mm2']} ({rep['open_area']['share']:.0%})",
@@ -949,6 +994,8 @@ def check_md(rep: dict) -> str:
     lines += [f"| {k} | {' x '.join(str(x) for x in r['box'])} | {'yes' if r['fits'] else 'NO'} |" for k, r in rep["print"].items()]
     lines += ["", "Result: PASS" if not rep["failures"] else "Result: FAIL", ""]
     lines += [f"- {f}" for f in rep["failures"]]
+    if rep.get("open"):
+        lines += ["", "Open items:", ""] + [f"- {o}" for o in rep["open"]]
     if rep["face_findings_hidden"]:
         lines += ["", "Findings on faces that do not show:", ""]
         lines += [f"- {f['part']} {f['rule']} at {tuple(f['at'])}: {f['detail']}" for f in rep["face_findings_hidden"]]
@@ -1002,6 +1049,8 @@ def export(folder: Path, parts: dict[str, Part.Shape], base_folder: Path, d: Blu
         MeshPart.meshFromShape(Shape=s, LinearDeflection=0.03, AngularDeflection=0.05).write(str(folder / f"{k}.stl"))
         s.exportBrep(str(folder / f"{k}.brep"))
         manifest[k] = {"file": f"{k}.stl", "finish": (finish or {}).get(kind(k), PARTS[kind(k)][0]), "brep": f"{k}.brep", "class": PARTS[kind(k)][1]}
+        if k in open_edges(v):   # for tools/edge_finish.py: the sharp edges of this part that show are an open item
+            manifest[k]["open"] = open_edges(v)[k]
     json.dump(manifest, open(folder / "manifest.json", "w"), indent=1)
     edges = json.load(open(base_folder / "edges.json"))
     edges.update({k: so.edge_polylines(s) for k, s in parts.items()})

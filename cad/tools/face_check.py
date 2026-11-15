@@ -37,8 +37,10 @@ import os
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
+import FreeCAD
 import Part
 
+V = FreeCAD.Vector
 MIN_WIDTH = 2.0
 NEEDLE_DEG = 12.0
 MAX_EDGES = 4
@@ -238,6 +240,26 @@ def is_break_surface(face: Part.Face, radius: float, tol: float = 0.02) -> bool:
     return True
 
 
+def behind_break(shape: Part.Shape, f: Part.Face, radius: float) -> bool:
+    """Whether a narrow face is the wall of a thin plate behind an edge break: it runs on, tangent, from a face of the
+    break (is_break) along one of its long edges. A plate of 2.4 with a break of R 1 on its front keeps a wall of 1.4
+    round each opening and at its rim."""
+    if width(f) < 0.5:
+        return False
+    half = sum(e.Length for e in f.Edges) / 2
+    for e in f.Edges:
+        if e.Degenerated or e.Length < 0.4 * half:
+            continue
+        m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        for g in shape.ancestorsOfType(e, Part.Face):
+            if g.isSame(f) or not is_break(g, radius):
+                continue
+            na, nb = (x.normalAt(*x.Surface.parameter(m)) for x in (f, g))
+            if math.degrees(math.acos(max(-1.0, min(1.0, abs(na.dot(nb)))))) < 1.0:   # tangent
+                return True
+    return False
+
+
 def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = (), break_radius: float = 0.0) -> list[Finding]:
     """The findings of the five rules on one solid. break_radius: a narrow face that is a round of that radius along an
     edge is listed as allowed ("edge break"); nothing else is."""
@@ -256,6 +278,8 @@ def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = (), break_rad
             add("sliver", f.CenterOfMass, f"{type(f.Surface).__name__} {w:.2f} wide, area {f.Area:.1f} mm2", [i + 1])
             if break_radius and is_break(f, break_radius):
                 found[-1].allowed = "edge break"
+            elif break_radius and behind_break(shape, f, break_radius):
+                found[-1].allowed = "the wall of a thin plate behind its edge break"
         for a, v in corners(f):
             if a < NEEDLE_DEG:
                 add("needle", v.Point, f"{type(f.Surface).__name__}: two edges meet at {a:.1f} deg", [i + 1])
@@ -329,16 +353,26 @@ def mark_known(found: list[Finding], known: tuple[Known, ...] = ()) -> list[Know
     return [k for k in known if k not in seen]
 
 
-def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -> tuple[list[Finding], list[Known]]:
+
+
+def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None, meta: dict | None = None) -> tuple[list[Finding], list[Known]]:
     """The face check of the parts of the shell: the findings, with the reveals, the edge breaks and the known items
-    marked as allowed; and the known items that have no finding."""
+    marked as allowed; and the known items that have no finding. `meta` is the manifest of the folder. Besides the
+    reveals and the known items:
+      - a finding on a print piece, or on a coupon cut from the real skin, that is not on the outside of the shell
+        (none of its faces is on the outside of the default build's form: edge_finish.face_on_skin) does not show: the steps of the cavity, a flange, a key, a
+        seam face, the cut face of a coupon
+      - the findings on a printed part inside the shell and on a test print are listed and do not fail (the face check
+        is for the look of the cabinet)
+      - a bought part and a place are not checked"""
     from candybar.shell.dims import Blueprint
-    allow = default_reveals()
+    from tools import edge_finish as ef
+    meta = meta or {}
+    allow = default_reveals() + band_reveals(shapes)
     found: list[Finding] = []
-    from candybar.shell import socket_plate as spm
     for name, shape in shapes.items():
-        # the bought parts in the folder of a work package are not printed: their faces are not ours to judge
-        if name in NOT_PARTS or name in spm.BOUGHT or (parts and name not in parts):
+        cls = ef.finish_class(name, meta.get(name))
+        if name in NOT_PARTS or cls in ("bought", "a place") or (parts and name not in parts):
             continue
         found += check(shape, name, allow, break_radius=Blueprint().edge_break)
     stale = mark_known(found)
@@ -347,8 +381,60 @@ def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -
     for f in found:
         if not f.allowed and f.rule not in INFO and f.part in cr.HALVES + cr.INSIDE + cr.PRINTED:
             f.allowed = cr.face_known(Blueprint(), f.part, f.rule, f.at, f.detail) and "known item: " + cr.face_known(Blueprint(), f.part, f.rule, f.at, f.detail)
+    for f in found:
+        if f.allowed or f.rule in INFO:
+            continue
+        entry = meta.get(f.part, {})
+        cls = ef.finish_class(f.part, entry)
+        if cls in ("inside, not painted", "a test print"):
+            f.allowed = f"listed: a finding on {'an inside part' if cls.startswith('inside') else 'a test print'}; not a fault of the look"
+            continue
+        if f.part in ef.WALLS or "to_cabinet" in entry:
+            back = V(*entry.get("to_cabinet", (0.0, 0.0, 0.0)))
+            if not any(ef.face_on_skin(x, back) for x in faces_of(shapes[f.part], f)):
+                f.allowed = "not on the outside of the shell: a face of the cavity, a flange, a seam or the cut face of a coupon"
+            elif "coupon" in entry and on_cut(V(*f.at) + back, entry["coupon"]):
+                f.allowed = "on the cut face of a coupon: a face of the test piece, not of the cabinet"
     # a known item of a part that is not in this set has nothing to be found in
     return found, [k for k in stale if k.part in shapes and (not parts or k.part in parts)]
+
+
+def faces_of(shape: Part.Shape, f: Finding) -> list[Part.Face]:
+    """The faces of a finding: those it names, or for a crowded vertex the faces that meet there."""
+    if f.faces:
+        return [shape.Faces[i - 1] for i in f.faces]
+    p, out = V(*f.at), []
+    for x in shape.Faces:   # the place of a finding is rounded to 0.1
+        bb = FreeCAD.BoundBox(x.BoundBox)
+        bb.enlarge(0.1)
+        if bb.isInside(p) and x.distToShape(Part.Vertex(p))[0] < 0.1:
+            out.append(x)
+    return out
+
+
+def on_cut(p, coupon: str, tol: float = 0.05) -> bool:
+    """Whether a point of the cabinet lies on a face of the box that cut a coupon from the real skin."""
+    from candybar.shell import coupons as cp
+    x0, x1, y0, y1, z0, z1 = cp.CUT_BOXES[coupon]
+    near = lambda v, a, b: a - tol <= v <= b + tol
+    on = lambda v, a, b: abs(v - a) < tol or abs(v - b) < tol
+    return near(p.x, x0, x1) and near(p.y, y0, y1) and near(p.z, z0, z1) and (on(p.x, x0, x1) or on(p.y, y0, y1) or on(p.z, z0, z1))
+
+
+def band_reveals(shapes: dict[str, Part.Shape]) -> list[Reveal]:
+    """The reveal of the marquee front of the hood band (hood_band.py): the lap of the two halves. The step of the
+    lap lies in the joint, 1.1 wide, 6 each side of the centre line."""
+    halves = {k: shapes[k] for k in ("marquee_front_right", "marquee_front_left") if k in shapes}
+    if not halves:
+        return []
+    bb = FreeCAD.BoundBox()
+    for s in halves.values():
+        bb.add(s.BoundBox)
+    out = []
+    if len(halves) == 2:
+        out.append(Reveal("lap of the two halves of the marquee front", tuple(halves), ("sliver",),
+                          (-6.0, bb.YMin - 0.5, bb.ZMin - 0.5, 6.0, bb.YMax + 0.5, bb.ZMax + 0.5)))
+    return out
 
 
 def run_dir(out: str, parts: list[str] | None = None) -> tuple[list[Finding], list[Known]]:
@@ -358,7 +444,7 @@ def run_dir(out: str, parts: list[str] | None = None) -> tuple[list[Finding], li
         s = Part.Shape()
         s.read(os.path.join(out, entry["brep"]))
         shapes[name] = s
-    return check_shell(shapes, parts)
+    return check_shell(shapes, parts, manifest)
 
 
 def default_reveals() -> list[Reveal]:

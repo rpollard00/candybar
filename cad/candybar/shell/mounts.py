@@ -57,6 +57,11 @@ ZONES = {"dock_r": (185.0, 255.0, 405.0, 470.0, 105.0, 195.0), "dock_l": (-255.0
 SEAM_CLEAR = 6.0
 FINISH = {"compute": "#d98030", "psu": "#3c8f8f", "hub": "#9a6fd0", "ties": "#c8b030", "boss": "#e8e6e0", "places": "#58a8e0", "charger": "#3c8f8f"}
 OWNER = "Mount_"
+# the names of the solids of the mounts, for the tools: the printed parts and the bosses are inside the shell and are
+# not painted; a place is a room that the checks keep clear, not a part
+INSIDE_PREFIXES = ("Tray", "Dock", "Boss", "PsuRail", "PsuStop", "HubRail", "HubSaddle", "Tie", "ChargerRib")
+PLACE_PREFIX = "Place"
+
 # the pairs that the fit rules report and that the design accepts: a tray has two posts through the air zone behind
 # the backplate, because the standoffs of the board are there
 DECLARED = (("Compute_UndersideAir", "Mount_TrayL"), ("Compute_UndersideAir", "Mount_TrayR"))

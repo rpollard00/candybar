@@ -315,6 +315,20 @@ The pieces whose longest flat edge on the bed is more than 200 mm:
 - **A long stray edge in some plain pieces.** The exploded sheet shows thin lines across the cabinet. The plain pieces of the split already have them: the box of the plain upper pieces, upper rear pieces and hood sides is as wide as the cabinet, and their mesh is not. The edges were not found one by one. This package did not remove them.
 - **The mesh of a shape in memory can have a triangle at the origin** (hood side). The build writes each STL file from the shape as its BREP file holds it, which does not have this fault.
 
+## The edge finish and the face check
+
+Date: 2026-11-15. `tools/edge_finish.py` and `tools/face_check.py` run on `cad/out/pieces`:
+
+```sh
+CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.edge_finish     # about 50 minutes
+CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.face_check      # about 40 minutes
+```
+
+- **The classes.** The pieces of the walls and of the hood are "printed". The floor tiles are "inside, not painted". The pieces "logo form" and "speaker form L/R" are the stand-ins of the hood band and are "provisional, not finished".
+- **What shows.** A face of a piece shows only when it is on the outside of the outer form of the default build (`edge_finish.face_on_skin`: its middle is on the form, and a point 0.5 off it, along its normal, is outside the form). The faces of the cavity, the flanges, the keys, the ribs and the seams do not show. On the outside, a face does not show when a part of the default build lies on it (the control panel, the bezel plate, the screen, the stand-ins of the hood band), with the fit of the skin's pockets (0.3); when it is a face of the stand-in of the marquee lip, which the skin of the hood carries; when the next piece lies on it; or when it lies in the V of a filled seam (`joints.vgroove_profile`).
+- **Edge finish: one finding on each lower piece.** At the lower rim of the bezel recess, x ±199 to ±235, z 133.7, one sharp edge of 66.5 degrees, 35.4 long, between the sill and a flat of 0.2 at the seam L1. The default build has the same rim: its tool hides it because the middle of the long rim lies under the stand-in of the bezel plate, and here the rim is cut at the seam. The stand-in plate stands 1.9 from it. To break the rim changes the outer form, so this unit did not change it. It is open (see the roadmap).
+- **Face check: 3184 findings on the outside faces, not changed.** They are in the faces of the skin, not in its form: 1134 on the underside (z 0, the face on the table), 212 at the seam on the body top, 62 along the line where the deck and the body meet (y 207), and 1776 at other places. The samples of these that were read are at the levels of the slabs of the cavity (z 65, 70, 72), at the cut-ins and at the bezel recess; not all 1776 were read. 2562 are splits (one surface cut into several faces), 248 crowded vertices, 224 slivers, 116 needles and 34 kinks. They do not change the printed form or the fit. The face check of the default build has none of them, because its parts are the outer form, not the skin.
+
 ## Assumptions
 
 1. The pilot hole of joint 1 is 2.25 (`Joint.pilot_d_pet`). The coupon decides between 2.25 and 2.4.

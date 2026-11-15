@@ -25,6 +25,30 @@ class CouponSetTest(unittest.TestCase):
         cls.shapes = {it.name: coupons.to_bed(it.make()) for it in cls.items}
         cls.rows = [coupons.check_item(it, cls.shapes[it.name], cls.lim) for it in cls.items]
 
+    def test_the_tools_of_the_shell_pass_on_the_coupons_that_test_the_form(self) -> None:
+        """tools/edge_finish.py and tools/face_check.py on the coupons of plate 6, as the manifest of the layout places
+        them (here at the origin of the plate): the cuts from the real skin are checked against the rest of the shell
+        and the box that cut them; the edge bars keep their control edge sharp; no other sharp edge shows."""
+        from tools import edge_finish as ef, face_check as fc
+
+        names = [it.name for it in self.items if it.coupon in coupons.PAINTED]
+        self.assertTrue(names)
+        meta = {}
+        for it in self.items:
+            if it.name in names:
+                meta[it.name] = {"coupon": it.name, "group": it.coupon, "offset": [0.0, 0.0, 0.0]}
+                if it.real:
+                    b = coupons.tight_box(it.make())
+                    meta[it.name]["to_cabinet"] = [b.XMin, b.YMin, b.ZMin]
+        shapes = {n: self.shapes[n] for n in names}
+        rows = ef.survey(shapes, Blueprint(), meta)
+        self.assertEqual(ef.failures(rows), [])
+        for c in coupons.CONTROL:
+            if c in rows:
+                self.assertIn(ef.CONTROL_EDGE, {g["against"] for g in rows[c]["sharp"]})
+        found, _ = fc.check_shell(shapes, meta=meta)
+        self.assertEqual(fc.failures(found), [])
+
     def test_every_stl_is_a_closed_mesh(self) -> None:
         for name, shape in self.shapes.items():
             with self.subTest(part=name):

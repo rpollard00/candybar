@@ -303,3 +303,16 @@ Date: 2026-11-14. The package was merged on the laptop after the rear door and t
 - **ABS**, the saddle and the inserts: see "The material".
 - **The adapter** has its measured size: see "The room at the DisplayPort socket".
 - Result: PASS, with the declared item. `tests/test_mounts.py` checks the interface: each part lies on the tray at each point, the screw passes through a hole in the part into a hole in the tray, and the part and the tray have no common volume.
+
+## The edge finish and the face check
+
+Date: 2026-11-15. `tools/edge_finish.py` and `tools/face_check.py` run on `cad/out/mounts/parts`:
+
+```sh
+CANDYBAR_OUT=cad/out/mounts/parts cad/candybar/freecad-run.sh tools.edge_finish
+CANDYBAR_OUT=cad/out/mounts/parts cad/candybar/freecad-run.sh tools.face_check
+```
+
+- **The classes.** Each solid is in a class by its name (`mounts.INSIDE_PREFIXES`, `mounts.PLACE_PREFIX`): the trays, the docks, the bosses, the rails, the stops, the saddle, the tie points and the charger rib are "inside, not painted". The places of the small items are "a place" and are not checked: they are volumes of room, not parts.
+- **Edge finish.** The rule is for the faces that show on the outside, so it does not fail on an inside part. The tool lists the sharp edges of each part: they are the edges of printed brackets, and none is a print or an assembly problem.
+- **Face check.** Six findings, listed and not failed: one sliver 1.10 wide on each boss (x ±231.4, y 442.8, z 131.1) and two on each rear bundle tie point (z 74.0). Each is the face of a root that stands 0.4 to 0.5 inside the wall, and it goes into the wall when the part is bonded. It is not a print or an assembly problem. No part changed.

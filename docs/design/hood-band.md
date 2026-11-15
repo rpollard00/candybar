@@ -147,7 +147,7 @@ The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With 
 
 `hood_band.check` does these checks on each variant and writes `check.md` and `report.json` into the folder of the variant.
 
-- **Edge rule.** The painted parts are the hood, the lip, the pods and the logo field. A convex edge that turns more than 45.5 degrees and has no round fails when it shows. An edge does not show when it lies in a joint, or when five rays from it toward the player all meet a part.
+- **Edge rule.** The rule holds on each part that shows (`hood_band.SHOWN`): the painted parts (the hood, the lip, the pods and the logo field), the black grilles, the translucent marquee front and the badge. A convex edge that turns more than 45.5 degrees and has no round fails when it shows. An edge does not show when it lies in a joint, or when five rays from it toward the player all meet a part. The sharp edges of a part in `hood_band.open_edges` are an open item for the owner: they are listed and do not fail.
 - **Face check.** `tools/face_check.py` on each part that shows, with the reveals and the known items of the shell. A finding fails when it shows.
 - **Room.** No inside part and no hardware envelope shares volume with another one or with the skin of the hood.
 - **Open area.** The holes or slots of the grille, inside the circle of the cone, are 40% of that circle or more.
@@ -155,7 +155,8 @@ The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With 
 
 | Check | A | B | C |
 | --- | --- | --- | --- |
-| Sharp edges of painted parts that show | 0 | 0 | 0 |
+| Sharp edges that show, on the parts that show | 0 | 0 | 0 |
+| Sharp edges that are an open item for the owner | the hole grille | 0 | the rear rims of the slots |
 | Face-check findings that show | 0 | 0 | 0 |
 | Face-check findings that do not show | 4 | 4 | 4 |
 | Inside parts or hardware that share volume | 0 | 0 | 0 |
@@ -165,7 +166,7 @@ The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With 
 
 The four findings that do not show are the same in each variant: the two steps of the lap between the halves of the marquee front, 1.1 wide. They lie inside the joint.
 
-`tools/edge_finish.py` and `tools/face_check.py` were not run as programs on the folders of the variants. `edge_finish.py` has a fixed list of part names, and a part that is not in the list fails. The module calls the functions of the two tools on its own parts.
+`tools/edge_finish.py` and `tools/face_check.py` run as programs on the folder of each variant (section 14).
 
 The fit study (`candybar.shell.fit`) was not run with these parts. The tests compare the band with its values: the driver frame against the largest frame of the fit study, and the mouth of the light box against the marquee room of the fit study (they are the same box).
 
@@ -240,7 +241,7 @@ What the studies do not have:
 1. The driver is the Tectonic TEBM35C10-4 with a frame of 51.8 (the research). Its depth of 28 and the sizes of its basket and magnet are not verified.
 2. The enclosure is sealed by a gasket on the baffle. The wires go through a sealed hole. Neither is modelled.
 3. An open area of 40% of the cone is sufficient for a small full-range driver.
-4. The grilles, the badge, the light box and the seats are black ABS as printed (the owner may print every part in ABS), and they are not painted. The edge rule is for painted parts.
+4. The grilles, the badge, the light box and the seats are black ABS as printed (the owner may print every part in ABS), and they are not painted. The edge rule holds on each of them that shows (section 14).
 5. The marquee light is one LED strip, 10 wide. The diffuser distance of 26.6 gives even light for a strip of 60 LEDs for each metre or more.
 6. The pods, the logo field and the lip are bonded to the hood, filled and painted with it.
 7. The hood form in the build folders is the solid outer form with the openings as pockets 8 deep, as the default build writes its parts. The sections use the printed skin from the cache of the split.
@@ -255,6 +256,8 @@ What the studies do not have:
 5. The lip is 4.5 proud, 0.5 less than the stand-in. Accept?
 6. Two black screw heads show on each grille. Accept, or a snap fit?
 7. Variant B: accept a support in the speaker opening of the hood side?
+8. The hole grille of band A: its webs (1.4) are too narrow for the edge break of R 1. Larger holes at a larger pitch (6 at 9 keeps 40 % open), slots, or sharp hole rims on a black part?
+9. The upright slots of band C: their rear rims show through the slots. A grille of 3.4 with a break on both faces, or sharp rear rims on a black part?
 
 ## 11. Not done
 
@@ -292,3 +295,23 @@ Date: 2026-11-14. The package was merged on the laptop (OpenCascade 7.9.3) after
 - **The printer.** The print check reads the limit of the Q2 from `cad/params/printer.csv`.
 - **Result.** Variants A, B and C: PASS. The study H20 has 10 findings and H46 has 12 (they do not fail the run). In both, the top edge of the larger marquee opening is sharp on the centre line (211 and 315 long), and the face check finds narrow faces at the corners of the opening and at the rear of the cap. The known items of the face check are those of the present hood, so two of them have no finding in a taller hood. These are open items of the studies, to solve if the owner chooses a taller hood.
 - `tests/test_hood_band.py`: 28 tests pass.
+
+## 14. The edge rule on every part that shows
+
+Date: 2026-11-15. The edge rule of the roadmap holds on each face that shows on the outside, painted or not. The first build held it on the painted parts only (assumption 4 of the first build). The parts that changed:
+
+- **Grille, slots (B and C).** Each edge of the front face has the break of R 1: the rim of the plate and the mouth of each slot. The mouth of a screw hole lies under the head of its screw, and the bar between two slots (5.6) leaves no room for a break round a hole of 3.4.
+- **Screw heads.** The two screws of each grille are now in the build as bought parts (`grille_screw_inner_*`, `grille_screw_outer_*`): an M3 button head of 5.7 x 1.65 (ISO 7380, ESTIMATED: the screw is not bought). They cover the mouths of the screw holes.
+- **Marquee front.** Each edge of its front face has the break, before the split into the two halves, so that the halves agree at the lap. The rim behind the break is 1.2 (the front is 2.2 thick, for the groove of the lip).
+- **Badge.** Each edge of its front face has the break.
+- **Grille, holes (A).** No change. The webs are 1.4 on the front, and two breaks need 2. It is an open item (question 8).
+- **Grille, upright slots (C).** The front has the break. The rear rims show through the slots, because the frame leaves the room behind the grille open. It is an open item (question 9).
+
+`tools/face_check.py` now allows a narrow face that runs on, tangent, from a face of the edge break: the wall of a thin plate behind its break (1.4 in a grille of 2.4, 1.2 in the marquee front and the badge). It is listed as allowed with that reason.
+
+| Tool | A | B | C |
+| --- | --- | --- | --- |
+| `hood_band` checks | PASS, 1 open item | PASS | PASS, 1 open item |
+| `tools/edge_finish.py` | holds, 1 open item | holds | holds, 1 open item |
+| `tools/face_check.py` | PASS | PASS | PASS |
+

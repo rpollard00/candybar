@@ -15,6 +15,7 @@ import Part
 
 from candybar.shell import fit, hood_band as hb, profiles as pr, split
 from candybar.shell.dims import Blueprint
+from tools import face_check as fc
 
 OUT = Path(__file__).resolve().parents[1] / "out" / "hood-band"
 V = App.Vector
@@ -210,6 +211,43 @@ class VariantsTest(unittest.TestCase):
         for key in hb.VARIANTS:
             with self.subTest(variant=key):
                 self.assertEqual(checked(key)["failures"], [])
+
+    def test_the_parts_that_show_have_the_edge_break_and_the_hole_grille_is_an_open_item(self) -> None:
+        """The edge rule holds on each part that shows (hood_band.SHOWN), the black grille and the translucent marquee
+        front among them: their front edges have the break. The field of holes (variant A) has webs too narrow for the
+        break, and the rear rims of the upright slots (variant C) show through the slots: these are open items for the
+        owner (hood_band.open_edges), and only the grille holds them."""
+        for key, v in hb.VARIANTS.items():
+            rep = checked(key)
+            with self.subTest(variant=key):
+                self.assertEqual(rep["sharp_edges_that_show"], [])
+                held = {e["part"] for e in rep["sharp_edges_open"]}
+                self.assertEqual(held, set(hb.open_edges(v)))
+                self.assertEqual(held, {"grille_right", "grille_left"} if v.grille in ("holes", "upright slots") else set())
+                self.assertEqual(len(rep["open"]), 1 if held else 0)
+                for name in ("grille_right", "marquee_front_right"):
+                    breaks = [f for f in built(key)[name].Faces if fc.is_break(f, Blueprint().edge_break)]
+                    self.assertEqual(bool(breaks), not (name.startswith("grille") and v.grille == "holes"), (key, name))
+                    self.assertTrue(built(key)[name].isValid(), (key, name))
+
+    def test_the_tools_of_the_shell_pass_on_each_variant(self) -> None:
+        """tools/edge_finish.py and tools/face_check.py as they run on cad/out/hood-band/<variant>: the parts of the
+        band and the base parts of the shell, each in a class; no sharp edge of a part that shows is left, but for the
+        open item of the hole grille (hood_band.open_edges); the face check
+        has no failure; each named joint of the painted parts of the band holds a sharp edge in one variant or more."""
+        from tools import edge_finish as ef, face_check as fc
+
+        used = set()
+        for key in hb.VARIANTS:
+            parts = {**built(key), **{k: base()[k] for k in hb.BASE}}
+            rows = ef.survey(parts, Blueprint(), {k: {"open": o} for k, o in hb.open_edges(hb.VARIANTS[key]).items()})
+            with self.subTest(variant=key):
+                self.assertEqual(ef.failures(rows), [])
+                found, _ = fc.check_shell(parts)
+                self.assertEqual(fc.failures(found), [])
+            used |= {(n, g["against"]) for n, r in rows.items() if n in ef.BAND_SHOWN for g in r["sharp"] if g["against"]}
+        named = {j for j in ef.JOINTS if j[0] in ef.BAND_SHOWN and j[1] not in ("deck", "body", "bezel", "screen", "control_panel", ef.SEAM_NAME)}
+        self.assertEqual(used & named, named)
 
     def test_each_part_is_one_valid_solid_and_the_left_is_the_mirror_of_the_right(self) -> None:
         for key in hb.VARIANTS:
