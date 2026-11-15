@@ -315,6 +315,34 @@ The pieces whose longest flat edge on the bed is more than 200 mm:
 - **A long stray edge in some plain pieces.** The exploded sheet shows thin lines across the cabinet. The plain pieces of the split already have them: the box of the plain upper pieces, upper rear pieces and hood sides is as wide as the cabinet, and their mesh is not. The edges were not found one by one. This package did not remove them.
 - **The mesh of a shape in memory can have a triangle at the origin** (hood side). The build writes each STL file from the shape as its BREP file holds it, which does not have this fault.
 
+## The second pass on the joints: the seams
+
+Date: 2026-11-15. The owner asked that every seam of the 32 pieces closes and stays closed, during the solvent weld and in use. The values below are for one side of the cabinet (the left is the mirror). They come from `cad/out/pieces/seams.json` of the present build.
+
+**The values used.** A solvent weld of ABS holds 5 MPa on its mating area (ESTIMATED and low on purpose: lap tests of welded ABS give 10 to 20 MPa; the weld pairs of plate 5 of the coupons measure it). The largest loads in use (ESTIMATED): a person leans on the deck nose with 500 N; a push of 300 N on the side of the hood; the cabinet is lifted by the rear hand-holds, 25 kg with a shock of 2 g, so 250 N at each hand-hold. No seam carries more than the whole of one of these loads.
+
+| Seam | Pieces | Mating area, cm2 | Weld holds, kN | Screws | Key | What closes it during the weld | In use |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | deck nose, deck side | 5.9 | 3.0 | 0 | yes | A bar clamp across the deck, with pads on the two outer side faces at the height of the deck (z 30 to 40): it pushes both deck sides onto the nose and closes F1 and F2 on both sides at once. The key of F1 sets the place across the wall. | The weld: 3.0 + 3.8 kN against 250 N of the lean at each end of the nose (factor 27) |
+| F2 | deck nose, deck side | 7.5 | 3.8 | 0 | no | The same clamp as F1 (the same plane, the same two pieces) | As F1 |
+| D1 | deck side, lower | 0.5 and 2.2 | 0.2 and 1.1 | 0 | no | The two screws of D2, between the same two pieces, on the same plane (y 207) | Not needed: D2 (7.1 kN, 2 screws) carries the joint |
+| D2 | deck side, lower | 14.2 | 7.1 | 2 | yes | Its screws | The weld and the screws |
+| P1 | apron, lower | 21.6 | 10.8 | 2 | yes | Its screws | The weld and the screws |
+| S1, lower to middle | lower, middle | 3.2 | 1.6 | 0 | no | The screw of L1 between the same middle piece and the lower piece, and the screws of S1 below | Not needed alone: L1 and S1 join the same pieces (10.3 and 8.1 kN) |
+| S1, lower to rear lower | lower, rear lower | 5.4, 1.9, 10.8 | 2.7, 0.9, 5.4 | 2 | yes | Its screws | The weld and the screws |
+| L1 | lower or rear lower, middle | 20.7 and 23.9 | 10.3 and 11.9 | 1 and 2 | yes | Its screws, and the weight of the middle piece on a level seam; tape over the outside at the front | The weld and the screws |
+| B1 | middle, upper | 34.1 | 17.1 | 1 | yes | One screw at the rear; the upper piece lies on the middle piece (a level seam) and the key holds it across. Tape over the outside along the 264 mm of the run | The weld (17.1 kN) |
+| W1 | brow, upper | 8.9 | 4.5 | 1 | no | Its screw | The weld and the screw |
+| R2 | rear lower R, rear lower L | 6.3 | 3.1 | 1 | yes | Its screw, and the feet of both halves screwed to the floor | The weld and the screw |
+| R3 | upper, upper rear | 21.8 | 10.9 | 1 | yes | Its screw; tape at the far end | The weld and the screw |
+| R5 | upper rear R, upper rear L | 23.2 | 11.6 | 2 | yes | Its screws | The weld and the screws |
+| H1 | hood side, hood centre | 52.1 | 26.1 | 5 | yes | Its screws | The weld and the screws |
+| R1 | middle, upper rear | 0 | 0 | 0 | no | A stub of flange only: the frame of the door opening joins these two pieces (the rear package) | The frame of the door opening |
+
+**F1 and F2: why no screw.** Every station has 0 to 8 mm behind the head for the screwdriver: the deck border is 72 high and turns at the flank break, so the shaft hits the wall of the nose or of the deck side at once. A screw from the outside would leave a head on a face that shows. A screw through the inner wall from the pocket finds only 4 of wall, and a boss for it stands in the pocket of the control panel, which another agent is changing. The weld alone carries a factor of 27 over the largest load. What the seam needs is a hand that holds it closed while the weld sets: the bar clamp across the deck does this for all four faces at once.
+
+**What would add a fastener, if the owner wants one.** A foot screw of the nose near each end: the station at x 99.7 is left out today because it is 12 or less from the edge of its tile. Moving the tile seam or the rule of 12 there puts a screw 37 from F1 into the floor, and the floor then holds the bottom of the corner. This changes the floor tiles, so it is not done here.
+
 ## The edge finish and the face check
 
 Date: 2026-11-15. `tools/edge_finish.py` and `tools/face_check.py` run on `cad/out/pieces`:
