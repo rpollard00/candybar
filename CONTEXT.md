@@ -160,6 +160,22 @@ _Avoid_: tilt (that word is for the hood face)
 **Sight line**:
 The line from the player's eye to the center of the screen. The sight angle is how far this line points below horizontal.
 
+**Cradle**:
+What holds the monitor behind the bezel plate: two uprights between the ledges of the opening, and four jaws that slide on them and hold the top and the bottom edge of the monitor.
+_Avoid_: carrier (the word of the earlier study), mount (alone)
+
+**Jaw**:
+A printed slider on an upright of the cradle. It has a wall beside the edge of the monitor and a rest behind it, and a lock screw holds it.
+
+**Lug**:
+A solid added to the inside of the body at the opening of the bezel plate. The uprights of the cradle screw to it, and the pins and the magnets of the bezel plate go into it.
+
+**Cable channel**:
+A printed channel on the inner face of a side, beside an edge of the monitor, that holds the leads of the monitor and their slack.
+
+**Push rod**:
+The option that reaches the monitor's power button through the right bar of the bezel plate: a rod in the plate and a striker behind it.
+
 ### The print pieces and the mounts
 
 **Print piece**:
