@@ -27,7 +27,23 @@ The removable plate that carries the lever and the buttons. It sits in an openin
 _Avoid_: control plate, panel (alone), deck top
 
 **Tile**:
-One printed piece of a control panel. A panel is wider than the printer bed, so it is a lever tile and a button tile.
+One printed piece of a control panel. A panel is wider than the printer bed, so the arcade panel is a lever tile and a button tile, with a bonded seam between them.
+
+**Panel frame**:
+The printed ring below the ledge of the deck's opening. It has the latch points, the locating cones and the cable anchor, and it stays in the cabinet.
+_Avoid_: carrier, subframe
+
+**Ledge**:
+The strip of deck skin round the opening below a control panel. The control panel rests on it.
+
+**Latch point**:
+One of the four places where a control panel is held down on the panel frame, by a screw or by a magnet.
+
+**Seat** (of a control panel):
+The recess in the panel pocket that the plate of the control panel fills.
+
+**Blank panel**:
+A control panel with no hardware, made from the shared interface only.
 
 **Shelf**:
 The flat strip of deck between the control panel and the foot of the screen face.
