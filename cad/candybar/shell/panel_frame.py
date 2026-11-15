@@ -82,7 +82,9 @@ class Interface:
     screw_head_d: float = 9.0
     insert_hole_d: float = OTHER_JOINTS.insert_hole_d
     insert_l: float = OTHER_JOINTS.insert_l
-    insert_hole_depth: float = 12.5
+    # the hole under each latch insert: deeper than the insert hole of the joints (joints.OTHER_JOINTS), because the
+    # M4 x 16 latch screw goes through the plate of panel_t and 11 into the pad, past the end of the insert
+    latch_hole_depth: float = 12.5
     # the magnets: a disc of magnet_d x magnet_h in the pad, a disc of magnet_d x keeper_h in the plate
     magnet_d: float = 12.0
     magnet_h: float = 5.0
@@ -282,7 +284,7 @@ def frame(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
     cuts = []
     for x, y in latch_points(d, i):
         if i.latch == SCREW:
-            cuts.append(cyl(i.insert_hole_d, x, y, top - i.insert_hole_depth, top + 1))
+            cuts.append(cyl(i.insert_hole_d, x, y, top - i.latch_hole_depth, top + 1))
         else:
             cuts.append(cyl(i.magnet_d + i.magnet_clear, x, y, top - i.magnet_h - i.magnet_clear, top + 1))
     solid = solid.cut(cuts)

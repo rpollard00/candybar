@@ -211,7 +211,7 @@ class FrameTest(unittest.TestCase):
         i = self.b.i
         frame = Part.makeCompound(list(self.b.frame.values()))
         self.assertTrue(near(support.hole_centres(frame, i.insert_hole_d), pf.latch_points(self.b.d, i)))
-        self.assertGreaterEqual(i.insert_hole_depth, i.latch_screw_l - self.b.d.panel_t + 1.0)
+        self.assertGreaterEqual(i.latch_hole_depth, i.latch_screw_l - self.b.d.panel_t + 1.0)
 
 
 class ChecksTest(unittest.TestCase):
