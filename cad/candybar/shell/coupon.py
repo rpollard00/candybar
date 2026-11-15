@@ -427,47 +427,23 @@ def readme(j: Joint, checks: dict, parts: dict) -> str:
         "",
         "## What to print",
         "",
-        "### PETG (the plan)",
-        "",
-        "| Step | Print | Count | Use |",
-        "| --- | --- | --- | --- |",
-        "| 1 | `coupon-lower-c01` + `coupon-upper-c01`, `-c02` + `-c02`, `-c03` + `-c03` | 3 pairs | Fit test. Choose the clearance. Then the repeated-drive test on one pair. |",
-        "| 2 | lower + upper halves of the chosen clearance | 4 pairs | Coupons A, B, C and D of the matrix (section 4.2): one bond each. Write the letter on the inside. |",
-        "| 3 | `plaque-P1` to `plaque-P4` | 4 plaques | Primer tests P1 to P4 (section 4.2). |",
-        "",
-        "### ABS (an option)",
-        "",
-        "The ABS note (`docs/research/abs-switch.md`, summary and sections 7 and 10) allows these conditions only:",
-        "",
-        "- Print ABS on the A1 only as small parts, \"small-sized models with low infill densities\" (Bambu A1 FAQ). A 120 mm coupon is small.",
-        "- Use the open frame, in a ventilated place, with no tent. Bambu does not recommend an enclosure for the A1.",
-        "- Bambu says that ABS needs glue on the plate. The textured PEI plate needs no glue for ABS at a bed temperature of 90 to 100 C. Do not put acetone \"ABS juice\" on PEI.",
-        "- The ABS set of the note: two coupons welded with acetone and two with slurry (one ABS and one ASA each), and two plaques. "
-        "Put one coupon through the hobby-lacquer test over primer near a heat-set insert (stress cracking); the coupon has no boss for an insert, so put the insert into the flange. Use the tests and the pass rules of the PETG note.",
-        "- Do not print ABS in a living area. Bambu says to avoid living areas and bedrooms.",
-        "",
-        "| Print | Count |",
-        "| --- | --- |",
-        "| Pairs at the chosen clearance (ABS, and ASA if you test it) | 2 ABS pairs, 2 ASA pairs |",
-        "| `plaque-P1` and `plaque-P2` (or the two primers you test) | 2 |",
-        "",
-        "The PETG clearance can be different in ABS. If you continue with ABS, print the three fit pairs in ABS too.",
+        "The owner prints the cabinet in ABS on a Qidi Q2 (decision record 0008). These pairs and plaques are in the coupon set for ABS "
+        "(`docs/design/coupons.md`, built into `cad/out/coupons` by `candybar.shell.coupons`): plate 4 has the three fit pairs, and "
+        "plates 5, 8 and 9 the pairs and the plaques of the weld and of the finish. Print them from there, in that order.",
         "",
         "**Shrink of ABS.** Do not change the model. Set the shrink compensation in the filament profile of the slicer "
-        "(OrcaSlicer: Filament, Shrinkage XY and Z). Measure the value on a calibration print in the same filament. "
-        "As a guide, one study (ABS note, section 3.3) measured a shrink of 0.59 % in X and 0.69 % in Y, and a growth of 0.92 % in Z, for printed ABS. "
-        "If your slicer has no shrink setting, scale the object in the slicer by the measured value.",
+        "(OrcaSlicer: Filament, Shrinkage XY and Z). Measure the value on plate 1 of the coupon set. "
+        "As a guide, one study (`docs/research/abs-on-the-q2.md`) measured a shrink of 0.59 % in X and 0.69 % in Y, and a growth of 0.92 % in Z, for printed ABS.",
         "",
         "## Screws",
         "",
         f"Thread-forming screws for plastics, {j.screw_d:g} x {j.screw_l:g}, pan head, with the 30 degree thread of the PT type. Example: "
         "EJOT PT K 30x16 (WN 5411), or an equivalent \"screw for plastics\" of the same size. Do not use a sheet metal screw.",
         "",
-        "- Two screws for each pair. The plan above needs 7 PETG pairs (14 screws), plus the screws of the repeated-drive test, "
-        "plus 8 for the ABS option. Buy 50.",
+        "- Two screws for each pair, plus the screws of the repeated-drive test. Buy 50.",
         f"- Each lower half has two pilot holes. The hole at -30 is {j.pilot_d_pet:g} (the value for PET in the EJOT PT table, 0.75 d). "
         f"A sunk bar on the inside face, under the hole, marks it. The hole at +30 is {j.pilot_d_abs:g} (the value for ABS, 0.8 d). "
-        "PETG is not in the table. The repeated-drive test chooses the value for the cabinet.",
+        "The cabinet is ABS, so 2.4 is the first candidate. The repeated-drive test chooses the value for the cabinet.",
         f"- A printed vertical hole comes out a little smaller than the model. Before the test, measure each pilot with the shank of a drill "
         f"(for example {j.pilot_d_pet - 0.15:.1f}, {j.pilot_d_pet - 0.05:.1f}, {j.pilot_d_abs - 0.1:.1f} and {j.pilot_d_abs:.1f}) and write down the largest shank that goes in.",
         f"- The driver: the screw head sits in a pocket {j.head_pocket_d:g} wide in the gusset of the upper half, "
@@ -489,10 +465,10 @@ def readme(j: Joint, checks: dict, parts: dict) -> str:
         "3. Choose the smallest clearance that goes together by hand with no force and has no play that you can feel.",
         "",
         "**Repeated-drive test (the cabinet needs this, the research note does not have it).** The cabinet is screwed together dry first, "
-        "then opened and screwed again for the bond. Each pilot hole thus gets the same screw two or more times.",
+        "then opened and screwed again for the weld. Each pilot hole thus gets the same screw two or more times.",
         "",
-        f"The test compares the two pilot holes: {j.pilot_d_pet:g} (under the bar, at -30) and {j.pilot_d_abs:g} (at +30). Do it in PETG. "
-        "If the owner prints the ABS set, do it in ABS too.",
+        f"The test compares the two pilot holes: {j.pilot_d_pet:g} (under the bar, at -30) and {j.pilot_d_abs:g} (at +30). Do it in ABS, "
+        "the material of the cabinet.",
         "",
         "1. Use one pair of the fit set. Drive a screw into a pilot hole until the flanges touch, then 1/4 turn more.",
         "2. Remove the screw. Drive it into the same hole again.",

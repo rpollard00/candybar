@@ -72,6 +72,10 @@ cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit      # docs/blueprint
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
 # the detail pass: the open small questions of the form
 cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options
+# the coupon set for ABS on the Qidi Q2: 37 parts on nine plates, the owner's next print (1 minute; docs/design/coupons.md)
+CANDYBAR_OUT=cad/out/coupons cad/candybar/freecad-run.sh candybar.shell.coupons                      # stl/, brep/, coupons.json
+CANDYBAR_OUT=cad/out/coupons cad/candybar/freecad-run.sh --gui candybar.shell.coupons_doc            # shell.FCStd, the plates
+cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupons --set                            # coupons.png, plates.png
 # the joint coupon: printable parts, checks and README.md in cad/out/coupon; then its drawing and renders
 CANDYBAR_OUT=cad/out/coupon cad/candybar/freecad-run.sh candybar.shell.coupon
 cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupon
