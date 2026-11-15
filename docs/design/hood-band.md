@@ -282,7 +282,7 @@ The sheets are in `cad/out/hood-band/sheets/`: `01-cabinet.png`, `02-band.png`, 
 
 `HOOD_BAND_TALL=` (empty) builds no study of a taller hood. `HOOD_BAND_TALL=H20` builds one.
 
-### The default build on the server pal9000
+### The default build on the server
 
 On this machine `candybar.shell.solids` stops in the edge break of the hood: `the edge break of the hood: tool 1 still holds 0.013 mm3 of 0.013`. The one boolean of `solids.cut_near` with all 30 tools leaves 14 of them uncut. The second try then fails on the tool at the kink of the opening. The result is the same on one core and on 64. `hood_band.cap` calls `solids.cap` first. If that fails, it cuts the same tools one at a time. The cap then has 77 faces, as the roadmap records, and no sharp edge is left. The caps of the two taller hoods do not have this fault: `solids.cap` makes them on this machine.
 

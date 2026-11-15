@@ -238,7 +238,10 @@ The front of the plate is the form of `solids.bezel`: the land on its cylinder, 
 
 ## The mount of the bezel plate
 
-### Proposal: magnets and pins
+### The decision: magnets and pins
+
+The owner decided this way on 2026-11-15 ("Bezel plate should definitely be magnets"). Pins put the plate in its place, magnets hold it, and no screw is used.
+
 
 - **Rest.** The back of the plate lies on the two ledges and on the four lugs.
 - **Location.** Four dowel pins of 4 x 12 are pressed into the lugs at `x` 50 and `v` 143 on each side, at the top and at the bottom. Each pin goes 6 into a slot in the back of the plate. A slot is 4.3 wide and lets its pin move 2 each way. The long axis of each slot points at the centre of the image.
@@ -249,9 +252,9 @@ The radial slots keep the centre of the plate on the centre of the image when th
 
 The fastening has no part on the face of the plate.
 
-### The other way: screws
+### The other way: screws (not chosen)
 
-Two screws through the top of the inner frame into the top lugs hold the plate without magnets. They are positive, and they need no pull on the rim. But their heads are on the face of the plate. The owner asked for a plate with no mark on its face, so this way is not built.
+Two screws through the top of the inner frame into the top lugs hold the plate without magnets. They are positive, and they need no pull on the rim. But their heads are on the face of the plate. The owner asked for a plate with no mark on its face and chose the magnets, so this way is not built. The code has no screw option for the plate.
 
 Screws that are hidden need access from the front, and the only faces in front of the lugs are the faces of the plate. A hole of 3.5 for the key on the seam beside the plate is a third way. It makes a notch in the edge of the plate and in the rail land.
 

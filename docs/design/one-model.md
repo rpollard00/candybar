@@ -130,7 +130,7 @@ Date: 2026-11-14. The steps are done, and each is one commit on the branch `t3/p
 
 ### The proof
 
-The proof ran on the server pal9000 (FreeCAD 1.1.4). On this machine the code of commit 3633457 does not give the results that the roadmap records. These faults are older than this work, and this work does not touch their code:
+The proof ran on the server (FreeCAD 1.1.4). On this machine the code of commit 3633457 does not give the results that the roadmap records. These faults are older than this work, and this work does not touch their code:
 
 - `candybar.shell.solids` stops at the edge break of the hood: `tool 1 still holds 0.013 mm3 of 0.013`. The same error comes in each run, also on one processor core.
 - The body has 47166388.0 mm3 here. The reference build (`~/.local/share/candybar/out/shell-rev7`) has 47165352.4 mm3. The face count is the same (191).

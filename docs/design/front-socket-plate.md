@@ -248,7 +248,7 @@ The proud seat has no recess, and then no face that shows needs a support.
 | Face check, plate | 0 findings that fail. With the knob: 90 faces, 69 narrow faces allowed by name. Without the knob: 87 and 68. |
 | Face check, deck at the seat | 0 findings that fail. 4 allowed: the rounds of the edge break on the rim. |
 | Solids | Each plate is one valid solid. The deck with the seat is one valid solid. |
-| Tests | `cad/test.sh test_socket_plate`: 28 tests. 27 pass on pal9000. The fit test cannot start there, because the default build of the shell stops at the edge break of the hood. |
+| Tests | `cad/test.sh test_socket_plate`: 28 tests. 27 pass on the server. The fit test cannot start there, because the default build of the shell stops at the edge break of the hood. |
 
 The tools `edge_finish.py` and `face_check.py` work on the parts of the shell by name. They do not know the part `socket_plate`. Thus the module makes the two checks with the functions of these tools (`socket_plate.edge_finish()` and `socket_plate.face_rows()`):
 

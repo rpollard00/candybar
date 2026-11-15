@@ -377,7 +377,7 @@ def right_and_left(name: str, right: Part.Shape) -> dict[str, Part.Shape]:
 
 def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shape]:
     """The cap of the hood with its edge break, in the hood's frame, and its opening as a prism: solids.cap. (The
-    server pal9000, OpenCascade 7.8.1, needed a fall-back here that cut the tools of the edge break one at a time;
+    server, OpenCascade 7.8.1, needed a fall-back here that cut the tools of the edge break one at a time;
     with OpenCascade 7.9.3 solids.cap makes the cap of the present hood and of the two taller hoods.)"""
     return so.cap(d, h, log)
 
