@@ -34,6 +34,7 @@ from collections import defaultdict
 import FreeCAD
 import Part
 
+from candybar.shell import panel_frame as pf
 from candybar.shell import solids as so
 from candybar.shell.dims import Blueprint
 from tools import face_check
@@ -44,7 +45,8 @@ NEAR = 0.05
 SEAM = 0.2
 SEAM_NAME = "the seam between the body and the hood"
 
-PRINTED = ("deck", "body", "hood")
+# the printed parts of the shell, and of the work packages by the module that makes them
+PRINTED = ("deck", "body", "hood") + pf.PARTS
 CUT_PLATES = {"control_panel": "The top of a control panel is a cut plate (roadmap, settled by the owner)."}
 PROVISIONAL = {
     "marquee_lip": "A stand-in for the lower frame of the marquee window. The marquee is not designed yet.",
@@ -65,7 +67,19 @@ JOINTS = {
     ("body", "bezel"): "The recess and the reveal of the bezel plate, under and beside the plate.",
     ("body", "screen"): "The window of the form behind the bezel plate, where the monitor lies. The screen of the build is a "
                         "plate of 1 mm for the renders.",
+    # the control panel (docs/design/control-panel.md): its covers (panel_frame.covers) and the bonded seam of its tiles
+    **{(part, cover): pf.JOINTS[cover] for part in pf.PARTS for cover in pf.joints_of(part)},
 }
+
+
+def covers_of(name: str, parts: dict[str, Part.Shape], d: Blueprint) -> tuple[dict[str, Part.Shape], tuple[str, ...]]:
+    """What the faces of a part lie against, and the covers that can hide an edge of the top face of a control
+    panel (all when the tuple is empty). A part of the shell lies against the other parts of the build. A part of
+    the control panel lies against the covers of panel_frame (its seat, its holes, the room below it) and the other
+    tile of its panel; on its top face only a hole or that tile hides an edge (panel_frame.ON_TOP)."""
+    if name in pf.PARTS:
+        return {**{"the other tile": parts[k] for k in pf.twins(name, parts)}, **pf.covers(d, pf.Interface())}, pf.ON_TOP
+    return {k: s for k, s in parts.items() if k != name}, ()
 
 
 def finish_class(part: str) -> str:
@@ -138,7 +152,7 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     for name, shape in parts.items():
         if name in face_check.NOT_PARTS:
             continue
-        others = {k: s for k, s in parts.items() if k != name}
+        others, on_top = covers_of(name, parts, d)
         lies = {f.hashCode(): against(f, others, d) for f in shape.Faces}
         groups: dict[tuple[str, str], list] = defaultdict(list)
         for e in shape.Edges:
@@ -151,7 +165,10 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
             if not convex or turn <= d.edge_break_turn:
                 continue
             m = so.middle(e)
-            joint = next((lies[f.hashCode()] for f in fs if lies[f.hashCode()]), "")
+            hidden = [lies[f.hashCode()] for f in fs if lies[f.hashCode()]]
+            if on_top and abs(m.z - d.panel_top) < 1e-6:
+                hidden = [j for j in hidden if j in on_top]
+            joint = hidden[0] if hidden else ""
             groups[(zone(name, m, d), joint)].append((round(e.Length, 1), round(turn, 1), [round(m.x, 1), round(m.y, 1), round(m.z, 1)]))
         breaks = [f for f in shape.Faces if face_check.is_break(f, d.edge_break)]
         balls = [f for f in shape.Faces if isinstance(f.Surface, Part.Sphere) and abs(f.Surface.Radius - d.edge_break) < 0.02]

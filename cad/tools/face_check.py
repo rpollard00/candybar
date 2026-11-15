@@ -340,7 +340,8 @@ def check_shell(shapes: dict[str, Part.Shape], parts: list[str] | None = None) -
             continue
         found += check(shape, name, allow, break_radius=Blueprint().edge_break)
     stale = mark_known(found)
-    return found, [k for k in stale if not parts or k.part in parts]
+    # a known item of a part that is not in this set has nothing to be found in
+    return found, [k for k in stale if k.part in shapes and (not parts or k.part in parts)]
 
 
 def run_dir(out: str, parts: list[str] | None = None) -> tuple[list[Finding], list[Known]]:
@@ -363,7 +364,10 @@ def default_reveals() -> list[Reveal]:
     bezel = (-xb - 1, s0[0] - 30, s0[1] - 30, xb + 1, s1[0] + 30, s1[1] + 30)
     del fr
     panel = (-d.width / 2, 0.0, d.panel_top - d.panel_t - 0.5, d.width / 2, d.foot_y, d.deck_top + 0.5)
-    return reveals(d.body_top, d.seam_gap, d.seam_groove, bezel, panel)
+    # the reveals of the printed parts of the work packages: the corner balls of the control panel's plates
+    from candybar.shell import panel_frame as pf
+    tiles = tuple(k for k in pf.PARTS if pf.kind(k) == "tile")
+    return reveals(d.body_top, d.seam_gap, d.seam_groove, bezel, panel) + pf.corner_balls(d, pf.Interface(), tiles)
 
 
 def known_md(stale: list[Known]) -> str:

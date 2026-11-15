@@ -66,3 +66,14 @@ def params_copy(overrides: dict[str, str]) -> Path:
     if pending:
         raise KeyError(f"no parameter rows named {sorted(pending)}")
     return folder
+
+
+def hole_centres(shape: Part.Shape, diameter: float) -> list[tuple[float, float]]:
+    """The (x, y) centres of the cylinder faces of the given diameter in a shape: its upright round holes."""
+    return sorted(
+        {
+            (round(face.Surface.Center.x, 6), round(face.Surface.Center.y, 6))
+            for face in shape.Faces
+            if isinstance(face.Surface, Part.Cylinder) and abs(2 * face.Surface.Radius - diameter) < 1e-6
+        }
+    )

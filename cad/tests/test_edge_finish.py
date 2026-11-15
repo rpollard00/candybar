@@ -223,7 +223,8 @@ class ShellEdgeFinishTest(unittest.TestCase):
     def test_every_named_joint_holds_a_sharp_edge(self) -> None:
         """A list that names a joint with nothing in it is not honest."""
         used = {(part, g["against"]) for part, r in self.rows.items() if r["class"] == "printed" for g in r["sharp"] if g["against"]}
-        self.assertEqual(used, set(ef.JOINTS))
+        # the joints of the parts of this build; those of a work package are held on its own parts (test_panel_frame)
+        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in self.rows})
 
     def test_the_hood_has_no_sharp_edge_at_all(self) -> None:
         """The rim of the opening and the seam bevel have the break; the foot of the hood is blunt."""
