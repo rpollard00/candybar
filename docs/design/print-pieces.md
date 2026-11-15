@@ -360,3 +360,14 @@ The checks of the set on the laptop:
 - Screws of joint 1: 37. Each one has room for the screwdriver. Floor screws: 50. Cones: 22.
 - Mass at 1.05 g/cm3: the pieces without the floor are 4889 g, the plain skin 3928 g. The joints, the feet and the ribs add 961 g (24 %): flanges and gussets 1351 g, feet 155 g, ribs 33 g, less the holes and grooves. The nine tiles as solid parts are 2421 g.
 - Seams with a flange and a key but no screw: D1, F1, F2 and S1. Clamps or tape hold them while the weld sets.
+
+## The front socket plate
+
+Date: 2026-11-15. The socket plate is not in the default build. `CANDYBAR_PIECES_SOCKET_PLATE=1` builds the pieces with it:
+
+- Deck side R has the seat of the plate: the opening, the frame behind the skin and the edge break of the rim (`socket_plate.seat`).
+- The floor tile under the frame gets a notch round it, with 0.5 of clearance, as round each part of a wall that stands in the plan of the floor.
+- The foot flange of deck side R stops along the plate. Over that length the tile has its notch, so a foot flange there would hold no tile and have no screw.
+- The plate and the bought parts of all four variants (the sockets with the room of their leads, the button, the knob, the screws) are obstacles of the flanges, and the floor is checked against them.
+
+The frame and the plate keep their form. Only the inside parts change: the tile and the foot flange. `tests/test_pieces.py` (class `SocketPlateTest`) holds this.

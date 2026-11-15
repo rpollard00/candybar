@@ -26,6 +26,8 @@ corner).
 
     CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces
 
+CANDYBAR_PIECES_SOCKET_PLATE=1 builds the pieces with the front socket plate in deck side R (it is not in the default
+build): the seat and its frame, the notch of the floor tile, and the foot flange that stops along the plate.
 CANDYBAR_PIECES names what to do: "all" (default: every piece, the files and the checks), "pilot" (the two pilot
 pairs only), "check" (the checks again, on the files of a build) or "views" (the folders that tools/draw_pieces.py
 renders). No FreeCAD at import.
@@ -181,6 +183,44 @@ def plain(d: Blueprint, out: Path, log=print) -> Plain:
     outer = {k: load_binary(f) for k, f in outer_files.items()}
     outer["base"] = outer["body"]
     return Plain(shapes, outer, seams, pieces, key)
+
+
+# ---------- the front socket plate (an option; not in the default build) ----------
+
+SOCKET_PLATE = "socket plate"   # the role of its parts among the items; the stop of the foot flange is a "zone"
+
+
+def with_socket_plate(pl: Plain, d: Blueprint) -> Plain:
+    """The plain cut with the seat of the front socket plate in "deck side R": the opening, the frame behind the skin
+    and the edge break of the rim (socket_plate.seat). The floor then gets its notch round the frame, as round any
+    part of a wall that stands in its plan."""
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    shapes = dict(pl.shapes)
+    shapes["deck side R"] = spm.seat(shapes["deck side R"], spm.SocketPlate(), d, hollow=True)
+    return replace(pl, shapes=shapes)
+
+
+def socket_plate_items(d: Blueprint, fl: "Floor" = None) -> list[tuple[str, str, object]]:
+    """The plate and the bought parts of every variant of the front socket plate (with the room of their leads), and
+    the stretch of the foot flange along the plate: the floor tile has its notch round the frame there, so a foot
+    flange under it holds no tile and has no screw."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    fl = fl or FLOOR
+    sp = spm.SocketPlate()
+    out = []
+    for v in spm.VARIANTS:
+        out.append((f"socket plate {v.key}", SOCKET_PLATE, spm.plate(sp, d, v)))
+        out += [(f"{k} ({v.key})", SOCKET_PLATE, shape) for k, shape in spm.hardware(sp, d, v).items()]
+    x, y, z = sp.centre(d)
+    a, _ = sp.half(sp.reveal + sp.frame_grow)
+    stop = Part.makeBox(fl.foot_w + 10.0, 2 * a, fl.foot_thick + 1.0, App.Vector(x - fl.foot_w - 5.0, y - a, -0.5))
+    out.append(("the foot flange along the socket plate", "zone", stop))
+    return out
 
 
 # ---------- the cut faces ----------
@@ -1747,6 +1787,10 @@ def build_all(out: Path, log=print) -> int:
     d = Blueprint()
     pl = plain(d, out, log)
     items = hardware()
+    if os.environ.get("CANDYBAR_PIECES_SOCKET_PLATE") == "1":
+        # the front socket plate is not in the default build; with it, deck side R has the seat (with_socket_plate)
+        pl = with_socket_plate(pl, d)
+        items += socket_plate_items(d)
     res = generate(d, pl, None, None, items, log)
     write_parts(out, res.pieces)
     # the joints alone, for tools/face_check.py: the skin has narrow step faces of its own, which hide the joints' faces

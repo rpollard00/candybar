@@ -433,3 +433,45 @@ class WholeSetTest(unittest.TestCase):
         for sd in self.res.sides + self.res.ribs:
             if sd.solid is not None and sd.solid.BoundBox.intersect(zone.BoundBox):
                 self.assertLess(sd.solid.common(zone).Volume, 1.0, f"{sd.cf.seam} {sd.cf.piece}")
+
+
+@unittest.skipIf(os.environ.get("CANDYBAR_PIECES_SKIP_SET"), "CANDYBAR_PIECES_SKIP_SET is set")
+class SocketPlateTest(unittest.TestCase):
+    """The pieces with the front socket plate (an option, not in the default build): the seat with its frame in deck
+    side R, the floor tile with its notch round the frame, and the foot flange that stops along the plate. The plate
+    and the bought parts of every variant stay clear of the pieces."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from pathlib import Path
+
+        cls.d = Blueprint()
+        out = Path(os.environ.get("CANDYBAR_PIECES_CACHE") or pieces.CAD / "out" / "pieces")
+        quiet = lambda *_: None
+        cls.pl = pieces.with_socket_plate(pieces.plain(cls.d, out, quiet), cls.d)
+        cls.items = pieces.socket_plate_items(cls.d)
+        cls.hits: list = []
+        cls.feet = pieces.feet(cls.pl, ["deck side R"], cls.items, cls.hits, quiet)
+        module = {p.full: p.module for p in cls.pl.pieces}
+        walls = {n: s for n, s in cls.pl.shapes.items() if module[n] == "body"}
+        cls.tiles, _, cls.rep = pieces.floor(cls.pl, walls, cls.items, quiet)
+
+    def test_the_seat_is_in_deck_side_r_and_the_piece_is_one_valid_solid(self) -> None:
+        seated = self.pl.shapes["deck side R"]
+        self.assertTrue(seated.isValid())
+        self.assertEqual(len(seated.Solids), 1)
+
+    def test_a_floor_tile_has_its_notch_round_the_frame_and_no_tile_meets_the_seat_or_the_plate(self) -> None:
+        self.assertTrue(any(n["wall"] == "deck side R" for n in self.rep["notches"]))
+        seated = self.pl.shapes["deck side R"]
+        for n, t in self.tiles.items():
+            with self.subTest(tile=n):
+                self.assertLess(t.common(seated).Volume, pieces.BUILD.clash_mm3)
+        self.assertEqual([h for h in self.rep["hardware_in_floor"] if h["role"] == pieces.SOCKET_PLATE], [])
+
+    def test_the_foot_flange_stops_along_the_plate(self) -> None:
+        stop = next(s for name, _, s in self.items if name.startswith("the foot flange"))
+        for sd in self.feet:
+            if sd.solid is not None:
+                self.assertLess(sd.solid.common(stop).Volume, pieces.BUILD.clash_mm3)
+        self.assertTrue(any(h["item"] == "the foot flange along the socket plate" for h in self.hits))
