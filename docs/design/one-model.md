@@ -171,3 +171,21 @@ The split report and the full suite must run again on the machine that made the 
 ### A finding for the owner
 
 `fit/warnings.md` shows the palm rest at 92.5 mm against a target of 100 to 120 mm. The front edge of the cabinet to the centre of the nearest action button is shorter since the deck became shorter. The older generator had this check on its own, longer panel, where the value was in the range.
+
+### The proof on the laptop
+
+Date: 2026-11-14. The proof ran again on the laptop, which has OpenCascade 7.9.3 and made the reference build. Here the default build ends, and no aid was used. The "before" run used the code of commit b80698c (the main line with the rear door). The "after" run used the merge of this branch, with the imports of `rear.py` and `tests/test_rear.py` changed to `candybar.shell`. Each run made the solids, the fit study, the split, the structure and the rear.
+
+| Item | Before | After | Result |
+| --- | --- | --- | --- |
+| Parts: volume and face count | 10 parts | 10 parts | The same for each part |
+| Parts: BREP files | | | 8 of 10 have the same bytes. `deck.brep` and `hood.brep` have the same records in a different sequence. |
+| Parts: `tools/compare_parts.py`, tolerance 0.000001 | | | Pass. The largest distance is 0.0000. On the faces of the edge break of the hood it is 0.0001. |
+| Fit study: the rules | PASS | PASS | The same rules and the same results |
+| Fit study: `report.json` | | | The same, except two numbers: the probe of the wall measured 2642 and 2646 points, and the cavity volume differs by 3e-12 l |
+| Fit study: `sections.json` | | | 197 polylines. Each has the same points; some start at a different point. |
+| Split: `measurements.json` | | | The same bytes |
+| Structure: `structure.json` | | | The same bytes |
+| Rear: `report.json`, `report.md`, `sections.json` | PASS | PASS | The same bytes |
+
+The hood of the reference build in `cad/out/shell-rev7` has the bytes of the "after" run. Thus the sequence of the records in the hood changes from one run to the next, and this work does not cause it.
