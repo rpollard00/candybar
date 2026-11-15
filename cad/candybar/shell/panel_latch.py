@@ -120,7 +120,7 @@ class Latch:
     bolt_spring_d: float = 4.0
     mu: float = 0.3                # ABS on ABS, dry (ESTIMATED; 0.25 to 0.45)
     # ---- the quarter-turn cams (Q)
-    cam_x: float = 125.0
+    cam_x: float = 128.5          # on the middle line of the rib beside the service buttons: the rib crosses the boss cleanly
     cam_y: float = 43.2
     cam_head_d: float = 16.0
     cam_head_h: float = 3.2
@@ -131,7 +131,7 @@ class Latch:
     cam_tongue: tuple = (8.0, 14.0, 3.8)   # wide, from the axis, thick
     cam_boss_h: float = 8.0
     cam_pin_d: float = 3.0           # a steel dowel pin 3 x 14 joins the tongue to the shank
-    cam_plate_boss: tuple = (14.0, 3.0)   # a boss under the plate round each cam hole: diameter, height
+    cam_plate_boss: tuple = (15.0, 5.0)   # a boss under the plate round each cam hole: diameter, height
     cam_tongue_clear: float = 0.4
     # ---- the loads (docs/research/controls-ergonomics.md 6.3, control-panel.md)
     pull_up: float = 80.0          # on the lever, upward
@@ -248,14 +248,16 @@ def bolt(d: Blueprint, L: Latch = L0, s: float = 0.0) -> Part.Shape:
     # the button: a cylinder cut by the plane of the leaning band of the front face
     t = math.tan(math.radians(d.deck_lean))
     crease = d.deck_top - d.deck_lean_h
-    head = ycyl(L.button_d, -5.0, head_y1, 0.0, L.button_z)
+    # it is no wider than the bolt, so that the bolt lies flat on its side on the printer
+    head = ycyl(L.button_d, -5.0, head_y1, 0.0, L.button_z).common(pf.box(-hw, hw, -10.0, head_y1 + 1, 0.0, 100.0))
     outside = side_prism([(-20.0, crease - 40.0), (-20.0, crease + 60.0), (60.0 * t, crease + 60.0), (-40.0 * t, crease - 40.0)],
                          -L.button_d, L.button_d)
     head = head.cut(outside)
     front = pf.box(-hw, hw, head_y1 - 1, neck0 + 0.5, z0, z1)
     narrow = pf.box(-L.neck_w / 2, L.neck_w / 2, neck0, neck1, under(L, neck1), z1)
     lock = side_prism([(neck1, under(L, neck1)), (yw1, z0), (L.bolt_end_y, z0), (L.bolt_end_y, z1), (neck1, z1)], -hw, hw)
-    stop = pf.box(-L.stop_w / 2, L.stop_w / 2, L.stop_y, L.stop_y + 3.0, z0, z1)
+    # the stop block stands out on the +x side only: the -x side of the bolt is one plane, which lies on the bed
+    stop = pf.box(-hw, L.stop_w / 2, L.stop_y, L.stop_y + 3.0, z0, z1)
     solid = so.unsplit(head.fuse([front, narrow, lock, stop]))
     bore = ycyl(L.bolt_spring_bore, L.bolt_end_y - 10.0, L.bolt_end_y + 1, 0.0, (z0 + z1) / 2)
     solid = pf.one_solid(solid.cut(bore), "push bolt")
@@ -364,8 +366,11 @@ def springs(L: Latch = L0, s: float = 0.0, lifted: float = 0.0) -> dict[str, Par
 
 
 def button_hole(L: Latch = L0) -> Part.Shape:
-    """The hole for the button in the front wall of the deck (a change of the deck nose)."""
-    return ycyl(L.button_hole_d, -2.0, 12.0, 0.0, L.button_z)
+    """The hole for the button in the front wall of the deck (a change of the deck nose): a circle with two flats,
+    the shape of the button with a gap of (button_hole_d - button_d) / 2 round it."""
+    g = (L.button_hole_d - L.button_d) / 2
+    hw = L.bolt_w / 2 + g
+    return ycyl(L.button_hole_d, -2.0, 12.0, 0.0, L.button_z).common(pf.box(-hw, hw, -3.0, 13.0, 0.0, 100.0))
 
 
 def front_notch(d: Blueprint, i: pf.Interface, L: Latch = L0) -> Part.Shape:
@@ -397,6 +402,9 @@ def cam(d: Blueprint, L: Latch = L0, x: float = 125.0, turn: float = 0.0) -> dic
     tz1 = b0 - L.cam_tongue_clear
     tz0 = tz1 - tt
     head = pf.cyl(L.cam_head_d, x, y, zt - L.cam_head_h, zt)
+    # under the head, a cone of 45 degrees down to the shank: the stud prints upright with no support
+    rh, rs = L.cam_head_d / 2, L.cam_shank_d / 2
+    head = head.fuse(Part.makeCone(rs, rh, rh - rs, V(x, y, zt - L.cam_head_h - (rh - rs)), V(0, 0, 1)))
     bw, bl, bh = L.cam_bar
     r = bw / 2
     capsule = ycyl(bw, y - bl / 2 + r, y + bl / 2 - r, x, zt).fuse([Part.makeSphere(r, V(x, y - bl / 2 + r, zt)), Part.makeSphere(r, V(x, y + bl / 2 - r, zt))])
@@ -444,7 +452,10 @@ def cam_holes(d: Blueprint, L: Latch = L0) -> tuple[list[Part.Shape], list[Part.
     for x in (-L.cam_x, L.cam_x):
         clear.append(pf.cyl(L.cam_hub_d + 1.0, x, L.cam_y, zr - 30.0, zr))
         bosses.append(pf.cyl(L.cam_plate_boss[0], x, L.cam_y, zr - L.cam_plate_boss[1], zr + 0.5))
-        holes += [pf.cyl(L.cam_hole_d, x, L.cam_y, zr - 10.0, zt + 1), pf.cyl(L.cam_head_d + 0.6, x, L.cam_y, zt - L.cam_head_h - 0.2, zt + 1)]
+        rh, rs = L.cam_head_d / 2 + 0.3, L.cam_hole_d / 2
+        z_cb = zt - L.cam_head_h - 0.2
+        holes += [pf.cyl(L.cam_hole_d, x, L.cam_y, zr - 10.0, zt + 1), pf.cyl(2 * rh, x, L.cam_y, z_cb, zt + 1),
+                  Part.makeCone(rs, rh, rh - rs, V(x, L.cam_y, z_cb - (rh - rs)), V(0, 0, 1))]
     return clear, bosses, holes
 
 
@@ -856,13 +867,14 @@ def print_rows(parts: dict[str, Part.Shape]) -> list[dict]:
     up_of = {"latch_bolt": (V(1, 0, 0), "on its side: the profile in y and z on the bed"),
              "latch_housing": (V(0, 0, 1), "on its floor, as in the cabinet"),
              "latch_cover": (V(0, 0, -1), "its top on the bed"),
-             "cam_stud": (V(0, 0, -1), "its head on the bed"),
+             "cam_stud": (V(0, 0, 1), "upright, the end of the shank on the bed"),
              "cam_tongue": (V(0, 0, 1), "flat, the arm on the bed")}
     rows = []
     for name, shape in parts.items():
         key = next((k for k in up_of if name.startswith(k)), None)
         up, how = up_of[key] if key else pf.PRINT[pf.kind(name)]
-        pts = [(p.x, p.y, p.z) for p in (vx.Point for vx in shape.Vertexes)]
+        # the points of a mesh, not the vertices: a round part has few vertices on its outline
+        pts = [(p.x, p.y, p.z) for p in shape.tessellate(0.5)[0]]
         b = split.print_box(pts, (up.x, up.y, up.z), lim)
         rows.append({"part": name, "how": how, "x": b["x"], "y": b["y"], "z": b["z"], "fits": b["fits"],
                      "overhang_cm2": round(pf.overhang(shape, up) / 100, 2), "mass_g": round(shape.Volume * pf.ABS, 1)})
@@ -1010,7 +1022,7 @@ def shows(cd: Candidate) -> dict:
         return {"top_in": "Nothing. The gap stays 0.3 all round.", "front_in": "Nothing.", "out": base_out + hooks_out, "gap": f"{gap:g} all round, no change"}
     if cd.c == "B":
         return {"top_in": "Nothing. The gap stays 0.3 all round.",
-                "front_in": f"A round button of {L.button_d:g} in the front face of the deck at the centre line, {L.button_z:g} above the desk, on the leaning band above the crease. It is flush, with a gap of {(L.button_hole_d - L.button_d) / 2:g} round it and an edge break on its rim.",
+                "front_in": f"A button of {L.button_d:g} with two flats ({L.bolt_w:g} wide) in the front face of the deck at the centre line, {L.button_z:g} above the desk, on the leaning band above the crease. It is flush, with a gap of {(L.button_hole_d - L.button_d) / 2:g} round it and an edge break on its rim.",
                 "out": base_out.replace("the four pads", "the four pads (magnets in the rear two)") + hooks_out + " At the front centre: the bolt across the opening's edge, the cover of its housing and the two lift springs.",
                 "gap": f"{gap:g} all round, no change. When the button is pushed, the front edge stands {lifted_rise(cd):.0f} above its seat."}
     return {"top_in": f"Two round heads of {L.cam_head_d:g} at x -{L.cam_x:g} and +{L.cam_x:g}, {L.cam_y - pf.y0(cd.d):.0f} behind the front edge of the panel. Each is flush with the plate and has a finger bar {L.cam_bar[2]:g} high (it stays {cd.d.deck_top - cd.d.panel_top - L.cam_bar[2]:g} below the deck top).",
@@ -1025,11 +1037,11 @@ def buy(cd: Candidate) -> list[str]:
     out = [frame + " (frame, once for the cabinet)", f"{n} disc magnets N52 12 x {L.plate_magnet_h:g}, axial, for each panel (or {n} steel discs 12 x 2: no polarity to mind, ESTIMATED 10 % less pull)",
            "Epoxy for the magnets"]
     if cd.c == "B":
-        out += [f"1 compression spring, steel, 6 outside, {L.bolt_spring_free:g} free, about {L.bolt_spring_rate:g} N/mm (the bolt)",
+        out += [f"1 compression spring, steel, {L.bolt_spring_d:g} outside, {L.bolt_spring_free:g} free, about {L.bolt_spring_rate:g} N/mm (the bolt)",
                 f"2 compression springs, steel, 6 outside, {L.kicker_free:g} free, about {L.kicker_rate:g} N/mm (they lift the panel)",
                 "2 thread-forming screws 3.0 x 10 for the cover, into the printed pilot holes"]
     if cd.c == "Q":
-        out += ["2 screws M3 x 10 for each panel (tongue to stud)"]
+        out += [f"2 steel dowel pins {L.cam_pin_d:g} x 14 for each panel (tongue to stud)", "2 O-rings 8 x 2 (inside 8, section 2) for each panel, on the shank under the plate"]
     return out
 
 
@@ -1049,7 +1061,8 @@ def interface_rows(cd: Candidate) -> list[list[str]]:
                      "A rib that crosses it (the front rib of the arcade panel, the seam of the blank panel) stops at it."])
         rows.append(["Lower face", f"Flat at x -{L.kicker_x:g} and +{L.kicker_x:g}, {yl(L.kicker_y)}: the two lift springs push there."])
     if cd.c == "Q":
-        rows.append(["Cam holes (2)", f"At x -{L.cam_x:g} and +{L.cam_x:g}, {yl(L.cam_y)}: a hole of {L.cam_hole_d:g} through the plate with a counterbore of {L.cam_head_d + 0.6:g} x {L.cam_head_h + 0.2:g}. Each panel carries 2 printed cams (stud and tongue) and 2 M3 screws."])
+        rows.append(["Cam holes (2)", f"At x -{L.cam_x:g} and +{L.cam_x:g}, {yl(L.cam_y)}: a hole of {L.cam_hole_d:g} through the plate and a boss of {L.cam_plate_boss[0]:g} x {L.cam_plate_boss[1]:g} under it, "
+                     f"with a counterbore of {L.cam_head_d + 0.6:g} x {L.cam_head_h + 0.2:g} and a cone of 45 degrees under it for the head. Each panel carries 2 printed cams (stud and tongue), 2 steel pins {L.cam_pin_d:g} x 14 and 2 O-rings."])
         rows.append(["Room below the plate", f"A circle of {2 * (L.cam_tongue[1] + 1):g} round each cam hole, from z {bar_z(d, cd.i)[0] - L.cam_tongue_clear - L.cam_tongue[2] - 0.5:.1f} up, is the sweep of its tongue."])
     return rows
 
@@ -1177,18 +1190,20 @@ def exploded(cd: Candidate) -> dict:
                 "tile_corner": (tile, FINISH["hook"])}
     yr = rear_bar_face(d, i)
     out = {}
-    if cd.c in ("H", "Q"):
+    if cd.c == "Q":
+        # one cam with the piece of the front bar that its tongue turns under
+        x = L.cam_x
+        parts = cam(d, L, x)
+        keep = pf.box(x - 22, x + 22, 20, 60, -so.BIG, so.BIG)
+        return {"frame_front": (fr["frame_right"][0].common(keep), pf.FINISH["frame"]),
+                "cam_tongue": (parts["cam_tongue"].translated(V(0, 0, -14)), FINISH["tongue"]),
+                "cam_pin": (cam_pin(L, x, bar_z(d, i)[0] - L.cam_tongue_clear - L.cam_tongue[2]).translated(V(14, 0, -14)), FINISH["spring"]),
+                "cam_stud": (parts["cam_stud"].translated(V(0, 0, 24)), FINISH["cam"])}
+    if cd.c == "H":
         x = L.hook_x
         keep = pf.box(x - 30, x + 30, yr - 30, yr + 20, -so.BIG, so.BIG)
         out["frame_rear"] = (fr["frame_right"][0].common(keep), pf.FINISH["frame"])
         out["hook"] = (hook(d, i, x, L).translated(V(0, -14, 26)), FINISH["hook"])
-        if cd.c == "Q":
-            parts = cam(d, L, L.cam_x)
-            shift = V(0, -(yr - L.cam_y) + 40, 0)
-            out["cam_stud"] = (parts["cam_stud"].translated(shift + V(0, 0, 30)), FINISH["cam"])
-            out["cam_tongue"] = (parts["cam_tongue"].translated(shift), FINISH["tongue"])
-            keep2 = pf.box(L.cam_x - 30, L.cam_x + 30, 20, 60, -so.BIG, so.BIG)
-            out["frame_front"] = (fr["frame_right"][0].common(keep2).translated(shift + V(0, 0, -12)), pf.FINISH["frame"])
         return out
     # B: the housing, the bolt, the cover, the springs, the strike
     hs = housing(d, i, L)
@@ -1210,12 +1225,12 @@ def exploded_target(cd: Candidate) -> tuple:
     if cd.c == "B":
         return (0.0, 45.0, 70.0)
     if cd.c == "Q":
-        return (L.hook_x + 20, 120.0, 70.0)
+        return (L.cam_x, L.cam_y - 6, 62.0)
     return (L.hook_x, rear_bar_face(d, cd.i) - 8, 70.0)
 
 
 def exploded_radius(cd: Candidate) -> float:
-    return {"M": 50.0, "H": 45.0, "B": 75.0, "Q": 110.0}[cd.c]
+    return {"M": 50.0, "H": 45.0, "B": 75.0, "Q": 48.0}[cd.c]
 
 
 def compare_scene(out: Path, cands: dict[str, Candidate], deck: Part.Shape, hw: pf.Hardware) -> None:
