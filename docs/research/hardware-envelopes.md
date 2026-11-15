@@ -66,10 +66,11 @@ files; section 3 gives the corrected sizes.
 
 | Item | Value | Status |
 | --- | --- | --- |
-| Body W x H x T | 354 x 230 x 10 | SOURCED (uperfect.com, "Product Size") |
+| Body W x H x T | 354 x 230 x 10 | SOURCED (uperfect.com, "Product Size"). The thickness is measured: see the next row but one. |
 | Body W x H x T, second source | 355.3 x 228.6 x 10.2 (13.99 in x 9 in x 0.4 in) | SOURCED (Amazon "Item Dimensions") |
-| CAD envelope to reserve | 356 x 231 x 11 | ESTIMATED: larger of the two sources, plus 1 |
-| Thickness profile | Uniform slab. No thicker chin or port bump. | ESTIMATED: manufacturer side renders in the product gallery |
+| Body thickness | 10.45 to 10.6, all the way round | MEASURED by the owner with a caliper, 2026-11-14. Thicker than the maker's 10 and the second source's 10.2. The model uses 10.6. |
+| CAD envelope to reserve | 356 x 231 x 11 | ESTIMATED: larger of the two sources, plus 1. The measured thickness is 0.4 inside the 11. |
+| Thickness profile | Uniform slab. No thicker chin or port bump. | MEASURED by the owner, 2026-11-14: 10.45 to 10.6 all the way round |
 | Small protrusions | Two rubber feet on the bottom edge. Power button and scroll wheel stand proud of the right edge by about 1 to 1.5. | ESTIMATED: manufacturer front render |
 | Active area | 344.678 x 215.424 | SOURCED (uperfect.com, "Viewable Area") |
 | Pixel pitch | 0.0898 (344.678 / 3840) | ESTIMATED: calculation. The page rounds it to 0.09. |
@@ -145,7 +146,7 @@ Notes:
 
 ### Must measure on the real unit
 
-1. Body width, height and thickness, including the feet and the button protrusion. The owner measures the width and the height with a rule (about +/-0.5) and the thickness with a caliper. Until then the model uses the maker's 354 x 230 x 10 and keeps the room of 356 x 231 x 11.
+1. Body width and height, including the feet and the button protrusion. The owner measures them with a rule (about +/-0.5). Until then the model uses the maker's 354 x 230 and keeps the room of 356 x 231 x 11. The thickness is done: 10.45 to 10.6 (the owner, with a caliper, 2026-11-14).
 2. Whether a built-in stand exists (BE16CU or BE16DU Gen 2).
 3. VESA hole centres to the left edge and to the bottom edge. Real thread depth.
 4. Port centre heights on the left edge and their offset from the front face.

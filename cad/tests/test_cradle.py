@@ -123,6 +123,22 @@ class PartsTest(unittest.TestCase):
         self.assertLess(cr.volume_in(jaw, parts()["lugs"]), cr.TOL_VOLUME)
 
 
+    def test_a_housing_from_10_45_to_10_6_lies_on_the_rests_of_its_jaws(self) -> None:
+        """The owner measured 10.45 to 10.6 (2026-11-14). The jaws are made for 10.6. The screen leans back, so the
+        housing lies on the felt of the rests: a thinner one has its glass farther from the plate by the difference."""
+        f, p = cr.Frame(D), parts()
+        pads = cr.pads(D, C, cr.PRESENT)
+        for t in (cr.PRESENT_T_MIN, cr.PRESENT.t):
+            back = cr.PRESENT.t - t
+            unit = cr.monitor(D, C, replace(cr.PRESENT, t=t)).translated(f.into * back)
+            with self.subTest(t=t):
+                self.assertLess(cr.volume_in(unit, p["jaws"]), cr.TOL_VOLUME)
+                self.assertLess(cr.volume_in(unit, pads), cr.TOL_VOLUME)
+                self.assertLess(cr.volume_in(unit, p["bezel_plate"]), cr.TOL_VOLUME)
+                self.assertLess(cr.gap(unit, pads), 1e-3)                                   # it lies on the felt
+                self.assertAlmostEqual(cr.gap(unit, p["bezel_plate"]), C.glass_gap + back, delta=1e-3)
+
+
 class BezelPlateTest(unittest.TestCase):
     def test_the_plate_has_the_form_of_the_shells_plate(self) -> None:
         plate = cr.bezel_plate(D, C, back=False)

@@ -18,7 +18,7 @@ All lengths are millimetres. This document uses the frame of the module: `x` is 
 
 The opening behind the bezel plate is 434.7 x 293.4. A ledge of 6 x 4 is at its bottom and at its top. Each side is a wall (the jamb) that goes from the rail land back to `t` = 11.2. Behind each jamb the rail is hollow, out to the inner face of the side at `x` = 243.
 
-The fit study has two monitor bodies. The present unit is 354 x 230 x 10. The body that the cabinet must take is 360 x 247.1 x 20.6, with a movement of 8 each way and a plug room of 22 on each side.
+The fit study has two monitor bodies. The present unit is 354 x 230 x 10.6 (the thickness measured by the owner, 10.45 to 10.6; the width and the height are the maker's). The body that the cabinet must take is 360 x 247.1 x 20.6, with a movement of 8 each way and a plug room of 22 on each side.
 
 ## The cradle
 
@@ -44,6 +44,14 @@ A jaw is printed for one monitor. Its rest is as deep as that monitor is thin, s
 The glass stands 1.0 behind the back of the plate (`glass_gap`). In the fit study the glass is on the plane of the back of the plate. With no gap, the plate presses on the glass. The gap also lets a fingernail or a card go behind the rim of the window.
 
 Each jaw has a pad of cellular rubber, 2 thick, on its wall. The two top jaws press the pads together by 0.5. The jaws have no lip in front of the glass, because the back of the plate is 1.0 in front of the glass and the plate is 2 thick at the rim of the window.
+
+### The thickness of the housing
+
+The owner measured the housing with a caliper: 10.45 to 10.6, all the way round (2026-11-14). The maker gives 10, and the second source 10.2. The model uses 10.6 (`PRESENT.t`), so that each part clears the thickest housing. The reserved room of 11 has 0.4 to spare.
+
+The screen leans back 30 degrees, so the housing lies on the felt of the rests of the bottom and top jaws. The felt is not pressed by the thickness: the weight holds the housing on it. The rests are made for 10.6. A housing of 10.6 has its glass 1.0 behind the back of the plate (`glass_gap`). A housing of 10.45 lies on the same felt and has its glass 1.15 behind the plate. The edge pads hold the top and the bottom edge in both cases: they press across the face, not through the thickness.
+
+What was made for 10 before, and is made for 10.6 now: the rest of each jaw (0.6 farther back), the box of the monitor and its plug room in the depth (the sockets and the button are in the middle of the edge, so they stand 0.3 farther back), the place of the power button for the push rod (0.3 farther back), and the body of the monitor in the fit study (`mon_t` in `cad/params/hardware.csv`). The glass does not move: the plate and the window do not change.
 
 ### Adjustment
 
@@ -335,13 +343,14 @@ The brow is "upright" in the split. In that position the top lugs hang 11.1 belo
 
 Date: 2026-11-14. The package was merged on the laptop after the control panel. What changed:
 
-- **The owner's measurements and facts.** The power button is 63.5 above the bottom edge of the housing (it was an estimate of 66). The bottom bezel is 8.9 (it was an estimate of 9.6), so the cradle puts the bottom edge of the housing 8.9 below the lit picture. The side bezels are 4.0 and the top bezel 3.4; across the face the monitor is set by hand on its pads, so the side bezels change no value of the model. The housing stays the maker's 354 x 230 x 10 until the owner measures it, and the reserved room of 356 x 231 x 11 stays. The top jaws hold the top edge of the housing, which the model puts 230 above the bottom edge: that value needs the real height of the housing, and it is in the list of things to measure.
+- **The owner's measurements and facts.** The power button is 63.5 above the bottom edge of the housing (it was an estimate of 66). The bottom bezel is 8.9 (it was an estimate of 9.6), so the cradle puts the bottom edge of the housing 8.9 below the lit picture. The side bezels are 4.0 and the top bezel 3.4; across the face the monitor is set by hand on its pads, so the side bezels change no value of the model. The width and the height of the housing stay the maker's 354 x 230 until the owner measures them, and the reserved room of 356 x 231 x 11 stays. The top jaws hold the top edge of the housing, which the model puts 230 above the bottom edge: that value needs the real height of the housing, and it is in the list of things to measure.
 - **The window and the picture.** The rim of the window lies on the edge of the lit area (BZ3 is made from the lit area). With the monitor where the cradle puts it, the margin between the window and the lit picture is 0 at the left, at the right, at the bottom and at the top. With the old bottom bezel of 9.6 the picture would have stood 0.7 low: 0.7 of it behind the rim at the bottom, and 0.7 of black bezel in the window at the top. The jaws move 8 each way, so a person sets the picture to the window by hand in any case.
 - **The push rod.** `Cradle.push_rod` (off) puts the option in the document. It is tested as before, at the new height of the button.
 - **The mini HDMI plug** is described by its geometry (see "The cable channel").
 - **The plug order** is in the steps "How to put the monitor in".
 - **ABS.** The density is 1.05, the shrink 0.59 % to 0.69 %, and the print limit that of the Q2.
 - **The skin.** On the laptop the skin of the cache reads as a valid shape.
+- **The thickness** of the housing is the owner's measurement (see "The thickness of the housing").
 - **The fit study** reads the measured bottom bezel too (`mon_bezel_bottom` 8.9 in `cad/params/hardware.csv`, status measured), so that its monitor and the cradle's monitor are one body. It passes.
 - **The checks of the push rod** now include the pins and the magnets of the plate: no common volume.
 - **The tools.** `tools/edge_finish.py` has the two halves of the plate as printed parts, with two named joints (the screen behind the window, and the other half at the seam), and the upright, the jaw, the shoe and the channel in a new class: printed parts inside the shell that are not painted. `tools/face_check.py` takes the known items of this module (`cradle.face_known`). Both pass when they run on `cad/out/cradle/print`.

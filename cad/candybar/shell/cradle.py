@@ -61,9 +61,12 @@ class Unit:
 
 # the present unit (hardware-envelopes.md 1) and the body that the cabinet must take (the survey: the widest, the
 # tallest and the thickest of five units, centred on the image; its mass is an assumption)
-# the present unit's housing is the maker's 354 x 230 x 10 until the owner measures it; its bottom bezel, 8.9 from the
-# bottom edge of the housing to the lit picture, is MEASURED by the owner (2026-11-14; the estimate was 9.6)
-PRESENT = Unit("UPERFECT BE16CU", 354.0, 230.0, 10.0, 8.9, 0.82)
+# the present unit's housing: width and height are the maker's 354 x 230 until the owner measures them; its
+# thickness is MEASURED by the owner with a caliper, 10.45 to 10.6 all round (2026-11-14; the maker gives 10): the
+# model uses 10.6, so that each part clears the thickest; its bottom bezel, 8.9 from the bottom edge of the housing
+# to the lit picture, is MEASURED by the owner (2026-11-14; the estimate was 9.6)
+PRESENT = Unit("UPERFECT BE16CU", 354.0, 230.0, 10.6, 8.9, 0.82)
+PRESENT_T_MIN = 10.45
 GENERIC = Unit("any 16 inch 16:10 unit", 360.0, 247.1, 20.6, (247.1 - MON_ACTIVE_H) / 2, 1.5)
 
 

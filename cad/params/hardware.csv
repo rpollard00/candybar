@@ -1,7 +1,7 @@
 name,value,unit,status,measure,source,note
 mon_w,354,mm,sourced,"Body width, including the power button that stands proud of the right edge",uperfect.com BE16CU product size,Monitor body width
 mon_h,230,mm,sourced,"Body height, including the rubber feet on the bottom edge",uperfect.com BE16CU product size,Monitor body height
-mon_t,10,mm,sourced,Body thickness at the thickest point,uperfect.com BE16CU product size,Monitor body thickness
+mon_t,10.6,mm,measured,Body thickness at the thickest point,"the owner with a caliper, 2026-11-14: 10.45 to 10.6 all round (the maker gives 10)",Monitor body thickness
 mon_active_w,344.678,mm,sourced,,uperfect.com viewable area,Lit image width
 mon_active_h,215.424,mm,sourced,,uperfect.com viewable area,Lit image height
 mon_bezel_bottom,8.9,mm,measured,"Bottom body edge up to the first lit pixel row, with the screen on","the owner, 2026-11-14 (the estimate was 9.6)",Bottom bezel height
