@@ -63,10 +63,15 @@ FLOOR_INFILL = 0.40
 FLOOR_KG_DM2 = 1.05 * (2 * FLOOR_SKIN + FLOOR_INFILL * (FLOOR_T - 2 * FLOOR_SKIN)) / 100  # g/cm3 x mm -> kg/dm2
 
 
+# the ribs, flanges, feet, keys, the top ring and the foot of the hood, and the screws, as a share of the skin: the print
+# pieces as built have 0.37 (2026-11-15: 0.24 before the top ring of joint 7); the estimate keeps a margin over that
+EXTRAS_SHARE = 0.40
+
+
 def total_mass(skin_kg: float, floor_area_dm2: float) -> dict:
     """skin_kg: the shell pieces without the floor tiles; the floor is the FLOOR_T sandwich."""
     hw = sum(m for _, m, _, _ in HARDWARE)
-    extras = 0.25 * skin_kg
+    extras = EXTRAS_SHARE * skin_kg
     floor = FLOOR_KG_DM2 * floor_area_dm2
     return {"skin": skin_kg, "joints_and_ribs": extras, "floor": floor, "hardware": hw, "total": skin_kg + extras + floor + hw}
 

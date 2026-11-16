@@ -139,7 +139,7 @@ def write(meas: dict, lay: sp.Layout, d: Blueprint, face_cloud, crossed, near_ha
     w("")
     w("| Part | kg |")
     w("| --- | --- |")
-    for k, label in (("skin", "printed skin, without the floor"), ("joints_and_ribs", "ribs, flanges, splice plates, inserts, screws (25 % of the skin)"),
+    for k, label in (("skin", "printed skin, without the floor"), ("joints_and_ribs", f"ribs, flanges, the top ring, inserts, screws ({st.EXTRAS_SHARE * 100:g} % of the skin)"),
                      ("floor", f"printed floor, sandwich of {st.FLOOR_T:g} mm"), ("hardware", "hardware")):
         w(f"| {label} | {mass[k]:.2f} |")
     w(f"| **total** | **{mass['total']:.2f}** |")

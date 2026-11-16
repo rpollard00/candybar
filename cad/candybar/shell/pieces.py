@@ -1093,7 +1093,7 @@ def grown(shape, by: float):
 
 def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: list[str] | None = None,
              items: list | None = None, log=print, j: Joint | None = None, b: Build = BUILD, heads: dict | None = None,
-             with_feet: bool = True, with_ribs: bool = True, with_floor: bool = True) -> Result:
+             with_feet: bool = True, with_ribs: bool = True, with_floor: bool = True, with_ring: bool = True) -> Result:
     """Make the joints of the given pieces (all when None) on the given seams (all bonded seams when None), the
     foot flanges, the ribs and the floor."""
     import Part  # noqa: PLC0415
@@ -1133,6 +1133,14 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
     if with_ribs:
         res.ribs = rib_sides(d, pl, names, items, res.hits, {}, log, b)
     res.pairs = pair_up(res.sides, b)
+    rings, foot_sides, cones, sockets = [], [], {}, {}
+    if with_ring and all(n in pl.shapes for n in RING_PIECES + FOOT_PIECES) and (names is None or set(names) & set(RING_PIECES + FOOT_PIECES)):
+        level = top_ring(d, pl, items, res.hits, kerfs, log, j, b)
+        rings = [sd for sd in level if sd.cf.piece in RING_PIECES]
+        foot_sides = [sd for sd in level if sd.cf.piece in FOOT_PIECES]
+        cones, sockets, res.extra["ring_cones"] = ring_cones(d, rings, foot_sides)
+        res.extra["ring"] = [{"piece": sd.cf.piece, "cm3": round(sd.solid.Volume / 1000, 1) if sd.solid is not None else 0.0, "notes": sd.notes}
+                             for sd in level]
     # what a screwdriver must pass: the plain pieces and every flange, foot and rib but the two of its own seam
     made = [sd for sd in res.sides + res.feet + res.ribs if sd.solid is not None]
     for pair in res.pairs:
@@ -1144,9 +1152,13 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
         log(f"pieces: {pair.name}: head in {pair.head.cf.piece}, {len(pair.screws)} screws {pair.notes} [{time.time() - t0:.0f} s]")
     add: dict[str, list] = {}
     cut: dict[str, list] = {}
-    for side in res.feet + res.ribs:
+    for side in res.feet + res.ribs + rings + foot_sides:
         if side.solid is not None:
             add.setdefault(side.cf.piece, []).append(side.solid)
+    for name, shapes in cones.items():
+        add.setdefault(name, []).extend(shapes)
+    for name, shapes in sockets.items():
+        cut.setdefault(name, []).extend(shapes)
     for side in res.sides:
         if side.solid is not None:
             add.setdefault(side.cf.piece, []).append(side.solid)
@@ -1211,6 +1223,126 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
         log(f"pieces: floor: {len(tiles)} tiles, {len(rep['lap_screws'])} lap screws, {len(rep['cones'])} cones, "
             f"{len(rep['foot_screws'])} foot screws, {len(rep['left_out'])} left out, hardware in the floor {rep['hardware_in_floor']} [{time.time() - t0:.0f} s]")
     return res
+
+
+# ---------- joint 7: the top ring of the body and the foot of the hood ----------
+
+RING_PIECES = ("brow", "upper R", "upper L", "upper rear R", "upper rear L")   # the pieces that carry the body top
+FOOT_PIECES = ("hood centre", "hood side R", "hood side L")
+RING_CONE_X = 150.0      # the four cones of the ring: at x +-RING_CONE_X, at the front and at the rear
+
+
+def ring_joints(j: Joint):
+    """The joint values of the top ring (OtherJoints ring_w x ring_t, between the inserts) and of the foot of the
+    hood (ring_w x hood_foot_t), as Joint values that the flange code carries along the outer line."""
+    from dataclasses import replace  # noqa: PLC0415
+    from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
+
+    return replace(j, flange_h=oj.ring_w, flange_t=oj.ring_t), replace(j, flange_h=oj.ring_w, flange_t=oj.hood_foot_t)
+
+
+def ring_section(j: Joint, rise: float, b: Build = BUILD):
+    """The section of the top ring, (u inward, z down from the body top): the flange of 14 x 12 with its gusset, and
+    inside the wall a rise of `rise` up to the foot of the hood, so that the seam gap of the form stays open outside.
+    The inserts of a bolted hood (ring_h deep) are not modelled: the way to reach their screws is not chosen."""
+    w, h, t, g = j.wall_t, j.flange_h, j.flange_t, j.gusset_leg
+    return lambda seg: [(b.skin_lap, 0.0), (w + 0.2, 0.0), (w + 0.2, -rise), (w + h, -rise), (w + h, t), (w, t + g), (b.skin_lap, t + g)]
+
+
+def level_faces(pl: Plain, names: tuple, z: float, up: bool) -> list:
+    """The planar faces of the named pieces that lie in the level plane z and face up (or down), as CutFace objects
+    of the seam "G": the body top of the ring pieces, the foot of the hood pieces."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+
+    n = App.Vector(0, 0, 1)
+    out = []
+    for name in names:
+        for f in pl.shapes[name].Faces:
+            if isinstance(f.Surface, Part.Plane) and abs(f.CenterOfMass.z - z) < 1e-3 and abs(f.Surface.Axis.z) > 1 - 1e-9 \
+                    and (f.normalAt(0, 0).z > 0) == up:
+                out.append(CutFace("G", len(out), name, f, n, -1 if up else 1, f.CenterOfMass, 0.0))
+    return out
+
+
+def cabinet_form(pl: Plain, d: Blueprint):
+    """The outer form of the body and the hood with the seam gap between them filled: the form that the ring and the
+    foot must stay inside."""
+    import FreeCAD as App  # noqa: PLC0415
+
+    body, hood = pl.outer["body"], pl.outer["hood"]
+    sec = body.slice(App.Vector(0, 0, 1), d.body_top - 0.01)
+    import Part  # noqa: PLC0415
+
+    face = Part.Face(Part.Wire(max(sec, key=lambda w: w.Length).Edges)).translated(App.Vector(0, 0, 0.01))
+    gap = face.extrude(App.Vector(0, 0, d.seam_gap))
+    return body.fuse([hood, gap]).removeSplitter()
+
+
+def top_ring(d: Blueprint, pl: Plain, items: list, hits: list, kerfs: dict, log=print, j: Joint | None = None, b: Build = BUILD) -> list[Side]:
+    """Joint 7 (docs/blueprint/index.md): the top ring on the body pieces under the body top, and the foot of the hood
+    on the hood pieces. The ring rises inside the wall to the foot, which lies on it with a bond line of 0.1. The
+    flanges end at the cut faces of the other seams of their module, as the flanges of joint 1 do."""
+    from . import split as sp  # noqa: PLC0415
+
+    j = j or joint()
+    jr, jf = ring_joints(j)
+    form = cabinet_form(pl, d)
+    module = {p.full: p.module for p in pl.pieces}
+    out = []
+    for cf, jj, section in ([(cf, jr, ring_section(jr, d.seam_gap - 0.1, b)) for cf in level_faces(pl, RING_PIECES, d.body_top, True)]
+                            + [(cf, jf, None) for cf in level_faces(pl, FOOT_PIECES, d.body_top + d.seam_gap, False)]):
+        mod = module[cf.piece]
+        sec = form.slice(cf.n, cf.origin.z)
+        import Part  # noqa: PLC0415
+
+        side = Side(cf, outer_lines(cf, form, Part.makeCompound(sec), b))
+        if not side.lines:
+            side.notes.append("no outer line on the level plane")
+            out.append(side)
+            continue
+        for sk in side.lines:
+            for seg in sk.segs:
+                seg.lean_out, seg.gusset = False, True
+        trims = [k for (m, k) in kerfs.values() if m == mod]
+        flange(side, pl.shapes[cf.piece], form, trims, jj, b, section)
+        cut_back(side, pl.shapes[cf.piece], items, hits, b)
+        out.append(side)
+        log(f"pieces: joint 7 on {cf.piece}: {0 if side.solid is None else side.solid.Volume / 1000:.1f} cm3 {side.notes}")
+    return out
+
+
+def ring_cones(d: Blueprint, rings: list[Side], feet: list[Side]) -> tuple[dict, dict, list]:
+    """The four cones of joint 7 on the top of the ring (two at the front, two at the rear, at x +-RING_CONE_X), and
+    their sockets in the foot of the hood. Returns (cones by piece, sockets by piece, the places)."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+    from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
+
+    top = d.body_top + d.seam_gap - 0.1   # the top of the ring inside the wall
+    cones, sockets, places = {}, {}, []
+    up = App.Vector(0, 0, 1)
+    for x in (RING_CONE_X, -RING_CONE_X):
+        line = Part.makeLine(App.Vector(x, -100.0, top - 0.05), App.Vector(x, 800.0, top - 0.05))
+        hits = []
+        for r in rings:
+            if r.solid is None:
+                continue
+            for e in r.solid.common(line).Edges:
+                ys = sorted(v.Point.y for v in e.Vertexes)
+                if ys[1] - ys[0] > oj.cone_d + 2.0:
+                    hits.append(((ys[0] + ys[1]) / 2, r.cf.piece))
+        if not hits:
+            continue
+        for y, piece in (min(hits), max(hits)):
+            p = App.Vector(x, y, top)
+            c = oj.cone_clearance
+            cones.setdefault(piece, []).append(Part.makeCone(oj.cone_d / 2, 1.0, oj.cone_h, p - up * 0.01, up))
+            foot = next((f for f in feet if f.solid is not None and f.solid.distToShape(Part.Vertex(p + up * 0.2))[0] < 0.3), None)
+            if foot is not None:
+                sockets.setdefault(foot.cf.piece, []).append(Part.makeCone(oj.cone_d / 2 + c, 1.0 + c, oj.cone_h + c, p - up * 0.01, up))
+            places.append({"at": [round(p.x, 1), round(p.y, 1), round(p.z, 2)], "ring": piece, "foot": foot.cf.piece if foot else None})
+    return cones, sockets, places
 
 
 # ---------- the foot of the walls and the printed floor ----------
@@ -1693,7 +1825,8 @@ def seam_report(res: Result) -> dict:
               "run_mm": round(sum(r[-1][0] - r[0][0] for r in p.runs), 1), "normal": vec(p.head.cf.into),
               "screws": [{"at": vec(sc.at), "along": [round(v, 4) for v in sc.tangent], "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
     return {"sides": [side_row(sd) for sd in res.sides], "feet": [side_row(sd) for sd in res.feet], "ribs": [side_row(sd) for sd in res.ribs],
-            "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {}), "closing": res.extra.get("closing", [])}
+            "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {}), "closing": res.extra.get("closing", []),
+            "ring": res.extra.get("ring", []), "ring_cones": res.extra.get("ring_cones", [])}
 
 
 # ---------- the checks of the whole set ----------

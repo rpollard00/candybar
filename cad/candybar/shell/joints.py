@@ -143,7 +143,9 @@ class OtherJoints:
     service_chamfer: float = 0.5
     # joint 7, hood on the body top: the top ring of the body and the foot flange of the hood; the cones locate it
     ring_w: float = 14.0
-    ring_h: float = 12.0
+    ring_h: float = 12.0             # at an insert: the room for the M4 insert (insert_hole_depth) and its floor
+    ring_t: float = 6.0              # the ring between the inserts, as the flange of joint 1: 12 all round adds about
+                                     # 110 cm3 to the pieces of the body top (the print pieces, 2026-11-15)
     hood_foot_t: float = 6.0
     # the piece that closes a ring goes in last, into two seams at once: those seams get this gap at each side
     closing_gap: float = 0.5

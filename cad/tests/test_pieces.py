@@ -411,8 +411,10 @@ class WholeSetTest(unittest.TestCase):
 
     def test_the_mass_of_the_joints_is_less_than_the_budget_of_the_structure_study(self) -> None:
         m = self.chk["mass"]
-        # structure.total_mass allows 25 % of the skin for ribs, flanges and screws
-        self.assertLess(m["joints_ribs_feet_g"], 0.25 * m["plain_skin_without_floor_g"])
+        # structure.total_mass allows EXTRAS_SHARE of the skin for ribs, flanges, the top ring and screws
+        from candybar.shell import structure
+
+        self.assertLess(m["joints_ribs_feet_g"], structure.EXTRAS_SHARE * m["plain_skin_without_floor_g"])
 
     def test_the_floor_has_nine_tiles_and_every_tile_is_screwed(self) -> None:
         fl = self.rep["floor"]
@@ -441,6 +443,36 @@ class WholeSetTest(unittest.TestCase):
                 self.assertGreater(done[side.cf.piece]["removed_mm3"], 0.0)
                 near = pieces.closing_slab(side.cf, gap - 0.02)
                 self.assertLess(self.res.pieces[side.cf.piece].common(near).Volume, 0.05)
+
+    def test_joint_7_rings_the_body_top_and_the_hood_lies_on_it(self) -> None:
+        """The top ring on every piece of the body top and the foot on every hood piece (docs/blueprint/index.md,
+        joint 7); four cones on the ring, each in a socket of the foot; the seam gap of the form stays open outside
+        the wall: nothing of the ring or the foot is in the outer part of the gap."""
+        made = {r["piece"] for r in self.rep["ring"] if r["cm3"] > 10.0}
+        self.assertEqual(made, set(pieces.RING_PIECES) | set(pieces.FOOT_PIECES))
+        cones = self.rep["ring_cones"]
+        self.assertEqual(len(cones), 4)
+        self.assertTrue(all(c["foot"] in pieces.FOOT_PIECES for c in cones), cones)
+        # the gap between the body top and the foot of the hood: at points 1 and 3 inside the outer line of the body
+        # top, in the middle of the gap, no piece has material
+        body = self.pl.outer["body"]
+        wire = max(body.slice(V(0, 0, 1), self.d.body_top - 0.01), key=lambda w: w.Length)
+        z = self.d.body_top + self.d.seam_gap / 2
+        points = []
+        for e in wire.Edges:
+            for t in (0.25, 0.5, 0.75):
+                u = e.FirstParameter + (e.LastParameter - e.FirstParameter) * t
+                p, tan = e.valueAt(u), e.tangentAt(u)
+                n = V(-tan.y, tan.x, 0.0)
+                if not body.isInside(V(p.x, p.y, self.d.body_top - 1.0) + n * 1.0, 1e-4, True):
+                    n = n * -1.0
+                points += [V(p.x, p.y, z) + n * k for k in (1.0, 3.0)]
+        self.assertGreater(len(points), 40)
+        for name in pieces.RING_PIECES + pieces.FOOT_PIECES:
+            with self.subTest(piece=name):
+                shape = self.made[name]
+                inside = [q for q in points if shape.BoundBox.isInside(q) and shape.isInside(q, 1e-4, True)]
+                self.assertEqual(inside, [])
 
     def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
         # a head pocket there would cut into the step of the skin behind the lowest cut-in

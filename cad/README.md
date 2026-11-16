@@ -95,6 +95,8 @@ CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces
 CANDYBAR_PIECES=check CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the checks again, on the files
 CANDYBAR_PIECES=views CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the folders for the sheets
 cad/.venv-tools/bin/python cad/tools/draw_pieces.py                                                  # the sheets and report.md
+CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.joint_sheets               # the sheet of the second pass on the joints: scenes
+cad/.venv-tools/bin/python cad/tools/draw_joint_sheets.py cad/out/pieces                              # renders and joints-2/joints-2.png
 CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc                 # shell.FCStd
 # the mounts of the hardware: tray, docks, fence, saddle, tie points, places (2 minutes; docs/design/hardware-mounts.md)
 CANDYBAR_OUT=cad/out/mounts cad/candybar/freecad-run.sh candybar.shell.mounts                        # CANDYBAR_MOUNT_SCENES=0: no scenes

@@ -355,6 +355,31 @@ Date: 2026-11-15. A piece that closes a ring goes in last, into two seams at onc
 
 The upper rear R is the closing half, not the left one, because then both keys of its seams stand on the other pieces. The faces that move are seam faces: the outer edge of each of these seams has the V of 1.0 that the owner fills, and the gap of 0.5 lies inside it. A thin solvent does not fill 0.5: these seams take a bond that fills a gap (dissolved ABS or a thick cement; `docs/design/print-plan-abs.md`, pair E of the coupons). The build removes 208 mm3 from the brow and 621 mm3 from upper rear R (`seams.json`, "closing"). `test_pieces` holds that no material of a closing piece is nearer to its seam plane than the gap.
 
+## The top ring and the foot of the hood (joint 7)
+
+Date: 2026-11-15. The hood had nothing to lie on but the body top, a land of 4 to 8, with the seam gap of the form (1.5) between the two. `pieces.top_ring` now makes joint 7 of the blueprint with the flange code of joint 1, on a level seam "G" at the body top:
+
+- **The top ring** on the five pieces of the body top (brow, upper R and L, upper rear R and L): 14 wide inward of the outer line (`ring_w`), 6 thick (`ring_t`, new: the flange of joint 1), with the gusset of 45 degrees below it, so that it prints with no support. Inside the wall it rises 1.4 to the foot of the hood. The outer 4 of the seam gap, the part that shows, stays open (a test holds this).
+- **The foot of the hood** on the three hood pieces: 14 wide, 6 thick (`hood_foot_t`), with its gusset. It lies on the ring with a bond line of 0.1.
+- **Four cones** of 8 x 3 on the ring, at x +-150 at the front and at the rear, each in a socket of the foot (`OtherJoints.cone_clearance` 0.15). They put the hood in its place, bolted or bonded.
+- The ring and the foot end at the cut faces of the other seams of their module (W1, R3, R5 on the body; H1 on the hood), as the flanges of joint 1 do. The closing gap of the brow and of upper rear R holds for the ring too.
+
+| Piece | Ring or foot, cm3 |
+| --- | --- |
+| brow | 57.5 |
+| upper R, upper L | 68.7 each |
+| upper rear R, upper rear L | 56.7 each |
+| hood centre | 103.5 (front and rear) |
+| hood side R, hood side L | 85.9 each |
+
+**What it costs.** The joints, feet and ribs of the set are now 1437 g at 1.05 g/cm3, 37 % of the plain skin (961 g, 24 %, before). The ring at 12 thick, the value of the blueprint (`ring_h`), was 420 cm3 in a trial build against 308 cm3 now: about 120 g more. `ring_h` stays the depth at an insert. `structure.EXTRAS_SHARE` is now 0.40 of the skin (it was 0.25), so the total mass and the centre of mass of the structure study carry the real joints.
+
+**The checks.** Each piece stays one valid solid inside the limit. No clash between pieces, with the hardware, or with the parts of the rear. The ring and the foot alone have no common volume with any part of the cradle (`cad/out/cradle`) or with any part of hood band A (`cad/out/hood-band/A`).
+
+**Not done.** The M4 inserts and screws of a bolted hood (the blueprint: two pins at the front, two M4 at the rear, inserts in the ring, `ring_h` 12 deep there). Their heads would be inside the hood, on its foot, and no way for the screwdriver to reach them is chosen: from inside the hood through the marquee opening, or from below with the inserts in the foot. The owner has not chosen between a bolted and a bonded hood. The cones and the faces serve both.
+
+**The sheet.** `cad/out/pieces/joints-2/joints-2.png` (`candybar.shell.joint_sheets`, `tools/draw_joint_sheets.py`): the closing gap at W1, R5 and R3, the ring and the foot along the right side, and sections at the front and the rear cone. Every face edge is drawn.
+
 ## The edge finish and the face check
 
 Date: 2026-11-15. `tools/edge_finish.py` and `tools/face_check.py` run on `cad/out/pieces`:
@@ -385,7 +410,7 @@ CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.face_check      # 
 ## Not done
 
 - **The rear door and the frame of its opening.** Another package. The door halves are plain pieces. Seam R1 has only a stub of flange.
-- **The hood on the body top** (joint 7) and the other service seams: no top ring, no inserts.
+- **The inserts of a bolted hood** (joint 7) and the other service seams: see "The top ring and the foot of the hood".
 - **The node plate** (joint 4). The flanges of the three pieces meet at each node, but no plate goes over them.
 - **The cones at the ends of the wall seams** (`OtherJoints.cone_d`). The key locates a seam across the wall and square to the seam. Along the seam, the seams that cross it locate the piece. Only the floor has cones.
 - **The chamfer at the ends of a groove.** The long sides of a groove have the chamfer of 0.3. The ends do not.
