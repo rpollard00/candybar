@@ -131,16 +131,27 @@ def body_box(d: Blueprint, c: cr.Cradle, u: Screen, turned: bool = False) -> tup
     return f.box((-w / 2, w / 2), (v0, v0 + h), (g, g + u.t)), (-w / 2, w / 2, v0, v0 + h, g, g + u.t)
 
 
+TURNED = ("p18",)     # the units that the study also tries with the long side up the face
+
+
 def units(d: Blueprint, c: cr.Cradle, groups: dict[str, Part.Shape]) -> list[dict]:
+    """Each unit at its place: the volume that it shares with each group, and its gap to each group but the skin.
+    The gap to the skin takes an hour for each unit on this machine; the sections give it (tools/larger_monitor_room.py).
+    MONITOR_UNITS names the units to try (default: all)."""
+    only = [k for k in (os.environ.get("MONITOR_UNITS") or "").split(",") if k]
     rows = []
     for u in UNITS:
-        for turned in (False, True):
+        if only and u.key not in only:
+            continue
+        for turned in (False, True) if u.key in TURNED else (False,):
             box, edge = body_box(d, c, u, turned)
             row = {"key": u.key, "name": u.name, "turned": turned, "x": edge[:2], "v": edge[2:4], "t": edge[4:], "with": {}}
             for k, s in groups.items():
-                row["with"][k] = {"common_mm3": round(cr.volume_in(box, s), 1), "gap": round(cr.gap(box, s), 2)}
+                row["with"][k] = {"common_mm3": round(cr.volume_in(box, s), 1)}
+                if k != "skin":
+                    row["with"][k]["gap"] = round(cr.gap(box, s), 2)
+                print(u.key, "turned" if turned else "", k, row["with"][k], flush=True)
             rows.append(row)
-            print(u.key, "turned" if turned else "", {k: (r["common_mm3"], r["gap"]) for k, r in row["with"].items()}, flush=True)
     return rows
 
 

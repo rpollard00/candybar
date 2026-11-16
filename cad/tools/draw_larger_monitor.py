@@ -152,7 +152,7 @@ def sections() -> None:
     span(-287.0, 72.0, 209.5, 72.0, "#005a9c")
     label(120.0, 72.0, "3  behind the ledges the cavity is free\nfrom 287 below to 209 above the centre\nof the image (the shell: sweep and hood)", "#005a9c", ha="left")
     span(40.0, 8.2, 40.0, 96.6, "#1d5e1d")
-    label(40.0, 100.0, "4  from the glass to the keep-out zone\nof the compute module: 88.4", "#1d5e1d", ha="left")
+    label(40.0, 100.0, "4  from the glass to the keep-out zone\nof the compute module: 88.4 on this line,\n65.5 at its nearest point", "#1d5e1d", ha="left")
     label(165.0, -8.0, "5  the ledges are 4.0 thick and end\n11.2 behind the screen face", "#c00000", ha="right")
     ax.set_xlim(150, 640)
     ax.set_ylim(0, 560)
@@ -181,7 +181,7 @@ def sections() -> None:
                                label="plug room of the present unit, 22 each side" if s == 1 else None))
     dim(ax, (-217.34, -24), (217.34, -24), "1  opening between the jambs: 434.7 (the shell)", off=(0, -7))
     dim(ax, (-242.0, 84), (242.0, 84), "2  between the inner faces of the sides, behind the jambs: 484 (the shell); 464 at the top corners of a body 343 high", off=(0, 7), colour="#005a9c")
-    dim(ax, (-120.0, 8.2), (-120.0, 119.7), "3  from the glass to the keep-out zone\nof the compute module: 111.5", off=(-78, 30), colour="#1d5e1d")
+    dim(ax, (-120.0, 8.2), (-120.0, 119.7), "3  from the glass to the keep-out zone\nof the compute module: 111.5 on this line", off=(-78, 30), colour="#1d5e1d")
     ax.text(262, 5.6, "4  the jambs end\n11.2 behind\nthe face", color="#c00000", fontsize=11, ha="center", va="center")
     ax.set_xlim(-290, 290)
     ax.set_ylim(-40, 300)
@@ -197,17 +197,23 @@ def sections() -> None:
     plt.close(fig)
 
 
+ROWS = (("present", False, "Present unit, 16.0 in 16:10"), ("present", True, "Present unit, turned 90 degrees"), ("p173", False, "17.3 in 16:9 portable"),
+        ("p18", False, "A. 18 in 16:10 portable"), ("p18", True, "A, turned 90 degrees"), ("b185", False, "18.5 in 16:9, portable or panel"),
+        ("b19w", False, "B. 19 in 16:10 panel"), ("b19", False, "C. 19 in 5:4: panel, open frame or desktop"), ("b17", False, "17 in 5:4 panel"),
+        ("b15", False, "15 in 4:3 panel"))
+COLUMNS = ("16:10", "16:9", "4:3", "tate 3:4", "tate 9:16")
+
+
 def table() -> str:
-    names = [n for n, _ in mp.SHAPES]
-    lines = ["| Unit | " + " | ".join(names) + " |", "| --- |" + " --- |" * len(names)]
-    for row in mp.table():
-        if row["turned"] and row["key"] not in ("present", "p18", "b19w"):
-            continue
+    """The table of the document: a row for each unit of ROWS, a column for each shape of COLUMNS."""
+    rows = {(r["key"], r["turned"]): r for r in mp.table()}
+    lines = ["| Unit | " + " | ".join(COLUMNS) + " |", "| --- |" + " --- |" * len(COLUMNS)]
+    for key, turned, name in ROWS:
         cells = []
-        for n in names:
-            x = row["cells"][n]
-            cells.append(f"{x['in']:.1f} in, {x['w']:.0f} x {x['h']:.0f} ({x['gain'] * 100:+.0f} %)")
-        lines.append(f"| {row['name']}{', turned 90 degrees' if row['turned'] else ''} | " + " | ".join(cells) + " |")
+        for n in COLUMNS:
+            x = rows[(key, turned)]["cells"][n]
+            cells.append(f"**{x['in']:.1f}** ({x['w']:.0f} x {x['h']:.0f}) {x['gain'] * 100:+.0f} %")
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
 

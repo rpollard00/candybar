@@ -39,7 +39,7 @@ CELL = 0.5
 V0, V1, T0, T1 = -330.0, 380.0, -260.0, 240.0
 OWN = ("hw_Monitor",)                                # the present monitor, its room and its cables
 HOOD = ("skin_hood", "hw_Speaker", "hw_Marquee")     # what leaves with the hood
-MARGIN = 1.0                                         # the unit keeps this clear of each part on its way
+MARGIN = 0.6                                         # the unit keeps this clear of each part on its way (the raster is 0.5)
 
 
 def grid() -> tuple[np.ndarray, tuple[int, int]]:
@@ -124,8 +124,9 @@ def way(mask: np.ndarray, h: float, t: float, seat: tuple[float, float], frame: 
     rim = outline(h + 2 * MARGIN, t + 2 * MARGIN)
     tilts = np.arange(-30.0, 91.0, 2.0)
     step = 3.0
-    av = np.arange(-240.0, 300.0, step)
-    bt = np.arange(-240.0, 180.0, step)
+    # the seat is a point of the grid
+    av = seat[0] + np.arange(-80, 100) * step
+    bt = seat[1] + np.arange(-85, 55) * step
     cz, upz, intoz = frame["c"][2], frame["up"][2], frame["into"][2]
 
     def pose(k):
@@ -189,7 +190,10 @@ def paths(cuts: dict) -> list[dict]:
     # the body top: the highest point of the skin of the body in the centre section
     frame["top_z"] = max(p[4] for loop in sides[0.0]["skin_body"] for p in loop)
     rows = []
+    only = [k for k in (os.environ.get("MONITOR_UNITS") or "").split(",") if k]
     for u in mp.UNITS:
+        if only and u.key not in only:
+            continue
         for turned in (False, True):
             w, h, up = (u.h, u.w, 0.0) if turned else (u.w, u.h, u.up)
             seat = (-up, mp.glass_t(w, h) + u.t / 2)
