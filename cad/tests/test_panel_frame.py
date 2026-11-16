@@ -1,5 +1,6 @@
 """The control panel of candybar.shell.panel_frame: the interface, the arcade panel on the hardware of fit.Layout,
-the blank panel, the frame, and the checks of the package on the real skin of the deck."""
+the blank panel, the frame, the latch (the push bolt by default, the screws and the magnets as options), and the
+checks of the package on the real skin of the deck."""
 from __future__ import annotations
 
 import functools
@@ -40,6 +41,15 @@ def scene() -> tuple[Part.Shape, pf.Hardware]:
 @functools.cache
 def report() -> dict:
     return pf.check(built(), *scene(), values())
+
+
+@functools.cache
+def option(latch: str) -> pf.Built:
+    return pf.build(i=pf.Interface(latch=latch), v=values())
+
+
+def pocket(i: pf.Interface) -> float:
+    return i.magnet_d + i.magnet_clear
 
 
 def cylinders(shape: Part.Shape, diameter: float) -> int:
@@ -140,15 +150,18 @@ class ArcadeTest(unittest.TestCase):
         self.assertLess(min(math.dist(p, q) for k, p in enumerate(centres) for q in centres[k + 1:]), v("btn_nut_d"))
 
     def test_the_latch_is_one_value(self) -> None:
-        i = self.b.i
-        self.assertEqual(i.latch, pf.SCREW)
-        self.assertEqual(cylinders(self.whole, i.screw_hole_d), 4)
-        magnet = replace(i, latch=pf.MAGNET)
-        tiles = Part.makeCompound(list(pf.arcade(self.b.d, magnet, self.b.a, values()).values()))
-        self.assertEqual(cylinders(tiles, i.screw_hole_d), 0)
-        self.assertTrue(near(support.hole_centres(tiles, i.magnet_d + i.magnet_clear), pf.latch_points(self.b.d, i)))
-        frame = Part.makeCompound(list(pf.frame(self.b.d, magnet).values()))
-        self.assertTrue(near(support.hole_centres(frame, i.magnet_d + i.magnet_clear), pf.latch_points(self.b.d, i)))
+        """The push bolt is the default (the owner, 2026-11-15): a pocket for a disc at each latch point and no screw
+        hole. The screws (the fall-back) and the magnets alone stay options on the same four points."""
+        i, d = self.b.i, self.b.d
+        self.assertEqual(i.latch, pf.PUSH_BOLT)
+        self.assertEqual(cylinders(self.whole, i.screw_hole_d), 0)
+        self.assertTrue(near(support.hole_centres(self.whole, pocket(i)), pf.latch_points(d, i)))
+        screw = Part.makeCompound(list(option(pf.SCREW).arcade.values()))
+        self.assertTrue(near(support.hole_centres(screw, i.screw_hole_d), pf.latch_points(d, i)))
+        magnet = option(pf.MAGNET)
+        for part in (magnet.arcade, magnet.frame):
+            self.assertTrue(near(support.hole_centres(Part.makeCompound(list(part.values())), pocket(i)), pf.latch_points(d, i)))
+        self.assertEqual(magnet.latch, {})
 
 
 class BlankTest(unittest.TestCase):
@@ -163,8 +176,13 @@ class BlankTest(unittest.TestCase):
         i = self.b.i
         points = pf.latch_points(self.b.d, i)
         for panel in (self.blank, self.arcade):
-            self.assertTrue(near(support.hole_centres(panel, i.screw_hole_d), points))
+            self.assertTrue(near(support.hole_centres(panel, pocket(i)), points))
             self.assertEqual(cylinders(panel, i.cable_bore), 1)
+
+    def test_it_has_the_finger_hole_and_the_arcade_panel_has_none(self) -> None:
+        x, yl, dia = self.b.i.push.finger_hole
+        self.assertTrue(near(support.hole_centres(self.blank, dia), [(x, pf.y0(self.b.d) + yl)]))
+        self.assertEqual(cylinders(self.arcade, dia), 0)
 
     def test_its_sockets_take_the_cones_of_the_frame(self) -> None:
         frame = Part.makeCompound([self.b.frame["frame_left"], self.b.frame["frame_right"]])
@@ -208,8 +226,8 @@ class FrameTest(unittest.TestCase):
             self.assertAlmostEqual(post.BoundBox.ZMax, d.panel_top - d.panel_t - d.wall_t - i.bond_gap - i.bar_h - i.bond_gap)
 
     def test_the_insert_is_under_each_screw(self) -> None:
-        i = self.b.i
-        frame = Part.makeCompound(list(self.b.frame.values()))
+        i = option(pf.SCREW).i
+        frame = Part.makeCompound(list(option(pf.SCREW).frame.values()))
         self.assertTrue(near(support.hole_centres(frame, i.insert_hole_d), pf.latch_points(self.b.d, i)))
         self.assertGreaterEqual(i.latch_hole_depth, i.latch_screw_l - self.b.d.panel_t + 1.0)
 
@@ -232,7 +250,7 @@ class ChecksTest(unittest.TestCase):
         from tools import edge_finish as ef, face_check as fc
 
         b = built()
-        parts = {**b.frame, **b.arcade, **b.blank}
+        parts = b.parts
         self.assertEqual(set(parts), set(pf.PARTS))
         rows = ef.survey(parts, b.d)
         self.assertEqual(ef.failures(rows), [])
@@ -261,8 +279,21 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual([r for r in rows if r["result"] != "PASS"], [])
         self.assertTrue(any(r["what"].startswith("Lever_Tip") for r in rows))
 
-    def test_the_panel_lifts_straight_out(self) -> None:
-        self.assertEqual([r for r in report()["lift"] if r["result"] != "PASS"], [])
+    def test_the_panel_comes_out_with_the_button_held_and_not_without_it(self) -> None:
+        rep = report()
+        self.assertGreater(len(rep["lift"]), 20)
+        self.assertEqual([r for r in rep["lift"] if r["result"] != "PASS"], [])
+        self.assertTrue(any(r["step"].startswith("blank panel") for r in rep["lift"]))
+        self.assertEqual(len(rep["locks"]), 2)
+        self.assertEqual([r for r in rep["locks"] if r["result"] != "PASS"], [])
+
+    def test_the_options_still_build_and_pass(self) -> None:
+        """The screws (the fall-back) and the magnets alone: each passes every check of the package."""
+        skin, hw = scene()
+        for latch in (pf.SCREW, pf.MAGNET):
+            rep = pf.check(option(latch), skin, hw, values())
+            self.assertEqual(rep["failures"], [], latch)
+            self.assertEqual([r for r in rep["lift"] if r["result"] != "PASS"], [], latch)
 
     def test_a_panel_that_hooks_under_the_ledge_does_not_lift_out(self) -> None:
         b = built()
@@ -274,13 +305,17 @@ class ChecksTest(unittest.TestCase):
 
     def test_each_part_fits_the_printer_and_needs_no_support(self) -> None:
         rows = report()["print"]
-        self.assertEqual(len(rows), 10)
+        self.assertEqual(len(rows), 12)
         for r in rows:
             self.assertTrue(r["fits"], r["part"])
-            # a tile lies on its top face: the round of the edge break and the countersinks are all that looks down
+            # a tile lies on its top face: the round of the edge break, the hooks and the lips of the strike are all
+            # that looks down; each half of the frame has the roof of a notch of a hook (a bridge), the left half also
+            # the roofs of the tunnel; the bolt has the round of its button and the bore of its spring
             self.assertLess(r["overhang_cm2"], 6.0, r["part"])
-            if not r["part"].startswith(("panel", "blank")):
+            if r["part"].startswith(("post", "latch_gate")):
                 self.assertEqual(r["overhang_cm2"], 0.0, r["part"])
+            if r["part"].startswith(("frame", "latch_bolt")):
+                self.assertLess(r["overhang_cm2"], 4.0, r["part"])
 
     def test_no_sharp_edge_shows_and_no_face_fails(self) -> None:
         rep = report()
@@ -317,3 +352,57 @@ class StiffnessTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PushBoltTest(unittest.TestCase):
+    """The latch of the default build: the rear hooks, the push bolt in its tunnel, the gate, the magnets in the frame
+    and the steel discs in the plate (docs/design/control-panel-latch.md)."""
+
+    def setUp(self) -> None:
+        self.b = built()
+        self.d, self.i, self.p = self.b.d, self.b.i, self.b.i.push
+
+    def test_the_halves_of_the_frame_meet_at_x_20_and_the_left_half_has_the_tunnel(self) -> None:
+        left, right = self.b.frame["frame_left"], self.b.frame["frame_right"]
+        g = self.i.half_gap / 2
+        self.assertAlmostEqual(left.BoundBox.XMax, self.p.frame_split_x - g, places=4)
+        self.assertAlmostEqual(right.BoundBox.XMin, self.p.frame_split_x + g, places=4)
+        tunnel = pf.tunnel(self.d, self.i, self.p)
+        self.assertLess(tunnel.cut(left).Volume, 1.0)
+
+    def test_the_frame_has_a_magnet_in_each_pad_and_the_plate_a_steel_disc(self) -> None:
+        frame = Part.makeCompound([self.b.frame["frame_left"], self.b.frame["frame_right"]])
+        self.assertTrue(near(support.hole_centres(frame, pocket(self.i)), pf.latch_points(self.d, self.i)))
+        self.assertEqual((self.i.pad_magnet_h(), self.i.keeper_h, self.p.plate_disc), (2.0, 2.0, pf.STEEL))
+        hw = pf.latch_hardware(self.d, self.i)
+        self.assertEqual(set(hw), {"magnets", "discs", "spring"})
+        self.assertEqual(set(pf.latch_split(hw)[0]), {"discs"})
+
+    def test_the_gap_round_the_button_is_the_same_all_round(self) -> None:
+        """The button is the outline of its hole in the deck moved in by button_gap: the distance from each point of
+        its outline to the hole's outline is button_gap, at the round, the flats and the corners."""
+        from candybar.shell import solids as so
+
+        d = self.d
+        button = pf.button_outline(d, self.p)
+        r, fx, z = d.latch_button_d / 2, d.latch_button_flats / 2, d.latch_button_z
+        hole = Part.makeCylinder(r, 1.0, pf.V(0, -0.5, z), pf.V(0, 1, 0)).common(pf.box(-fx, fx, -0.5, 0.5, z - r - 1, z + r + 1))
+        corners = [e for e in hole.Edges if abs(e.BoundBox.YLength - 1.0) < 1e-6 and e.BoundBox.XLength < 1e-6 and e.BoundBox.ZLength < 1e-6]
+        hole = hole.makeFillet(so.LATCH_CORNER, corners)
+        rim = hole.slice(pf.V(0, 1, 0), 0.0)[0]
+        gaps = [rim.distToShape(Part.Vertex(q))[0] for w in button.Wires for q in w.discretize(Distance=0.1)]
+        self.assertAlmostEqual(min(gaps), self.p.button_gap, places=4)
+        self.assertAlmostEqual(max(gaps), self.p.button_gap, places=4)
+        self.assertGreater(so.LATCH_CORNER - self.p.button_gap, d.edge_break)
+
+    def test_the_bolt_and_the_gate_are_parts_and_the_button_has_its_edge_break(self) -> None:
+        bolt = self.b.latch["latch_bolt"]
+        self.assertTrue(bolt.isValid() and len(bolt.Solids) == 1)
+        self.assertGreater(len([f for f in bolt.Faces if f.BoundBox.YMax < pf.SHOWN and isinstance(f.Surface, (Part.Toroid, Part.Cylinder, Part.BSplineSurface))]), 0)
+        self.assertEqual([g for g in report()["edge_finish"]["latch_bolt"]["sharp"] if not g["against"]], [])
+
+    def test_a_button_with_no_edge_break_fails_the_edge_rule(self) -> None:
+        bare = pf.bolt(self.d, self.p).cut(pf.box(-50, 50, -50, 1.5, 0, 100))
+        bare = bare.fuse(pf.box(-5, 5, 1.0, 2.0, 53, 57)).removeSplitter()
+        _, bad, _ = pf.finish_rows({"latch_bolt": bare}, self.d, self.i)
+        self.assertTrue(any(line.startswith("edge rule: latch_bolt") for line in bad), bad)

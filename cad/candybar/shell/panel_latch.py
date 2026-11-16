@@ -283,6 +283,25 @@ def build(c: str, d: Blueprint | None = None, a: pf.Arcade | None = None, v=None
     return Candidate(c, d, i, L, frame, fixed, arcade, blank, on_panel, moving)
 
 
+def latch_of(i: pf.Interface) -> Latch:
+    """The values of the study for the push bolt of an interface (its PushBolt, its magnets)."""
+    keep = {f.name: getattr(i.push, f.name) for f in fields(pf.PushBolt) if f.name != "pad_magnet_h"}
+    return replace(L0, **keep, frame_magnet_h={**L0.frame_magnet_h, "B": i.push.pad_magnet_h}, plate_magnet_h=i.keeper_h)
+
+
+def default_hold(b: pf.Built, v) -> dict:
+    """The estimates of the study for a build of panel_frame with PUSH_BOLT: the pull of a latch point, the hold with
+    its factor, the play, the lift out with the button held, and the preload of the wedge."""
+    cd = Candidate("B", b.d, b.i, latch_of(b.i), b.frame, {"latch_gate": b.latch["latch_gate"]}, b.arcade, b.blank, {},
+                   {"latch_bolt": b.latch["latch_bolt"]})
+    L = cd.L
+    play = hold(cd, v, preload_only=True, loads=[{"name": f"play {L.play:g} {k}", "f": f} for k, f in
+                                                  (("to the front", (0, -L.play, 0)), ("to the rear", (0, L.play, 0)),
+                                                   ("to the left", (-L.play, 0, 0)), ("to the right", (L.play, 0, 0)))])
+    return {"magnet": pull_of(cd), "hold_factor": hold(cd, v)["factor"], "play_factor": play["factor"], "removal": removal(cd, v),
+            "preload": bolt_preload(L)}
+
+
 # ---------- the motion ----------
 
 def way_out(c: str, L: Latch = L0) -> list[Step]:
@@ -806,7 +825,7 @@ def interface_rows(cd: Candidate) -> list[list[str]]:
                      f"Its tip at {yl(rear_bar_face(d, cd.i) + L.notch_back - L.toe_tip_gap)}. A blank panel prints them with its tiles."])
     if cd.c == "B":
         rows.append(["Strike (1)", f"At the front centre, {yl(L.lug_y[0])} to {yl(L.lug_y[1])}: two legs each side of x 0 ({L.bolt_w / 2 + L.bolt_clear:g} to {L.bolt_w / 2 + L.bolt_clear + L.lug_leg_t:g}), down to z {L.lug_z0:g}, each with a lip {L.lug_lip:g} in under the bolt; the top of each lip falls {L.wedge_deg:g} degrees to the rear."])
-        rows.append(["Room below the plate", f"Less the box of the bolt: x -{L.housing_w / 2 + 0.5:g} to +{L.housing_w / 2 + 0.5:g}, {yl(L.housing_y[0])} to {yl(L.housing_y[1] + 0.5)}, z 48.3 to the rest face. "
+        rows.append(["Room below the plate", f"Less the box of the bolt: x -{L.housing_w / 2 + 0.5:g} to +{L.housing_w / 2 + 0.5:g}, {yl(L.housing_y[0])} to {yl(L.housing_y[1] + L.room_rear)}, z 48.3 to the rest face. "
                      "A rib that crosses it (the front rib of the arcade panel, the seam of the blank panel) stops at it."])
         x, ylh, dia = L.finger_hole
         rows.append(["Grip", f"A panel with nothing to hold has a finger hole of {dia:g} through the plate at x {x:g}, yl {ylh:g}, with the edge break on both rims. It is not a part of the interface: a panel with a lever or keys lifts by them."])

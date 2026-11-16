@@ -104,9 +104,10 @@ RUN_OUT = ("hood: the round of the rear corner runs out on the roof, where the s
 KINK = ("hood: the wall of the front opening has a concave kink of 11.5 degrees at each lower corner, where the round of the sill "
         "corner ends upright and the leg starts with its lean (the form of R10). The ball of the edge break turns about that "
         "kink between the break along the corner and the break along the leg")
-LATCH = ("deck: the edge break by hand on the rim of the latch button's hole (solids.deck): at each corner, where a flat of the "
-         "hole meets its round (round in plan, solids.LATCH_CORNER), the lofts of the break meet in a narrow patch, and the face of "
-         "the break is split at the top and the bottom of the hole")
+LATCH = ("deck: the hole of the latch button (solids.deck): at each corner, where a flat of the hole meets its round, the corner "
+         "is rounded in plan by solids.LATCH_CORNER (1.5, so that the button's corner of 1.2 keeps the gap of 0.3 and takes its "
+         "edge break); the corner turns 31 degrees only, so its face is about 0.8 wide. The face of the break by hand is split at "
+         "the top and the bottom of the hole")
 
 KNOWN: tuple[Known, ...] = (
     Known("body", "sliver", (246.8, 549.8, 305.0), "1.20 wide, 4.2 mm2", HIP_TOP, within=0.5),
@@ -117,8 +118,8 @@ KNOWN: tuple[Known, ...] = (
     Known("body", "kink", (234.8, 297.6, 200.9), "2.5 degrees along 214.5, below the tuck", RAIL),
     Known("body", "kink", (232.6, 390.2, 357.5), "2.5 degrees along 153.9, in the tuck", RAIL),
     Known("body", "kink", (223.9, 438.2, 422.4), "2.2 degrees along 4.2, in the seam bevel", RAIL),
-    Known("deck", "sliver", (6.7, 0.9, 51.6), "0.46 wide, 0.7 mm2: the patch at the lower corner of the hole", LATCH, within=1.0),
-    Known("deck", "sliver", (6.7, 2.3, 59.2), "0.45 wide, 0.8 mm2: the patch at the upper corner of the hole", LATCH, within=1.0),
+    Known("deck", "sliver", (6.2, 5.4, 51.6), "0.89 wide, 6.9 mm2: the face of the lower corner of the hole", LATCH, within=1.0),
+    Known("deck", "sliver", (6.2, 6.1, 59.0), "0.89 wide, 5.6 mm2: the face of the upper corner of the hole", LATCH, within=1.0),
     Known("deck", "split", (0.0, 3.0, 62.9), "the face of the break at the top of the hole, split on the centre line, 1.6 long", LATCH, within=1.0),
     Known("deck", "split", (0.0, 0.4, 47.9), "the face of the break at the bottom of the hole, split on the centre line, 1.0 long", LATCH, within=1.0),
     Known("hood", "sliver", (181.3, 522.6, 572.9), "0.77 wide, 6.4 mm2: the last face of the round, 1.6 wide where it starts, 10 long", RUN_OUT, within=1.0),

@@ -39,8 +39,9 @@ def report(c: str) -> dict:
 
 
 class DefaultTest(unittest.TestCase):
-    def test_the_default_stays_the_screws_and_option_b_stays_as_it_is(self) -> None:
-        self.assertEqual(pf.Interface().latch, pf.SCREW)
+    def test_b_is_the_default_and_option_b_stays_as_it_is(self) -> None:
+        self.assertEqual(pf.Interface().latch, pf.PUSH_BOLT)
+        self.assertEqual(pl.interface("B"), pf.Interface())
         b = pf.Interface(latch=pf.MAGNET)
         self.assertEqual((b.magnet_d, b.magnet_h, b.keeper_h), (12.0, 5.0, 2.0))
 
@@ -48,7 +49,7 @@ class DefaultTest(unittest.TestCase):
         d = Blueprint()
         for c in pl.CANDIDATES:
             i = pl.interface(c)
-            self.assertEqual(i.latch, pf.MAGNET, c)
+            self.assertEqual(i.latch, pf.PUSH_BOLT if c == "B" else pf.MAGNET, c)
             self.assertEqual((i.magnet_d, i.keeper_h), (12.0, 2.0), c)
             self.assertEqual(pf.latch_points(d, i), pf.latch_points(d, pf.Interface()), c)
 

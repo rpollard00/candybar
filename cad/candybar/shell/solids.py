@@ -309,7 +309,8 @@ def warped_wire(path: pr.Path, place: Place, flat: Place) -> Part.Wire:
 
 # ---------- deck ----------
 
-LATCH_CORNER = 0.5   # the round in plan of the four corners of the latch button's hole
+LATCH_CORNER = 1.5   # the round in plan of the four corners of the latch button's hole: larger than the edge break of
+                     # the button's rim plus the gap (panel_frame.button_outline), so that the gap is even all round
 
 
 def latch_button_hole(d: Blueprint, deck_solid: Part.Shape, past: float) -> tuple[Part.Shape, float] | None:
@@ -325,7 +326,8 @@ def latch_button_hole(d: Blueprint, deck_solid: Part.Shape, past: float) -> tupl
     cyl = Part.makeCylinder(r, length, V(0, y1, z), V(0, 1, 0))
     tool = cyl.common(Part.makeBox(2 * fx, length, 2 * r + 2.0, V(-fx, y1, z - r - 1.0)))
     # the four corners where the flats meet the round are rounded in plan (LATCH_CORNER), so that the rim is one smooth
-    # loop that the edge break can follow; the button (14 with flats 12) keeps its gap of 0.3 there but for about 0.2
+    # loop that the edge break can follow; the button's outline is this outline moved in by its gap (0.3), so that the
+    # gap is the same at the corners (2026-11-16)
     corners = [e for e in tool.Edges if abs(e.BoundBox.YLength - length) < 1e-6 and e.BoundBox.XLength < 1e-6 and e.BoundBox.ZLength < 1e-6
                and abs(abs(e.BoundBox.XMin) - fx) < 1e-6]
     if len(corners) == 4:

@@ -4,7 +4,7 @@ Date: 2026-11-16. Roadmap step 12. This document gives the latch of the control 
 
 The owner rejected the screws of option A (2026-11-14): "I don't like screws as it defeats how swappable it is. Magnets plus a printed latch mechanism to keep it from moving? We can fall back to screws but we should investigate more." The study built four latches with no tool. The owner chose B (2026-11-15): "Yeah we can do the button on the decks front face. Ideally on the center line. I don't think it needs to pop up, pushing it in should allow it to be lifted out. I think simpler is better here with less chance of failure."
 
-The source is `cad/candybar/shell/panel_latch.py`. The tests are in `cad/tests/test_panel_latch.py`. The drawings come from `cad/tools/draw_panel_latch.py`. The build output is `cad/out/panel-latch/` (not in git). The default of `panel_frame.Interface.latch` is still `SCREW` in the code. "For the shared files" gives the change that makes B the default.
+The source is `cad/candybar/shell/panel_latch.py`. The tests are in `cad/tests/test_panel_latch.py`. The drawings come from `cad/tools/draw_panel_latch.py`. The build output is `cad/out/panel-latch/` (not in git). Since 2026-11-16 B is the default of the build: `panel_frame.Interface.latch` is `PUSH_BOLT`, its values are `panel_frame.PushBolt`, and its functions are in `panel_frame.py` (see "For the shared files", done). This module builds B from there and keeps M, H and Q as the record of the study.
 
 All dimensions are in millimetres, in the frame of `dims.py`. A depth with the name `yl` is a distance from the front edge of the panel at the centre line, as in `control-panel.md`. A value marked ESTIMATED is a calculation, not a test.
 
@@ -17,7 +17,8 @@ Two hooks under the rear edge of the panel hold the rear edge. One bolt at the f
 - **The strike.** Two legs under the front edge of the panel, each side of the bolt, with a lip on each leg in under the bolt.
 - **The spring.** A steel spring pushes the bolt forward. The underside of the bolt and the top of each lip meet at 8 degrees. Thus the spring pulls the panel down through the wedge (the preload). A lift of the panel cannot push the bolt back while the friction coefficient is more than 0.14. ABS on ABS is 0.25 to 0.45 (ESTIMATED).
 - **The gate.** A small printed plate dropped into a slot at the rear of the tunnel. The spring pushes against it. The plate of a seated panel stands 0.7 above the gate, so the gate cannot leave its slot while a panel is in.
-- **The magnets.** A pair of 12 x 2 discs at each of the four latch points of `control-panel.md`. The two at the front keep the front corners down (see "The front corners").
+- **The magnets.** A magnet of 12 x 2 in the frame at each of the four latch points of `control-panel.md`, and a steel disc of 12 x 2 above it in the panel (the user, 2026-11-16). The two at the front keep the front corners down (see "The front corners").
+- **The button.** The outline of its hole moved in by 0.3: the gap is 0.3 all round. The hole's corners are R 1.5 and the button's R 1.2 (2026-11-16; before, a sharp button in corners of 0.5 had 0.292 at the corners).
 
 ### To take the panel out
 
@@ -424,11 +425,15 @@ The latch was built and tested on the server (OpenCascade 7.8.1). The laptop (Op
 
 ## Open questions for the owner
 
-1. Is a pull of 55 N on the lever acceptable to lift the panel out with the button held? Steel discs in the panel give about 10 % less. Weaker front magnets give less, but the front corners can then click in hard play.
-2. Is a finger hole of 22 in the blank panel acceptable as its grip?
-3. Magnets or steel discs in each panel?
+Answered by the user on 2026-11-16:
+
+1. The lift-out force of about 55 N on the lever is the starting value. With steel discs in the panel the estimate is 49.2 N on the lever and 31.1 N at the finger hole (the build of 2026-11-16, `cad/out/control-panel/report.md`). After the first print, the size of the front magnets is the thing to change: weaker front magnets give less force, but the front corners can then click in hard play.
+2. The blank panel has the finger hole of 22.
+3. The panels carry steel discs of 12 x 2, and the frame carries the magnets. With steel discs one latch point holds 14.1 N (ESTIMATED), the hold in the worst case has a factor of 2.85 and the preload in normal play a factor of 7.3.
 
 ## For the shared files
+
+Done on 2026-11-16, with these differences: the values of B are in `panel_frame.PushBolt` (a field of `Interface`), not in `Interface` itself; the estimates of the hold stay in `panel_latch.py`, and `panel_frame.check()` reports them for the default (`panel_latch.default_hold`); the halves of the frame are cut at x 20 directly, not joined again and cut (the study's `resplit`); the room of the bolt reaches 3 behind the tunnel (0.5 before), because the seam rib of the blank panel swings into the end of the roof at 3 to 4 degrees.
 
 ### `cad/candybar/shell/panel_frame.py` (on the laptop)
 

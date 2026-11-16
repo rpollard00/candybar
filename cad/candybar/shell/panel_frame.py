@@ -116,6 +116,9 @@ class PushBolt:
     gate_x: tuple = (-8.4, 10.6)
     gate_tab: float = 2.0          # the gate stands this much above the roof: a grip for the fingers
     gate_slot_clear: float = 0.2
+    # behind the tunnel the room of a panel stops room_rear back: a rib on the centre line (the seam of the blank
+    # panel) sweeps 1.1 forward into the end of the roof as the front swings up 3 to 4 degrees
+    room_rear: float = 3.0
     frame_split_x: float = 20.0    # the halves of the frame meet here, not on the centre line: the tunnel is whole in the left half
     # a panel with nothing to hold (the blank panel) has a finger hole near its front edge (the user, 2026-11-16)
     finger_hole: tuple = (50.0, 37.0, 22.0)   # x, yl, diameter
@@ -428,7 +431,11 @@ def bolt(d: Blueprint, p: PushBolt = PB0, s: float = 0.0) -> Part.Shape:
     outside = side_prism([(-20.0, crease - 40.0), (-20.0, crease + 60.0), (60.0 * t, crease + 60.0), (-40.0 * t, crease - 40.0)],
                          -20.0, 20.0)
     head = so.unsplit(head.cut(outside))
-    front = box(-hw, hw, head_y1 - 1, neck0 + 0.5, z0, z1)
+    # the lower face of the front of the bar starts where the flats of the button end (above z0 by 0.04), so that the
+    # side of the bar and the flat of the button are one face with a straight lower edge
+    r, fx, c = d.latch_button_d / 2, d.latch_button_flats / 2, so.LATCH_CORNER
+    flat_low = d.latch_button_z - math.sqrt((r - c) ** 2 - (fx - c) ** 2)
+    front = box(-hw, hw, head_y1 - 1, neck0 + 0.5, max(z0, flat_low), z1)
     narrow = box(-p.neck_w / 2, p.neck_w / 2, neck0, neck1, under(p, neck1), z1)
     lock = side_prism([(neck1, under(p, neck1)), (yw1, z0), (p.bolt_end_y, z0), (p.bolt_end_y, z1), (neck1, z1)], -hw, hw)
     # the stop block stands out on the +x side only: the -x side of the bolt is one plane, which lies on the bed
@@ -555,11 +562,11 @@ def front_notch(d: Blueprint, i: Interface, p: PushBolt = PB0) -> Part.Shape:
 
 
 def bolt_room(p: PushBolt = PB0) -> Part.Shape:
-    """What B takes from the room below the plate: the box of the tunnel, the gate and the travel of the bolt, with
-    room_gap round it. A panel keeps clear of it, but for its strike."""
+    """What the push bolt takes from the room below the plate: the box of the tunnel, the gate and the travel of the
+    bolt, with 0.5 round it and room_rear behind it. A panel keeps clear of it, but for its strike."""
     g = 0.5
     hw = p.housing_w / 2 + g
-    return box(-hw, hw, p.housing_y[0], p.housing_y[1] + g, 48.8 - g, 65.0)
+    return box(-hw, hw, p.housing_y[0], p.housing_y[1] + p.room_rear, 48.8 - g, 65.0)
 
 
 def finger_hole(d: Blueprint, tiles: dict[str, Part.Shape], p: PushBolt = PB0) -> dict[str, Part.Shape]:
@@ -990,7 +997,11 @@ def room(d: Blueprint, i: Interface, fr: dict[str, Part.Shape], hw: Hardware) ->
     below = box(-so.BIG, so.BIG, -so.BIG, so.BIG, -so.BIG, zr)
     sb = strike(d, i, p).BoundBox
     extra = [n.common(below) for n in notches(d, i, p)] + [box(sb.XMin, sb.XMax, sb.YMin, sb.YMax, sb.ZMin, sb.ZMax)]
-    return one_solid(so.unsplit(out.fuse(extra)), "the room below the plate")
+    # the place of the strike is an island inside the room of the bolt: the room is two solids
+    out = so.unsplit(out.fuse(extra))
+    if not out.isValid():
+        raise RuntimeError("the room below the plate: not a valid shape")
+    return out
 
 
 # ---------- the checks ----------
@@ -1328,6 +1339,11 @@ def check(b: Built, skin: Part.Shape, hw: Hardware, v, log=lambda text: None) ->
         locks = locked_rows(d, i, b.frame)
     else:
         lifts, locks = lift_rows(b.arcade, hw, b.frame, skin), []
+    held = None
+    if push:
+        log("hold (the estimates of panel_latch)")
+        from . import panel_latch  # noqa: PLC0415 - the study imports this module
+        held = panel_latch.default_hold(b, v)
     log("print")
     prints = print_rows(b.parts)
     log("edges and faces")
@@ -1340,7 +1356,7 @@ def check(b: Built, skin: Part.Shape, hw: Hardware, v, log=lambda text: None) ->
     failures += bad
     return {"interface": asdict(i), "arcade": asdict(b.a), "latch_points": latch_points(d, i), "cone_points": cone_points(d, i),
             "seam_x": seam_x(b.a), "room_volume_cm3": round(space.Volume / 1000, 1), "room_box": box_of(space),
-            "clashes": clashes, "clashes_blank": clashes_blank, "room": rooms, "lift": lifts, "locks": locks, "print": prints,
+            "clashes": clashes, "clashes_blank": clashes_blank, "room": rooms, "lift": lifts, "locks": locks, "hold": held, "print": prints,
             "stiffness": stiffness(d, i, b.a, v), "edge_finish": edges, "face_check": faces, "failures": failures}
 
 
@@ -1519,6 +1535,13 @@ def markdown(rep: dict) -> str:
     if rep.get("locks"):
         lines += ["", "| The lock holds | Common volume, mm3 | Result |", "| --- | --- | --- |"]
         lines += [f"| {r['what']} | {r['common_mm3']} | {r['result']} |" for r in rep["locks"]]
+    if rep.get("hold"):
+        h = rep["hold"]
+        lines += ["", "## The hold of the push bolt (ESTIMATED, candybar.shell.panel_latch)", "",
+                  f"One latch point: a magnet {h['magnet']['frame'][0]:g} x {h['magnet']['frame'][1]:g} in the pad on a {h['magnet']['plate_disc']} disc "
+                  f"{h['magnet']['plate'][0]:g} x {h['magnet']['plate'][1]:g} in the plate: {h['magnet']['pull_N']:g} N. The hold in the worst load case: factor "
+                  f"{h['hold_factor']:.2f}; in normal play: factor {h['play_factor']:.2f}.", "",
+                  f"To take the panel out: {h['removal']['how']}"]
     lines += ["", "## Stiffness (hand estimate)", "", f"Load {st['load_N']:g} N on the ball, {st['arm_mm']:g} above the panel: a couple of {st['couple_Nmm'] / 1000:g} N m. "
               f"E {st['E_MPa']:g} MPa. Span {st['span_mm']:g}, bay {st['bay_mm']:g}, ribs {st['rib_spacing_mm']:g} apart.", "",
               "| Case | I of the bay, mm4 | Forward: slope, mrad | Deflection, mm | Ball moves, mm | Sideways: slope, mrad | Ball moves, mm |", "| --- | --- | --- | --- | --- | --- | --- |"]
