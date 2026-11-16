@@ -11,10 +11,12 @@ stays as it is. Each candidate starts from option B (a magnet pair at each of th
   M  magnets and shear keys only: the largest frame magnet that the pad takes (12 x 10). The cones stay. Straight lift.
   H  hook and drop: two hooks under the rear edge of the panel go into notches in the rear bar of the frame. The
      panel swings down about its rear top edge. The magnets (12 x 5 in the frame) hold the front edge.
-  B  hooks and a push bolt: the hooks of H, and one bolt at the front centre. The bolt is a printed slider in a
-     housing under the frame. Its front end is a flush button in the front face of the deck. Push the button: the
-     bolt slides back, two springs lift the front edge of the panel 7 mm, and the panel swings out. A steel spring
-     pushes the bolt forward again. A wedge of 8 degrees on the bolt pulls the panel down (the preload).
+  B  hooks and a push bolt (the owner's choice, 2026-11-15; this is its final form): the hooks of H, and one bolt
+     at the front centre. The bolt is a printed bar in a tunnel that is one print with the left half of the frame.
+     Its front end is a flush button in the front face of the deck, on the centre line. Hold the button in and lift
+     the panel out by hand. A steel spring pushes the bolt forward again; a gate dropped into the rear of the tunnel
+     holds the spring. A wedge of 8 degrees under the bolt pulls the panel down (the preload). Magnets in all four
+     pads. A panel with nothing to hold has a finger hole.
   Q  hooks and two quarter-turn cams: the hooks of H, and two printed cams in the panel near its front edge. A cam
      has a flush head with a finger bar on the top face; its tongue turns under the front bar of the frame.
 
@@ -54,8 +56,8 @@ class Latch:
     # ---- the magnets (all candidates): a disc in each pad of the frame, a disc of 12 x 2 in the plate (the pocket
     # of option B, 12.2 x 2.2, does not change). The frame magnet of each candidate:
     frame_magnet_h: dict = field(default_factory=lambda: {"M": 10.0, "H": 5.0, "B": 2.0, "Q": 2.0})
-    # B has magnets at the two rear latch points only: the bolt holds and preloads the front
-    magnet_points: dict = field(default_factory=lambda: {"M": (0, 1, 2, 3), "H": (0, 1, 2, 3), "B": (2, 3), "Q": (0, 1, 2, 3)})
+    # B has them at all four: the front two keep the front corners down (see corner_rock)
+    magnet_points: dict = field(default_factory=lambda: {"M": (0, 1, 2, 3), "H": (0, 1, 2, 3), "B": (0, 1, 2, 3), "Q": (0, 1, 2, 3)})
     plate_magnet_h: float = 2.0
     # ESTIMATED pull of an N52 disc of 12 diameter on thick steel at contact (maker's data, case 1): 46 N for 12 x 5
     # (one maker), 50 N for 12.7 x 4.76 (another). Other thicknesses: F = f_inf (1 - exp(-h / h0)), fitted to these
@@ -101,20 +103,22 @@ class Latch:
     bolt_end_y: float = 66.0
     stop_y: float = 61.0           # the stop block on the bolt (it limits the forward travel with the panel out)
     stop_w: float = 18.0
+    # the tunnel of the bolt: one print with the left half of the frame. Its floor lies in the plane of the lower
+    # face of the bar (the frame prints on that plane), under the bolt; its walls and roof close round the bolt
+    # behind the strike. A gate dropped into a slot at its rear holds the spring; the panel keeps the gate in.
     housing_y: tuple = (26.5, 78.0)
-    housing_floor: tuple = (42.6, 48.6)
-    housing_w: float = 32.0
-    housing_wall: float = 5.0
-    cover_z: tuple = (58.3, 62.3)
-    kicker_x: float = 20.0
-    kicker_y: float = 41.0
-    kicker_d: float = 12.0
-    kicker_bore: float = 7.0
-    kicker_top: float = 56.0
-    kicker_bottom: float = 44.0
-    kicker_free: float = 28.0      # free length of the spring that lifts the panel
-    kicker_rate: float = 0.57      # N/mm
-    bolt_spring_free: float = 24.0
+    housing_w: float = 32.0        # the floor
+    tunnel_w: float = 26.0         # outside the walls
+    roof_z: tuple = (58.3, 62.3)
+    strike_window: float = 0.5     # round the strike, in the floor
+    gate_y: tuple = (72.2, 75.8)
+    gate_x: tuple = (-8.4, 10.6)
+    gate_tab: float = 2.0          # the gate stands this much above the roof: a grip for the fingers
+    gate_slot_clear: float = 0.2
+    frame_split_x: float = 20.0    # the halves of the frame meet here, not on the centre line: the tunnel is whole in the left half
+    # a panel with nothing to hold (the blank panel) has a finger hole near its front edge
+    finger_hole: tuple = (50.0, 37.0, 22.0)   # x, yl, diameter
+    bolt_spring_free: float = 22.0
     bolt_spring_rate: float = 1.2  # N/mm: 7.8 N at the lock, 13.8 N at the full stroke
     bolt_spring_bore: float = 4.4
     bolt_spring_d: float = 4.0
@@ -308,61 +312,57 @@ def strike(d: Blueprint, i: pf.Interface, L: Latch = L0) -> Part.Shape:
     return pf.one_solid(so.unsplit(outer.cut([window, slot])), "strike")
 
 
-def housing(d: Blueprint, i: pf.Interface, L: Latch = L0) -> dict[str, Part.Shape]:
-    """The housing of the bolt, bonded under the front bar of the frame across the centre line: a floor, two walls
-    beside the bolt behind the strike, a rear wall with the seat of the spring, and two towers with the springs that
-    lift the panel. The cover (a part of its own, two M3 screws) closes the top over the bolt."""
-    fz0, fz1 = L.housing_floor
+def tunnel(d: Blueprint, i: pf.Interface, L: Latch = L0) -> Part.Shape:
+    """The tunnel of the bolt, a part of the left half of the frame: a floor under the bolt from the front bar to the
+    rear of the tunnel (in the plane of the lower face of the bar), with a window round the strike; two walls and a
+    roof round the bolt behind the strike; a shoulder in the right wall that stops the stop block of the bolt; a slot
+    for the gate at the rear. The walls stand back on the right from the shoulder to the rear, so that the bolt goes
+    in from the rear."""
+    fz0, _ = bar_z(d, i)
+    fz1 = L.bolt_z[0] - L.bolt_clear
     ya, yb = L.housing_y
-    hw = L.housing_w / 2
-    z0, z1 = L.bolt_z
+    hw, tw = L.housing_w / 2, L.tunnel_w / 2
     bw = L.bolt_w / 2 + L.bolt_clear
-    cz0, cz1 = L.cover_z
-    floor = pf.box(-hw, hw, ya, yb, fz0, fz1)
-    # the wing under the towers ends at their middles: an edge of the wing is not a tangent of a tower
-    wing = pf.box(-L.kicker_x, L.kicker_x, ya, L.kicker_y, fz0, fz1)
-    y_walls = L.lug_y[1] + 1.5
-    span = lambda s, a, b: (min(s * a, s * b), max(s * a, s * b))
-    outer_x = bw + L.housing_wall
-    # the stop chamber: there the walls stand back to let the stop block pass
-    ch0, ch1 = L.stop_y - 0.3, L.stop_y + 3.0 + L.stroke + 1.0
     sw = L.stop_w / 2 + L.bolt_clear
-    walls = []
-    for s_ in (-1, 1):
-        walls += [pf.box(*span(s_, bw, outer_x), y_walls, ch0, fz1, cz0), pf.box(*span(s_, sw, outer_x), ch0, ch1, fz1, cz0),
-                  pf.box(*span(s_, bw, outer_x), ch1, yb, fz1, cz0)]
-    rear = pf.box(-outer_x, outer_x, yb - 4.0, yb, fz1, cz0)
-    towers = [pf.cyl(L.kicker_d, s * L.kicker_x, L.kicker_y, fz0, L.kicker_top) for s in (-1, 1)]
-    base = joined([floor, wing, *walls, rear, *towers])
-    base = base.cut([pf.cyl(L.kicker_bore, s * L.kicker_x, L.kicker_y, L.kicker_bottom, L.kicker_top + 1) for s in (-1, 1)])
-    # the seat of the bolt's spring in the rear wall, and the pilot holes of the cover's screws
-    base = base.cut(ycyl(L.bolt_spring_bore, yb - 4.5, yb - 1.5, 0.0, (z0 + z1) / 2))
-    screws = cover_screws(L)
-    base = base.cut([pf.cyl(2.5, x, y, fz0 - 1, cz0 + 1) for x, y in screws])
-    cover = pf.box(-outer_x, outer_x, y_walls, yb, cz0, cz1)
-    cover = cover.cut([pf.cyl(3.4, x, y, cz0 - 1, cz1 + 1) for x, y in screws])
-    return {"latch_housing": pf.one_solid(base, "housing of the bolt"), "latch_cover": pf.one_solid(cover, "cover of the housing")}
+    rz0, rz1 = L.roof_z
+    y_walls = L.lug_y[1] + 1.5
+    ch0 = L.stop_y - 0.3
+    floor = pf.box(-hw, hw, ya, yb, fz0, fz1)
+    walls = [pf.box(-tw, -bw, y_walls, yb, fz1, rz0), pf.box(bw, tw, y_walls, ch0, fz1, rz0), pf.box(sw, tw, ch0, yb, fz1, rz0)]
+    roof = pf.box(-tw, tw, y_walls, yb, rz0, rz1)
+    solid = pf.joined([floor, *walls, roof])
+    g = L.strike_window
+    sb = strike(d, i, L).BoundBox
+    window = pf.box(sb.XMin - g, sb.XMax + g, sb.YMin - g - 0.5, sb.YMax + g + 0.5, fz0 - 1, fz1 + 1)
+    c = L.gate_slot_clear
+    slot = pf.box(L.gate_x[0] - c, L.gate_x[1] + c, L.gate_y[0] - c, L.gate_y[1] + c, fz1, rz1 + 1)
+    return so.unsplit(solid.cut([window, slot]))
 
 
-def cover_screws(L: Latch = L0) -> list[tuple[float, float]]:
-    """The two screws of the cover: in the walls beside the bolt, at the front of the cover, where the bolt pushes up."""
-    bw = L.bolt_w / 2 + L.bolt_clear
-    return [(s * (bw + L.housing_wall / 2), L.lug_y[1] + 1.5 + 2.8) for s in (-1, 1)]
+def gate(L: Latch = L0) -> Part.Shape:
+    """The gate: a plate dropped into the slot at the rear of the tunnel. The spring of the bolt pushes it back
+    against the rear face of the slot. Its top stands gate_tab above the roof for the fingers; the plate of a seated
+    panel stands above it, so it cannot leave its slot while a panel is in."""
+    z0, z1 = L.bolt_z
+    g = pf.box(L.gate_x[0], L.gate_x[1], L.gate_y[0], L.gate_y[1], z0, L.roof_z[1] + L.gate_tab)
+    # a peg on its front face that the end of the spring goes over
+    peg = ycyl(3.0, L.gate_y[0] - 4.0, L.gate_y[0] + 0.5, 0.0, (z0 + z1) / 2)
+    return pf.one_solid(so.unsplit(g.fuse(peg)), "gate")
 
 
 def joined(shapes: list[Part.Shape]) -> Part.Shape:
     return pf.joined(shapes)
 
 
-def springs(L: Latch = L0, s: float = 0.0, lifted: float = 0.0) -> dict[str, Part.Shape]:
-    """The bought springs as plain cylinders, for the pictures and the room check: the spring of the bolt (between
-    the bore of the bolt and the rear wall) and the two springs that lift the panel."""
+def springs(L: Latch = L0, s: float = 0.0) -> dict[str, Part.Shape]:
+    """The bought spring of the bolt as a plain cylinder, for the pictures: between the bore of the bolt and the seat
+    in the gate."""
     z0, z1 = L.bolt_z
-    yb = L.housing_y[1]
-    bolt_spring = ycyl(L.bolt_spring_d, L.bolt_end_y - 10.0 + s, yb - 4.5, 0.0, (z0 + z1) / 2)
-    top = 65.0 + lifted
-    kick = [pf.cyl(6.0, x * L.kicker_x, L.kicker_y, L.kicker_bottom, min(top, L.kicker_bottom + L.kicker_free)) for x in (-1, 1)]
-    return {"bolt_spring": bolt_spring, "lift_springs": Part.makeCompound(kick)}
+    return {"bolt_spring": ycyl(L.bolt_spring_d, L.bolt_end_y - 10.0 + s, L.gate_y[0], 0.0, (z0 + z1) / 2)}
+
+
+def spring_length(L: Latch = L0, s: float = 0.0) -> float:
+    return L.gate_y[0] - (L.bolt_end_y - 10.0 + s)
 
 
 def button_hole(L: Latch = L0) -> Part.Shape:
@@ -374,18 +374,50 @@ def button_hole(L: Latch = L0) -> Part.Shape:
 
 
 def front_notch(d: Blueprint, i: pf.Interface, L: Latch = L0) -> Part.Shape:
-    """The bolt passes the front bar of the frame: the gap between the two halves is wider there."""
-    z0, z1 = bar_z(d, i)
+    """The bolt passes the front bar of the frame through a notch above the floor of the tunnel."""
+    _, z1 = bar_z(d, i)
     hw = L.bolt_w / 2 + 1.0
-    return pf.box(-hw, hw, front_bar_face(d, i) - 12, front_bar_face(d, i) + 1, z0 - 1, z1 + 1)
+    return pf.box(-hw, hw, front_bar_face(d, i) - 12, front_bar_face(d, i) + 1, L.bolt_z[0] - L.bolt_clear, z1 + 1)
 
 
 def bolt_room(L: Latch = L0) -> Part.Shape:
-    """What B takes from the room below the plate: the box of the housing, the cover and the travel of the bolt,
-    with room_gap round it. A panel keeps clear of it, but for its strike."""
+    """What B takes from the room below the plate: the box of the tunnel, the gate and the travel of the bolt, with
+    room_gap round it. A panel keeps clear of it, but for its strike."""
     g = 0.5
-    hw = L.kicker_x + L.kicker_d / 2 + g
-    return pf.box(-hw, hw, L.housing_y[0], L.housing_y[1] + g, L.housing_floor[0] - g, 65.0)
+    hw = L.housing_w / 2 + g
+    return pf.box(-hw, hw, L.housing_y[0], L.housing_y[1] + g, 48.8 - g, 65.0)
+
+
+def resplit(frame: dict[str, Part.Shape], at: float, gap: float) -> dict[str, Part.Shape]:
+    """The two halves of the frame joined again and cut at x = at. Near the centre line the frame is two straight
+    bars along x, so the gap of the first cut is filled with a slice of the right half moved to it."""
+    left, right = frame["frame_left"], frame["frame_right"]
+    x0 = right.BoundBox.XMin
+    fill = right.common(pf.box(x0, x0 + 2.0, -so.BIG, so.BIG, -so.BIG, so.BIG)).translated(V(-2.0 * x0 - 0.5, 0, 0))
+    whole = so.unsplit(left.fuse([right, fill]))
+    g = gap / 2
+    out = dict(frame)
+    out["frame_left"] = pf.one_solid(so.unsplit(whole.common(pf.box(-so.BIG, at - g, -so.BIG, so.BIG, 0, 200))), "frame, left half")
+    out["frame_right"] = pf.one_solid(so.unsplit(whole.common(pf.box(at + g, so.BIG, -so.BIG, so.BIG, 0, 200))), "frame, right half")
+    return out
+
+
+def finger_hole(d: Blueprint, tiles: dict[str, Part.Shape], L: Latch = L0) -> dict[str, Part.Shape]:
+    """A finger hole through the plate of a panel with nothing to hold, with the edge break round both of its rims."""
+    x, yl, dia = L.finger_hole
+    y = pf.y0(d) + yl
+    zr, zt = pf.z_rest(d), d.panel_top
+    out = {}
+    for name, tile in tiles.items():
+        b = tile.BoundBox
+        if not (b.XMin < x < b.XMax):
+            out[name] = tile
+            continue
+        cut = pf.one_solid(so.unsplit(tile.cut(pf.cyl(dia, x, y, zr - 1, zt + 1))), name)
+        rims = [e for e in cut.Edges if not e.Degenerated and abs(e.BoundBox.Center.x - x) < 1e-3 and abs(e.BoundBox.Center.y - y) < 1e-3
+                and (abs(e.BoundBox.ZMin - zt) < 1e-6 or abs(e.BoundBox.ZMin - zr) < 1e-6) and abs(e.BoundBox.ZMax - e.BoundBox.ZMin) < 1e-6]
+        out[name] = pf.one_solid(cut.makeFillet(d.edge_break, rims), f"{name}, with the finger hole")
+    return out
 
 
 # ---------- the quarter-turn cams (Q) ----------
@@ -468,7 +500,7 @@ class Candidate:
     i: pf.Interface
     L: Latch
     frame: dict[str, Part.Shape]          # stays in the cabinet: the frame halves and posts
-    fixed: dict[str, Part.Shape]          # other latch parts that stay in the cabinet (housing, cover)
+    fixed: dict[str, Part.Shape]          # other latch parts that stay in the cabinet (the gate of B)
     arcade: dict[str, Part.Shape]
     blank: dict[str, Part.Shape]
     on_panel: dict[str, Part.Shape]       # latch parts that go with the panel (the cams)
@@ -500,19 +532,6 @@ def add_to_tiles(tiles: dict[str, Part.Shape], add: list[Part.Shape], cut: list[
     return out
 
 
-def magnet_cut_fix(c: str, d: Blueprint, i: pf.Interface, frame: dict[str, Part.Shape], L: Latch) -> dict[str, Part.Shape]:
-    """B: no magnet in the two front pads. Their pockets are filled again, so that the pads are whole."""
-    top = pf.z_rest(d) - i.pad_drop
-    out = dict(frame)
-    for k, (x, y) in enumerate(pf.latch_points(d, i)):
-        if k in L.magnet_points[c]:
-            continue
-        name = "frame_left" if x < 0 else "frame_right"
-        plug = pf.cyl(i.magnet_d + i.magnet_clear, x, y, top - i.magnet_h - i.magnet_clear, top)
-        out[name] = pf.one_solid(so.unsplit(out[name].fuse(plug)), name)
-    return out
-
-
 def build(c: str, d: Blueprint | None = None, a: pf.Arcade | None = None, v=None, L: Latch = L0) -> Candidate:
     d, a = d or Blueprint(), a or pf.Arcade()
     v = v or pf.values()
@@ -527,11 +546,12 @@ def build(c: str, d: Blueprint | None = None, a: pf.Arcade | None = None, v=None
         frame = {k: (pf.one_solid(so.unsplit(s.cut(cuts)), k) if k.startswith("frame") else s) for k, s in frame.items()}
         panel_add, panel_cut = list(hk), []
         if c == "B":
-            frame = magnet_cut_fix(c, d, i, frame, L)
-            frame = {k: (pf.one_solid(so.unsplit(s.cut(front_notch(d, i, L))), k) if k.startswith("frame") else s) for k, s in frame.items()}
+            frame = resplit(frame, L.frame_split_x, i.half_gap)
+            left = so.unsplit(frame["frame_left"].cut(front_notch(d, i, L)).fuse(tunnel(d, i, L)))
+            frame["frame_left"] = pf.one_solid(left, "frame, left half, with the tunnel of the bolt")
             panel_cut.append(bolt_room(L))
             panel_add.append(strike(d, i, L))
-            fixed = housing(d, i, L)
+            fixed = {"latch_gate": gate(L)}
             moving = {"latch_bolt": bolt(d, L)}
         if c == "Q":
             clear, bosses, holes = cam_holes(d, L)
@@ -546,6 +566,8 @@ def build(c: str, d: Blueprint | None = None, a: pf.Arcade | None = None, v=None
         if c == "Q":
             arcade = add_to_tiles(arcade, [], holes)
             blank = add_to_tiles(blank, [], holes)
+        if c == "B":
+            blank = finger_hole(d, blank, L)
     return Candidate(c, d, i, L, frame, fixed, arcade, blank, on_panel, moving)
 
 
@@ -586,14 +608,6 @@ def placed(shape: Part.Shape, st: Step, d: Blueprint, i: pf.Interface) -> Part.S
     if st.lift != (0.0, 0.0):
         out = out.translated(V(0, *st.lift))
     return out
-
-
-def lifted_by_springs(cd: Candidate) -> float:
-    """B: how far the springs turn the panel up when the bolt is back, in degrees, and how far its front edge rises."""
-    L, d, i = cd.L, cd.d, cd.i
-    yp, _ = pivot(d, i)
-    rise = L.kicker_free - (65.0 - L.kicker_bottom)
-    return math.degrees(math.atan2(rise, yp - L.kicker_y))
 
 
 def motion_rows(cd: Candidate, hw: pf.Hardware, skin: Part.Shape) -> list[dict]:
@@ -695,13 +709,13 @@ def strength(cd: Candidate) -> dict:
     leg_N = 2 * L.abs_across / (1 / (leg * ly) + lip_arm / (ly * leg ** 2 / 6))
     lip_t = L.bolt_z[0] - L.bolt_clear - L.lug_z0
     lip_N = 2 * L.abs_along * (ly * lip_t ** 2 / 6) / (L.lug_lip / 2)
-    # the cover: the bolt pushes up on its front edge, between the two walls (a beam of the span between them, as
-    # wide as the contact, about 8); the cover prints top down, so the stress lies along the layers
-    ct = L.cover_z[1] - L.cover_z[0]
+    # the roof of the tunnel: the bolt pushes up on its front edge, between the two walls (a beam of the span between
+    # them, as wide as the contact, about 8); it prints with the frame, so the stress lies along the layers
+    ct = L.roof_z[1] - L.roof_z[0]
     span = L.bolt_w + 2 * L.bolt_clear
     cover_N = L.abs_along * (8.0 * ct ** 2 / 6) / (span / 4)
     out["strike_N"] = round(min(leg_N, lip_N, cover_N), 0)
-    out["strike_parts_N"] = {"legs": round(leg_N), "lips": round(lip_N), "cover": round(cover_N)}
+    out["strike_parts_N"] = {"legs": round(leg_N), "lips": round(lip_N), "roof": round(cover_N)}
     # the cam: the tongue bends along the layers (it prints flat); the shank is in tension across the layers
     tw, tl, tt = L.cam_tongue
     tongue_N = L.abs_along * (tw * tt ** 2 / 6) / (tl - L.cam_hub_d / 2 - 2.5)
@@ -751,7 +765,7 @@ def mechanisms(d: Blueprint, i: pf.Interface):
             yield (f"turn about a line at {deg} degrees, {extra:g} outside the plate", up, (t[0], t[1], 0.0), (p0[0], p0[1], zr), swing)
 
 
-def hold(cd: Candidate, v, preload_only: bool = False, loads: list[dict] | None = None) -> dict:
+def hold(cd: Candidate, v, preload_only: bool = False, loads: list[dict] | None = None, point: tuple | None = None, released: bool = False) -> dict:
     """The factor of the latch for each load case: for every way the plate can leave its ledge, the work that the
     restraints and the weight can do against the work of the load; the smallest ratio. A plate point that goes down
     rests on the ledge, which takes any load. With preload_only the rigid parts with play (the hooks; the cams; the
@@ -759,7 +773,11 @@ def hold(cd: Candidate, v, preload_only: bool = False, loads: list[dict] | None 
     d, i, L = cd.d, cd.i, cd.L
     lx, ly = lever_point(d)
     bz = ball_z(d, v)
+    if point is not None:
+        lx, ly, bz = point
     res = restraints(cd)
+    if released:
+        res = [r for r in res if r["kind"] != "lock"]
     if preload_only:
         res = [r for r in res if r["kind"] == "magnet"]
         if cd.c == "B":
@@ -794,16 +812,81 @@ def hold(cd: Candidate, v, preload_only: bool = False, loads: list[dict] | None 
 
 def bolt_preload(L: Latch = L0) -> dict:
     """B: the spring pushes the bolt forward; the wedge of wedge_deg turns that into a pull down on the strike. The
-    two springs that lift the panel push against it. The wedge holds by friction when tan(wedge) < mu."""
-    s = L.bolt_spring_free - (L.housing_y[1] - 4.5 - (L.bolt_end_y - 10.0))
-    p_lock = L.bolt_spring_rate * s
-    p_full = L.bolt_spring_rate * (s + L.stroke)
+    wedge holds by friction when tan(wedge) < mu. The push on the button: the spring, and the friction of the wedge
+    less its slope while the bolt starts back; at the end of the stroke the spring and some friction in the tunnel."""
+    comp = L.bolt_spring_free - spring_length(L, 0.0)
+    p_lock = L.bolt_spring_rate * comp
+    p_full = L.bolt_spring_rate * (comp + L.stroke)
     a, phi = math.radians(L.wedge_deg), math.atan(L.mu)
     down = p_lock / math.tan(a + phi)
-    kick = 2 * L.kicker_rate * (L.kicker_free - (65.0 - L.kicker_bottom))
-    return {"spring_lock_N": round(p_lock, 1), "spring_full_N": round(p_full, 1), "wedge_down_N": round(down, 1), "lift_springs_N": round(kick, 1),
-            "net_N": round(down - kick, 1), "self_locking": math.tan(a) < L.mu, "mu_needed": round(math.tan(a), 3),
-            "button_force_N": round(p_full + 2.0, 1)}
+    start = p_lock + down * (L.mu * math.cos(a) - math.sin(a))
+    free_at = L.lug_y[1] - neck(L)[1]
+    return {"spring_lock_N": round(p_lock, 1), "spring_full_N": round(p_full, 1), "spring_compressed_mm": [round(comp, 1), round(comp + L.stroke, 1)],
+            "wedge_down_N": round(down, 1), "net_N": round(down, 1), "self_locking": math.tan(a) < L.mu, "mu_needed": round(math.tan(a), 3),
+            "button_start_N": round(start, 1), "button_force_N": round(p_full + 2.0, 1), "unlocks_at_mm": round(free_at, 2), "stroke_mm": L.stroke}
+
+
+def ramp_option(cd: Candidate, v) -> dict:
+    """The grip that B does not take (ESTIMATED): a rigid ramp of 45 degrees on the bolt that lifts the strike by
+    `rise` after the lips are free. The bolt must then travel further, and the button must lift the front against
+    the magnets through the ramp."""
+    d, L, i = cd.d, cd.L, cd.i
+    rise = 2.5
+    p = bolt_preload(L)
+    travel = p["unlocks_at_mm"] + 0.5 + rise + 0.5
+    ys = sum(L.lug_y) / 2
+    lift = hold(cd, v, loads=[{"name": "up 1", "f": (0.0, 0.0, 1.0)}], point=(0.0, ys, d.panel_top), released=True)["rows"][0]["factor"]
+    phi = math.atan(L.mu)
+    spring = L.bolt_spring_rate * (p["spring_compressed_mm"][0] + travel)
+    yp, _ = pivot(d, i)
+    front = rise * (yp - pf.y0(d)) / (yp - ys)
+    return {"rise_at_strike_mm": rise, "travel_mm": round(travel, 1), "lift_at_strike_N": round(lift, 1),
+            "button_N": round(spring + lift * math.tan(math.radians(45.0) + phi), 0), "front_edge_rise_mm": round(front, 1),
+            "above_deck_top_mm": round(front - (d.deck_top - d.panel_top), 1)}
+
+
+def corner_rock(cd: Candidate, v) -> dict:
+    """The front corners under the lever's couple, with the plate not rigid (a beam estimate, ESTIMATED).
+
+    A push at the ball to the rear lifts the front edge. The couple goes into the two ribs of the lever's bay (the
+    rib beside the encoder and the flanges of the seam) and each puts half of M / span up at the front edge. The
+    front strip of the plate (the plate from the front edge to yl 40, with the front rib) is a beam along x. It is
+    held down by the bolt at x 0. Without front magnets the left end of the strip is free (a cantilever from the
+    bolt): the front left corner lifts. With a magnet pair at the front left pad the strip is a beam held at the bolt
+    and at the magnet; the magnet keeps the corner down while its share stays below its pull."""
+    d, i, L, a = cd.d, cd.i, cd.L, pf.Arcade()
+    e = pf.structure.E_ABS
+    h = pf.holes(d, a, v)
+    rl0, rl1 = pf.rib_left(i, h)
+    xs = [-(rl0 + rl1) / 2, -pf.seam_x(a)]           # distances of the two ribs from the bolt
+    span = d.panel_d - 2 * i.ledge
+    arm = ball_z(d, v) - pf.z_rest(d)
+    ii = pf.tee(40.0, d.panel_t, i.rib_t, i.rib_h)
+    corner = -pr.panel_outline(d, -i.seat_gap)[0][0]
+    xm = -pf.latch_points(d, i)[0][0]
+    pull = magnet_pull(L.frame_magnet_h[cd.c], L.plate_magnet_h, L)["pull_N"]
+
+    def cant(x: float, at: float, p: float) -> float:
+        return p * x ** 2 * (3 * at - x) / (6 * e * ii) if x <= at else p * at ** 2 * (3 * x - at) / (6 * e * ii)
+
+    def ss(x: float, at: float, p: float, ln: float) -> float:
+        b = ln - at
+        if x <= at:
+            return p * b * x * (ln ** 2 - b ** 2 - x ** 2) / (6 * ln * e * ii)
+        return ss(ln - x, b, p, ln)
+
+    rows = []
+    for name, f in (("normal play", L.play), ("hard input", L.side)):
+        p = f * arm / span / 2
+        free_corner = sum(cant(corner, x, p) for x in xs)
+        free_rib = sum(cant(xs[0], x, p) for x in xs)
+        held_rib = max(sum(ss(t, x, p, xm) for x in xs) for t in [k * xm / 40 for k in range(1, 40)])
+        share = sum(p * x / xm for x in xs)
+        rows.append({"case": f"{name}: {f:g} N at the ball, to the rear", "front_lift_N": round(2 * p, 2),
+                     "no_front_magnets": {"corner_lift_mm": round(free_corner, 3), "lift_at_encoder_rib_mm": round(free_rib, 3)},
+                     "front_magnets": {"largest_lift_mm": round(held_rib, 3), "corner_share_N": round(share, 2), "magnet_N": pull, "factor": round(pull / share, 1)}})
+    return {"E_MPa": e, "I_strip_mm4": round(ii), "strip": "plate 5 x 40 with the front rib 3 x 15", "ribs_x": [round(-x, 1) for x in xs],
+            "corner_x": round(-corner, 1), "magnet_x": round(-xm, 1), "rows": rows}
 
 
 # ---------- the flexing features and the wear ----------
@@ -865,8 +948,7 @@ def print_rows(parts: dict[str, Part.Shape]) -> list[dict]:
     tongue flat)."""
     lim = split.printer()
     up_of = {"latch_bolt": (V(1, 0, 0), "on its side: the profile in y and z on the bed"),
-             "latch_housing": (V(0, 0, 1), "on its floor, as in the cabinet"),
-             "latch_cover": (V(0, 0, -1), "its top on the bed"),
+             "latch_gate": (V(0, -1, 0), "flat, its rear face on the bed"),
              "cam_stud": (V(0, 0, 1), "upright, the end of the shank on the bed"),
              "cam_tongue": (V(0, 0, 1), "flat, the arm on the bed")}
     rows = []
@@ -971,43 +1053,36 @@ def check(cd: Candidate, deck: Part.Shape, hw: pf.Hardware, v, log=lambda text: 
     return {"candidate": cd.c, "name": NAMES[cd.c], "interface": asdict(i), "latch": {k: getattr(cd.L, k) for k in ()},
             "magnet": magnet_pull(cd.L.frame_magnet_h[cd.c], cd.L.plate_magnet_h, cd.L), "restraints": restraints(cd), "strength": strength(cd),
             "hold": held, "play": play, "removal": release, "preload": bolt_preload(cd.L) if cd.c == "B" else None,
-            "springs_lift_deg": round(lifted_by_springs(cd), 2) if cd.c == "B" else None,
+            "corner_rock": corner_rock(cd, v) if cd.c == "B" else None, "ramp_option": ramp_option(cd, v) if cd.c == "B" else None,
             "clashes": clashes, "clashes_blank": clashes_blank, "room_volume_cm3": round(space.Volume / 1000, 1), "room": rooms,
             "motion": motion, "locks": locks, "print": prints, "strain": strain_rows(cd), "wear": wear(cd.c), "edge_finish": edges,
             "face_check": faces, "shows": shows(cd), "buy": buy(cd), "interface_rows": interface_rows(cd), "failures": failures}
 
 
 def removal(cd: Candidate, v) -> dict:
-    """What it takes to free the panel after the release (the latch open): the pull on the ball of the lever that
-    lifts the front edge, and how a panel with no lever is held."""
+    """What it takes to free the panel after the release (the latch open): the smallest upward pull that lifts it out,
+    found as the hold is (every way the plate can leave its ledge, the hooks free in the swing), at the ball of the
+    lever, at the middle of the front edge, and (B) at the finger hole of a panel with nothing to hold."""
     d, L = cd.d, cd.L
-    lx, ly = lever_point(d)
-    yp, _ = pivot(d, cd.i)
-    pull = magnet_pull(L.frame_magnet_h[cd.c], L.plate_magnet_h, L)["pull_N"]
-    pts = pf.latch_points(d, cd.i)
-    if cd.c == "M":
-        n = len(L.magnet_points["M"])
-        # the panel peels: the two magnets nearer the lever let go first
-        need = 2 * pull * 362.0 / (362.0 - 2 * abs(lx))
-        return {"lever_N": round(need, 0), "how": f"pull the lever up: the two magnets on the lever's side let go first (peel). A panel with no lever has no grip: {n * pull:g} N on a flat face."}
-    front = [k for k in L.magnet_points[cd.c] if k in (0, 1)]
-    rear = [k for k in L.magnet_points[cd.c] if k in (2, 3)]
-    m_front = sum(pull * (yp - pts[k][1]) for k in front)
-    m_rear = sum(pull * max(0.0, yp - pts[k][1] - 8.0) for k in rear) * 0 + sum(pull * (yp - pts[k][1]) for k in rear)
-    need = (m_front + m_rear - L.panel_weight * 0) / (yp - ly)
+    up = [{"name": "up 1", "f": (0.0, 0.0, 1.0)}]
+    zt = d.panel_top
+    at = {"lever": None, "front edge": (0.0, pf.y0(d) + 3.0, zt)}
     if cd.c == "B":
-        kick = bolt_preload(L)["lift_springs_N"]
-        return {"lever_N": round(max(0.0, (m_rear - kick * (yp - L.kicker_y)) / (yp - ly)), 0), "button_N": bolt_preload(L)["button_force_N"],
-                "how": f"push the button: the bolt slides back {L.stroke:g} and the two springs lift the front edge {lifted_rise(cd):.1f}; lift it by the edge. Only the two rear magnets ({pull:g} N each, near the pivot) are left."}
-    if cd.c == "Q":
-        return {"lever_N": round(need, 0), "how": f"turn the two heads a quarter turn; lift the front by the two finger bars or by the lever ({round(need)} N on the ball). The two front magnets hold {2 * pull:g} N."}
-    return {"lever_N": round(need, 0), "how": f"pull the lever up: the front magnets ({2 * pull:g} N) let go and the panel swings about its rear edge. A panel with no lever has no grip."}
-
-
-def lifted_rise(cd: Candidate) -> float:
-    L, (yp, _) = cd.L, pivot(cd.d, cd.i)
-    rise = L.kicker_free - (65.0 - L.kicker_bottom)
-    return rise * (yp - pf.y0(cd.d)) / (yp - L.kicker_y)
+        at["finger hole"] = (L.finger_hole[0], pf.y0(d) + L.finger_hole[1], zt)
+    f = {k: round(hold(cd, v, loads=up, point=p, released=True)["rows"][0]["factor"], 1) for k, p in at.items()}
+    pull = magnet_pull(L.frame_magnet_h[cd.c], L.plate_magnet_h, L)["pull_N"]
+    n = len(L.magnet_points[cd.c])
+    if cd.c == "M":
+        how = f"pull the lever up with {f['lever']:g} N; the magnets on the lever's side let go first. A panel with no lever has no grip."
+    elif cd.c == "H":
+        how = f"pull the lever up with {f['lever']:g} N: the front magnets let go and the panel swings about its rear edge. A panel with no lever has no grip."
+    elif cd.c == "Q":
+        how = f"turn the two heads a quarter turn; lift the front by the lever ({f['lever']:g} N) or by the two finger bars."
+    else:
+        p = bolt_preload(L)
+        how = (f"hold the button in (it starts at {p['button_start_N']:g} N, {p['button_force_N']:g} N at the end of its {L.stroke:g}) and lift the panel by the lever "
+               f"({f['lever']:g} N) or, a panel with nothing to hold, by its finger hole ({f['finger hole']:g} N). The {n} magnets ({pull:g} N each) are all that hold it then.")
+    return {"lever_N": f["lever"], "front_edge_N": f["front edge"], "finger_hole_N": f.get("finger hole"), "how": how}
 
 
 def shows(cd: Candidate) -> dict:
@@ -1023,8 +1098,8 @@ def shows(cd: Candidate) -> dict:
     if cd.c == "B":
         return {"top_in": "Nothing. The gap stays 0.3 all round.",
                 "front_in": f"A button of {L.button_d:g} with two flats ({L.bolt_w:g} wide) in the front face of the deck at the centre line, {L.button_z:g} above the desk, on the leaning band above the crease. It is flush, with a gap of {(L.button_hole_d - L.button_d) / 2:g} round it and an edge break on its rim.",
-                "out": base_out.replace("the four pads", "the four pads (magnets in the rear two)") + hooks_out + " At the front centre: the bolt across the opening's edge, the cover of its housing and the two lift springs.",
-                "gap": f"{gap:g} all round, no change. When the button is pushed, the front edge stands {lifted_rise(cd):.0f} above its seat."}
+                "out": base_out + hooks_out + " At the front centre: the bolt across the front bar, and its tunnel (a part of the frame) with the tab of the gate at its rear.",
+                "gap": f"{gap:g} all round, no change. A panel with nothing to hold has a finger hole of {L.finger_hole[2]:g} near its front edge; the arcade panel has none."}
     return {"top_in": f"Two round heads of {L.cam_head_d:g} at x -{L.cam_x:g} and +{L.cam_x:g}, {L.cam_y - pf.y0(cd.d):.0f} behind the front edge of the panel. Each is flush with the plate and has a finger bar {L.cam_bar[2]:g} high (it stays {cd.d.deck_top - cd.d.panel_top - L.cam_bar[2]:g} below the deck top).",
             "front_in": "Nothing.", "out": base_out + hooks_out, "gap": f"{gap:g} all round, no change"}
 
@@ -1037,9 +1112,7 @@ def buy(cd: Candidate) -> list[str]:
     out = [frame + " (frame, once for the cabinet)", f"{n} disc magnets N52 12 x {L.plate_magnet_h:g}, axial, for each panel (or {n} steel discs 12 x 2: no polarity to mind, ESTIMATED 10 % less pull)",
            "Epoxy for the magnets"]
     if cd.c == "B":
-        out += [f"1 compression spring, steel, {L.bolt_spring_d:g} outside, {L.bolt_spring_free:g} free, about {L.bolt_spring_rate:g} N/mm (the bolt)",
-                f"2 compression springs, steel, 6 outside, {L.kicker_free:g} free, about {L.kicker_rate:g} N/mm (they lift the panel)",
-                "2 thread-forming screws 3.0 x 10 for the cover, into the printed pilot holes"]
+        out += [f"1 compression spring, steel, {L.bolt_spring_d:g} outside, {L.bolt_spring_free:g} free, about {L.bolt_spring_rate:g} N/mm (the bolt)"]
     if cd.c == "Q":
         out += [f"2 steel dowel pins {L.cam_pin_d:g} x 14 for each panel (tongue to stud)", "2 O-rings 8 x 2 (inside 8, section 2) for each panel, on the shank under the plate"]
     return out
@@ -1057,9 +1130,10 @@ def interface_rows(cd: Candidate) -> list[list[str]]:
                      f"Its tip at {yl(rear_bar_face(d, cd.i) + L.notch_back - L.toe_tip_gap)}. A blank panel prints them with its tiles."])
     if cd.c == "B":
         rows.append(["Strike (1)", f"At the front centre, {yl(L.lug_y[0])} to {yl(L.lug_y[1])}: two legs each side of x 0 ({L.bolt_w / 2 + L.bolt_clear:g} to {L.bolt_w / 2 + L.bolt_clear + L.lug_leg_t:g}), down to z {L.lug_z0:g}, each with a lip {L.lug_lip:g} in under the bolt; the top of each lip falls {L.wedge_deg:g} degrees to the rear."])
-        rows.append(["Room below the plate", f"Less the box of the bolt: x -{L.kicker_x + L.kicker_d / 2 + 0.5:g} to +{L.kicker_x + L.kicker_d / 2 + 0.5:g}, {yl(L.housing_y[0])} to {yl(L.housing_y[1] + 0.5)}, z {L.housing_floor[0] - 0.5:g} to {L.cover_z[1] + 0.5:g}. "
+        rows.append(["Room below the plate", f"Less the box of the bolt: x -{L.housing_w / 2 + 0.5:g} to +{L.housing_w / 2 + 0.5:g}, {yl(L.housing_y[0])} to {yl(L.housing_y[1] + 0.5)}, z 48.3 to the rest face. "
                      "A rib that crosses it (the front rib of the arcade panel, the seam of the blank panel) stops at it."])
-        rows.append(["Lower face", f"Flat at x -{L.kicker_x:g} and +{L.kicker_x:g}, {yl(L.kicker_y)}: the two lift springs push there."])
+        x, ylh, dia = L.finger_hole
+        rows.append(["Grip", f"A panel with nothing to hold has a finger hole of {dia:g} through the plate at x {x:g}, yl {ylh:g}, with the edge break on both rims. It is not a part of the interface: a panel with a lever or keys lifts by them."])
     if cd.c == "Q":
         rows.append(["Cam holes (2)", f"At x -{L.cam_x:g} and +{L.cam_x:g}, {yl(L.cam_y)}: a hole of {L.cam_hole_d:g} through the plate and a boss of {L.cam_plate_boss[0]:g} x {L.cam_plate_boss[1]:g} under it, "
                      f"with a counterbore of {L.cam_head_d + 0.6:g} x {L.cam_head_h + 0.2:g} and a cone of 45 degrees under it for the head. Each panel carries 2 printed cams (stud and tongue), 2 steel pins {L.cam_pin_d:g} x 14 and 2 O-rings."])
@@ -1082,7 +1156,7 @@ def scenes(out: Path, cd: Candidate, deck: Part.Shape, hw: pf.Hardware) -> None:
     floor = deck_outer.common(pf.box(-so.BIG, so.BIG, -so.BIG, so.BIG, 0.0, fit.Layout().floor_t))
     base = {"deck": (deck, FINISH["deck"]), "floor": (floor, FINISH["floor"])}
     outer = {"deck": deck_outer}
-    fin = lambda k: FINISH["hook"] if k.startswith("panel") else FINISH["housing"] if k == "latch_housing" else FINISH["cover"] if k == "latch_cover" \
+    fin = lambda k: FINISH["hook"] if k.startswith("panel") else FINISH["cover"] if k == "latch_gate" \
         else FINISH["slider"] if k == "latch_bolt" else FINISH["cam"] if k.startswith("cam_stud") else FINISH["tongue"] if k.startswith("cam_tongue") else pf.finish_of(k)
     frame = {k: (s, fin(k)) for k, s in {**cd.frame, **cd.fixed}.items()}
     on_panel_hw = {k: hard[k] for k in ("Lever", "Buttons", "Encoder")}
@@ -1100,8 +1174,7 @@ def scenes(out: Path, cd: Candidate, deck: Part.Shape, hw: pf.Hardware) -> None:
         shapes = {**base, **frame, "frame_magnets": mags["frame"]}
         if cd.c == "B":
             shapes["latch_bolt"] = (bolt(d, L, st.bolt), FINISH["slider"])
-            lift = 0.0 if st.bolt < L.stroke else 99.0
-            for k, s in springs(L, st.bolt, lift if st.swing else 0.0).items():
+            for k, s in springs(L, st.bolt).items():
                 shapes[k] = (s, FINISH["spring"])
         return shapes
 
@@ -1119,6 +1192,11 @@ def scenes(out: Path, cd: Candidate, deck: Part.Shape, hw: pf.Hardware) -> None:
     # 3. the way out in four steps
     for k, st in enumerate(steps_for_sheet(cd)):
         write(out / f"way-{k + 1}", {**cabinet_at(st), **panel_at(st)}, outer, {"way": view((0.0, mid[1] - 10, zt + 25), 300, -40, 26, 0.7)})
+    # 5. B: the blank panel with its finger hole
+    if cd.c == "B":
+        blank = {k: (s, pf.FINISH["blank"]) for k, s in cd.blank.items()}
+        x, ylh, _ = L.finger_hole
+        write(out / "blank", {**base, **blank}, outer, {"player": view(mid, 240, 0, 52), "hole": view((x, pf.y0(d) + ylh, zt), 45, -25, 40, 0.7)})
     # 4. the latch parts apart
     write(out / "parts", exploded(cd), None, {"parts": view(exploded_target(cd), exploded_radius(cd), -35, 30, 0.7)})
 
@@ -1161,7 +1239,7 @@ def release_step(cd: Candidate) -> Step:
     if cd.c == "H":
         return Step("front up 4", swing=4.0)
     if cd.c == "B":
-        return Step("released", bolt=cd.L.stroke, swing=round(lifted_by_springs(cd), 2))
+        return Step("released", bolt=cd.L.stroke)
     return Step("released", cam=90.0)
 
 
@@ -1169,7 +1247,7 @@ def steps_for_sheet(cd: Candidate) -> list[Step]:
     L = cd.L
     if cd.c == "M":
         return [Step("seated"), Step("lifted 10", lift=(0, 10)), Step("lifted 40", lift=(0, 40)), Step("lifted 120", lift=(0, 120))]
-    first = {"H": Step("seated"), "B": Step("released", bolt=L.stroke, swing=round(lifted_by_springs(cd), 2)), "Q": Step("released", cam=90.0)}[cd.c]
+    first = {"H": Step("seated"), "B": Step("button in", bolt=L.stroke, swing=4.0), "Q": Step("released", cam=90.0)}[cd.c]
     b, t = (L.stroke if cd.c == "B" else 0.0), (90.0 if cd.c == "Q" else 0.0)
     return [first, Step("front up 10", bolt=b, cam=t, swing=10.0), Step("front up 20", bolt=b, cam=t, swing=20.0),
             Step("out", bolt=b, cam=t, swing=20.0, lift=(-40.0, 110.0))]
@@ -1205,15 +1283,13 @@ def exploded(cd: Candidate) -> dict:
         out["frame_rear"] = (fr["frame_right"][0].common(keep), pf.FINISH["frame"])
         out["hook"] = (hook(d, i, x, L).translated(V(0, -14, 26)), FINISH["hook"])
         return out
-    # B: the housing, the bolt, the cover, the springs, the strike
-    hs = housing(d, i, L)
-    out["latch_housing"] = (hs["latch_housing"], FINISH["housing"])
-    out["latch_cover"] = (hs["latch_cover"].translated(V(0, 0, 26)), FINISH["cover"])
-    out["latch_bolt"] = (bolt(d, L).translated(V(0, 0, 14)), FINISH["slider"])
-    out["strike"] = (strike(d, i, L).translated(V(0, 0, 44)), FINISH["hook"])
-    sp = springs(L)
-    out["bolt_spring"] = (sp["bolt_spring"].translated(V(0, 18, 14)), FINISH["spring"])
-    out["lift_springs"] = (sp["lift_springs"].translated(V(0, 0, 22)), FINISH["spring"])
+    # B: the tunnel (a piece of the left half of the frame), the bolt, the gate, the spring, the strike
+    keep = pf.box(-L.housing_w / 2 - 6, L.housing_w / 2 + 6, L.housing_y[0] - 2, L.housing_y[1] + 2, -so.BIG, so.BIG)
+    out["frame_tunnel"] = (cd.frame["frame_left"].common(keep), pf.FINISH["frame"])
+    out["latch_bolt"] = (bolt(d, L).translated(V(0, 0, 16)), FINISH["slider"])
+    out["latch_gate"] = (gate(L).translated(V(0, 18, 30)), FINISH["cover"])
+    out["bolt_spring"] = (springs(L)["bolt_spring"].translated(V(0, 8, 22)), FINISH["spring"])
+    out["strike"] = (strike(d, i, L).translated(V(0, 0, 40)), FINISH["hook"])
     return out
 
 
@@ -1308,10 +1384,18 @@ def main() -> int:
     summary = {c: {"name": r["name"], "failures": r["failures"], "factor": r["hold"]["factor"], "play": r["play"]["factor"],
                    "removal": r["removal"], "shows": r["shows"], "buy": r["buy"], "interface_rows": r["interface_rows"],
                    "strain": r["strain"], "wear": r["wear"], "magnet": r["magnet"], "strength": r["strength"], "preload": r["preload"],
-                   "hold": r["hold"]["rows"], "print": r["print"]} for c, r in reps.items()}
+                   "hold": r["hold"]["rows"], "print": r["print"], "corner_rock": r["corner_rock"], "ramp_option": r["ramp_option"],
+                   "interface_rows_all": r["interface_rows"]} for c, r in reps.items()}
     summary["detent"] = detent()
+    # a run of some candidates keeps the others of an earlier run (the record of the study)
+    old = out / "summary.json"
+    if old.exists():
+        summary = {**json.loads(old.read_text(encoding="utf-8")), **summary}
     (out / "summary.json").write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
-    (out / "report.md").write_text(markdown(reps), encoding="utf-8")
+    for c, r in reps.items():
+        (out / c / "report.md").write_text(markdown({c: r}), encoding="utf-8")
+    if len(reps) == len(CANDIDATES):
+        (out / "report.md").write_text(markdown(reps), encoding="utf-8")
     print(markdown(reps))
     log("done")
     return 1 if any(r["failures"] for r in reps.values()) else 0
