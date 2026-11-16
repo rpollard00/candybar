@@ -143,10 +143,19 @@ class OtherJoints:
     service_chamfer: float = 0.5
     # joint 7, hood on the body top: the top ring of the body and the foot flange of the hood; the cones locate it
     ring_w: float = 14.0
-    ring_h: float = 12.0             # at an insert: the room for the M4 insert (insert_hole_depth) and its floor
+    ring_h: float = 12.0             # at a screw of the hood: the boss under the ring, the seat of the screw's head
     ring_t: float = 6.0              # the ring between the inserts, as the flange of joint 1: 12 all round adds about
                                      # 110 cm3 to the pieces of the body top (the print pieces, 2026-11-15)
     hood_foot_t: float = 6.0
+    # the bolted hood (the owner, 2026-11-16): M4 socket head screws (ISO 4762, a 3 mm hex key) from below, up through
+    # the boss of the ring (ring_h) into the M4 insert of joint 5 in a boss of the foot (hood_boss_h: the hole of
+    # insert_hole_depth and the floor of insert_floor). Length: the boss of 12, then 8 into the insert of 8.1; the
+    # hole of 9.5 leaves 1.5 under the screw's end
+    hood_screw: str = "M4 x 20 socket head (ISO 4762)"
+    hood_screw_l: float = 20.0
+    hood_screw_hole_d: float = 4.5
+    hood_screw_head: tuple[float, float] = (7.0, 4.0)   # diameter, height
+    hood_boss_h: float = 12.0
     # the piece that closes a ring goes in last, into two seams at once: those seams get this gap at each side
     closing_gap: float = 0.5
 

@@ -88,7 +88,11 @@ A price is in the list only where a source gave it. The source and the date are 
 | USB cable, panel to cabinet | USB-C or USB-B to USB-A, with a loop of 200 mm | 1 for each panel | Split report, "Cable routes" | A panel-mount socket on each panel | The connector on the encoder |
 | Top plate | 5052-H32 aluminium, 2.03 mm, cut by a service | 1 | Panel and USB, B3 and B4 | 3.18 mm aluminium with no cover. A printed plate (ABS) comes first (roadmap). | The plate stack (roadmap, "The arcade plate stack") |
 | Clear cover | Polycarbonate or acrylic, 1.5 mm, cut from the same drawing | 1 | The owner wants a cover with art under it | None | Confirm 2.0 + 1.5 mm with snap-in buttons |
-| What holds the panel | Two pins at the front and a latch or screws at the back | See 2.3 | Split report. The latch is not designed (roadmap step 12). | See 2.3 | The latch |
+| What holds the panel | The push bolt (`docs/design/control-panel-latch.md`): two rear hooks and a strike on each panel, a printed bolt, one spring, and four magnets in the frame | See the next rows | The owner's choice, 2026-11-15 | Four M4 x 16 countersunk screws into M4 inserts (the fall-back) | The size of the front magnets after the first print (the force to lift the panel out) |
+| Latch magnets | Disc magnet N52, 12 x 2, axial | 4 (in the frame, once) | `panel_frame.PushBolt`: one in each pad | Steel discs in the frame and magnets in the panel | The pull, ESTIMATED 14.1 N for each latch point |
+| Latch steel discs | Steel disc 12 x 2 | 4 for each panel | The user, 2026-11-16: no pole to mind, about 10 % less pull than a magnet | A magnet of 12 x 2 | None |
+| Spring of the push bolt | Compression spring, steel, 4 outside, 22 free, about 1.2 N/mm | 1 | `PushBolt.bolt_spring_*` | None | The maker's part |
+| Epoxy for the magnets and discs | Two-part epoxy | A little | A pocket that holds the disc by its rim, and epoxy | Cyanoacrylate | None |
 
 ### 1.4 Controls: the PC control panel
 
@@ -156,14 +160,14 @@ floor is about 2.0 m. ESTIMATED from the print boxes of the tiles.
 | Heat-set insert, M4 | Brass, M4 x 8.1 mm, outside 6.3 mm, hole 5.6 mm | About 30 to 40 | Joint 5: "M4 heat-set insert in the fixed part". The values agree with two makers' tables (section 2.1). | M4 square nuts in pockets | The hole as printed, and its depth (section 2.1) |
 | Heat-set insert, M3 | Brass, M3 x 5.7 mm, outside 4.6 mm, hole 4.0 mm | About 20 to 30 | The encoder, the speakers, small covers | Thread-forming screws | None |
 | Heat-set insert, M2 | Brass, M2 x 4.0 mm, outside 3.6 mm, hole 3.2 mm | 4 to 6 | The keyboard PCB posts | None | Only with a bought PCB |
-| Machine screws, M4 | Button head or pan head, 10 mm to 16 mm | About 30 | For the M4 inserts | None | The lengths, when the parts are modelled |
+| Machine screws, M4 | Button head or pan head, 10 mm to 16 mm; for the hood 4 socket head M4 x 20 (ISO 4762, a 3 mm hex key) | About 30 | For the M4 inserts | None | The lengths, when the parts are modelled |
 | Locating pins | Steel dowel pin, 4 mm, in holes with 0.1 mm of clearance | About 16 | Joint 5: "two pins 4 dia, +0.1" for each service part | Printed pins | The length. Steel or printed. |
 | Rear door: what holds it | The plan: four thumb screws, two pins and a lip on the sill | 4 thumb screws | Blueprint, "What opens for service" | See 2.3 and 2.4 | The owner's choice |
 | Bezel plate: what holds it | The plan: magnets and two pins. The plate rests on the ledge below it. | See 2.3 | Split report: "held by magnets and two pins (trim: no load)" | See 2.3 | The magnet size and count |
-| Hood: what holds it | Two pins at the front, two M4 screws at the rear | 2 screws, 2 pins | Split report, seam G | A bonded hood: the owner examines the two | Bolted or bonded |
-| Control panel: what holds it | Not designed | - | Roadmap step 12 | See 2.3 | The latch |
+| Hood: what holds it | Four cones of the top ring locate it; four M4 x 20 socket head screws (ISO 4762) from below, up through bosses of the ring into M4 heat-set inserts in the hood's foot. A 3 mm hex key, from inside the body with the rear door off. | 4 screws, 4 inserts | The owner, 2026-11-16: "for the hood - we can bolt it on" (`docs/design/print-pieces.md`, "The bolted hood") | A bonded hood | None |
+| Control panel: what holds it | The push bolt (section 1.3) | - | The owner, 2026-11-15 | Screws (the fall-back) | None |
 
-Method of the insert estimate: the rear door (4), the hood (2), the USB socket plate (4), the control
+Method of the insert estimate: the rear door (4), the hood (4), the USB socket plate (4), the control
 panel (2 to 4 for each cabinet), the lever on a printed plate (4), the monitor cradle (4), the saddle of
 the supply (4), the BC-250 carrier (4 to 6), the duct fan (4). ESTIMATED: these parts are not designed.
 
@@ -254,7 +258,7 @@ Options for each part. The first option in each row is the plan in the repositor
 | Rear door (422.7 mm x 165 mm, two halves bonded into one) | About 0.35 kg of skin (split report). The foam seals push it out. It carries no cable. | (1) A lip on the sill, two pins, four thumb screws. (2) The lip, the pins, and two quarter-turn fasteners at the top. (3) The lip, the pins, and magnets at the top. (4) Lift-off hinges on one side (2.4). | Option 1 or 2. The foam seals need a force that stays, and a screw or a quarter-turn gives it. Magnets are a risk here: the force of the seals is not known. |
 | Bezel plate (four plates, one for each aspect ratio) | About 0.76 kg of skin (split report). It leans on a face reclined 30 degrees and rests on its bottom ledge. | (1) Two pins in the bottom ledge and magnets on the fixed cradle. (2) Two pins and two screws from the front (they show). | Option 1. The plate carries no load, and the player changes it by hand. Start with four pairs of 8 mm x 3 mm magnets, and add pairs if the plate rattles. |
 | Control panel | The lever puts a moment of 1.2 N m to 2.4 N m on it (controls, 6.3). | (A) A tongue at the rear and two clamps at the front. (B) A ledge, two pins and four captive thumb screws or quarter-turns. Magnets only seat the panel. | Follow controls, 6.5: make a coupon of the two. The fasteners go into metal. |
-| Hood | It lifts off for service only. | Two pins and two M4 screws. | As the plan. No change. |
+| Hood | It lifts off for service only. | Four cones and four M4 screws from below (2026-11-16). | Bolted. The rear door comes off first to reach the screws. |
 | USB socket plate | It comes off only when a socket changes. | M4 screws from inside into inserts. | As the plan. No change. |
 
 Magnet count for the bezel plate, as a first value: the plate weighs about 7.5 N. The face is reclined

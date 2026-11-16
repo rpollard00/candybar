@@ -86,7 +86,63 @@ def main(argv: list[str]) -> int:
     path = os.path.join(out, "joints-2", "joints-2.png")
     sheet.save(path)
     print(f"draw_joint_sheets: {path}")
+    if seams.get("hood_screws"):
+        hood_sheet(out, seams, "--no-render" not in argv)
     return 0
+
+
+HOOD_VIEWS = [("hood-reach", "reach", "The right side cut open inside its wall, the rear door off: the two screws of the side, a key of 3 (red) in each"),
+              ("hood-reach", "reach-close", "The same, close: the boss under the ring, the screw, the key; the monitor (blue) stays in"),
+              ("hood-screw", "screw", "Section through the front screw: the ring's boss, the screw, the insert's hole in the foot's boss")]
+
+
+def hood_sheet(out: str, seams: dict, render_now: bool) -> None:
+    """The sheet of the bolted hood: how a key from the rear door reaches each screw."""
+    if render_now:
+        for s in sorted({s for s, _, _ in HOOD_VIEWS}):
+            views = ",".join(v for sc, v, _ in HOOD_VIEWS if sc == s)
+            subprocess.run([os.path.join(HERE, "cad-lock.sh"), sys.executable, os.path.join(HERE, "render_views.py"),
+                            os.path.join(out, "joints-2", "renders", s), os.path.join(out, "joints-2", "scenes", s), "--views", views, "--size", "1400"],
+                           check=True)
+    imgs = [(Image.open(os.path.join(out, "joints-2", "renders", s, f"{v}.png")).convert("RGB"), cap) for s, v, cap in HOOD_VIEWS]
+    cw = 760
+    imgs = [(i.resize((cw, int(i.size[1] * cw / i.size[0]))), cap) for i, cap in imgs]
+    ch = max(i.size[1] for i, _ in imgs)
+    margin, gap, head, cap_h = 40, 30, 150, 50
+    width = 2 * margin + 3 * cw + 2 * gap
+    rows = seams["hood_screws"]
+    chk = os.path.join(out, "check.json")
+    reach = json.load(open(chk)).get("hood_reach", []) if os.path.exists(chk) else []
+    lines = ["Four screws M4 x 20, socket head (ISO 4762), from below: up through a boss of 13 under the ring (its seat 12 below the ring's top) into",
+             "an M4 x 8.1 insert in a boss of 13 x 12 on the foot of the hood. One tool: a hex key of 3 (ball end), from inside the body with the rear door off.",
+             "Places (x, y, seat z): " + "; ".join(f"({r['at'][0]:g}, {r['at'][1]:g}, {r['at'][2]:g})" for r in rows)]
+    if reach:
+        lines.append("Free straight under each head: " + ", ".join(f"{r['free']:g} (then {r['first'] or 'nothing'})" for r in reach))
+    height = head + cap_h + ch + 40 + 34 * len(lines) + 40
+    sheet = Image.new("RGB", (width, height), "white")
+    d = ImageDraw.Draw(sheet)
+    d.text((margin, 30), "The bolted hood: four screws from below, reached through the rear door", font=font(40, True), fill="black")
+    d.text((margin, 85), "All sizes in mm. Face edges drawn. The pieces as built in cad/out/pieces.", font=font(22), fill="black")
+    for k, (img, cap) in enumerate(imgs):
+        x = margin + k * (cw + gap)
+        words, line, wrapped = cap.split(), "", []
+        for w in words:
+            if d.textlength(line + " " + w, font=font(18, True)) > cw and line:
+                wrapped.append(line)
+                line = w
+            else:
+                line = (line + " " + w).strip()
+        wrapped.append(line)
+        for i, t in enumerate(wrapped[:2]):
+            d.text((x, head + i * 22 - 4), t, font=font(18, True), fill="black")
+        sheet.paste(img, (x, head + cap_h))
+    y = head + cap_h + ch + 30
+    for line in lines:
+        d.text((margin, y), line, font=font(22), fill="black")
+        y += 34
+    path = os.path.join(out, "joints-2", "hood-screws.png")
+    sheet.save(path)
+    print(f"draw_joint_sheets: {path}")
 
 
 if __name__ == "__main__":

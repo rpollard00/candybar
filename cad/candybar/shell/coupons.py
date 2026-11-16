@@ -11,7 +11,8 @@ The parts, each in its print orientation (z up, on the bed):
   shrink-x, shrink-y    two bars with three stops (0, half, full length), along X and along Y of the bed
   warp-wall, flat-strip a tall wall of the skin on its foot flange, and a long flat strip of the floor
   weld-lower, weld-upper   the section of joint 1 on a short straight seam, to weld with solvent and then break
-  insert                M4 heat-set insert holes of three diameters, upright and level, in a flange on a wall
+  insert                M4 heat-set insert holes of three diameters, upright from the bed in the foot of the hood and
+                        level in a flange on a wall
   holes-*               the button holes, the lever's mount, the hole of a 16 mm power button, the USB cut-outs
   cone-gauge, cone-plug the cone that locates a seam, in sockets of three clearances
   joint1-*              the pairs of joint 1 (candybar.shell.coupon): three clearances, and the plaques
@@ -19,6 +20,9 @@ The parts, each in its print orientation (z up, on the bed):
   facet45, cut-in, hand-hold     cut from the real skin of the body (the cache of candybar.shell.split)
   edges-level, edges-upright     one bar with the edges of decision record 0007, in two print orientations
   floor-tile            a plate of the size of the smallest floor tile of the split, as the 10 mm sandwich
+  latch-*               the first test piece of the control panel's latch (docs/design/control-panel-latch.md): a
+                        strip of the deck nose with the button's hole (cut from the real skin), the middle of the
+                        frame's front bar with the tunnel, the bolt, the gate and a strip of a tile with the strike
 
 Values. The joints come from candybar.shell.joints (JOINT, OTHER_JOINTS) and the form from dims.Blueprint. A value
 that the concept does not have yet is derived from those or named here as PROPOSED, with its reason; the hand-over
@@ -323,21 +327,26 @@ def insert_holes() -> list[float]:
 
 
 def insert_coupon():
-    """A wall with the top ring of joint 7 on a 45 degree gusset (holes with an upright axis, as in the ring under the
-    hood) and a thick foot (holes with a level axis, as in the frame of the rear door)."""
+    """A wall of the skin, standing, with the foot of the hood at the bed (joint 7, the bolted hood of 2026-11-16: the
+    foot flange on the bed with three bosses of 13 x hood_boss_h, the holes from the bed upward, as the hood side
+    prints) and at its top a thick flange on a 45 degree gusset (holes with a level axis, as in the frame of the rear
+    door)."""
     o, w = OTHER_JOINTS, JOINT.wall_t
     n = len(INSERT_PLUS)
     length = (n - 1) * INSERT_PITCH + 18.0
     xs = [9.0 + k * INSERT_PITCH for k in range(n)]
     foot_h = INSERT_BOSS + 3.0
     top = foot_h + 3.5 + o.ring_w + INSERT_BOSS
-    ring = prism([(w - 0.5, top), (w + o.ring_w, top), (w + o.ring_w, top - INSERT_BOSS), (w, top - INSERT_BOSS - o.ring_w),
-                  (w - 0.5, top - INSERT_BOSS - o.ring_w - 0.5)], 0, length)
-    body = fuse([box(0, length, 0, w, 0, top), box(0, length, 0, INSERT_BOSS, 0, foot_h), ring])
+    t, rw = o.hood_foot_t, o.ring_w
+    foot = prism([(w - 0.5, 0.0), (w + rw, 0.0), (w + rw, t), (w, t + rw), (w - 0.5, t + rw)], 0, length)
+    bosses = [cyl(o.service_boss, (x, w + rw / 2, 0.0), (0, 0, 1), o.hood_boss_h) for x in xs]
+    block = prism([(w - 0.5, top), (INSERT_BOSS, top), (INSERT_BOSS, top - foot_h), (w, top - foot_h - (INSERT_BOSS - w)),
+                   (w - 0.5, top - foot_h - (INSERT_BOSS - w))], 0, length)
+    body = fuse([box(0, length, 0, w, 0, top), foot, block, *bosses])
     tools = []
     for k, (x, d) in enumerate(zip(xs, insert_holes())):
-        tools.append(cyl(d, (x, w + o.ring_w / 2, top + 0.01), (0, 0, -1), INSERT_DEPTH + 0.01))
-        tools.append(cyl(d, (x, INSERT_BOSS + 0.01, foot_h / 2), (0, -1, 0), INSERT_DEPTH + 0.01))
+        tools.append(cyl(d, (x, w + rw / 2, -0.01), (0, 0, 1), INSERT_DEPTH + 0.01))
+        tools.append(cyl(d, (x, INSERT_BOSS + 0.01, top - foot_h / 2), (0, -1, 0), INSERT_DEPTH + 0.01))
         tools += dots(k + 1, (x, w / 2, top), (0, 0, -1), (1, 0, 0))
     return cut(body, tools)
 
@@ -455,6 +464,68 @@ def rod_piece():
         return rod.makeFillet(c.small_break, tip)
     except Part.OCCError:
         return rod.makeChamfer(c.small_break, tip)
+
+
+# ---------- the latch of the control panel: the first test piece (panel_frame, PUSH_BOLT) ----------
+
+LATCH_W = 60.0      # the strips are this wide, on the centre line (the latch document's test piece)
+
+
+def latch_build():
+    """The control panel as built (panel_frame.build), once for the four parts of the latch."""
+    from . import panel_frame as pf
+    global _LATCH
+    try:
+        return _LATCH
+    except NameError:
+        _LATCH = pf.build()
+        return _LATCH
+
+
+def latch_nose_box() -> tuple:
+    """The strip of the deck nose: LATCH_W wide on the centre line, from the front face to the front of the ledge's
+    room, and from below the button's hole to above the deck top."""
+    from . import panel_frame as pf
+    d = Blueprint()
+    return (-LATCH_W / 2, LATCH_W / 2, -3.0, pf.y0(d) + 18.0, d.latch_button_z - d.latch_button_d / 2 - 6.0, d.deck_top + 1.0)
+
+
+def latch_nose():
+    """The deck nose round the button's hole, cut from the real skin: its front wall with the hole and its rim break,
+    the deck top and the ledge of the pocket, under which the frame strip bonds. As the cabinet stands, on its lower
+    cut."""
+    return skin_piece("latch-nose", latch_nose_box())
+
+
+def latch_frame():
+    """The middle of the left half of the frame (it ends at the frame's seam at x 20): the front bar with the notch
+    of the bolt and the tunnel with its floor, walls, roof and the slot of the gate. As the frame prints."""
+    from . import panel_frame as pf
+    b = latch_build()
+    p = b.i.push
+    keep = box(-LATCH_W / 2, p.frame_split_x, -50.0, p.housing_y[1] + 2.0, 0.0, 200.0)
+    return pf.one_solid(b.frame["frame_left"].common(keep).removeSplitter(), "latch frame strip")
+
+
+def latch_bolt():
+    """The bolt, on its side (the flat side x -6 on the bed)."""
+    return turned(latch_build().latch["latch_bolt"], (0, 1, 0), -90)
+
+
+def latch_gate():
+    """The gate, flat: its rear face on the bed, the peg up."""
+    return turned(latch_build().latch["latch_gate"], (1, 0, 0), -90)
+
+
+def latch_strike():
+    """A strip of the button tile with the strike: LATCH_W wide on the centre line, the front of the plate with the
+    stub of the front rib each side of the bolt's room. Top face down, as the tiles print."""
+    from . import panel_frame as pf
+    b = latch_build()
+    d = b.d
+    keep = box(-LATCH_W / 2, LATCH_W / 2, pf.y0(d) - 1.0, pf.y0(d) + 32.0, 0.0, 200.0)
+    tile = next(t for t in b.arcade.values() if t.BoundBox.XMin < 0 < t.BoundBox.XMax)
+    return turned(pf.one_solid(tile.common(keep).removeSplitter(), "latch strike strip"), (1, 0, 0), 180)
 
 
 # ---------- joint 2: floor tile to floor tile (assembled: seam along x, z up from the table) ----------
@@ -746,7 +817,7 @@ class Item:
 PLATES = (("1", "shrink"), ("2", "warp: two walls and the flat strip"), ("3", "holes, inserts and the cone"),
           ("4", "joint 1: the fit"), ("5", "the weld pairs and joints 2, 3 and 5"),
           ("6", "the form: facets, edges, cut-in, hand-hold"), ("7", "the floor tile"),
-          ("8", "the finish: four pairs"), ("9", "the finish: four plaques"))
+          ("8", "the finish: four pairs"), ("9", "the finish: four plaques"), ("10", "the latch of the control panel"))
 
 
 def _joint1_stated(part: str) -> tuple:
@@ -770,8 +841,10 @@ def items() -> list[Item]:
         Item("shrink-y", "shrink", "1", lambda: turned(shrink_bar(2), (0, 0, 1), 90), "flat, along Y of the bed"),
         Item("warp-wall", "warp", "2", warp_wall, upright + ", on its foot flange", count=2, view=(145.0, 25.0)),
         Item("flat-strip", "warp", "2", flat_strip, "flat, the table face on the bed", ff),
-        Item("insert", "insert", "3", insert_coupon, upright + ": the ring on its 45 degree gusset", view=(140.0, 35.0),
-             stated=(Stated(0.0, INSERT_BOSS + 3.0, "the tops of the three level insert holes (5.6 to 5.8 wide)"),)),
+        Item("insert", "insert", "3", insert_coupon, upright + ": the foot of the hood on the bed, the holes from the bed up", view=(140.0, 35.0),
+             stated=(Stated(INSERT_DEPTH - 0.2, INSERT_DEPTH + 0.2, "the ends of the three upright holes from the bed: bridges of 5.6 to 5.8, as in the foot of the hood"),
+                     Stated(INSERT_BOSS + 3.0 + 3.5 + OTHER_JOINTS.ring_w + INSERT_BOSS - (INSERT_BOSS + 3.0), INSERT_BOSS + 3.0 + 3.5 + OTHER_JOINTS.ring_w + INSERT_BOSS,
+                            "the tops of the three level insert holes (5.6 to 5.8 wide)"))),
         Item("holes-buttons", "holes", "3", button_plate, "flat, the panel top on the bed"),
         Item("holes-lever", "holes", "3", lever_plate, "flat, the panel top on the bed"),
         Item("holes-power", "holes", "3", power_wall, upright + ", on its foot flange", view=(-35.0, 20.0),
@@ -816,6 +889,17 @@ def items() -> list[Item]:
         Item("edges-upright", "edges", "6", lambda: turned(edge_bar(), (0, 1, 0), -90), "on its end: the edges are upright, as on the band's stub", 0.55,
              view=(-150.0, 30.0)),
         Item("floor-tile", "floor", "7", floor_tile, "flat, the table face on the bed", ff),
+        Item("latch-nose", "latch", "10", latch_nose, "as the deck stands, as the deck nose prints: on its lower cut, the front face upright", view=(-40.0, 15.0), real=True,
+             stated=(Stated(0.0, 30.0, "the ceilings of the skin inside: the steps of the cavity, the underside of the ledge and of the deck top, as in the deck nose piece"),)),
+        Item("latch-frame", "latch", "10", latch_frame, "as the frame prints: the lower face of the bar on the bed", view=(-35.0, 35.0),
+             stated=(Stated(9.3, 9.7, "the roof of the tunnel: a bridge between its walls, as in the frame"),)),
+        Item("latch-bolt", "latch", "10", latch_bolt, "on its side: the flat side on the bed", view=(-35.0, 35.0),
+             stated=(Stated(0.0, 1.0, "the edge break of the button's rim at the bed"),
+                     Stated(3.8, 8.4, "the side of the neck (a step of 4) and the top of the spring's bore: short bridges"))),
+        Item("latch-gate", "latch", "10", latch_gate, "flat: its rear face on the bed, the peg up"),
+        Item("latch-strike", "latch", "10", latch_strike, "top face down, as the tiles print", view=(-35.0, 35.0),
+             stated=(Stated(0.0, 0.4, "the edge break of the plate's front edge at the bed"),
+                     Stated(17.4, 18.0, "the lips of the strike: an overhang of 3.4, as on each panel"))),
     ]
     best = c1.ASSEMBLED_C
     out += [
@@ -944,9 +1028,13 @@ def check_pairs() -> dict:
         gaps.append({"clearance": cl, "gap_mm": round(Part.Vertex(probe).distToShape(gauge)[0], 4), "common_mm3": round(p.common(gauge).Volume, 6)})
     out["cone"] = {"sockets": gaps, "pass": all(abs(g["gap_mm"] - g["clearance"]) < 2e-3 and g["common_mm3"] < 1e-6 for g in gaps)}
     ins = insert_coupon()
-    out["insert"] = {"holes_upright": holes_of(ins, (0, 0, 1)), "holes_level": holes_of(ins, (0, 1, 0)), "depth": INSERT_DEPTH, "boss": INSERT_BOSS}
+    upright = holes_of(ins, (0, 0, 1))
+    # the bosses of the foot of the hood (service_boss across) are cylinders with an upright axis too
+    bosses = sum(n for k, n in upright.items() if abs(float(k) - OTHER_JOINTS.service_boss) < 1e-6)
+    upright = {k: n for k, n in upright.items() if abs(float(k) - OTHER_JOINTS.service_boss) >= 1e-6}
+    out["insert"] = {"holes_upright": upright, "bosses_of_the_foot": bosses, "holes_level": holes_of(ins, (0, 1, 0)), "depth": INSERT_DEPTH, "boss": INSERT_BOSS}
     want = {d: 1 for d in insert_holes()}
-    out["insert"]["pass"] = out["insert"]["holes_upright"] == want and out["insert"]["holes_level"] == want
+    out["insert"]["pass"] = upright == want and out["insert"]["holes_level"] == want and bosses == len(want)
     return out
 
 
@@ -1029,10 +1117,11 @@ def table(rows: list[dict], layout: dict) -> str:
 
 
 PROVES = {"rod-fit": "the fit of the push rod of 4 x 4 in its hole of 4.4 in the bezel plate, in ABS",
+          "latch": "the latch of the control panel: the button flush in its hole with 0.3 all round, the stroke, the wedge and the spring",
           "shrink": "the shrink of ABS along X and Y of the bed",
           "warp": "warp in ABS: a tall wall and a long flat strip stay flat",
           "weld": "the solvent weld of ABS on the real joint section",
-          "insert": "the hole for the M4 heat-set insert, upright and level",
+          "insert": "the hole for the M4 heat-set insert, upright from the bed (the foot of the bolted hood) and level",
           "holes": "holes: buttons, lever, power button, USB sockets",
           "cone": "the clearance of the cone that locates a seam",
           "joint1": "joint 1: the groove clearance and the pilot hole",
@@ -1046,7 +1135,7 @@ PROVES = {"rod-fit": "the fit of the push rod of 4 x 4 in its hole of 4.4 in the
           "floor": "the floor sandwich: flat, stiff, its mass and time",
           "finish": "bond, fill, prime and paint: the seam does not show"}
 
-TINT = {"rod-fit": "#c0c0c0", "shrink": "#9ec5e8", "warp": "#9ec5e8", "weld": "#f0a0a0", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
+TINT = {"rod-fit": "#c0c0c0", "latch": "#d0762b", "shrink": "#9ec5e8", "warp": "#9ec5e8", "weld": "#f0a0a0", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
         "joint2": "#a8d8d0", "joint3": "#c9b8e8", "joint5": "#f2b8a0", "facet45": "white", "cut-in": "white", "hand-hold": "white",
         "edges": "white", "floor": "#d0d0d0", "finish": "#b9dea0"}
 PLATE_PITCH = 280.0

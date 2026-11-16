@@ -72,7 +72,7 @@ cad/.venv-tools/bin/python cad/tools/draw_blueprint.py fit      # docs/blueprint
 cad/.venv-tools/bin/python cad/tools/draw_split.py blueprint    # docs/blueprint/10-split and 11-joints
 # the detail pass: the open small questions of the form
 cad/.venv-tools/bin/python cad/tools/draw_detail.py detail-options
-# the coupon set for ABS on the Qidi Q2: 37 parts on nine plates, the owner's next print (1 minute; docs/design/coupons.md)
+# the coupon set for ABS on the Qidi Q2: 44 parts on ten plates, the owner's next print (1 minute; docs/design/coupons.md)
 CANDYBAR_OUT=cad/out/coupons cad/candybar/freecad-run.sh candybar.shell.coupons                      # stl/, brep/, coupons.json
 CANDYBAR_OUT=cad/out/coupons cad/candybar/freecad-run.sh --gui candybar.shell.coupons_doc            # shell.FCStd, the plates
 cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupons --set                            # coupons.png, plates.png
@@ -96,18 +96,21 @@ CANDYBAR_PIECES=check CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh ca
 CANDYBAR_PIECES=views CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces   # the folders for the sheets
 cad/.venv-tools/bin/python cad/tools/draw_pieces.py                                                  # the sheets and report.md
 CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.joint_sheets               # the sheet of the second pass on the joints: scenes
-cad/.venv-tools/bin/python cad/tools/draw_joint_sheets.py cad/out/pieces                              # renders and joints-2/joints-2.png
+cad/.venv-tools/bin/python cad/tools/draw_joint_sheets.py cad/out/pieces                              # renders, joints-2/joints-2.png, joints-2/hood-screws.png
 CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc                 # shell.FCStd
 # the mounts of the hardware: tray, docks, fence, saddle, tie points, places (2 minutes; docs/design/hardware-mounts.md)
 CANDYBAR_OUT=cad/out/mounts cad/candybar/freecad-run.sh candybar.shell.mounts                        # CANDYBAR_MOUNT_SCENES=0: no scenes
 cad/.venv-tools/bin/python cad/tools/draw_mounts.py cad/out/mounts                                   # the sheets
 CANDYBAR_OUT=cad/out/mounts cad/candybar/freecad-run.sh --gui candybar.shell.mounts_scenes           # shell.FCStd
-# the control panel: two printed tiles, the frame, the latch, a blank panel (2 minutes; docs/design/control-panel.md)
+# the control panel: two printed tiles, the frame, the push bolt (the latch), a blank panel (4 minutes; docs/design/control-panel.md)
 CANDYBAR_OUT=cad/out/control-panel cad/candybar/freecad-run.sh candybar.shell.panel_frame            # parts, checks, report.md
 CANDYBAR_OUT=cad/out/control-panel cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc          # shell.FCStd
 cad/.venv-tools/bin/python cad/tools/draw_panel.py                                                   # renders and sheets
 CANDYBAR_OUT=cad/out/control-panel/parts cad/candybar/freecad-run.sh tools.edge_finish               # the edge rule on its parts
 CANDYBAR_OUT=cad/out/control-panel/parts cad/candybar/freecad-run.sh tools.face_check                # the face check on its parts
+# the latch study of the control panel: M, H and Q as the record, B from panel_frame (docs/design/control-panel-latch.md)
+CANDYBAR_OUT=cad/out/panel-latch cad/candybar/freecad-run.sh candybar.shell.panel_latch              # the candidates, report.md
+cad/.venv-tools/bin/python cad/tools/draw_panel_latch.py                                             # the sheets of the study
 # the monitor cradle and the printed bezel plate (4 minutes; docs/design/monitor-cradle-and-bezel.md)
 CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh candybar.shell.cradle                        # parts, checks, report.md
 CANDYBAR_OUT=cad/out/cradle cad/candybar/freecad-run.sh --gui candybar.shell.cradle_view             # shell.FCStd

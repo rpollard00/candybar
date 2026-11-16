@@ -359,8 +359,8 @@ The upper rear R is the closing half, not the left one, because then both keys o
 
 Date: 2026-11-15. The hood had nothing to lie on but the body top, a land of 4 to 8, with the seam gap of the form (1.5) between the two. `pieces.top_ring` now makes joint 7 of the blueprint with the flange code of joint 1, on a level seam "G" at the body top:
 
-- **The top ring** on the five pieces of the body top (brow, upper R and L, upper rear R and L): 14 wide inward of the outer line (`ring_w`), 6 thick (`ring_t`, new: the flange of joint 1), with the gusset of 45 degrees below it, so that it prints with no support. Inside the wall it rises 1.4 to the foot of the hood. The outer 4 of the seam gap, the part that shows, stays open (a test holds this).
-- **The foot of the hood** on the three hood pieces: 14 wide, 6 thick (`hood_foot_t`), with its gusset. It lies on the ring with a bond line of 0.1.
+- **The top ring** on the five pieces of the body top (brow, upper R and L, upper rear R and L): 14 wide inward of the outer line (`ring_w`), 6 thick (`ring_t`, new: the flange of joint 1), with the gusset of 45 degrees below it, so that it prints with no support. Inside the wall it rises 1.5 to the foot of the hood (1.4 until 2026-11-16, with a bond line of 0.1). The outer 4 of the seam gap, the part that shows, stays open (a test holds this).
+- **The foot of the hood** on the three hood pieces: 14 wide, 6 thick (`hood_foot_t`), with its gusset. It lies on the ring (since 2026-11-16 with no bond line: the hood is bolted).
 - **Four cones** of 8 x 3 on the ring, at x +-150 at the front and at the rear, each in a socket of the foot (`OtherJoints.cone_clearance` 0.15). They put the hood in its place, bolted or bonded.
 - The ring and the foot end at the cut faces of the other seams of their module (W1, R3, R5 on the body; H1 on the hood), as the flanges of joint 1 do. The closing gap of the brow and of upper rear R holds for the ring too.
 
@@ -376,9 +376,57 @@ Date: 2026-11-15. The hood had nothing to lie on but the body top, a land of 4 t
 
 **The checks.** Each piece stays one valid solid inside the limit. No clash between pieces, with the hardware, or with the parts of the rear. The ring and the foot alone have no common volume with any part of the cradle (`cad/out/cradle`) or with any part of hood band A (`cad/out/hood-band/A`).
 
-**Not done.** The M4 inserts and screws of a bolted hood (the blueprint: two pins at the front, two M4 at the rear, inserts in the ring, `ring_h` 12 deep there). Their heads would be inside the hood, on its foot, and no way for the screwdriver to reach them is chosen: from inside the hood through the marquee opening, or from below with the inserts in the foot. The owner has not chosen between a bolted and a bonded hood. The cones and the faces serve both.
+**The screws.** See "The bolted hood" (2026-11-16).
 
 **The sheet.** `cad/out/pieces/joints-2/joints-2.png` (`candybar.shell.joint_sheets`, `tools/draw_joint_sheets.py`): the closing gap at W1, R5 and R3, the ring and the foot along the right side, and sections at the front and the rear cone. Every face edge is drawn.
+
+## The bolted hood
+
+Date: 2026-11-16. The owner: "for the hood - we can bolt it on". The hood comes off and goes back with one tool, a hex key of 3, with no bond, and with no fastener and no mark on a face that shows. The four cones of the ring locate it; the screws only hold it down.
+
+### The way to the screws
+
+| Way | What comes off first | Tool and room | Result |
+| --- | --- | --- | --- |
+| From below at the front cones (x ±150, y 450.8) | The rear door, and the monitor | The cradle of the monitor stands 48 below the ring there, and the monitor is in front of the hand | Not taken: a screw that needs the monitor out |
+| From below on the rear ring (beside the hand-holds) | The rear door | The ring lies over the rear shelf (45 degrees, from y 540 to 580): under the ring the shelf is about 85 below the head, and a key from the door comes in at 25 degrees or more | Not taken: at the limit of a ball end |
+| From above through a speaker opening | The grille (two screws) and the driver | The key reaches only the inside of the sealed enclosure of 0.45 l. Its floor is about 10 above the foot; a screw through it opens the enclosure | Not taken |
+| **From below on the side rings, behind the monitor (taken)** | **The rear door** (four thumb screws) | **A hex key of 3 with a ball end, long arm 100 or more, straight up from inside the body (see "The reach")** | **Four screws, all from one opening** |
+
+### What is built
+
+- **Four screws** M4 x 20, socket head (ISO 4762), at x ±222.4 (the middle of the side ring), y 475 and y 540 (`pieces.HOOD_SCREWS`). The front pair stands 24 behind the front cones, the rear pair 26 in front of the rear cones. Each screw goes up from below through a boss of the ring into an M4 heat-set insert in a boss of the foot.
+- **The boss of the ring**: 13 across (`service_boss`), from the ring's top down to 12 below it (`ring_h`), with a hole of 4.5. Its lower face is the seat of the head.
+- **The boss of the foot**: 13 across, 12 high (`hood_boss_h`), with the hole of the insert from below (5.6, 9.5 deep, `insert_hole_depth`). The insert is the M4 x 8.1 of joint 5. The screw goes 8 into the insert; the hole leaves 1.5 under its end.
+- Each boss stays inside the outer form. The values are in `joints.OtherJoints` (`hood_screw`, `hood_screw_l`, `hood_screw_hole_d`, `hood_screw_head`, `hood_boss_h`).
+
+### The reach
+
+From the build (`check.json`, "hood_reach"): how far a key goes straight down from each head before it meets a piece or a part of the hardware, and the nearest of them at 20, 50 and 80 under the head.
+
+| Screw | Head at z | Free straight down | First met | Nearest at 20 / 50 / 80 under the head |
+| --- | --- | --- | --- | --- |
+| x ±222.4, y 475 | 409.4 | 110.3 | the side wall of upper R or L, where the body leans in | 13.6 / 17.6 / 19.6 (the side wall) |
+| x ±222.4, y 540 | 409.4 | 100.8 | the same | 13.6 / 17.6 / 10.9 (the side wall) |
+
+The hand comes in through the door (its top at z 281) and holds the key below the head; with a ball end the key can lean 10 degrees inward past the bulge of the wall. The monitor stays in: at the screws it is 36 to 64 away. The rear door is the only part that comes off.
+
+### The load
+
+A person may lift the cabinet's top by the lip of the hood. The load is the lift of the shell at the hand-holds of the second pass on the joints: 25 kg with a shock of 2 g, 490 N. The worst case puts it all on the two screws of one side or of the front: 245 N on one screw. The hood's own weight (about 20 N) rests on the ring and is not a load of the screws. The coupon `insert` pulls one insert with 250 N (`docs/design/coupons.md`). An M4 thread in a brass insert holds much more; the insert in ABS and the bond of the boss to the ring are what the coupon proves.
+
+### The seam
+
+The ring now rises 1.5 inside the wall, to the foot of the hood. With the screws tight the foot lies on the ring, and the seam gap outside stays 1.5, the open design line of the form. Across the seam the cones locate the hood with 0.15 of clearance; the screws hold it down with their preload, so the hood cannot rattle at the screws or at the cones. Between the screws a printed ring and foot can stand apart by their warp, which is not known before the first print (the warp coupons of plate 2 show its size). A gap there does not rattle, because nothing pushes across it; if the speakers make it buzz at the dry fit, sand the top of the ring flat between the screws. Nothing is added to the model for it.
+
+### The order
+
+The hood is the last part of the shell to go on and the first to come off, after the rear door, which opens to reach its screws:
+
+- Off: the rear door (four thumb screws); the four screws of the hood from below; unplug the multi-pin plug at the hood's foot; lift the hood up. The body is then open from above: the monitor, the cradle and the top of the bay can be reached from above.
+- On: the hood down onto its four cones; the plug; the four screws from below; the rear door.
+
+The sheet: `cad/out/pieces/joints-2/hood-screws.png` (`candybar.shell.joint_sheets`, `tools/draw_joint_sheets.py`): the right side cut open just inside its wall with the door off and a key in each screw, and a section through the front screw. Every face edge is drawn.
 
 ## The edge finish and the face check
 

@@ -1133,12 +1133,13 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
     if with_ribs:
         res.ribs = rib_sides(d, pl, names, items, res.hits, {}, log, b)
     res.pairs = pair_up(res.sides, b)
-    rings, foot_sides, cones, sockets = [], [], {}, {}
+    rings, foot_sides, cones, sockets, screw_add, screw_cut = [], [], {}, {}, {}, {}
     if with_ring and all(n in pl.shapes for n in RING_PIECES + FOOT_PIECES) and (names is None or set(names) & set(RING_PIECES + FOOT_PIECES)):
         level = top_ring(d, pl, items, res.hits, kerfs, log, j, b)
         rings = [sd for sd in level if sd.cf.piece in RING_PIECES]
         foot_sides = [sd for sd in level if sd.cf.piece in FOOT_PIECES]
         cones, sockets, res.extra["ring_cones"] = ring_cones(d, rings, foot_sides)
+        screw_add, screw_cut, res.extra["hood_screws"] = hood_screws(d, rings, foot_sides, cabinet_form(pl, d))
         res.extra["ring"] = [{"piece": sd.cf.piece, "cm3": round(sd.solid.Volume / 1000, 1) if sd.solid is not None else 0.0, "notes": sd.notes}
                              for sd in level]
     # what a screwdriver must pass: the plain pieces and every flange, foot and rib but the two of its own seam
@@ -1158,6 +1159,10 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
     for name, shapes in cones.items():
         add.setdefault(name, []).extend(shapes)
     for name, shapes in sockets.items():
+        cut.setdefault(name, []).extend(shapes)
+    for name, shapes in screw_add.items():
+        add.setdefault(name, []).extend(shapes)
+    for name, shapes in screw_cut.items():
         cut.setdefault(name, []).extend(shapes)
     for side in res.sides:
         if side.solid is not None:
@@ -1230,6 +1235,20 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
 RING_PIECES = ("brow", "upper R", "upper L", "upper rear R", "upper rear L")   # the pieces that carry the body top
 FOOT_PIECES = ("hood centre", "hood side R", "hood side L")
 RING_CONE_X = 150.0      # the four cones of the ring: at x +-RING_CONE_X, at the front and at the rear
+# the screws of the bolted hood (the owner, 2026-11-16: "for the hood - we can bolt it on"): (side, y), on the middle
+# line of the side ring at that y. Each is an M4 screw from below, up through a boss of the ring into a heat-set insert
+# in a boss of the foot, turned with a 3 mm hex key from inside the body with the rear door off
+# (docs/design/print-pieces.md, "The bolted hood"). On the sides, behind the monitor: under the front cones the
+# cradle of the monitor stands 48 below the ring, and the rear ring lies over the rear shelf, which a key from the
+# door cannot pass upright
+HOOD_SCREWS: tuple = ((1, 475.0), (-1, 475.0), (1, 540.0), (-1, 540.0))
+HOOD_KEY = 100.0   # mm: a hex key from below needs this much straight and free under the head of a screw of the hood
+
+
+def ring_top(d: Blueprint) -> float:
+    """The top of the ring inside the wall: the foot of the hood lies on it, so the seam gap of the form stays
+    d.seam_gap outside (a bolted hood has no bond line)."""
+    return d.body_top + d.seam_gap
 
 
 def ring_joints(j: Joint):
@@ -1242,9 +1261,9 @@ def ring_joints(j: Joint):
 
 
 def ring_section(j: Joint, rise: float, b: Build = BUILD):
-    """The section of the top ring, (u inward, z down from the body top): the flange of 14 x 12 with its gusset, and
-    inside the wall a rise of `rise` up to the foot of the hood, so that the seam gap of the form stays open outside.
-    The inserts of a bolted hood (ring_h deep) are not modelled: the way to reach their screws is not chosen."""
+    """The section of the top ring, (u inward, z down from the body top): the flange of 14 x ring_t with its gusset,
+    and inside the wall a rise of `rise` up to the foot of the hood, so that the seam gap of the form stays open
+    outside. At each screw of the hood the ring has a boss (hood_screws)."""
     w, h, t, g = j.wall_t, j.flange_h, j.flange_t, j.gusset_leg
     return lambda seg: [(b.skin_lap, 0.0), (w + 0.2, 0.0), (w + 0.2, -rise), (w + h, -rise), (w + h, t), (w, t + g), (b.skin_lap, t + g)]
 
@@ -1290,7 +1309,7 @@ def top_ring(d: Blueprint, pl: Plain, items: list, hits: list, kerfs: dict, log=
     form = cabinet_form(pl, d)
     module = {p.full: p.module for p in pl.pieces}
     out = []
-    for cf, jj, section in ([(cf, jr, ring_section(jr, d.seam_gap - 0.1, b)) for cf in level_faces(pl, RING_PIECES, d.body_top, True)]
+    for cf, jj, section in ([(cf, jr, ring_section(jr, ring_top(d) - d.body_top, b)) for cf in level_faces(pl, RING_PIECES, d.body_top, True)]
                             + [(cf, jf, None) for cf in level_faces(pl, FOOT_PIECES, d.body_top + d.seam_gap, False)]):
         mod = module[cf.piece]
         sec = form.slice(cf.n, cf.origin.z)
@@ -1319,7 +1338,7 @@ def ring_cones(d: Blueprint, rings: list[Side], feet: list[Side]) -> tuple[dict,
     import Part  # noqa: PLC0415
     from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
 
-    top = d.body_top + d.seam_gap - 0.1   # the top of the ring inside the wall
+    top = ring_top(d)   # the top of the ring inside the wall
     cones, sockets, places = {}, {}, []
     up = App.Vector(0, 0, 1)
     for x in (RING_CONE_X, -RING_CONE_X):
@@ -1343,6 +1362,40 @@ def ring_cones(d: Blueprint, rings: list[Side], feet: list[Side]) -> tuple[dict,
                 sockets.setdefault(foot.cf.piece, []).append(Part.makeCone(oj.cone_d / 2 + c, 1.0 + c, oj.cone_h + c, p - up * 0.01, up))
             places.append({"at": [round(p.x, 1), round(p.y, 1), round(p.z, 2)], "ring": piece, "foot": foot.cf.piece if foot else None})
     return cones, sockets, places
+
+
+def hood_screws(d: Blueprint, rings: list[Side], feet: list[Side], form, places: tuple = HOOD_SCREWS) -> tuple[dict, dict, list]:
+    """The screws of the bolted hood at `places`: under the ring a boss of service_boss down to ring_h below its top
+    (the seat of the head), with a clearance hole; in the foot a boss of service_boss up to hood_boss_h above its
+    lower face, with the hole of the M4 insert from below. Each boss stays inside the outer form. Returns (added
+    solids by piece, cut solids by piece, the rows of the report)."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+    from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
+
+    V = App.Vector
+    top = ring_top(d)
+    cyl = lambda dia, x, y, z0, z1: Part.makeCylinder(dia / 2, z1 - z0, V(x, y, z0), V(0, 0, 1))
+    add, cut, rows = {}, {}, []
+    nearest = lambda sides, q: min((s for s in sides if s.solid is not None), key=lambda s: s.solid.distToShape(Part.Vertex(q))[0])
+    for side, y in places:
+        # the middle line of the ring at y: the rise of the ring inside the wall, just under its top
+        line = Part.makeLine(V(0.0, y, top - 0.05), V(side * 400.0, y, top - 0.05))
+        spans = [sorted(v.Point.x for v in e.Vertexes) for r in rings if r.solid is not None for e in r.solid.common(line).Edges]
+        a, b_ = max(spans, key=lambda sp: abs(sp[0] + sp[1]))
+        x = (a + b_) / 2
+        ring = nearest(rings, V(x, y, top - 0.5))
+        foot = nearest(feet, V(x, y, top + 0.5))
+        seat = top - oj.ring_h
+        rb = cyl(oj.service_boss, x, y, seat, top).common(form)
+        fb = cyl(oj.service_boss, x, y, top, top + oj.hood_boss_h).common(form)
+        add.setdefault(ring.cf.piece, []).append(rb)
+        add.setdefault(foot.cf.piece, []).append(fb)
+        cut.setdefault(ring.cf.piece, []).append(cyl(oj.hood_screw_hole_d, x, y, seat - 1.0, top + 0.5))
+        cut.setdefault(foot.cf.piece, []).append(cyl(oj.insert_hole_d, x, y, top - 0.5, top + oj.insert_hole_depth))
+        rows.append({"at": [round(x, 1), round(y, 1), round(seat, 2)], "ring": ring.cf.piece, "foot": foot.cf.piece,
+                     "screw": oj.hood_screw, "ring_boss_cm3": round(rb.Volume / 1000, 2), "foot_boss_cm3": round(fb.Volume / 1000, 2)})
+    return add, cut, rows
 
 
 # ---------- the foot of the walls and the printed floor ----------
@@ -1826,7 +1879,8 @@ def seam_report(res: Result) -> dict:
               "screws": [{"at": vec(sc.at), "along": [round(v, 4) for v in sc.tangent], "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
     return {"sides": [side_row(sd) for sd in res.sides], "feet": [side_row(sd) for sd in res.feet], "ribs": [side_row(sd) for sd in res.ribs],
             "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {}), "closing": res.extra.get("closing", []),
-            "ring": res.extra.get("ring", []), "ring_cones": res.extra.get("ring_cones", [])}
+            "ring": res.extra.get("ring", []), "ring_cones": res.extra.get("ring_cones", []), "merged": res.extra.get("merged", []),
+            "hood_screws": res.extra.get("hood_screws", [])}
 
 
 # ---------- the checks of the whole set ----------
@@ -1872,10 +1926,12 @@ def split_rows() -> dict:
     return {}
 
 
-def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=print, b: Build = BUILD) -> dict:
+def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=print, b: Build = BUILD, unmerged: dict | None = None) -> dict:
     """The checks of the whole set: every piece is one valid solid inside the printer's limit; no two pieces share
     volume; no piece is in the hardware; a screwdriver reaches each screw past the finished pieces; the mass; the
-    screws; what each print orientation overhangs. made: the finished pieces; rep: seam_report of the build."""
+    screws; what each print orientation overhangs. made: the finished pieces; rep: seam_report of the build;
+    unmerged: the same pieces before their faces were merged (merge_faces), for a boolean that fails on a merged piece:
+    the merge does not change the form, so the clash is measured on the unmerged pair, and the pair is named."""
     import FreeCAD as App  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
@@ -1905,14 +1961,22 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             row["overhang_plain_cm2"] = round(before[name].get("overhang_seen", 0.0) + before[name].get("overhang_inside", 0.0), 1)
         rows[name] = row
     log(f"pieces: boxes and overhangs [{time.time() - t0:.0f} s]")
+    import Part  # noqa: PLC0415
+
     names = list(made)
-    clashes = []
+    clashes, fallback = [], []
     for i, a in enumerate(names):
         for c in names[i + 1:]:
             (alo, ahi), (clo, chi) = boxes[a], boxes[c]
             if np.any(alo > chi + 0.1) or np.any(clo > ahi + 0.1):
                 continue
-            v = made[a].common(made[c]).Volume
+            try:
+                v = made[a].common(made[c]).Volume
+            except (ValueError, Part.OCCError) as e:
+                if not unmerged:
+                    raise
+                v = unmerged[a].common(unmerged[c]).Volume
+                fallback.append({"a": a, "b": c, "why": str(e)})
             if v > b.clash_mm3:
                 clashes.append({"a": a, "b": c, "mm3": round(v, 1)})
     log(f"pieces: clashes between pieces: {clashes} [{time.time() - t0:.0f} s]")
@@ -1923,7 +1987,13 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             lo, hi = boxes[name]
             if sb.XMin > hi[0] or sb.XMax < lo[0] or sb.YMin > hi[1] or sb.YMax < lo[1] or sb.ZMin > hi[2] or sb.ZMax < lo[2]:
                 continue
-            v = shape.common(solid).Volume
+            try:
+                v = shape.common(solid).Volume
+            except (ValueError, Part.OCCError) as e:
+                if not unmerged:
+                    raise
+                v = unmerged[name].common(solid).Volume
+                fallback.append({"a": name, "b": iname, "why": str(e)})
             if v > b.clash_mm3:
                 plain_v = pl.shapes[name].common(solid).Volume if name in pl.shapes and not name.startswith("floor") else 0.0
                 hard.append({"piece": name, "item": iname, "role": role, "mm3": round(v, 1), "of_the_plain_piece_mm3": round(plain_v, 1)})
@@ -1939,6 +2009,8 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             reach.append({"seam": p["seam"], "head": p["head"], "at": sc["at"], "free": round(free)})
     short = [r for r in reach if r["free"] < b.driver_len]
     log(f"pieces: screws that a screwdriver does not reach: {short} [{time.time() - t0:.0f} s]")
+    hood = hood_reach(rep.get("hood_screws", []), unmerged or made, items)
+    log(f"pieces: the screws of the hood, free under the head: {[r['free'] for r in hood]} [{time.time() - t0:.0f} s]")
     fl = rep.get("floor", {})
     wall_g = sum(r["mass_g"] for n, r in rows.items() if not n.startswith("floor"))
     plain_g = sum(pl.shapes[n].Volume / 1000 * split.ABS_G_PER_CM3 for n in rows if not n.startswith("floor"))
@@ -1946,6 +2018,7 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
     twins = [{"piece": n[:-2], "right_cm3": r["volume_cm3"], "left_cm3": rows[n[:-1] + "L"]["volume_cm3"]} for n, r in rows.items()
              if n.endswith(" R") and n[:-1] + "L" in rows and abs(r["volume_cm3"] - rows[n[:-1] + "L"]["volume_cm3"]) > 0.05]
     return {"pieces": rows, "twins_that_differ": twins, "clashes": clashes, "hardware": hard, "reach": reach, "reach_short": short,
+            "hood_reach": hood, "merged_boolean_fallback": fallback,
             "screws": {"joint 1, 3.0 x 16": sum(len(p["screws"]) for p in rep["pairs"]),
                        "floor, 3.5 x 9.5 countersunk": len(fl.get("lap_screws", [])) + len(fl.get("foot_screws", []))},
             "cones": len(fl.get("cones", [])),
@@ -1953,7 +2026,40 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
                      "joints_ribs_feet_g": round(wall_g - plain_g), "flanges_and_gussets_g": part(rep["sides"]), "feet_g": part(rep["feet"]),
                      "ribs_g": part(rep["ribs"]), "floor_solid_g": sum(r["mass_g"] for n, r in rows.items() if n.startswith("floor"))},
             "printer": vars(lim),
-            "ok": all(r["valid"] and r["solids"] == 1 and r["fits"] for r in rows.values()) and not clashes and not short}
+            "ok": all(r["valid"] and r["solids"] == 1 and r["fits"] for r in rows.values()) and not clashes and not short
+                  and all(r["free"] >= HOOD_KEY for r in hood)}
+
+
+def hood_reach(screws: list[dict], made: dict, items: list) -> list[dict]:
+    """For each screw of the hood: how far a hex key goes straight down from the head (ring_h below the ring's top,
+    less the head) before it meets a piece or a part of the hardware, up to 300; and the nearest of them sideways at
+    20, 50 and 80 under the head."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+    from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
+
+    out = []
+    others = list(made.items()) + [(n, s) for n, _, s in items or []]
+    for sc in screws:
+        x, y, seat = sc["at"]
+        z0 = seat - oj.hood_screw_head[1]
+        seg = Part.makeLine(App.Vector(x, y, z0 - 0.1), App.Vector(x, y, z0 - 300.0))
+        free, what = 300.0, ""
+        for n, s in others:
+            if not s.BoundBox.intersect(seg.BoundBox):
+                continue
+            for e in s.common(seg).Edges:
+                top = max(v.Point.z for v in e.Vertexes)
+                if z0 - top < free:
+                    free, what = z0 - top, n
+        side = {}
+        for dz in (20.0, 50.0, 80.0):
+            q = Part.Vertex(App.Vector(x, y, z0 - dz))
+            near = [(round(s.distToShape(q)[0], 1), n) for n, s in others if s.BoundBox.isInside(App.Vector(x, y, z0 - dz)) or
+                    abs(s.BoundBox.XMin - x) < 100 or abs(s.BoundBox.XMax - x) < 100]
+            side[str(dz)] = min(near) if near else None
+        out.append({"at": sc["at"], "head_z": round(z0, 2), "free": round(free, 1), "first": what, "room": side})
+    return out
 
 
 def summary(chk: dict, log=print) -> int:
@@ -1961,6 +2067,39 @@ def summary(chk: dict, log=print) -> int:
     log(f"pieces: {len(chk['pieces'])} pieces, screws {chk['screws']}, not one valid solid in the limit: {bad}, clashes {len(chk['clashes'])}, "
         f"in hardware {len(chk['hardware'])}, screws out of reach {len(chk['reach_short'])}, twins that differ {chk['twins_that_differ']}, mass {chk['mass']}")
     return 0 if chk["ok"] else 1
+
+
+MERGE_DV = 0.5   # mm3: the volume of a piece may change by this much (or 1e-6 of it) when its faces are merged
+
+
+def merge_faces(shapes: dict, log=print) -> tuple[dict, list[dict]]:
+    """Each piece with the faces that continue each other merged into one (removeSplitter), after the joints are made
+    and before it is written. A piece keeps its faces when the merged piece is not one valid closed solid, or when
+    its volume changes by more than MERGE_DV; the row of that piece names the reason. The merge runs on a deep copy."""
+    out, rows = {}, []
+    for name, shape in shapes.items():
+        t0 = time.time()
+        row = {"piece": name, "faces_before": len(shape.Faces)}
+        try:
+            # on a deep copy: the merge can change the tolerances of the sub-shapes that it shares with the piece, and a
+            # piece that keeps its faces must stay as the joints left it
+            m = shape.copy().removeSplitter()
+            if len(m.Solids) == 1:
+                m = m.Solids[0]
+            dv = m.Volume - shape.Volume
+            ok = m.isValid() and len(m.Solids) == 1 and m.isClosed() and abs(dv) <= max(MERGE_DV, 1e-6 * shape.Volume)
+            row.update({"faces_after": len(m.Faces), "valid": bool(m.isValid()), "solids": len(m.Solids), "closed": bool(m.isClosed()),
+                        "dv_mm3": round(dv, 3), "merged": bool(ok)})
+            if not ok:
+                row["why"] = "not one valid closed solid" if not (m.isValid() and len(m.Solids) == 1 and m.isClosed()) else f"the volume changes by {dv:.3f} mm3"
+        except Exception as e:  # noqa: BLE001
+            ok, m = False, shape
+            row.update({"merged": False, "why": f"removeSplitter failed: {e}"})
+        out[name] = m if ok else shape
+        row["seconds"] = round(time.time() - t0, 1)
+        rows.append(row)
+        log(f"pieces: {name}: faces merged {row.get('faces_before')} -> {row.get('faces_after')}, merged {row['merged']} {row.get('why', '')}")
+    return out, rows
 
 
 def build_all(out: Path, log=print) -> int:
@@ -1972,13 +2111,16 @@ def build_all(out: Path, log=print) -> int:
         pl = with_socket_plate(pl, d)
         items += socket_plate_items(d)
     res = generate(d, pl, None, None, items, log)
+    # the pieces as the joints leave them, for the count of the face check before the faces are merged
+    write_parts(out / "unmerged", res.pieces)
+    res.pieces, res.extra["merged"] = merge_faces(res.pieces, log)
     write_parts(out, res.pieces)
     # the joints alone, for tools/face_check.py: the skin has narrow step faces of its own, which hide the joints' faces
     write_parts(out / "joints", res.added, {n: "#9ec5e8" for n in res.added})
     rep = seam_report(res)
     (out / "seams.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     # the checks are on the pieces as the files hold them
-    chk = check_set(d, pl, read_parts(out)[0], rep, items, log)
+    chk = check_set(d, pl, read_parts(out)[0], rep, items, log, unmerged=read_parts(out / "unmerged")[0])
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 
@@ -1989,7 +2131,8 @@ def check_files(out: Path, log=print) -> int:
     pl = plain(d, out, log)
     shapes, _ = read_parts(out)
     rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
-    chk = check_set(d, pl, shapes, rep, hardware(), log)
+    old = read_parts(out / "unmerged")[0] if (out / "unmerged" / "manifest.json").exists() else None
+    chk = check_set(d, pl, shapes, rep, hardware(), log, unmerged=old)
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 

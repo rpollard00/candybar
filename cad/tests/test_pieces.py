@@ -11,6 +11,7 @@ The whole set is made once for the module, from the skin in the cache (WholeSetT
 """
 from __future__ import annotations
 
+import math
 import os
 import unittest
 
@@ -473,6 +474,40 @@ class WholeSetTest(unittest.TestCase):
                 shape = self.made[name]
                 inside = [q for q in points if shape.BoundBox.isInside(q) and shape.isInside(q, 1e-4, True)]
                 self.assertEqual(inside, [])
+
+    def test_the_hood_is_bolted_with_four_screws_that_a_key_reaches_from_below(self) -> None:
+        """The bolted hood (2026-11-16): four screws, each with a boss in a piece of the ring and a boss with the hole
+        of the insert in a piece of the foot, a mirror pair on each side; a hex key goes straight up to each head
+        through HOOD_KEY of free room."""
+        from candybar.shell.joints import OTHER_JOINTS as oj
+
+        rows = self.rep["hood_screws"]
+        self.assertEqual(len(rows), 4)
+        for r in rows:
+            with self.subTest(at=r["at"]):
+                self.assertIn(r["ring"], pieces.RING_PIECES)
+                self.assertIn(r["foot"], pieces.FOOT_PIECES)
+                self.assertGreater(r["ring_boss_cm3"], 1.0)
+                self.assertGreater(r["foot_boss_cm3"], 1.0)
+                x, y, _ = r["at"]
+                holes = support.hole_centres(self.made[r["foot"]], oj.insert_hole_d)
+                self.assertTrue(any(math.dist(h, (x, y)) < 0.05 for h in holes), holes)
+        xs = sorted(round(r["at"][0], 3) for r in rows)
+        self.assertEqual(xs[:2], [-xs[3], -xs[2]])
+        self.assertEqual(len(self.chk["hood_reach"]), 4)
+        self.assertTrue(all(r["free"] >= pieces.HOOD_KEY for r in self.chk["hood_reach"]), self.chk["hood_reach"])
+
+    def test_merged_faces_keep_a_piece_valid_closed_and_of_the_same_volume(self) -> None:
+        name = "deck nose"
+        out, rows = pieces.merge_faces({name: self.made[name]}, lambda *_: None)
+        r = rows[0]
+        self.assertLessEqual(r["faces_after"], r["faces_before"])
+        if r["merged"]:
+            self.assertTrue(out[name].isValid() and out[name].isClosed() and len(out[name].Solids) == 1)
+            self.assertLessEqual(abs(out[name].Volume - self.made[name].Volume), pieces.MERGE_DV)
+        else:
+            self.assertIs(out[name], self.made[name])
+            self.assertTrue(r["why"])
 
     def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
         # a head pocket there would cut into the step of the skin behind the lowest cut-in

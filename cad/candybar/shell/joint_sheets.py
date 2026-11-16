@@ -55,4 +55,38 @@ def main() -> int:
     scene("ring", [("upper_R", load("upper R"), B), ("upper_rear_R", load("upper rear R"), W), ("hood_side_R", load("hood side R"), P), ("brow", load("brow"), W)],
           {"ring-front-cone": cam((150.0, 451.0, 425.0), 22.0, 270.0, 10.0), "ring-rear-cone": cam((150.0, 566.0, 425.0), 22.0, 270.0, 10.0),
            "ring-along": cam((150.0, 510.0, 425.0), 90.0, 240.0, 25.0)}, keep=cut)
+    hood_screw_scenes(root, load, scene, cam, box)
     return 0
+
+
+def hood_screw_scenes(root, load, scene, cam, box) -> None:
+    """The bolted hood (2026-11-16): the right side of the cabinet cut open just inside its wall, the rear door off,
+    with the two screws of that side and a hex key of 3 in each; and a section through the front screw."""
+    from . import pieces as pc
+    from .joints import OTHER_JOINTS as oj
+
+    seams = json.load(open(os.path.join(root, "seams.json")))
+    right = [r for r in seams.get("hood_screws", []) if r["at"][0] > 0]
+    if not right:
+        return
+    x = right[0]["at"][0]
+    wall = x + oj.ring_w / 2 - 0.1     # just inside the inner face of the side wall
+    names = ("upper R", "middle R", "lower R", "upper rear R", "rear lower R", "brow", "hood side R", "hood centre", "apron", "deck side R")
+    shown = [(n.replace(" ", "_"), load(n), "#e8c39e" if n.startswith("hood") else "white") for n in names
+             if os.path.exists(os.path.join(root, f"{n.replace(' ', '_')}.brep"))]
+    hw, hd = oj.hood_screw_head
+    tools = []
+    for k, r in enumerate(right):
+        sx, sy, seat = r["at"]
+        screw = Part.makeCylinder(hw / 2, hd, V(sx, sy, seat - hd), V(0, 0, 1)).fuse(Part.makeCylinder(2.0, oj.hood_screw_l, V(sx, sy, seat), V(0, 0, 1)))
+        key = Part.makeCylinder(1.5, pc.HOOD_KEY, V(sx, sy, seat - hd - pc.HOOD_KEY), V(0, 0, 1))
+        tools += [(f"screw_{k}", screw, "#b8bcc4"), (f"key_{k}", key, "#d02020")]
+    items = [(n, s_) for n, role, s_ in pc.hardware() if role == "hardware" and n.startswith(("Monitor_", "Compute", "PSU"))]
+    hard = [(f"hw_{k}", Part.makeCompound([s_ for n, s_ in items if n.startswith(pre)]), "#6a8fd0")
+            for k, pre in enumerate(("Monitor_", "Compute", "PSU")) if any(n.startswith(pre) for n, _ in items)]
+    keep = box(-400.0, wall, -100.0, 700.0, 0.0, 700.0)
+    mid = (wall, 500.0, 330.0)
+    scene("hood-reach", shown + hard + tools, {"reach": cam(mid, 330.0, 90.0, 8.0), "reach-close": cam((wall, 505.0, 380.0), 120.0, 90.0, 12.0)}, keep=keep)
+    sx, sy, seat = right[0]["at"]
+    cut = box(sx, sx + 40.0, sy - 40.0, sy + 40.0, seat - 60.0, seat + 40.0)
+    scene("hood-screw", [(n, sh, f) for n, sh, f in shown if n in ("upper_R", "hood_side_R")] + tools[:2], {"screw": cam((sx, sy, seat + 8.0), 46.0, 270.0, 5.0)}, keep=cut)

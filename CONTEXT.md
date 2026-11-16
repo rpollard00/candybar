@@ -30,14 +30,27 @@ _Avoid_: control plate, panel (alone), deck top
 One printed piece of a control panel. A panel is wider than the printer bed, so the arcade panel is a lever tile and a button tile, with a bonded seam between them.
 
 **Panel frame**:
-The printed ring below the ledge of the deck's opening. It has the latch points, the locating cones and the cable anchor, and it stays in the cabinet.
+The printed ring below the ledge of the deck's opening. It has the latch points, the locating cones, the cable anchor, the tunnel of the push bolt and the notches of the rear hooks, and it stays in the cabinet. Its two halves meet at x 20.
 _Avoid_: carrier, subframe
+
+**Push bolt**:
+The printed bolt of the latch of a control panel. It slides along the centre line in a tunnel of the panel frame, and its front end is a flush button in the front face of the deck.
+_Avoid_: slider, catch
+
+**Strike**:
+The part under the front edge of a control panel that the push bolt holds: two legs with a lip on each.
+
+**Rear hook**:
+One of the two hooks under the rear edge of a control panel. Its toe goes into a notch in the rear bar of the panel frame.
+
+**Gate** (of the push bolt):
+The printed plate in a slot at the rear of the tunnel that holds the spring of the push bolt.
 
 **Ledge**:
 The strip of deck skin round the opening below a control panel. The control panel rests on it.
 
 **Latch point**:
-One of the four places where a control panel is held down on the panel frame, by a screw or by a magnet.
+One of the four places where a magnet in the panel frame holds a steel disc in a control panel down (with the screw option, a screw).
 
 **Seat** (of a control panel):
 The recess in the panel pocket that the plate of the control panel fills.
@@ -112,8 +125,11 @@ A round of about 1 mm on a sharp convex edge. It is the last modelling step, and
 _Avoid_: fillet (for this round), chamfer
 
 **Hood**:
-The cap above the screen face.
+The cap above the screen face. It is bolted on the top ring of the body with four screws from below, and it is not bonded.
 _Avoid_: billboard, topper, marquee (for the whole cap)
+
+**Top ring**:
+The flange inside the top of the body that the foot of the hood lies on (joint 7). It has the four cones that locate the hood and the bosses of its screws.
 
 **Hood band**:
 The strip across the front of the hood that holds the two speaker grilles and the marquee.

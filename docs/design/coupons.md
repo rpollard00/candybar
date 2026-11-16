@@ -17,9 +17,9 @@ cad/.venv-tools/bin/python cad/tools/draw_coupon.py cad/out/coupons --set       
 | File in `cad/out/coupons/` | Content |
 | --- | --- |
 | `stl/`, `brep/` | One STL and one BREP for each part, in its print orientation. Do not turn a part in the slicer. |
-| `shell.FCStd` | All parts in their places on the nine plates, with one group for each plate |
+| `shell.FCStd` | All parts in their places on the ten plates, with one group for each plate |
 | `coupons.png` | Each part with all its edges, its name, its size, its plate, its mass and its time |
-| `plates.png` | The nine plates from above |
+| `plates.png` | The ten plates from above |
 | `coupons.json` | The checks of the model, with numbers |
 
 Three coupons are cut from the real skin of the body: `facet45`, `cut-in` and `hand-hold`. They need the skin in `cad/out/shell-rev7/split/cache` (made by `candybar.shell.split`).
@@ -42,14 +42,15 @@ Print the plates in this order. Plate 1 gives the shrink value for the slicer, s
 | --- | --- | --- | --- | --- | --- |
 | 1 | Shrink | 2 | 20 | 1.0 | First |
 | 2 | Warp: two walls and the flat strip | 3 | 226 | 10.1 | After the shrink value is in the slicer |
-| 3 | Holes, inserts and the cone | 7 | 110 | 4.9 | After plate 1 |
+| 3 | Holes, inserts and the cone | 9 | 114 | 5.1 | After plate 1 |
 | 4 | Joint 1: the fit | 6 | 324 | 14.4 | After plate 1 |
 | 5 | The weld pairs and joints 2, 3 and 5 | 12 | 193 | 8.6 | After plates 3 and 4 (they give the insert hole and the key clearance) |
 | 6 | The form: facet, edges, cut-in, hand-hold | 7 | 129 | 5.8 | After plate 2 |
 | 7 | The floor tile | 1 | 128 | 5.7 | After plate 2 |
 | 8 | The finish: four pairs | 8 | 432 | 19.1 | After plate 4 chooses the clearance and plate 5 chooses the weld |
 | 9 | The finish: four plaques | 4 | 136 | 6.1 | With plate 8 |
-| | All | 50 | 1697 | 75.7 | |
+| 10 | The latch of the control panel | 5 | 48 | 2.2 | After plate 3 (the insert hole is not needed; the shrink is) |
+| | All | 57 | 1748 | 78.1 | |
 
 The ABS note says to print few parts on one plate, because a short layer time decreases the layer bond. If a plate with many parts shows weak layers, divide it.
 
@@ -149,7 +150,7 @@ Warp is the largest risk of ABS for this cabinet. The ABS note found no publishe
 
 | Part | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |
 | --- | --- | --- | --- | --- | --- |
-| `insert` | 1 | 50 x 18 x 46.5 | Upright: the ring on its 45 degree gusset | 30 | 1.3 |
+| `insert` | 1 | 50 x 18 x 46.5 | Upright: the foot of the hood on the bed, the holes from the bed up | 28 | 1.2 |
 | `holes-buttons` | 1 | 145 x 42 x 5 | Flat, the panel top on the bed | 20 | 0.9 |
 | `holes-lever` | 1 | 63 x 105 x 9.2 | Flat, the panel top on the bed | 33 | 1.5 |
 | `holes-power` | 1 | 84 x 16 x 32 | Upright on its foot flange | 13 | 0.6 |
@@ -157,7 +158,7 @@ Warp is the largest risk of ABS for this cabinet. The ABS note found no publishe
 | `cone-gauge` | 1 | 52 x 14 x 6 | Flat, the sockets open to the top | 4 | 0.2 |
 | `cone-plug` | 1 | 14 x 14 x 9 | Flat, the cone on top | 1 | 0.1 |
 
-**`insert`: the M4 heat-set insert.** The coupon is a wall of the skin with two flanges. The top ring (14 wide, on a 45 degree gusset) has three holes with an upright axis, as the ring below the hood. The thick foot has three holes with a level axis, as the frame of the rear door. The holes are 5.6, 5.7 and 5.8 mm, 9.5 deep, in 13 mm of material. The insert is 8.1 long.
+**`insert`: the M4 heat-set insert.** The coupon is a wall of the skin. At its foot, on the bed, it has the foot of the hood (14 wide, 6 thick, on its gusset) with three bosses of 13 x 12; each has a hole with an upright axis that opens at the bed, as the inserts of the bolted hood in the foot of a hood side, which prints with its foot on the bed (2026-11-16). At its top a thick flange on a 45 degree gusset has three holes with a level axis, as the frame of the rear door. The holes are 5.6, 5.7 and 5.8 mm, 9.5 deep, in 13 mm of material. The insert is 8.1 long. Before 2026-11-16 the upright holes opened at the top, as in a ring under the hood: the inserts of the hood are now in its foot, and a hole that opens at the bed has the first layer at its mouth.
 
 The research gives a printed hole about 0.25 mm smaller than its model. It does not give this value for ABS, and it gives no iron temperature for ABS. The coupon gives the two values.
 
@@ -169,6 +170,7 @@ The research gives a printed hole about 0.25 mm smaller than its model. It does 
 - Pass: the insert is flush with the face or 0.1 mm below it, and square. No bulge shows on the wall face behind the hole. The insert does not turn and does not come out when you tighten the screw. No crack shows after one day.
 - Choose the smallest hole that passes, for the upright axis and for the level axis.
 - If it fails or the choice is not 5.6: change `OtherJoints.insert_hole_d`. If the depth of 9.5 and the 13 mm of material pass, change `insert_l` to the hole depth of 9.5 and `service_boss` to 13 in `joints.py`. The lever's mount uses the same insert (`stick_insert_d` in `cad/params/controls.csv`).
+- For the hood: put an M4 x 20 screw through a strip of 12 (the boss of the ring) into an upright insert and pull it with 250 N (the load of one screw when a person lifts the cabinet by the hood's lip, `docs/design/print-pieces.md`, "The bolted hood"). Pass: the insert does not move.
 - Keep this coupon for the stress-crack test of plate 8.
 
 **`holes-buttons`: the button holes.** A plate of the panel thickness (5 mm) with holes of 30.0, 30.3, 24.0 and 24.3 mm.
@@ -402,6 +404,27 @@ The four pairs follow the ABS set of `abs-switch.md`, section 10, item 2:
 - If it fails: change the weld, the filler or the primer. If no system hides the seam, the seams on open faces (`bond-fill` in the split report) must move into design lines.
 
 The plaques P1 to P4 are the primer tests. The matrix of the PETG note (section 4.2) names products for PETG. No matrix for ABS is written yet. The ABS note says that 1K plastic primers and polyester putties name ABS on their data sheets. Until an ABS matrix exists, use the four first coats of the PETG matrix. The scuffed and the wiped half stay. Do not wipe bare ABS with acetone or thinner.
+
+## Plate 10: the latch of the control panel
+
+The first test piece of the latch (`docs/design/control-panel-latch.md`, "The first test piece"), 2026-11-16. The parts come from the build of the control panel (`panel_frame.build`, the push bolt).
+
+| Part | Orientation | What it is |
+| --- | --- | --- |
+| `latch-nose` | As the deck stands, on its lower cut | The deck nose, 60 wide on the centre line, cut from the real skin: the front wall with the button's hole and its rim break, the deck top and the ledge of the pocket |
+| `latch-frame` | As the frame prints: the lower face of the bar on the bed | The middle of the left half of the frame (to its seam at x 20): the front bar with the notch of the bolt, and the tunnel with its floor, walls, roof and the slot of the gate |
+| `latch-bolt` | On its side | The bolt |
+| `latch-gate` | Flat, its rear face on the bed | The gate |
+| `latch-strike` | Top face down | A strip of the button tile, 60 wide, with the strike |
+
+Assemble: bond the frame strip under the ledge of the nose strip, as in the cabinet (bond gap 0.2). Put the spring (steel, 4 outside, 22 free) on the peg of the gate, the bolt into the tunnel from the rear, and drop the gate into its slot.
+
+- Pass: the button sits flush in its hole, with a gap of 0.3 all round (a feeler of 0.25 goes in at the round, the flats and the corners), and the rim of the hole has its break.
+- Pass: a fingertip pushes the button through 5. The bolt slides through its stroke with no bind, and the spring pushes it back to the stop, flush.
+- Pass: with the button held, the strike strip goes down onto the ledge and lifts out freely; with the button released, the strike cannot go down.
+- Pass: the strike seated, pull it up with 100 N: the bolt does not move back. Press it down and pull it up with 15 N: no movement is felt.
+- Pass: the roof of the tunnel and the lips of the strike print clean with no support.
+- If the fingertip cannot push it through 5: decrease `PushBolt.stroke` or increase the hole. If the wedge lets go under 100 N: decrease `wedge_deg`. If the gap is not even: the hole or the button shrank; change `PushBolt.button_gap`.
 
 ## What changed for ABS
 

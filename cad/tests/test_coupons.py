@@ -49,6 +49,20 @@ class CouponSetTest(unittest.TestCase):
         found, _ = fc.check_shell(shapes, meta=meta)
         self.assertEqual(fc.failures(found), [])
 
+    def test_the_latch_coupon_is_the_first_test_piece_of_the_latch(self) -> None:
+        """Plate 10: the strip of the deck nose has the button's hole (its round and its two flats), and the bolt, the
+        gate, the frame strip and the strike strip are the parts of the control panel's build."""
+        names = {it.name for it in self.items if it.coupon == "latch"}
+        self.assertEqual(names >= {"latch-frame", "latch-bolt", "latch-gate", "latch-strike"}, True)
+        b = coupons.latch_build()
+        self.assertAlmostEqual(self.shapes["latch-bolt"].Volume, b.latch["latch_bolt"].Volume, delta=0.01)
+        self.assertAlmostEqual(self.shapes["latch-gate"].Volume, b.latch["latch_gate"].Volume, delta=0.01)
+        if SKIN:
+            d = Blueprint()
+            nose = self.shapes["latch-nose"]
+            rounds = [f for f in nose.Faces if type(f.Surface).__name__ == "Cylinder" and abs(f.Surface.Radius - d.latch_button_d / 2) < 1e-3]
+            self.assertTrue(rounds)
+
     def test_every_stl_is_a_closed_mesh(self) -> None:
         for name, shape in self.shapes.items():
             with self.subTest(part=name):

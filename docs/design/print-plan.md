@@ -194,7 +194,7 @@ This is pass 2. It needs the result of coupon C3 (the adhesive).
    first candidate adhesive is 15 minutes to 18 minutes at 24 C.
 5. Let the batch cure before the next batch.
 6. Bond the two door halves and the three hood pieces apart from the cabinet, on a flat table.
-7. Do not bond a service seam: the rear door, the hood (if the owner bolts it), the bezel plate, the
+7. Do not bond a service seam: the rear door, the hood (bolted since 2026-11-16: four screws from below, reached through the rear door), the bezel plate, the
    control panel and the USB socket plate. Mask their threads, pins and seats.
 
 ### 5.6 Stage 6: fill, prime and paint

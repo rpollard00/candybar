@@ -275,7 +275,7 @@ More rules for this stage:
 - For the two closing seams of each ring, use the product that pair E chose. A thin solvent does not
   fill their gap of 0.5 mm.
 - Weld the two door halves and the three hood pieces apart from the cabinet, on a flat table.
-- Do not weld a service seam: the rear door, the hood (if the owner bolts it), the bezel plate, the
+- Do not weld a service seam: the rear door, the hood (bolted since 2026-11-16: four screws from below, reached through the rear door), the bezel plate, the
   control panel and the USB socket plate. Mask their threads, pins and seats.
 - If the floor is PETG, a solvent does not join it to the ABS wall feet [W1]. Use the screws and the
   methacrylate adhesive there.
