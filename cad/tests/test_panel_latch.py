@@ -134,10 +134,75 @@ class WayOutTest(unittest.TestCase):
         vol = pf.common_volume(pl.placed(strike, pl.Step("s", swing=3.0), d, i), pl.bolt(d))
         self.assertGreater(vol, pf.TOL)
 
-    def test_the_springs_lift_the_front_edge_when_the_bolt_is_back(self) -> None:
+    def test_a_panel_lowered_without_the_button_does_not_seat(self) -> None:
+        """B has no slope that lets the panel push the bolt back: if the button is not held, the lips land on the
+        bolt and the front of the panel stands high, where it shows."""
         cd = built("B")
-        self.assertGreater(pl.lifted_rise(cd), 5.0)
-        self.assertGreater(pl.lifted_by_springs(cd), 2.0)
+        d, i = cd.d, cd.i
+        strike = pl.strike(d, i)
+        # the strike on its way down, 5 above its seat, meets the bolt where it stands locked
+        self.assertGreater(pf.common_volume(strike.translated(pf.V(0, 0, 5.0)), pl.bolt(d)), pf.TOL)
+        # with the button held in, the same place is free
+        self.assertLess(pf.common_volume(strike.translated(pf.V(0, 0, 5.0)), pl.bolt(d, s=pl.L0.stroke)), pf.TOL)
+
+
+class FinalBTest(unittest.TestCase):
+    """The final form of B (the owner's choice of 2026-11-15): fewer parts and fewer ways to fail."""
+
+    def test_b_has_no_lift_spring_and_one_spring_in_all(self) -> None:
+        self.assertEqual(set(pl.springs()), {"bolt_spring"})
+        self.assertFalse(any("lift" in line or "screw" in line for line in report("B")["buy"]))
+        self.assertEqual(sum("spring" in line for line in report("B")["buy"]), 1)
+
+    def test_the_tunnel_is_one_print_with_the_left_half_of_the_frame(self) -> None:
+        cd = built("B")
+        self.assertEqual(set(cd.fixed), {"latch_gate"})
+        left, right = cd.frame["frame_left"], cd.frame["frame_right"]
+        self.assertGreater(left.BoundBox.XMax, pl.L0.tunnel_w / 2)
+        self.assertGreater(right.BoundBox.XMin, pl.L0.housing_w / 2)
+        # the tunnel's floor lies in the plane of the lower face of the bar: the half prints on that plane
+        self.assertAlmostEqual(left.BoundBox.ZMin, pl.bar_z(cd.d, cd.i)[0], places=6)
+        # what looks down on the frame halves is the flat roofs of the notches and of the tunnel: bridges, no support
+        L = pl.L0
+        bridges = 2 * (L.hook_w + 2 * L.notch_side) * L.notch_back / 100 + (L.tunnel_w - 1) * (L.housing_y[1] - L.lug_y[1] - 1.5) / 100
+        for r in report("B")["print"]:
+            if r["part"].startswith("frame"):
+                self.assertLess(r["overhang_cm2"], bridges, r["part"])
+
+    def test_the_seated_panel_keeps_the_gate_in_its_slot(self) -> None:
+        cd = built("B")
+        g = cd.fixed["latch_gate"].BoundBox
+        lower_face = pf.z_rest(cd.d)
+        self.assertLess(lower_face - g.ZMax, (pl.L0.roof_z[1] - pl.L0.bolt_z[0]) / 2)
+        self.assertGreater(lower_face - g.ZMax, 0.3)
+
+    def test_the_front_magnets_keep_the_front_corners_down(self) -> None:
+        rows = report("B")["corner_rock"]["rows"]
+        for row in rows:
+            self.assertGreaterEqual(row["front_magnets"]["factor"], 2.0, row["case"])
+            self.assertLess(row["front_magnets"]["largest_lift_mm"] * 3, row["no_front_magnets"]["corner_lift_mm"], row["case"])
+
+    def test_the_panel_lifts_out_by_hand_with_the_button_held(self) -> None:
+        r = report("B")["removal"]
+        self.assertLess(r["lever_N"], 80.0)
+        self.assertLess(r["finger_hole_N"], 60.0)
+
+    def test_the_blank_panel_has_a_finger_hole_with_broken_rims(self) -> None:
+        cd = built("B")
+        x, yl, dia = pl.L0.finger_hole
+        tile = cd.blank["blank_right_tile"]
+        self.assertFalse(tile.isInside(pf.V(x, pf.y0(cd.d) + yl, cd.d.panel_top - 2.5), 1e-6, True))
+        self.assertGreater(report("B")["edge_finish"]["blank_right_tile"]["break_faces"], report("H")["edge_finish"]["blank_right_tile"]["break_faces"])
+
+    def test_the_ramp_that_was_not_taken_needs_more_travel_and_force(self) -> None:
+        ro, p = report("B")["ramp_option"], pl.bolt_preload()
+        self.assertGreater(ro["travel_mm"], p["stroke_mm"] + 2.0)
+        self.assertGreater(ro["button_N"], 2 * p["button_force_N"])
+
+    def test_a_push_on_the_button_unlocks_only_after_most_of_its_travel(self) -> None:
+        p = pl.bolt_preload()
+        self.assertGreater(p["unlocks_at_mm"], 0.8 * p["stroke_mm"])
+        self.assertGreater(p["button_start_N"], p["spring_lock_N"])
 
 
 class HoldTest(unittest.TestCase):
