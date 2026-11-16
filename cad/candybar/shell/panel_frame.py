@@ -29,7 +29,7 @@ import json
 import math
 import os
 import time
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 import FreeCAD as App
@@ -50,10 +50,83 @@ OUT = "cad/out/control-panel"
 TOL = 1.0              # mm3: the common volume that the fit rules allow (check.VOLUME_TOLERANCE)
 ABS = split.ABS_G_PER_CM3 / 1000  # g/mm3
 SNAP_IN, SPREAD = "snap-in", "spread"
-SCREW, MAGNET = "screw", "magnet"
-FINISH = {"deck": "white", "frame": "#8fa6c2", "post": "#6f86a2", "tile": "#2b2b2e", "blank": "#3d4a40",
+SCREW, MAGNET, PUSH_BOLT = "screw", "magnet", "push-bolt"
+STEEL = "steel"
+FINISH = {"deck": "white", "frame": "#8fa6c2", "post": "#6f86a2", "tile": "#2b2b2e", "blank": "#3d4a40", "latch": "#d0762b",
+          "spring": "#8c8f96",
           "Lever": "#b03030", "Buttons": "#c8a020", "Encoder": "#2f7a3a", "USB": "#3070c0", "Hub": "#6a4fa0",
           "screw": "#b8bcc4", "insert": "#c9a23a", "magnet": "#9aa0aa", "floor": "#c9ccd2", "underside": "#9a9da6"}
+
+
+@dataclass(frozen=True)
+class PushBolt:
+    """The latch PUSH_BOLT (docs/design/control-panel-latch.md, the owner's choice of 2026-11-15): two hooks under the
+    rear edge of the panel in notches of the rear bar of the frame, and one printed bolt at the front centre in a tunnel
+    that is one print with the left half of the frame. The front end of the bolt is a flush button in the front face of
+    the deck (the hole: Blueprint.latch_button_d). A steel spring pushes the bolt forward; a gate dropped into the rear
+    of the tunnel holds the spring; a wedge under the bolt pulls the panel down. A magnet in each of the four pads of
+    the frame, a steel disc above each in the plate. A panel with nothing to hold has a finger hole.
+    Frames: the cabinet frame (y from the front face of the deck, z up from the desk). Lengths in mm."""
+    # the magnets: a disc of Interface.magnet_d x pad_magnet_h in each pad; in the plate a disc of magnet_d x
+    # Interface.keeper_h of plate_disc: STEEL (the user, 2026-11-16: no pole to mind, about 10 % less pull, ESTIMATED)
+    # or a magnet
+    pad_magnet_h: float = 2.0
+    plate_disc: str = STEEL
+    # the rear hooks: a stem under the plate and a toe whose top and bottom are arcs about the pivot (the rear top edge
+    # of the plate). The toe goes into a notch in the rear bar of the frame
+    hook_x: float = 100.0
+    hook_w: float = 14.0
+    stem_t: float = 6.0
+    stem_gap: float = 1.0          # the stem's rear face to the inner face of the frame bar
+    notch_top: float = 56.0        # the roof of the notch (z of its lower face)
+    notch_back: float = 4.4        # the notch goes this far into the bar
+    notch_side: float = 1.0        # clearance each side of the hook
+    toe_clear: float = 0.3         # radial clearance of the toe under the front edge of the roof
+    toe_r_out: float = 20.0
+    toe_tip_gap: float = 0.6       # the tip of the toe to the back of the notch
+    # the bolt
+    bolt_w: float = 12.0
+    bolt_z: tuple = (52.0, 58.0)
+    # the button fits in the leaning band of the front face (z 48 to 62.6), so that its face is one plane. Its outline
+    # is the outline of the hole (Blueprint.latch_button_d, latch_button_flats, latch_button_z, solids.LATCH_CORNER)
+    # moved in by button_gap (button_outline): a round of 14, two flats bolt_w apart, the four corners rounded
+    button_gap: float = 0.3
+    lug_y: tuple = (46.5, 50.5)    # the strike on the panel (its legs and lips), yl 20.5 to 24.5
+    lug_leg_t: float = 7.0
+    lug_lip: float = 3.4           # the lips reach in under the bolt
+    lug_z0: float = 49.5
+    bolt_clear: float = 0.2
+    wedge_deg: float = 8.0         # the lips and the underside of the bolt meet at this angle
+    neck_w: float = 4.0
+    neck_margin: float = 0.75      # the neck is this much longer than the lug at its rear end
+    neck_front: float = 2.0        # and this much at its front end: the lips move forward a little as the front swings up
+    stroke: float = 5.0
+    bolt_end_y: float = 66.0
+    stop_y: float = 61.0           # the stop block on the bolt (it limits the forward travel with the panel out)
+    stop_w: float = 18.0
+    # the tunnel of the bolt: one print with the left half of the frame. Its floor lies in the plane of the lower
+    # face of the bar (the frame prints on that plane), under the bolt; its walls and roof close round the bolt
+    # behind the strike. A gate dropped into a slot at its rear holds the spring; the panel keeps the gate in.
+    housing_y: tuple = (26.5, 78.0)
+    housing_w: float = 32.0        # the floor
+    tunnel_w: float = 26.0         # outside the walls
+    roof_z: tuple = (58.3, 62.3)
+    strike_window: float = 0.5     # round the strike, in the floor
+    gate_y: tuple = (72.2, 75.8)
+    gate_x: tuple = (-8.4, 10.6)
+    gate_tab: float = 2.0          # the gate stands this much above the roof: a grip for the fingers
+    gate_slot_clear: float = 0.2
+    frame_split_x: float = 20.0    # the halves of the frame meet here, not on the centre line: the tunnel is whole in the left half
+    # a panel with nothing to hold (the blank panel) has a finger hole near its front edge (the user, 2026-11-16)
+    finger_hole: tuple = (50.0, 37.0, 22.0)   # x, yl, diameter
+    # the bought spring of the bolt: steel, 4 outside, 22 free, about 1.2 N/mm (7.8 N at the lock, 13.8 N at the stroke)
+    bolt_spring_free: float = 22.0
+    bolt_spring_rate: float = 1.2
+    bolt_spring_bore: float = 4.4
+    bolt_spring_d: float = 4.0
+
+
+PB0 = PushBolt()
 
 
 @dataclass(frozen=True)
@@ -66,9 +139,12 @@ class Interface:
     ledge: float = cavity.Openings().panel_ledge
     # a bonded face of the frame stands this far from the skin: the room of the adhesive
     bond_gap: float = 0.2
-    # the latch: SCREW (four flush M4 screws into inserts in the pads) or MAGNET (a magnet in each pad, a thin
-    # magnet in the plate above it). One value: both use the same four latch points
-    latch: str = SCREW
+    # the latch: PUSH_BOLT (the default since 2026-11-16: the rear hooks, the push bolt and a magnet with a steel disc
+    # at each latch point, PushBolt), SCREW (the fall-back: four flush M4 screws into inserts in the pads) or MAGNET
+    # (a magnet in each pad, a thin magnet in the plate above it, nothing else). One value: all use the same four
+    # latch points
+    latch: str = PUSH_BOLT
+    push: PushBolt = PB0
     # a latch point is latch_at from a corner of the opening, on the line that halves the corner. The frame has a
     # pad of pad_r there, inside the opening. Its top stands pad_drop below the rest face, so that the plate
     # rests on the ledge and does not rock on a pad
@@ -133,6 +209,10 @@ class Interface:
     seam_flange_t: float = 4.0
     seam_screw_d: float = 3.4
     seam_screw_z: float = 10.0
+
+    def pad_magnet_h(self) -> float:
+        """The height of the magnet in a pad of the frame."""
+        return self.push.pad_magnet_h if self.latch == PUSH_BOLT else self.magnet_h
 
     def magnet_pull(self) -> float:
         """ESTIMATED hold of one latch point with magnets, N: an N52 disc of 12 x 5 pulls about 35 N on thick steel
@@ -262,6 +342,335 @@ def stadium(x: float, y: float, z: float, r: float, half: float) -> Part.Wire:
                       Part.LineSegment(c, e).toShape(), Part.Arc(e, V(x - half - r, y, z), a).toShape()])
 
 
+# ---------- the push bolt (PushBolt; moved from panel_latch, where the study keeps its other candidates) ----------
+
+def side_prism(pts: list[tuple[float, float]], x0: float, x1: float) -> Part.Shape:
+    """A profile in (y, z) at x0, extruded to x1."""
+    w = Part.makePolygon([V(x0, y, z) for y, z in pts] + [V(x0, *pts[0])])
+    return Part.Face(w).extrude(V(x1 - x0, 0, 0))
+
+
+def xcyl(r: float, x0: float, x1: float, y: float, z: float) -> Part.Shape:
+    return Part.makeCylinder(r, x1 - x0, V(x0, y, z), V(1, 0, 0))
+
+
+def ycyl(d: float, y0: float, y1: float, x: float, z: float) -> Part.Shape:
+    return Part.makeCylinder(d / 2, y1 - y0, V(x, y0, z), V(0, 1, 0))
+
+
+def pivot(d: Blueprint, i: Interface) -> tuple[float, float]:
+    """The axis of the swing (along x): the rear top edge of the plate."""
+    return pr.panel_outline(d, -i.seat_gap)[4][1], d.panel_top
+
+
+def rear_bar_face(d: Blueprint, i: Interface) -> float:
+    """y of the inner face of the rear bar of the frame (the opening less the bond gap)."""
+    return opening(d, i, i.bond_gap)[4][1]
+
+
+def front_bar_face(d: Blueprint, i: Interface) -> float:
+    return opening(d, i, i.bond_gap)[1][1]
+
+
+def bar_z(d: Blueprint, i: Interface) -> tuple[float, float]:
+    z1 = z_rest(d) - d.wall_t - i.bond_gap
+    return z1 - i.bar_h, z1
+
+
+def hook(d: Blueprint, i: Interface, x: float, p: PushBolt = PB0) -> Part.Shape:
+    """A hook under the rear edge of the plate: a stem and a toe. The top and the bottom of the toe are arcs about the
+    pivot, so that the toe slides out of the notch when the front of the panel goes up."""
+    yp, zp = pivot(d, i)
+    face = rear_bar_face(d, i)
+    zr = z_rest(d)
+    r_in = math.hypot(yp - (face - i.bond_gap), zp - p.notch_top) + p.toe_clear
+    tip = face + p.notch_back - p.toe_tip_gap
+    stem_y1 = face - p.stem_gap
+    x0, x1 = x - p.hook_w / 2, x + p.hook_w / 2
+    ring = xcyl(p.toe_r_out, x0, x1, yp, zp).cut(xcyl(r_in, x0 - 1, x1 + 1, yp, zp))
+    toe = ring.common(box(x0, x1, stem_y1 - p.stem_t, tip, zp - p.toe_r_out - 1, zr))
+    # the stem goes down to the bottom arc of the toe at the stem's rear face, so that no narrow strip of its lower
+    # face is left beside the toe
+    z_low = zp - math.sqrt(p.toe_r_out ** 2 - (yp - stem_y1) ** 2)
+    stem = box(x0, x1, stem_y1 - p.stem_t, stem_y1, z_low, zr)
+    return one_solid(so.unsplit(stem.fuse(toe)), "rear hook")
+
+
+def notches(d: Blueprint, i: Interface, p: PushBolt = PB0) -> list[Part.Shape]:
+    """The notches in the rear bar of the frame that take the toes: open at the bottom and at the front."""
+    face = rear_bar_face(d, i)
+    z0, _ = bar_z(d, i)
+    w = p.hook_w / 2 + p.notch_side
+    return [box(x - w, x + w, face - 1, face + p.notch_back, z0 - 1, p.notch_top) for x in (-p.hook_x, p.hook_x)]
+
+
+def band_y(z: float, d: Blueprint) -> float:
+    """y of the front face of the deck at height z, at the centre line (upright to the crease, then the band leans)."""
+    crease = d.deck_top - d.deck_lean_h
+    return max(0.0, (z - crease) * math.tan(math.radians(d.deck_lean)))
+
+
+def bolt(d: Blueprint, p: PushBolt = PB0, s: float = 0.0) -> Part.Shape:
+    """The push bolt, moved back by s: a bar along y with a flush button at its front, a neck (where the lips of the
+    strike pass when it is released), the lock section with the wedge under it, a stop block and a bore for its
+    spring at the rear. The underside of the lock section falls wedge_deg toward the rear over the lips: the spring
+    pushes the bolt forward, and the wedge pulls the strike (and the panel) down."""
+    z0, z1 = p.bolt_z
+    hw = p.bolt_w / 2
+    neck0, neck1 = neck(p)
+    yw1 = wedge_end(p)
+    head_y1 = 10.0
+    # the button: the outline of the hole moved in by button_gap (button_outline), cut by the plane of the leaning
+    # band of the front face. Its flats are bolt_w apart, so that the bolt lies flat on its side on the printer
+    t = math.tan(math.radians(d.deck_lean))
+    crease = d.deck_top - d.deck_lean_h
+    head = button_outline(d, p).translated(V(0, -5.0, 0)).extrude(V(0, head_y1 + 5.0, 0))
+    outside = side_prism([(-20.0, crease - 40.0), (-20.0, crease + 60.0), (60.0 * t, crease + 60.0), (-40.0 * t, crease - 40.0)],
+                         -20.0, 20.0)
+    head = so.unsplit(head.cut(outside))
+    front = box(-hw, hw, head_y1 - 1, neck0 + 0.5, z0, z1)
+    narrow = box(-p.neck_w / 2, p.neck_w / 2, neck0, neck1, under(p, neck1), z1)
+    lock = side_prism([(neck1, under(p, neck1)), (yw1, z0), (p.bolt_end_y, z0), (p.bolt_end_y, z1), (neck1, z1)], -hw, hw)
+    # the stop block stands out on the +x side only: the -x side of the bolt is one plane, which lies on the bed
+    stop = box(-hw, p.stop_w / 2, p.stop_y, p.stop_y + 3.0, z0, z1)
+    solid = so.unsplit(head.fuse([front, narrow, lock, stop]))
+    bore = ycyl(p.bolt_spring_bore, p.bolt_end_y - 10.0, p.bolt_end_y + 1, 0.0, (z0 + z1) / 2)
+    solid = one_solid(solid.cut(bore), "push bolt")
+    return break_front(solid, d).translated(V(0, s, 0))
+
+
+def button_outline(d: Blueprint, p: PushBolt = PB0) -> Part.Face:
+    """The outline of the button in the plane y = 0: the outline of its hole in the deck (solids.latch_button_hole: a
+    round of latch_button_d, two flats latch_button_flats apart, the four corners rounded by solids.LATCH_CORNER) moved
+    in by button_gap. Thus the gap round the button is button_gap all round, also at the corners (their rounds are
+    concentric), and the button's corners (LATCH_CORNER less button_gap) are larger than the edge break of its rim."""
+    r, fx, z = d.latch_button_d / 2, d.latch_button_flats / 2, d.latch_button_z
+    prism = Part.makeCylinder(r, 1.0, V(0, 0, z), V(0, 1, 0)).common(box(-fx, fx, 0.0, 1.0, z - r - 1.0, z + r + 1.0))
+    corners = [e for e in prism.Edges if abs(e.BoundBox.YLength - 1.0) < 1e-6 and e.BoundBox.XLength < 1e-6 and e.BoundBox.ZLength < 1e-6
+               and abs(abs(e.BoundBox.XMin) - fx) < 1e-6]
+    prism = prism.makeFillet(so.LATCH_CORNER, corners)
+    face = next(f for f in prism.Faces if isinstance(f.Surface, Part.Plane) and abs(f.CenterOfMass.y) < 1e-6)
+    out = face.makeOffset2D(-p.button_gap)
+    return out if out.ShapeType == "Face" else out.Faces[0]
+
+
+def neck(p: PushBolt = PB0) -> tuple[float, float]:
+    """The neck of the bolt at the lock: it holds the lug with neck_margin at each end when the bolt is back by the
+    stroke."""
+    y0, y1 = p.lug_y
+    return y0 - p.neck_front - p.stroke, y1 + p.neck_margin - p.stroke
+
+
+def wedge_end(p: PushBolt = PB0) -> float:
+    return p.lug_y[1] + p.neck_margin + 0.5
+
+
+def under(p: PushBolt, y: float) -> float:
+    """z of the underside of the bolt's lock section at y (the bolt at the lock)."""
+    w = math.tan(math.radians(p.wedge_deg))
+    return p.bolt_z[0] + w * max(0.0, wedge_end(p) - y)
+
+
+def break_front(solid: Part.Shape, d: Blueprint) -> Part.Shape:
+    """The edge break on the rim of the button: the only edge of the bolt that shows."""
+    rim = [e for e in solid.Edges if not e.Degenerated and e.BoundBox.YMax < 4.0 and len(solid.ancestorsOfType(e, Part.Face)) == 2]
+    for r in (d.edge_break, 0.8, 0.6):
+        try:
+            out = solid.makeFillet(r, rim)
+            if out.isValid():
+                return out
+        except Part.OCCError:
+            continue
+    return solid
+
+
+def strike(d: Blueprint, i: Interface, p: PushBolt = PB0) -> Part.Shape:
+    """The strike under the front edge of the panel, at the centre: two legs that stand each side of the bolt, a bridge
+    above it, and a lip on each leg that reaches in under the bolt. The top of each lip is parallel to the wedge
+    under the bolt, bolt_clear below it."""
+    z0, z1 = p.bolt_z
+    hw = p.bolt_w / 2 + p.bolt_clear
+    y0, y1 = p.lug_y
+    zr = z_rest(d)
+    outer = box(-hw - p.lug_leg_t, hw + p.lug_leg_t, y0, y1, p.lug_z0, zr)
+    window = side_prism([(y0 - 1, under(p, y0 - 1) - p.bolt_clear), (y1 + 1, under(p, y1 + 1) - p.bolt_clear), (y1 + 1, z1 + p.bolt_clear), (y0 - 1, z1 + p.bolt_clear)], -hw, hw)
+    slot = box(-(p.bolt_w / 2 - p.lug_lip), p.bolt_w / 2 - p.lug_lip, y0 - 1, y1 + 1, p.lug_z0 - 1, z1)
+    return one_solid(so.unsplit(outer.cut([window, slot])), "strike")
+
+
+def tunnel(d: Blueprint, i: Interface, p: PushBolt = PB0) -> Part.Shape:
+    """The tunnel of the bolt, a part of the left half of the frame: a floor under the bolt from the front bar to the
+    rear of the tunnel (in the plane of the lower face of the bar), with a window round the strike; two walls and a
+    roof round the bolt behind the strike; a shoulder in the right wall that stops the stop block of the bolt; a slot
+    for the gate at the rear. The walls stand back on the right from the shoulder to the rear, so that the bolt goes
+    in from the rear."""
+    fz0, _ = bar_z(d, i)
+    fz1 = p.bolt_z[0] - p.bolt_clear
+    ya, yb = p.housing_y
+    hw, tw = p.housing_w / 2, p.tunnel_w / 2
+    bw = p.bolt_w / 2 + p.bolt_clear
+    sw = p.stop_w / 2 + p.bolt_clear
+    rz0, rz1 = p.roof_z
+    y_walls = p.lug_y[1] + 1.5
+    ch0 = p.stop_y - 0.3
+    floor = box(-hw, hw, ya, yb, fz0, fz1)
+    walls = [box(-tw, -bw, y_walls, yb, fz1, rz0), box(bw, tw, y_walls, ch0, fz1, rz0), box(sw, tw, ch0, yb, fz1, rz0)]
+    roof = box(-tw, tw, y_walls, yb, rz0, rz1)
+    solid = joined([floor, *walls, roof])
+    g = p.strike_window
+    sb = strike(d, i, p).BoundBox
+    window = box(sb.XMin - g, sb.XMax + g, sb.YMin - g - 0.5, sb.YMax + g + 0.5, fz0 - 1, fz1 + 1)
+    c = p.gate_slot_clear
+    slot = box(p.gate_x[0] - c, p.gate_x[1] + c, p.gate_y[0] - c, p.gate_y[1] + c, fz1, rz1 + 1)
+    return so.unsplit(solid.cut([window, slot]))
+
+
+def gate(p: PushBolt = PB0) -> Part.Shape:
+    """The gate: a plate dropped into the slot at the rear of the tunnel. The spring of the bolt pushes it back
+    against the rear face of the slot. Its top stands gate_tab above the roof for the fingers; the plate of a seated
+    panel stands above it, so it cannot leave its slot while a panel is in."""
+    z0, z1 = p.bolt_z
+    g = box(p.gate_x[0], p.gate_x[1], p.gate_y[0], p.gate_y[1], z0, p.roof_z[1] + p.gate_tab)
+    # a peg on its front face that the end of the spring goes over
+    peg = ycyl(3.0, p.gate_y[0] - 4.0, p.gate_y[0] + 0.5, 0.0, (z0 + z1) / 2)
+    return one_solid(so.unsplit(g.fuse(peg)), "gate")
+
+
+def springs(p: PushBolt = PB0, s: float = 0.0) -> dict[str, Part.Shape]:
+    """The bought spring of the bolt as a plain cylinder, for the pictures: between the bore of the bolt and the seat
+    in the gate."""
+    z0, z1 = p.bolt_z
+    return {"bolt_spring": ycyl(p.bolt_spring_d, p.bolt_end_y - 10.0 + s, p.gate_y[0], 0.0, (z0 + z1) / 2)}
+
+
+def spring_length(p: PushBolt = PB0, s: float = 0.0) -> float:
+    return p.gate_y[0] - (p.bolt_end_y - 10.0 + s)
+
+
+def front_notch(d: Blueprint, i: Interface, p: PushBolt = PB0) -> Part.Shape:
+    """The bolt passes the front bar of the frame through a notch above the floor of the tunnel."""
+    _, z1 = bar_z(d, i)
+    hw = p.bolt_w / 2 + 1.0
+    return box(-hw, hw, front_bar_face(d, i) - 12, front_bar_face(d, i) + 1, p.bolt_z[0] - p.bolt_clear, z1 + 1)
+
+
+def bolt_room(p: PushBolt = PB0) -> Part.Shape:
+    """What B takes from the room below the plate: the box of the tunnel, the gate and the travel of the bolt, with
+    room_gap round it. A panel keeps clear of it, but for its strike."""
+    g = 0.5
+    hw = p.housing_w / 2 + g
+    return box(-hw, hw, p.housing_y[0], p.housing_y[1] + g, 48.8 - g, 65.0)
+
+
+def finger_hole(d: Blueprint, tiles: dict[str, Part.Shape], p: PushBolt = PB0) -> dict[str, Part.Shape]:
+    """A finger hole through the plate of a panel with nothing to hold, with the edge break round both of its rims."""
+    x, yl, dia = p.finger_hole
+    y = y0(d) + yl
+    zr, zt = z_rest(d), d.panel_top
+    out = {}
+    for name, tile in tiles.items():
+        b = tile.BoundBox
+        if not (b.XMin < x < b.XMax):
+            out[name] = tile
+            continue
+        cut = one_solid(so.unsplit(tile.cut(cyl(dia, x, y, zr - 1, zt + 1))), name)
+        rims = [e for e in cut.Edges if not e.Degenerated and abs(e.BoundBox.Center.x - x) < 1e-3 and abs(e.BoundBox.Center.y - y) < 1e-3
+                and (abs(e.BoundBox.ZMin - zt) < 1e-6 or abs(e.BoundBox.ZMin - zr) < 1e-6) and abs(e.BoundBox.ZMax - e.BoundBox.ZMin) < 1e-6]
+        out[name] = one_solid(cut.makeFillet(d.edge_break, rims), f"{name}, with the finger hole")
+    return out
+
+
+def add_to_tiles(tiles: dict[str, Part.Shape], add: list[Part.Shape], cut: list[Part.Shape]) -> dict[str, Part.Shape]:
+    """Fuse each added solid to the tile that holds its middle (a solid across the seam is split at it), and cut."""
+    names = list(tiles)
+    seam = tiles[names[0]].BoundBox.XMax
+    out = {}
+    for k, name in enumerate(names):
+        tile = tiles[name]
+        half = box(-so.BIG, seam, -so.BIG, so.BIG, -so.BIG, so.BIG) if k == 0 else box(seam, so.BIG, -so.BIG, so.BIG, -so.BIG, so.BIG)
+        parts = [s.common(half) for s in add]
+        parts = [s for s in parts if s.Volume > 1e-6]
+        if cut:
+            tile = tile.cut(cut)
+        if parts:
+            tile = so.unsplit(tile.fuse(parts))
+        out[name] = one_solid(tile, name)
+    return out
+
+
+# ---------- the way out of a panel with the push bolt ----------
+
+@dataclass(frozen=True)
+class Step:
+    """One position of the way out: the latch moved (the bolt back by `bolt`; panel_latch also turns its cams by
+    `cam`), the panel turned by `swing` degrees about the pivot (its front up), then moved by `lift` (y, z)."""
+    name: str
+    bolt: float = 0.0
+    cam: float = 0.0
+    swing: float = 0.0
+    lift: tuple = (0.0, 0.0)
+
+
+def way_out(p: PushBolt = PB0) -> list[Step]:
+    """The way out with the push bolt: the button in, the front of the panel up about its rear top edge, then up and
+    forward."""
+    pre = [Step(f"bolt back {s:g}", bolt=s) for s in (1.0, 2.5, p.stroke)]
+    swing = [Step(f"front up {a:g} degrees", bolt=p.stroke, swing=a) for a in (1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 13.0, 16.0, 20.0)]
+    out = [Step(f"up and forward {k}", bolt=p.stroke, swing=20.0, lift=(-2.0 * k, 6.0 * k)) for k in (1, 2, 4, 8, 16)]
+    return [Step("seated")] + pre + swing + out
+
+
+def placed(shape: Part.Shape, st: Step, d: Blueprint, i: Interface) -> Part.Shape:
+    """A part of the panel at a step: turned about the pivot, then moved."""
+    out = shape
+    if st.swing:
+        yp, zp = pivot(d, i)
+        # the front (smaller y) goes up: a turn about +x by -swing
+        out = out.rotated(V(0, yp, zp), V(1, 0, 0), -st.swing)
+    if st.lift != (0.0, 0.0):
+        out = out.translated(V(0, *st.lift))
+    return out
+
+
+def way_out_rows(d: Blueprint, i: Interface, panel: dict[str, Part.Shape], hw: Hardware | None, frame: dict[str, Part.Shape],
+                 fixed: dict[str, Part.Shape], skin: Part.Shape, p: PushBolt | None = None) -> list[dict]:
+    """The real way out in steps (way_out): at each step the common volume of the moving group (the panel with its
+    hardware) with what stays (the skin of the deck, the frame, the gate, the bolt where it is). Then the bolt alone
+    at four places of its travel against the deck, the frame and the gate, and the bolt back by the stroke against the
+    seated panel. FAIL above TOL."""
+    p = p or i.push
+    moving = [*panel.values(), *([s.world for s in hw.solids(("Panel",), ("hardware", "protrusion"))] if hw else [])]
+    still = [skin, *frame.values(), *fixed.values()]
+    rows = []
+    for st in way_out(p):
+        group = Part.makeCompound([placed(s, st, d, i) for s in moving])
+        vol = sum(common_volume(group, s) for s in [*still, bolt(d, p, st.bolt)])
+        rows.append({"step": st.name, "swing": st.swing, "lift": list(st.lift), "bolt": st.bolt, "cam": st.cam,
+                     "common_mm3": round(vol, 3), "result": "FAIL" if vol > TOL else "PASS"})
+    for s in (0.0, 1.0, 2.5, p.stroke):
+        vol = sum(common_volume(bolt(d, p, s), x) for x in still)
+        rows.append({"step": f"the bolt alone, back {s:g}, against the deck, the frame and the gate", "bolt": s, "common_mm3": round(vol, 3),
+                     "result": "FAIL" if vol > TOL else "PASS"})
+    vol = common_volume(bolt(d, p, p.stroke), Part.makeCompound(list(panel.values())))
+    rows.append({"step": "the bolt back by the stroke, against the seated panel", "bolt": p.stroke, "common_mm3": round(vol, 3),
+                 "result": "FAIL" if vol > TOL else "PASS"})
+    return rows
+
+
+def locked_rows(d: Blueprint, i: Interface, frame: dict[str, Part.Shape], p: PushBolt | None = None) -> list[dict]:
+    """The lock really holds: with the bolt forward, a lift of 1 makes the toes of the hooks meet the roofs of their
+    notches, and a swing of 2 degrees makes the lips of the strike meet the bolt. A row FAILS when the panel could
+    leave without the button."""
+    p = p or i.push
+    halves = Part.makeCompound([frame["frame_left"], frame["frame_right"]])
+    up = Step("lift 1", lift=(0.0, 1.0))
+    vol = sum(common_volume(placed(hook(d, i, x, p), up, d, i), halves) for x in (-p.hook_x, p.hook_x))
+    rows = [{"what": "rear hooks: a straight lift of 1 meets the roofs of the notches", "common_mm3": round(vol, 3), "result": "PASS" if vol > TOL else "FAIL"}]
+    vol = common_volume(placed(strike(d, i, p), Step("swing 2", swing=2.0), d, i), bolt(d, p))
+    rows.append({"what": "bolt locked: a swing of 2 degrees makes the lips meet the bolt", "common_mm3": round(vol, 3), "result": "PASS" if vol > TOL else "FAIL"})
+    return rows
+
+
 # ---------- the frame ----------
 
 def frame(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
@@ -286,11 +695,21 @@ def frame(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
         if i.latch == SCREW:
             cuts.append(cyl(i.insert_hole_d, x, y, top - i.latch_hole_depth, top + 1))
         else:
-            cuts.append(cyl(i.magnet_d + i.magnet_clear, x, y, top - i.magnet_h - i.magnet_clear, top + 1))
-    solid = solid.cut(cuts)
+            cuts.append(cyl(i.magnet_d + i.magnet_clear, x, y, top - i.pad_magnet_h() - i.magnet_clear, top + 1))
     g = i.half_gap / 2
-    out = {"frame_left": one_solid(solid.common(box(-so.BIG, -g, -so.BIG, so.BIG, 0, 200)), "frame, left half"),
-           "frame_right": one_solid(solid.common(box(g, so.BIG, -so.BIG, so.BIG, 0, 200)), "frame, right half")}
+    if i.latch == PUSH_BOLT:
+        # the notches of the rear hooks; the halves meet at frame_split_x, so that the tunnel of the bolt is whole in
+        # the left half, with the notch of the bolt in the front bar
+        p = i.push
+        solid = so.unsplit(solid.cut(cuts + notches(d, i, p)))
+        left = so.unsplit(solid.common(box(-so.BIG, p.frame_split_x - g, -so.BIG, so.BIG, 0, 200)))
+        left = so.unsplit(left.cut(front_notch(d, i, p)).fuse(tunnel(d, i, p)))
+        out = {"frame_left": one_solid(left, "frame, left half, with the tunnel of the bolt"),
+               "frame_right": one_solid(so.unsplit(solid.common(box(p.frame_split_x + g, so.BIG, -so.BIG, so.BIG, 0, 200))), "frame, right half")}
+    else:
+        solid = solid.cut(cuts)
+        out = {"frame_left": one_solid(solid.common(box(-so.BIG, -g, -so.BIG, so.BIG, 0, 200)), "frame, left half"),
+               "frame_right": one_solid(solid.common(box(g, so.BIG, -so.BIG, so.BIG, 0, 200)), "frame, right half")}
     floor = fit.Layout().floor_t
     front, rear = pr.panel_outline(d, -i.bar_in)[1][1], pr.panel_outline(d, -i.bar_in)[4][1]
     w = i.ledge + i.bond_gap - i.bar_in
@@ -451,7 +870,7 @@ def arcade(d: Blueprint, i: Interface, a: Arcade, v) -> dict[str, Part.Shape]:
             cuts.append(cyl(v(name) + a.hole_allow, x, y, zr - 1, zt + 1))
             if a.buttons == SNAP_IN:
                 cuts.append(cyl(v(name) + a.hole_allow + 2 * a.seat_ring, x, y, zr - 1, zt - a.seat_t))
-    return tiles(solid.cut(cuts), d, i, xs, ("panel_lever_tile", "panel_button_tile"))
+    return latch_on_panel(d, i, tiles(solid.cut(cuts), d, i, xs, ("panel_lever_tile", "panel_button_tile")))
 
 
 def blank(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
@@ -463,7 +882,18 @@ def blank(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
     add = [plate(d, i), *long_ribs(d, i, -i.rib_end_x, i.rib_end_x), seam_ribs(d, i, 0.0), panel_clip(d, i)]
     add += [box(x - i.seam_flange_t / 2, x + i.seam_flange_t / 2, y_f, y_r, zr - i.rib_h, zr) for x in (-q, q)]
     cuts = interface_cuts(d, i) + seam_holes(d, i, 0.0, (40.0, 70.0, 105.0, 135.0))
-    return tiles(joined(add).cut(cuts), d, i, 0.0, ("blank_left_tile", "blank_right_tile"))
+    out = latch_on_panel(d, i, tiles(joined(add).cut(cuts), d, i, 0.0, ("blank_left_tile", "blank_right_tile")))
+    # a panel with nothing to hold lifts by a finger hole (PUSH_BOLT: the front edge must come up first)
+    return finger_hole(d, out, i.push) if i.latch == PUSH_BOLT else out
+
+
+def latch_on_panel(d: Blueprint, i: Interface, tiles: dict[str, Part.Shape]) -> dict[str, Part.Shape]:
+    """PUSH_BOLT: the two rear hooks and the strike on the tiles of a panel, and the room of the bolt (bolt_room) cut
+    from its ribs. A rib that crosses that room stops at it."""
+    if i.latch != PUSH_BOLT:
+        return tiles
+    p = i.push
+    return add_to_tiles(tiles, [*(hook(d, i, x, p) for x in (-p.hook_x, p.hook_x)), strike(d, i, p)], [bolt_room(p)])
 
 
 # ---------- the deck and the hardware round the panel ----------
@@ -486,9 +916,10 @@ def deck_skin(d: Blueprint, log=print) -> Part.Shape:
     return out
 
 
-def pocket_skin(d: Blueprint, skin: Part.Shape, reach: float = 16.0) -> Part.Shape:
+def pocket_skin(d: Blueprint, skin: Part.Shape, reach: float = 32.0) -> Part.Shape:
     """The skin of the deck round the pocket of the panel: what a part of the panel or of the frame can meet. The
-    checks run on it, because a boolean with the whole deck takes much longer."""
+    checks run on it, because a boolean with the whole deck takes much longer. It reaches to the front face of the
+    deck, where the button of the push bolt stands in its hole."""
     pts = pr.panel_outline(d, reach)
     return skin.common(plan(pts, fit.Layout().floor_t - 1.0, d.deck_top + so.OVER))
 
@@ -550,7 +981,16 @@ def room(d: Blueprint, i: Interface, fr: dict[str, Part.Shape], hw: Hardware) ->
     cuts.append(box(i.anchor_x - i.clip_l / 2 - grow, i.anchor_x + i.clip_l / 2 + grow, y_edge - i.clip_w - grow, y_edge + 1, z0 - 1, zr + 1))
     usb = Part.makeCompound([s.world for s in hw.solids(("USB",))]).BoundBox
     cuts.append(box(usb.XMin - i.usb_gap, so.BIG, -so.BIG, so.BIG, z0 - 1, usb.ZMax + i.usb_gap))
-    return one_solid(out.cut(cuts), "the room below the plate")
+    if i.latch != PUSH_BOLT:
+        return one_solid(out.cut(cuts), "the room below the plate")
+    # PUSH_BOLT: less the box of the bolt, its tunnel and the gate (bolt_room); a panel takes in the two notches of the
+    # hooks and the place of its strike
+    p = i.push
+    out = out.cut(cuts + [bolt_room(p)])
+    below = box(-so.BIG, so.BIG, -so.BIG, so.BIG, -so.BIG, zr)
+    sb = strike(d, i, p).BoundBox
+    extra = [n.common(below) for n in notches(d, i, p)] + [box(sb.XMin, sb.XMax, sb.YMin, sb.YMax, sb.ZMin, sb.ZMax)]
+    return one_solid(so.unsplit(out.fuse(extra)), "the room below the plate")
 
 
 # ---------- the checks ----------
@@ -697,19 +1137,22 @@ def overhang(shape: Part.Shape, up: App.Vector, limit: float = 45.0) -> float:
 # how each part stands on the printer: the direction that points up, and the face on the bed
 PRINT = {"tile": (V(0, 0, -1), "top face down: the face that shows lies on the bed, the ribs stand up"),
          "frame": (V(0, 0, 1), "as in the cabinet: the lower face of the bar on the bed, the pads and the cones stand up"),
-         "post": (V(0, 1, 0), "on its wide side")}
+         "post": (V(0, 1, 0), "on its wide side"),
+         "latch_bolt": (V(1, 0, 0), "on its side: the flat side (x -6) on the bed"),
+         "latch_gate": (V(0, -1, 0), "flat: its rear face on the bed, the peg up")}
 
 
 def kind(name: str) -> str:
-    return "post" if name.startswith("post") else "frame" if name.startswith("frame") else "tile"
+    return "post" if name.startswith("post") else "frame" if name.startswith("frame") else "latch" if name.startswith("latch") else "tile"
 
 
 def print_rows(parts: dict[str, Part.Shape]) -> list[dict]:
     lim = split.printer()
     rows = []
     for name, shape in parts.items():
-        up, how = PRINT[kind(name)]
-        pts = [(p.x, p.y, p.z) for p in (vx.Point for vx in shape.Vertexes)]
+        up, how = PRINT[name if kind(name) == "latch" else kind(name)]
+        # the points of a mesh, not the vertices: a round part has few vertices on its outline
+        pts = [(p.x, p.y, p.z) for p in shape.tessellate(0.5)[0]]
         b = split.print_box(pts, (up.x, up.y, up.z), lim)
         low = min(vx.Point.dot(up) for vx in shape.Vertexes)
         bed = sum(f.Area for f in shape.Faces if isinstance(f.Surface, Part.Plane) and abs(f.CenterOfMass.dot(up) - low) < 1e-6
@@ -721,6 +1164,8 @@ def print_rows(parts: dict[str, Part.Shape]) -> list[dict]:
 
 # an edge on the top face is hidden only where its other face is the wall of a hole or the bonded seam
 HOLE_EDGE = 2.0
+# the front of the button of the push bolt shows: from the front face of the deck (y 0 below the crease) to this y
+SHOWN = 4.0
 ON_TOP = ("the other tile", "panel_holes")
 
 
@@ -730,28 +1175,29 @@ def covers(d: Blueprint, i: Interface) -> dict[str, Part.Shape]:
     plate is not a hole), and the room below the plate, inside the shell."""
     zr, zt = z_rest(d), d.panel_top
     seat = plan(pr.panel_outline(d), zr, zt).cut(plan(pr.panel_outline(d, -i.seat_gap), zr - 1, zt + 1))
-    return {"panel_seat": seat, "panel_holes": plan(pr.panel_outline(d, -i.seat_gap - HOLE_EDGE), zr, zt),
-            "panel_room": plan(pr.panel_outline(d, 30.0), 0.0, zr)}
+    # the room starts SHOWN behind the front face of the deck: the front of the push bolt's button shows in its hole
+    room = plan(pr.panel_outline(d, 30.0), 0.0, zr).common(box(-so.BIG, so.BIG, SHOWN, so.BIG, -so.BIG, so.BIG))
+    return {"panel_seat": seat, "panel_holes": plan(pr.panel_outline(d, -i.seat_gap - HOLE_EDGE), zr, zt), "panel_room": room}
 
 
 JOINTS = {"panel_seat": "The seat of the panel in the pocket: the side of the plate stands seat_gap from the wall of the seat. "
                         "The top edge of the side shows in the reveal, so the seat does not hide an edge on the top face.",
           "panel_holes": "A hole through the plate. The rim of a button, the dust washer of the lever or the head of a screw covers its top edge.",
-          "panel_room": "Below the plate, inside the shell: the ribs and the frame. These faces are not painted.",
+          "panel_room": "Below the plate, inside the shell: the ribs, the frame, the bolt behind its button and the gate. These faces are not painted.",
           "the other tile": "The bonded seam between the two tiles of a panel."}
 
 
 # the printed parts of this module, by name (tools/edge_finish.py puts them in its class of printed parts)
 PARTS = ("frame_left", "frame_right", "post_front_left", "post_front_right", "post_rear_left", "post_rear_right",
-         "panel_lever_tile", "panel_button_tile", "blank_left_tile", "blank_right_tile")
+         "panel_lever_tile", "panel_button_tile", "blank_left_tile", "blank_right_tile", "latch_bolt", "latch_gate")
 
 
 def joints_of(name: str) -> tuple[str, ...]:
     """The covers of JOINTS that a part's faces lie against: the frame lies under the plate and in the room below
-    it, a post in that room; a tile in its seat, on the room, at the other tile, and (but a blank tile) round its
+    it, a post, the bolt and the gate of the push bolt in that room; a tile in its seat, on the room, at the other tile, and (but a blank tile) round its
     holes."""
     k = kind(name)
-    if k == "post":
+    if k in ("post", "latch"):
         return ("panel_room",)
     if k == "frame":
         return ("panel_holes", "panel_room")
@@ -769,8 +1215,13 @@ def corner_balls(d: Blueprint, i: Interface, tiles: tuple[str, ...]) -> list:
     from tools import face_check  # noqa: PLC0415
 
     r = d.edge_break
-    return [face_check.Reveal("corner ball of the plate", tiles, ("sliver",), (x - 1.5 * r, y - 1.5 * r, d.panel_top - 1.5 * r, x + 1.5 * r, y + 1.5 * r, d.panel_top))
-            for x, y in (pr.panel_outline(d, -i.seat_gap)[k] for k in (0, 3, 4, 5))]
+    out = [face_check.Reveal("corner ball of the plate", tiles, ("sliver",), (x - 1.5 * r, y - 1.5 * r, d.panel_top - 1.5 * r, x + 1.5 * r, y + 1.5 * r, d.panel_top))
+           for x, y in (pr.panel_outline(d, -i.seat_gap)[k] for k in (0, 3, 4, 5))]
+    # the four corners of the button in plan (button_outline): each turns 31 degrees, so its round of LATCH_CORNER
+    # less button_gap is a face about 0.7 wide along the button, with its piece of the edge break at the front
+    z, h = d.latch_button_z, d.latch_button_d / 2
+    out += [face_check.Reveal("corner of the button in plan", ("latch_bolt",), ("sliver",), (-h, -6.0, z - h, h, 11.0, z + h))]
+    return out
 
 
 def finish_rows(parts: dict[str, Part.Shape], d: Blueprint, i: Interface, log=lambda text: None) -> tuple[dict, list[str], dict]:
@@ -829,10 +1280,18 @@ class Built:
     frame: dict[str, Part.Shape]
     arcade: dict[str, Part.Shape]
     blank: dict[str, Part.Shape]
+    # PUSH_BOLT: the printed parts of the latch that stay in the cabinet and are not the frame: the bolt (at the lock)
+    # and the gate
+    latch: dict[str, Part.Shape] = field(default_factory=dict)
 
     @property
     def parts(self) -> dict[str, Part.Shape]:
-        return {**self.frame, **self.arcade, **self.blank}
+        return {**self.frame, **self.arcade, **self.blank, **self.latch}
+
+    @property
+    def fixed(self) -> dict[str, Part.Shape]:
+        """What stays in the cabinet when a panel comes out."""
+        return {**self.frame, **self.latch}
 
 
 def values(base: App.Document | None = None):
@@ -843,33 +1302,45 @@ def values(base: App.Document | None = None):
 def build(d: Blueprint | None = None, i: Interface | None = None, a: Arcade | None = None, v=None) -> Built:
     d, i, a = d or Blueprint(), i or Interface(), a or Arcade()
     v = v or values()
-    return Built(d, i, a, frame(d, i), arcade(d, i, a, v), blank(d, i))
+    latch = {"latch_bolt": bolt(d, i.push), "latch_gate": gate(i.push)} if i.latch == PUSH_BOLT else {}
+    return Built(d, i, a, frame(d, i), arcade(d, i, a, v), blank(d, i), latch)
 
 
 def check(b: Built, skin: Part.Shape, hw: Hardware, v, log=lambda text: None) -> dict:
     """Every check of the package on the built parts. "failures" is empty when all pass. skin: pocket_skin."""
     d, i = b.d, b.i
+    push = i.latch == PUSH_BOLT
     log("clashes")
-    clashes = clash_rows({**b.frame, **b.arcade}, skin, hw)
+    clashes = clash_rows({**b.fixed, **b.arcade}, skin, hw)
     # the blank panel has no hardware of its own: it is compared with the skin, the frame, the USB sockets and the hub
-    clashes_blank = [r for r in clash_rows({**b.frame, **b.blank}, skin, hw, ("USB", "Hub")) if r["part"].startswith("blank") or r["against"].startswith("blank")]
+    clashes_blank = [r for r in clash_rows({**b.fixed, **b.blank}, skin, hw, ("USB", "Hub")) if r["part"].startswith("blank") or r["against"].startswith("blank")]
     log("room")
     space = room(d, i, b.frame, hw)
-    rooms = room_rows(space, d, b.frame, skin, hw, b.arcade) + [r for r in room_rows(space, d, {}, skin, hw, b.blank) if "blank" in r["what"]]
-    log("lift")
-    lifts = lift_rows(b.arcade, hw, b.frame, skin)
+    # the bolt stands in the room of the bolt (bolt_room) behind the front bar and in the notch of that bar before it
+    keep = {**b.frame, **{k: s for k, s in b.latch.items() if k != "latch_bolt"}}
+    rooms = room_rows(space, d, keep, skin, hw, b.arcade) + [r for r in room_rows(space, d, {}, skin, hw, b.blank) if "blank" in r["what"]]
+    log("way out" if push else "lift")
+    # PUSH_BOLT: the way out with the button held (way_out_rows) for each panel, and the lock (locked_rows); the other
+    # latches: a straight lift
+    if push:
+        lifts = way_out_rows(d, i, b.arcade, hw, b.frame, {"latch_gate": b.latch["latch_gate"]}, skin)
+        lifts += [{**r, "step": f"blank panel: {r['step']}"} for r in way_out_rows(d, i, b.blank, None, b.frame, {"latch_gate": b.latch["latch_gate"]}, skin)]
+        locks = locked_rows(d, i, b.frame)
+    else:
+        lifts, locks = lift_rows(b.arcade, hw, b.frame, skin), []
     log("print")
     prints = print_rows(b.parts)
     log("edges and faces")
     edges, bad, faces = finish_rows(b.parts, d, i, log)
     failures = [f"clash: {r['part']} / {r['against']}: {r['common_mm3']} mm3" for r in clashes + clashes_blank if r["result"] == "FAIL"]
     failures += [f"room: {r['what']}: {r['common_mm3']} mm3" for r in rooms if r["result"] == "FAIL"]
-    failures += [f"lift: at {r['lift']} the panel meets the deck or the frame: {r['common_mm3']} mm3" for r in lifts if r["result"] == "FAIL"]
+    failures += [f"lift: at {r.get('step', r.get('lift'))} the panel meets the deck or the frame: {r['common_mm3']} mm3" for r in lifts if r["result"] == "FAIL"]
+    failures += [f"lock: {r['what']}: {r['common_mm3']} mm3" for r in locks if r["result"] == "FAIL"]
     failures += [f"print: {r['part']} does not fit the printer ({r['x']} x {r['y']} x {r['z']})" for r in prints if not r["fits"]]
     failures += bad
     return {"interface": asdict(i), "arcade": asdict(b.a), "latch_points": latch_points(d, i), "cone_points": cone_points(d, i),
             "seam_x": seam_x(b.a), "room_volume_cm3": round(space.Volume / 1000, 1), "room_box": box_of(space),
-            "clashes": clashes, "clashes_blank": clashes_blank, "room": rooms, "lift": lifts, "print": prints,
+            "clashes": clashes, "clashes_blank": clashes_blank, "room": rooms, "lift": lifts, "locks": locks, "print": prints,
             "stiffness": stiffness(d, i, b.a, v), "edge_finish": edges, "face_check": faces, "failures": failures}
 
 
@@ -913,9 +1384,16 @@ def groups(hw: Hardware, which: tuple[str, ...] = ("Panel", "USB", "Hub")) -> di
 
 
 def latch_hardware(d: Blueprint, i: Interface) -> dict[str, tuple[Part.Shape, str]]:
-    """The bought parts of the latch, for the pictures: the screws and their inserts, or the magnets."""
+    """The bought parts of the latch, for the pictures: the screws and their inserts; or the magnets; or (PUSH_BOLT)
+    the magnets in the frame, the steel discs in the plate and the spring of the bolt."""
     zr, zt = z_rest(d), d.panel_top
     top = zr - i.pad_drop
+    if i.latch == PUSH_BOLT:
+        pts = latch_points(d, i)
+        p = i.push
+        return {"magnets": (Part.makeCompound([cyl(i.magnet_d, x, y, top - i.magnet_clear - i.pad_magnet_h(), top - i.magnet_clear) for x, y in pts]), FINISH["magnet"]),
+                "discs": (Part.makeCompound([cyl(i.magnet_d, x, y, zr, zr + i.keeper_h) for x, y in pts]), FINISH["magnet" if p.plate_disc != STEEL else "screw"]),
+                "spring": (springs(p)["bolt_spring"], FINISH["spring"])}
     a, b = [], []
     for x, y in latch_points(d, i):
         if i.latch == SCREW:
@@ -929,6 +1407,14 @@ def latch_hardware(d: Blueprint, i: Interface) -> dict[str, tuple[Part.Shape, st
     if i.latch == SCREW:
         return {"screws": (Part.makeCompound(a), FINISH["screw"]), "inserts": (Part.makeCompound(b), FINISH["insert"])}
     return {"magnets": (Part.makeCompound(a + b), FINISH["magnet"])}
+
+
+ON_PANEL = ("screws", "discs")    # the bought parts of a latch that go with the panel; the others stay in the frame
+
+
+def latch_split(bought: dict[str, tuple[Part.Shape, str]]) -> tuple[dict, dict]:
+    """The bought parts of a latch: those that go with the panel, and those that stay in the cabinet."""
+    return {k: v for k, v in bought.items() if k in ON_PANEL}, {k: v for k, v in bought.items() if k not in ON_PANEL}
 
 
 def cut_scene(shapes: dict[str, tuple[Part.Shape, str]], keep: Part.Shape, skin: Part.Shape | None, normal: App.Vector, at: float):
@@ -945,16 +1431,17 @@ def cam(target, radius: float, az: float, el: float, aspect: float = 0.62) -> di
     return {"target": [round(c, 1) for c in target], "radius": radius, "az": az, "el": el, "aspect": aspect}
 
 
-def scenes(out: Path, b: Built, skin: Part.Shape, hw: Hardware, magnet: Built) -> None:
-    """The model directories of the pictures (tools/draw_panel.py renders them with every edge drawn)."""
+def scenes(out: Path, b: Built, skin: Part.Shape, hw: Hardware, options: dict[str, Built]) -> None:
+    """The model directories of the pictures (tools/draw_panel.py renders them with every edge drawn). `b` is the
+    default build; `options` the other latches by name (screw, magnet), for their sections."""
     d, i = b.d, b.i
     deck_outer = so.deck(d)[0]
     zt = d.panel_top
     mid = (0.0, y0(d) + d.panel_d / 2, zt)
     hard = groups(hw)
-    fixed = {k: (s, finish_of(k)) for k, s in b.frame.items()}
+    fixed = {k: (s, finish_of(k)) for k, s in b.fixed.items()}
     panel = {k: (s, finish_of(k)) for k, s in b.arcade.items()}
-    bought = latch_hardware(d, i)
+    with_panel, in_frame = latch_split(latch_hardware(d, i))
     on_panel = {k: hard[k] for k in ("Lever", "Buttons", "Encoder")}
     # the printed floor is not a part of the shell's model yet: a slab of its thickness under the deck, for the pictures
     floor = deck_outer.common(box(-so.BIG, so.BIG, -so.BIG, so.BIG, 0.0, fit.Layout().floor_t))
@@ -962,31 +1449,59 @@ def scenes(out: Path, b: Built, skin: Part.Shape, hw: Hardware, magnet: Built) -
     outer = {"deck": deck_outer}
     light = lambda shapes: {k: (s, FINISH["underside"]) for k, s in shapes.items()}
     views = {"above": cam(mid, 265, 0, 62), "above-left": cam(mid, 265, -38, 34)}
-    write_model(out / "in-place", {**deck, **panel, **on_panel, "screws": bought["screws"]}, outer, views)
+    write_model(out / "in-place", {**deck, **fixed, **panel, **on_panel, **with_panel}, outer, views)
     lift = V(0, 0, 95)
-    moved = {k: (s.translated(lift), f) for k, (s, f) in {**panel, **on_panel, "screws": bought["screws"]}.items()}
+    moved = {k: (s.translated(lift), f) for k, (s, f) in {**panel, **on_panel, **with_panel}.items()}
     views = {"lifted": cam((0, mid[1], zt + 30), 300, -34, 30, 0.8), "frame": cam(mid, 265, 0, 58)}
-    write_model(out / "lifted", {**deck, **fixed, "inserts": bought["inserts"], "USB": hard["USB"], **moved}, outer, views)
-    write_model(out / "frame", {**deck, **fixed, "inserts": bought["inserts"], "USB": hard["USB"]}, outer,
+    write_model(out / "lifted", {**deck, **fixed, **in_frame, "USB": hard["USB"], **moved}, outer, views)
+    write_model(out / "frame", {**deck, **fixed, **in_frame, "USB": hard["USB"]}, outer,
                 {"frame": cam(mid, 265, 0, 58), "frame-corner": cam((latch_points(d, i)[1][0] - 12, latch_points(d, i)[1][1] + 6, zt - 4), 48, 35, 40)})
     low = cam((0, mid[1], z_rest(d) - 6), 255, 180, -52)
     write_model(out / "underside", {**light(b.arcade), **on_panel}, None, {"underside": low, "underside-lever": cam((-95, mid[1], z_rest(d) - 8), 120, 150, -38)})
-    write_model(out / "blank", {**deck, **{k: (s, finish_of(k)) for k, s in b.blank.items()}, "screws": bought["screws"]}, outer, {"above-left": cam(mid, 265, -38, 34)})
+    blank = {k: (s, finish_of(k)) for k, s in b.blank.items()}
+    views = {"above-left": cam(mid, 265, -38, 34)}
+    if i.latch == PUSH_BOLT:
+        x, yl, _ = i.push.finger_hole
+        views["finger-hole"] = cam((x, y0(d) + yl, zt), 45, -25, 40, 0.7)
+    write_model(out / "blank", {**deck, **fixed, **blank, **with_panel}, outer, views)
     write_model(out / "blank-underside", light(b.blank), None, {"underside": low})
     # the section through the lever: everything to the left of the lever's centre, seen from the right
     sx = fit.Layout().stick_x
     keep = box(-so.BIG, sx, -so.BIG, so.BIG, -so.BIG, so.BIG)
-    everything = {**deck, **fixed, **panel, **on_panel, "screws": bought["screws"], "inserts": bought["inserts"]}
+    everything = {**deck, **fixed, **panel, **on_panel, **with_panel, **in_frame}
     cut, lines = cut_scene(everything, keep, skin, V(1, 0, 0), sx)
     write_model(out / "section-lever", cut, None, {"section": cam((sx, y0(d) + d.panel_d / 2 - 4, 44), 122, 90, 0, 0.5),
                                                   "section-oblique": cam((sx, y0(d) + d.panel_d / 2, 50), 135, 62, 16, 0.6)}, lines)
-    # the latch: a cut through the front right latch point, for each option
-    for name, built in (("latch-screw", b), ("latch-magnet", magnet)):
+    # the latch of each option: a cut through the front right latch point
+    for name, built in (("latch-" + k, o) for k, o in {"default": b, **options}.items()):
         lx, ly = latch_points(d, built.i)[1]
         keep = box(-so.BIG, lx, -so.BIG, so.BIG, -so.BIG, so.BIG)
-        every = {**deck, **{k: (s, finish_of(k)) for k, s in {**built.frame, **built.arcade}.items()}, **latch_hardware(d, built.i), "Buttons": hard["Buttons"]}
+        every = {**deck, **{k: (s, finish_of(k)) for k, s in {**built.fixed, **built.arcade}.items()}, **latch_hardware(d, built.i), "Buttons": hard["Buttons"]}
         cut, lines = cut_scene(every, keep, skin, V(1, 0, 0), lx)
         write_model(out / name, cut, None, {"latch": cam((lx, ly + 6, z_rest(d) - 3), 30, 90, 0, 0.7), "latch-oblique": cam((lx, ly + 4, z_rest(d)), 34, 55, 28, 0.7)}, lines)
+    if i.latch == PUSH_BOLT:
+        push_bolt_scenes(out, b, skin, hw)
+
+
+def push_bolt_scenes(out: Path, b: Built, skin: Part.Shape, hw: Hardware) -> None:
+    """The pictures of the push bolt: the front of the deck with the button in its hole (from the front and close),
+    the rim of the hole alone (close), and the section through the bolt on the centre line, locked and with the
+    button in (seen from the right, the cut face toward the camera)."""
+    d, i = b.d, b.i
+    p = i.push
+    z = d.latch_button_z
+    front = {"deck": (skin, FINISH["deck"]), "latch_bolt": (b.latch["latch_bolt"], FINISH["latch"])}
+    write_model(out / "button-front", front, None, {"front": cam((0.0, 0.0, z), 70, 0, 4, 0.62), "close": cam((0.0, 0.0, z), 22, 0, 4, 0.8),
+                                                    "close-oblique": cam((0.0, 0.0, z), 24, -35, 18, 0.8)})
+    write_model(out / "button-rim", {"deck": (skin, FINISH["deck"])}, None, {"rim": cam((0.0, 0.0, z), 22, 0, 4, 0.8), "rim-oblique": cam((0.0, 2.0, z), 24, -35, 18, 0.8)})
+    hard = groups(hw)
+    panel = {**{k: (s, finish_of(k)) for k, s in b.arcade.items()}, "Buttons": hard["Buttons"], **latch_split(latch_hardware(d, i))[0]}
+    cabinet = {"deck": (skin, FINISH["deck"]), **{k: (s, finish_of(k)) for k, s in b.frame.items()}, "latch_gate": (b.latch["latch_gate"], FINISH["latch"])}
+    look = cam((0.0, 40.0, 56.0), 56, 90, 0, 0.6)
+    for state, s_ in (("locked", 0.0), ("button-in", p.stroke)):
+        every = {**cabinet, **panel, "latch_bolt": (bolt(d, p, s_), FINISH["latch"]), "spring": (springs(p, s_)["bolt_spring"], FINISH["spring"])}
+        cut, lines = cut_scene(every, box(-so.BIG, 0.0, -so.BIG, so.BIG, -so.BIG, so.BIG), skin, V(1, 0, 0), 0.0)
+        write_model(out / f"section-bolt-{state}", cut, None, {"section": look}, lines)
 
 
 def markdown(rep: dict) -> str:
@@ -999,8 +1514,11 @@ def markdown(rep: dict) -> str:
               for r in rep["clashes"] + rep["clashes_blank"]]
     lines += ["", "## The room below the plate", "", f"Volume {rep['room_volume_cm3']} cm3, box {rep['room_box']}.", "", "| What | Volume, mm3 | Result |", "| --- | --- | --- |"]
     lines += [f"| {r['what']} | {r['common_mm3']} | {r['result']} |" for r in rep["room"]]
-    lines += ["", "## Lift out", "", "| Lift, mm | Common volume with the deck and the frame, mm3 | Result |", "| --- | --- | --- |"]
-    lines += [f"| {r['lift']:g} | {r['common_mm3']} | {r['result']} |" for r in rep["lift"]]
+    lines += ["", "## The way out", "", "| Step | Common volume with what stays, mm3 | Result |", "| --- | --- | --- |"]
+    lines += [f"| {r['step'] if 'step' in r else 'lift ' + format(r['lift'], 'g')} | {r['common_mm3']} | {r['result']} |" for r in rep["lift"]]
+    if rep.get("locks"):
+        lines += ["", "| The lock holds | Common volume, mm3 | Result |", "| --- | --- | --- |"]
+        lines += [f"| {r['what']} | {r['common_mm3']} | {r['result']} |" for r in rep["locks"]]
     lines += ["", "## Stiffness (hand estimate)", "", f"Load {st['load_N']:g} N on the ball, {st['arm_mm']:g} above the panel: a couple of {st['couple_Nmm'] / 1000:g} N m. "
               f"E {st['E_MPa']:g} MPa. Span {st['span_mm']:g}, bay {st['bay_mm']:g}, ribs {st['rib_spacing_mm']:g} apart.", "",
               "| Case | I of the bay, mm4 | Forward: slope, mrad | Deflection, mm | Ball moves, mm | Sideways: slope, mrad | Ball moves, mm |", "| --- | --- | --- | --- | --- | --- | --- |"]
@@ -1043,12 +1561,12 @@ def main() -> int:
     write_model(out / "parts", {k: (s, finish_of(k)) for k, s in b.parts.items()})
     # the parts in place in the deck, for candybar.shell.viewdoc (shell.FCStd); the blank panel stands beside it
     aside = V(0, -260, 0)
-    doc = {"deck": (deck, FINISH["deck"]), **{k: (s, finish_of(k)) for k, s in {**b.frame, **b.arcade}.items()},
+    doc = {"deck": (deck, FINISH["deck"]), **{k: (s, finish_of(k)) for k, s in {**b.fixed, **b.arcade}.items()},
            **{k: (s.translated(aside), finish_of(k)) for k, s in b.blank.items()}, **groups(hw), **latch_hardware(b.d, b.i)}
     write_model(out, doc, {"deck": so.deck(b.d)[0]})
-    magnet = replace(b, i=replace(b.i, latch=MAGNET))
-    magnet = Built(b.d, magnet.i, b.a, frame(b.d, magnet.i), arcade(b.d, magnet.i, b.a, v), {})
-    scenes(out / "scenes", b, deck, hw, magnet)
+    options = {k: Built(b.d, oi, b.a, frame(b.d, oi), arcade(b.d, oi, b.a, v), {}) for k, oi in
+               (("screw", replace(b.i, latch=SCREW)), ("magnet", replace(b.i, latch=MAGNET)))}
+    scenes(out / "scenes", b, deck, hw, options)
     log("files written")
     print(markdown(rep))
     return 1 if rep["failures"] else 0
