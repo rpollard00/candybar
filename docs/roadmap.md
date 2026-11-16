@@ -89,7 +89,7 @@ The goal is a cabinet that can be printed in ABS on a Qidi Q2 (decision record 0
    - **The button's gap is 0.3 all round.** The corners of the hole in the deck are now R 1.5 (they were 0.5) and the button is the hole's outline moved in by 0.3, with corners of 1.2 and its rim break of R 1. Before, the gap was 0.292 at the four corners. Only the deck changes (the comparison of the default build).
    - **The latch coupon** is plate 10 of the coupon set (the strip of the deck nose, the front bar with the tunnel, the bolt, the gate and the strike).
    - **The bolted hood** (`docs/design/print-pieces.md`, "The bolted hood"). Four M4 x 20 socket head screws from below, up through bosses of the top ring into inserts in bosses of the hood's foot, two on each side ring, behind the monitor. The rear door comes off; a 3 mm hex key reaches each screw. The ring rises 1.5 to the foot, so the seam gap stays 1.5 with the screws tight. The insert coupon has its upright holes in the foot of the hood, from the bed.
-   - **Merged faces** on every print piece after its joints (`pieces.merge_faces`).
+   - **Merged faces** on every print piece after its joints (`pieces.merge_faces`): 26 of 32 pieces; six keep their faces, because OpenCascade's merge changes their volume (not the same six in each run). The face check of the pieces: 4845 findings before, 1801 after (splits 4153 to 1264).
 15. Next: the owner's review of the proposals of step 12 and the coupons on the printer. Then the node plates and the cut plates of the control panel.
 
 Modelling and iteration run on Opus subagents. The main session writes the brief and reviews. The owner asked for a Fable agent on the hood; that agent now makes the blueprint.
