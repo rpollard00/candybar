@@ -197,6 +197,12 @@ The research gives a printed hole about 0.25 mm smaller than its model. It does 
 - Pass: the cone seats fully by hand, and you feel no play.
 - Choose the smallest clearance that passes. If it is not 0.15, change `OtherJoints.cone_clearance`.
 
+**`rod-block` and `rod`: the push rod of the monitor's button** (2026-11-15). The rod of 4 x 4 runs through a hole of 4.4 in the inner frame of the bezel plate (`cradle.button_option`, 0.2 on each side). The block is 16 thick, as long as the rod's run through the plate, and has three square holes: 4.3, 4.4 (the plate's) and 4.5. It prints with its face on the bed, as the plate does. The rod is 40 long with the small break of 0.3 at its tip, and stands on its tip, as the real rod.
+
+- Push the rod through each hole by hand. It must slide with no force and not rock more than a little.
+- If 4.4 is tight: set `Cradle.rod_fit` to the clearance of the hole that slides (0.25 for 4.5). If 4.4 rocks and 4.3 slides: set it to 0.15.
+- Then press the real button through the plate with the rod: the travel of 2.0 must turn the monitor on and off.
+
 ## Plate 4: joint 1, the fit
 
 | Part | Count | Print box (mm) | Orientation | ABS (g) | Time (h) |

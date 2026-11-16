@@ -253,14 +253,20 @@ def to_bed(shape):
 
 def moved(shape, by):
     """The shape moved by the vector `by`: a translation, or transformGeometry when the translation is not valid
-    (see to_bed)."""
+    (see to_bed), or the translation mended (Shape.fix) when neither is valid. The cut of hand-hold from the skin of
+    2026-11-15 needs the third way: both moves leave a face that is not orientable, and the fix mends it."""
     out = shape.translated(by)
     if out.isValid() or not shape.isValid():
         return out
     import FreeCAD as App
     m = App.Matrix()
     m.move(by)
-    return shape.transformGeometry(m)
+    moved_ = shape.transformGeometry(m)
+    if moved_.isValid():
+        return moved_
+    out = out.copy()          # a mend in place on the translated shape does nothing; on a copy it works
+    out.fix(1e-7, 1e-7, 1e-7)
+    return out
 
 
 # ---------- shrink and warp ----------
@@ -419,6 +425,36 @@ def cone_gauge():
 def cone_plug():
     t, w = 6.0, 14.0
     return fuse([box(0, w, 0, w, 0, t), cone(at=(w / 2, w / 2, t - 0.001))])
+
+
+# ---------- the push rod of the monitor's button (cradle.button_option) ----------
+
+ROD_HOLES = (-0.1, 0.0, 0.1)   # the holes of the block: the hole of the plate (rod + 2 x rod_fit) and 0.1 less and more
+
+
+def rod_block():
+    """A block of the inner frame of the bezel plate, as thick as the frame at the rod's hole (the length of the rod's
+    run through the plate), with three square holes for the rod: the hole of the plate and 0.1 smaller and larger. It
+    prints as the plate does: its face on the bed."""
+    from . import cradle as cr
+    c = cr.Cradle()
+    t, w, pitch = 16.0, 12.0, 12.0
+    holes = [c.rod + 2 * c.rod_fit + k for k in ROD_HOLES]
+    block = box(0, pitch * len(holes), 0, w, 0, t)
+    return block.cut([box(pitch * (i + 0.5) - a / 2, pitch * (i + 0.5) + a / 2, w / 2 - a / 2, w / 2 + a / 2, -1, t + 1) for i, a in enumerate(holes)])
+
+
+def rod_piece():
+    """The rod of 4 x 4 with its small break at the tip, 40 long: it prints standing on its tip, as the real rod."""
+    import Part
+    from . import cradle as cr
+    c = cr.Cradle()
+    rod = box(0, c.rod, 0, c.rod, 0, 40.0)
+    tip = [e for e in rod.Edges if all(v.Point.z < 1e-6 for v in e.Vertexes)]
+    try:
+        return rod.makeFillet(c.small_break, tip)
+    except Part.OCCError:
+        return rod.makeChamfer(c.small_break, tip)
 
 
 # ---------- joint 2: floor tile to floor tile (assembled: seam along x, z up from the table) ----------
@@ -743,6 +779,9 @@ def items() -> list[Item]:
         Item("holes-usb", "holes", "3", usb_plate, "flat, the outer face on the bed"),
         Item("cone-gauge", "cone", "3", cone_gauge, "flat, the sockets open to the top (as the upper floor tile prints)"),
         Item("cone-plug", "cone", "3", cone_plug, "flat, the cone on top (as the lower floor tile prints)"),
+        Item("rod-block", "rod-fit", "3", rod_block, "flat, the face of the plate on the bed (as the bezel plate prints)"),
+        Item("rod", "rod-fit", "3", rod_piece, "standing on its tip, as the real rod",
+             stated=(Stated(0.0, 0.31, "the small break of 0.3 round the tip, at the bed"),)),
     ]
     for c in c1.CLEARANCES:
         out.append(Item(f"joint1-lower-{c1.tag(c)}", "joint1", "4", lambda c=c: c1.lower_half(c), upright + ", the seam at the top",
@@ -989,7 +1028,8 @@ def table(rows: list[dict], layout: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-PROVES = {"shrink": "the shrink of ABS along X and Y of the bed",
+PROVES = {"rod-fit": "the fit of the push rod of 4 x 4 in its hole of 4.4 in the bezel plate, in ABS",
+          "shrink": "the shrink of ABS along X and Y of the bed",
           "warp": "warp in ABS: a tall wall and a long flat strip stay flat",
           "weld": "the solvent weld of ABS on the real joint section",
           "insert": "the hole for the M4 heat-set insert, upright and level",
@@ -1006,7 +1046,7 @@ PROVES = {"shrink": "the shrink of ABS along X and Y of the bed",
           "floor": "the floor sandwich: flat, stiff, its mass and time",
           "finish": "bond, fill, prime and paint: the seam does not show"}
 
-TINT = {"shrink": "#9ec5e8", "warp": "#9ec5e8", "weld": "#f0a0a0", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
+TINT = {"rod-fit": "#c0c0c0", "shrink": "#9ec5e8", "warp": "#9ec5e8", "weld": "#f0a0a0", "insert": "#e8c39e", "holes": "#f0e09a", "cone": "#e3a8c8", "joint1": "#b9dea0",
         "joint2": "#a8d8d0", "joint3": "#c9b8e8", "joint5": "#f2b8a0", "facet45": "white", "cut-in": "white", "hand-hold": "white",
         "edges": "white", "floor": "#d0d0d0", "finish": "#b9dea0"}
 PLATE_PITCH = 280.0
