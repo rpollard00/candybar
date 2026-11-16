@@ -300,6 +300,15 @@ class SimpleLineTest(unittest.TestCase):
         self.assertAlmostEqual(abs(segs[0].turn), 30.0, places=6)
 
 
+class ClosingTest(unittest.TestCase):
+    def test_the_closing_pieces_and_their_seams(self) -> None:
+        self.assertEqual(pieces.closing("brow", "W1"), (True, True))
+        self.assertEqual(pieces.closing("upper rear R", "R5"), (True, True))
+        self.assertEqual(pieces.closing("upper rear L", "R5"), (False, False))
+        self.assertEqual(pieces.closing("middle R", "L1"), (True, False))
+        self.assertEqual(pieces.closing("middle L", "L1"), (False, False))
+
+
 class FloorDataTest(unittest.TestCase):
     """The floor, as data."""
 
@@ -412,6 +421,26 @@ class WholeSetTest(unittest.TestCase):
         used = {s["upper"] for s in fl["lap_screws"]} | {s["lower"] for s in fl["lap_screws"]} | {s["tile"] for s in fl["foot_screws"]}
         self.assertEqual(sorted(used), sorted(tiles))
         self.assertEqual(fl["hardware_in_floor"], [])
+
+    def test_each_closing_piece_has_the_closing_gap_at_its_upright_closing_seams(self) -> None:
+        """The brow and the upper rear R go in last, each into two upright seams at once (docs/blueprint/index.md,
+        "Where each ring closes"): their seam faces stand the closing gap back from the seam plane, flange faces
+        included. No material of the piece is nearer to the plane than that."""
+        from candybar.shell.joints import OTHER_JOINTS
+
+        gap = OTHER_JOINTS.closing_gap
+        done = {c["piece"]: c for c in self.rep["closing"]}
+        self.assertEqual(set(done), {"brow", "upper rear R"})
+        self.assertEqual(done["brow"]["seams"], ["W1"])
+        self.assertEqual(done["upper rear R"]["seams"], ["R3", "R5"])
+        for side in self.res.sides:
+            label = side.cf.seam.split()[0]
+            if not pieces.closing(side.cf.piece, label)[1]:
+                continue
+            with self.subTest(piece=side.cf.piece, seam=side.cf.seam):
+                self.assertGreater(done[side.cf.piece]["removed_mm3"], 0.0)
+                near = pieces.closing_slab(side.cf, gap - 0.02)
+                self.assertLess(self.res.pieces[side.cf.piece].common(near).Volume, 0.05)
 
     def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
         # a head pocket there would cut into the step of the skin behind the lowest cut-in

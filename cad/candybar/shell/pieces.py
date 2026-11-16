@@ -927,12 +927,12 @@ def on_bed(side: Side, up) -> bool:
     return (side.cf.into.x * up[0] + side.cf.into.y * up[1] + side.cf.into.z * up[2]) / n > 0.7
 
 
-def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = None):
+def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = None, clearance: float | None = None):
     """The key and the groove: the sections of joints.py carried along the outer line. The key is on the pilot
     side, as joints.py has it. But a key must not stand on the face that lies on the printer bed (ups: piece ->
     its up direction): then the key goes on the other piece. The key lies on the mating face only; it stops key_gap
     each side of a screw and key_end_margin from the ends of each run. The groove is the key with the clearance on
-    every side."""
+    every side (`clearance`, default the groove clearance of the joint)."""
     from . import joints  # noqa: PLC0415
 
     pair.key, pair.groove = pair.pilot, pair.head
@@ -945,7 +945,7 @@ def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = No
     h = split.KERF / 2
     up = pair.groove.cf.into
     sk = max(pair.key.lines, key=lambda s: s.length)
-    c = j.groove_clearance
+    c = j.groove_clearance if clearance is None else clearance
     key = carry(sk, joints.key_profile(j), up, -h, corners=False)
     groove = carry(sk, joints.groove_profile(j, c), up, h, corners=False)
     key = key.common([f.translated(up * -1.0).extrude(up * 4.0) for f in pair.mate.Faces][0] if len(pair.mate.Faces) == 1
@@ -967,6 +967,14 @@ def key_and_groove(pair: Pair, j: Joint, b: Build = BUILD, ups: dict | None = No
         pair.notes.append("no key: nothing left between the screws and the ends")
         return None, None
     return _fuse_all(keys), _fuse_all(grooves)
+
+
+def key_side_groove_in(pair: Pair, ups: dict | None, closing_pieces: list[str]) -> bool:
+    """Whether the groove of a pair lies in one of the closing pieces (as key_and_groove places the key)."""
+    groove = pair.head
+    if ups and on_bed(pair.pilot, ups[pair.pilot.cf.piece]) and not on_bed(pair.head, ups[pair.head.cf.piece]):
+        groove = pair.pilot
+    return groove.cf.piece in closing_pieces
 
 
 def _fuse_all(shapes: list):
@@ -996,6 +1004,32 @@ def vee(side: Side, j: Joint):
 # (seam, piece) with no flange, and seams with a run for screws but no screw
 NO_FLANGE: tuple = ()
 NO_SCREW: tuple = ("F2",)   # the deck is 72 high: no screwdriver gets behind a screw in the flank break
+# the pieces that close a ring (docs/blueprint/index.md, "Where each ring closes"): each goes in last, into two
+# seams at once. On the seams named here its grooves get the closing gap at each side in place of the groove
+# clearance; and where `face` is true (an upright seam that the piece drops into) its seam face, with the flange
+# face, stands the closing gap back from the seam plane, for a bond that fills a gap (joints.OtherJoints.closing_gap).
+# The second middle piece sits on the level seam L1: its grooves get the gap, its faces do not move.
+CLOSING: dict = {"brow": (("W1",), True), "upper rear R": (("R5", "R3"), True), "middle R": (("L1",), False)}
+
+
+def closing(piece: str, label: str) -> tuple[bool, bool]:
+    """(grooves get the closing gap, the face stands back) for a side of `piece` on the seam `label`."""
+    seams, face = CLOSING.get(piece, ((), False))
+    return (label in seams, label in seams and face)
+
+
+def closing_slab(cf: CutFace, gap: float, reach: float = 20.0):
+    """The layer of a piece that a closing gap takes away at one seam face: the cut face, grown by `reach` in its plane
+    so that it holds the face of the flange too, from the seam plane to `gap` past the face of the piece."""
+    face = cf.face
+    try:
+        big = face.makeOffset2D(reach, join=2)
+        face = big.Faces[0] if big.Faces else face
+    except Exception:  # noqa: BLE001
+        pass
+    return face.translated(cf.into * -0.01).extrude(cf.into * (cf.gap / 2 + gap + 0.01))
+
+
 SKIP = {"DR": "the outline of the rear door: the door and the frame of its opening are another package",
         "R4": "the centre seam of the rear door: the door is another package"}
 
@@ -1121,8 +1155,14 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
                 if r is not None:
                     cut.setdefault(side.cf.piece, []).append(r)
     ups = {p.full: p.up for p in pl.pieces}
+    from .joints import OTHER_JOINTS  # noqa: PLC0415
+    gap = OTHER_JOINTS.closing_gap
+    res.extra["closing"] = []
     for pair in res.pairs:
-        key, groove = key_and_groove(pair, j, b, ups)
+        label = seam_of[pair.a.cf.seam].label
+        wide = [sd.cf.piece for sd in (pair.a, pair.b) if closing(sd.cf.piece, label)[0]]
+        # the groove of a closing piece gets the closing gap; the key stays on the side that joints.py gives it
+        key, groove = key_and_groove(pair, j, b, ups, gap if key_side_groove_in(pair, ups, wide) else None)
         hp, pp = pair.head.cf.piece, pair.pilot.cf.piece
         if key is not None:
             add.setdefault(pair.key.cf.piece, []).append(key)
@@ -1145,9 +1185,16 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
                 for sd in add[name]:
                     out = out.fuse(sd)
                 log(f"pieces: {name}: the fuse of all flanges at once lost volume; fused one at a time")
+        slabs = [closing_slab(sd.cf, gap) for sd in res.sides if sd.cf.piece == name and closing(name, seam_of[sd.cf.seam].label)[1]]
+        if slabs:
+            before = out.Volume
+            out = out.cut(_fuse_all(slabs))
+            res.extra["closing"].append({"piece": name, "seams": sorted({seam_of[sd.cf.seam].label for sd in res.sides if sd.cf.piece == name
+                                                                          and closing(name, seam_of[sd.cf.seam].label)[1]}),
+                                         "gap": gap, "removed_mm3": round(before - out.Volume, 1)})
         if cut.get(name):
             out = out.cut(cut[name])
-        if add.get(name) or cut.get(name):
+        if add.get(name) or cut.get(name) or slabs:
             solids = [s for s in out.Solids if s.Volume > b.debris_mm3]
             if len(solids) == 1:
                 out = solids[0]
@@ -1646,7 +1693,7 @@ def seam_report(res: Result) -> dict:
               "run_mm": round(sum(r[-1][0] - r[0][0] for r in p.runs), 1), "normal": vec(p.head.cf.into),
               "screws": [{"at": vec(sc.at), "along": [round(v, 4) for v in sc.tangent], "free": round(sc.free)} for sc in p.screws], "notes": p.notes} for p in res.pairs]
     return {"sides": [side_row(sd) for sd in res.sides], "feet": [side_row(sd) for sd in res.feet], "ribs": [side_row(sd) for sd in res.ribs],
-            "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {})}
+            "pairs": pairs, "hits": res.hits, "floor": res.extra.get("floor", {}), "closing": res.extra.get("closing", [])}
 
 
 # ---------- the checks of the whole set ----------

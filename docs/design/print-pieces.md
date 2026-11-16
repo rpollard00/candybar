@@ -343,6 +343,18 @@ Date: 2026-11-15. The owner asked that every seam of the 32 pieces closes and st
 
 **What would add a fastener, if the owner wants one.** A foot screw of the nose near each end: the station at x 99.7 is left out today because it is 12 or less from the edge of its tile. Moving the tile seam or the rule of 12 there puts a screw 37 from F1 into the floor, and the floor then holds the bottom of the corner. This changes the floor tiles, so it is not done here.
 
+## The closing gap
+
+Date: 2026-11-15. A piece that closes a ring goes in last, into two seams at once (`docs/blueprint/index.md`, "Where each ring closes"). If the ring shrinks or grows by 1 %, the room for that piece changes by up to 2 mm, so it must not have to fit to the 0.2 of a groove. `pieces.CLOSING` names the three closing pieces:
+
+| Ring | Closing piece | Its seams | What the gap does |
+| --- | --- | --- | --- |
+| The top ring | brow | W1 R, W1 L (upright, x +-106) | The two seam faces of the brow, with the faces of its flanges, stand 0.5 back from the seam plane (0.55 from the plane in all). W1 has no key. |
+| The B1 ring | upper rear R | R5 (x 0), R3 R (x 211.4), both upright | The two seam faces stand 0.5 back. The grooves of both seams are in this piece and have 0.5 at each side. The keys stay on upper rear L and upper R. |
+| The L1 ring | middle R | L1 R, front and rear (level) | The piece lies on level seams, so its faces do not move: only its two grooves have 0.5 at each side. |
+
+The upper rear R is the closing half, not the left one, because then both keys of its seams stand on the other pieces. The faces that move are seam faces: the outer edge of each of these seams has the V of 1.0 that the owner fills, and the gap of 0.5 lies inside it. A thin solvent does not fill 0.5: these seams take a bond that fills a gap (dissolved ABS or a thick cement; `docs/design/print-plan-abs.md`, pair E of the coupons). The build removes 208 mm3 from the brow and 621 mm3 from upper rear R (`seams.json`, "closing"). `test_pieces` holds that no material of a closing piece is nearer to its seam plane than the gap.
+
 ## The edge finish and the face check
 
 Date: 2026-11-15. `tools/edge_finish.py` and `tools/face_check.py` run on `cad/out/pieces`:
@@ -376,7 +388,6 @@ CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.face_check      # 
 - **The hood on the body top** (joint 7) and the other service seams: no top ring, no inserts.
 - **The node plate** (joint 4). The flanges of the three pieces meet at each node, but no plate goes over them.
 - **The cones at the ends of the wall seams** (`OtherJoints.cone_d`). The key locates a seam across the wall and square to the seam. Along the seam, the seams that cross it locate the piece. Only the floor has cones.
-- **The closing gap** of 0.5 for the piece that closes a ring (`OtherJoints.closing_gap`). Every groove has the clearance of 0.2.
 - **The chamfer at the ends of a groove.** The long sides of a groove have the chamfer of 0.3. The ends do not.
 - **More screws on the seams with few.** F1, F2, D1 and R1 have no screw. R2, and each side of R3, of W1 and of L1 in front of the band, have one. Clamps or tape must hold these seams while the bond sets.
 - **A change of the split for the middle pieces.** See "Print": one seam face of each middle piece prints on support.
