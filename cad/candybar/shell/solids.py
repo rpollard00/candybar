@@ -309,6 +309,30 @@ def warped_wire(path: pr.Path, place: Place, flat: Place) -> Part.Wire:
 
 # ---------- deck ----------
 
+LATCH_CORNER = 0.5   # the round in plan of the four corners of the latch button's hole
+
+
+def latch_button_hole(d: Blueprint, deck_solid: Part.Shape, past: float) -> tuple[Part.Shape, float] | None:
+    """The hole of the latch's button in the deck's front face (Blueprint.latch_button_d, 0: none): a round of
+    latch_button_d with two upright flats latch_button_flats apart, along y, from 10 in front of the face to the wall
+    and `past` behind it. Returns the prism and the y of the face beside the hole."""
+    if d.latch_button_d <= 0:
+        return None
+    r, fx, z = d.latch_button_d / 2, d.latch_button_flats / 2, d.latch_button_z
+    line = Part.makeLine(V(r + 2.0, -OVER, z), V(r + 2.0, 100.0, z)).common(deck_solid)
+    y0 = min(v.Point.y for v in line.Vertexes)
+    y1, length = y0 - 10.0, 10.0 + 3.0 + d.wall_t + past
+    cyl = Part.makeCylinder(r, length, V(0, y1, z), V(0, 1, 0))
+    tool = cyl.common(Part.makeBox(2 * fx, length, 2 * r + 2.0, V(-fx, y1, z - r - 1.0)))
+    # the four corners where the flats meet the round are rounded in plan (LATCH_CORNER), so that the rim is one smooth
+    # loop that the edge break can follow; the button (14 with flats 12) keeps its gap of 0.3 there but for about 0.2
+    corners = [e for e in tool.Edges if abs(e.BoundBox.YLength - length) < 1e-6 and e.BoundBox.XLength < 1e-6 and e.BoundBox.ZLength < 1e-6
+               and abs(abs(e.BoundBox.XMin) - fx) < 1e-6]
+    if len(corners) == 4:
+        tool = tool.makeFillet(LATCH_CORNER, corners)
+    return tool, y0
+
+
 def deck(d: Blueprint, log: list[str] | None = None) -> tuple[Part.Shape, Part.Shape]:
     """The deck to the foot of the sweep, with the pocket of the control panel, the base facet round its foot and the
     edge break on the rim of the pocket; and the control panel plate."""
@@ -324,10 +348,22 @@ def deck(d: Blueprint, log: list[str] | None = None) -> tuple[Part.Shape, Part.S
     solid = solid.cut([pocket, panel]).removeSplitter()
     # the facet takes the front edges of the foot; it runs on along the sides, which are tangent to the front corners
     solid = solid.makeChamfer(d.base_facet, floor_edges(solid, lambda p: p.y < ya - 0.01))
-    # the rim of the pocket: the other sharp edges of the deck lie in its joint with the body or under the panel
+    # the hole of the latch's button: a pocket in the form; the cavity opens it through the skin (cavity.openings)
+    hole = latch_button_hole(d, solid, 1.0)
+    if hole is not None:
+        solid = solid.cut(hole[0]).removeSplitter()
+    # the rim of the pocket and the rim of the button's hole: the other sharp edges of the deck lie in its joint with
+    # the body or under the panel
     rim = sharp_edges(solid, d, lambda m: abs(m.z - d.deck_top) < 1e-3 and m.y < ya - 1.0)
     log.append(f"deck, edge break R {d.edge_break:g}: {len(rim)} edges (the rim of the panel pocket)")
-    return break_edges(solid, [e for e, _ in rim], d.edge_break, log, "deck"), panel
+    solid = break_edges(solid, [e for e, _ in rim], d.edge_break, log, "deck")
+    if hole is not None:
+        # the rim of the button's hole: the round of OpenCascade does not build on this solid (7.9.3), so the break
+        # is cut by hand, as on the hood. The four corners of the hole are round in plan (LATCH_CORNER)
+        r = d.latch_button_d / 2 + 0.5
+        edges = [e for e, _ in sharp_edges(solid, d, lambda m: abs(m.x) < r and abs(m.z - d.latch_button_z) < r and m.y < hole[1] + 3.0)]
+        solid = break_by_hand(solid, edges, d.edge_break, log, "deck, the rim of the latch's button")
+    return solid, panel
 
 
 # ---------- edges and rounds ----------
@@ -978,14 +1014,32 @@ def body(d: Blueprint, fr: pr.Front, log: list[str] | None = None) -> Part.Shape
     # the deck, under the bezel plate, in the seam under the hood
     xb = d.bezel_w / 2 + d.panel_gap
     reveal = lambda m: abs(abs(m.x) - xb) < 1e-3 and abs(math.dist((m.y, m.z), fr.rail.c) - fr.rail.r) < 1e-3
-    front = sharp_edges(s, d, lambda m: not behind_band(d, m) and (reveal(m) or (m.z < 1e-3 and m.y > ya + 0.01)))
-    log.append(f"body, edge break R {d.edge_break:g} at the front: {len(front)} edges ({sum(1 for e, _ in front if reveal(middle(e)))} of the rail land "
+    # the rims of the recess at its bottom and its top (the stations bezel_s0 and bezel_s1 of the rail): the printed
+    # plate leaves them open, so they show (2026-11-15). The bottom rim has the break; the top rim does not (below)
+    rims = [fr.on_rail(d, s_, 0.0) for s_ in (d.bezel_s0, d.bezel_s1)]
+    # and at its sides the corner of the plate's seat (x = bezel_w / 2), which the printed plate (plate_fit smaller)
+    # leaves open
+    seat = lambda m: abs(abs(m.x) - d.bezel_w / 2) < 1e-3 and rims[0][1] < m.z < rims[1][1]
+    rim = lambda m: (abs(m.x) < xb + 1.5 and any(math.dist((m.y, m.z), q) < 0.5 for q in rims)) or seat(m)
+    front = sharp_edges(s, d, lambda m: not behind_band(d, m) and (reveal(m) or rim(m) or (m.z < 1e-3 and m.y > ya + 0.01)))
+    # the short edges at the ends of the rims (1 long, where they meet the corner of the seat) stay out: with them the
+    # rounds of the rims and of the rail land meet in faces that fail the strict check
+    front = [(e, k) for e, k in front if not (rim(middle(e)) and e.Length < 2.0)]
+    log.append(f"body, edge break R {d.edge_break:g} at the front: {len(front)} edges ({sum(1 for e, _ in front if rim(middle(e)))} on the rims of the recess, "
+               f"{sum(1 for e, _ in front if reveal(middle(e)))} of the rail land "
                f"along the bezel reveal, {sum(1 for e, _ in front if not reveal(middle(e)))} floor edges of the sides)")
     in_groove = lambda m: m.z > d.body_top - g - 0.5
     listed, crossing = bevel_crossings(listed, in_groove)
     log += [f"body: the edge at {where(e)}, where the seam bevel crosses the round of the head's corner, is not in the round of the edge break"
             for e in crossing]
-    s = break_edges(s, [e for e, _ in listed + front], d.edge_break, log, "body")
+    # the top rim of the recess stays as it is: the round of OpenCascade meets the round of the rail land there in
+    # faces that fail the strict check (7.9.3), and the break by hand leaves narrow faces and short sharp ends where it
+    # meets it. tools/edge_finish.py names it as not finished (the edge finish is a guideline, docs/adr/0007)
+    top = lambda m: abs(m.x) < xb + 1.5 and math.dist((m.y, m.z), rims[1]) < 0.5
+    s = break_edges(s, [e for e, _ in listed + front if not top(middle(e))], d.edge_break, log, "body")
+    # the corner of the plate's seat at the sides of the recess lies 1 from the break of the rail land: R 1 does not
+    # build there, and a break by hand (0.5) left the body not strict-valid with kinks along it. It stays as it is,
+    # named in tools/edge_finish.py as not finished (the edge finish is a guideline, docs/adr/0007)
     # in the seam groove the break of the bevel's mitre ends on the round of the head's corner in a short edge that
     # turns more than edge_break_turn. It lies between two rounds, one of them of the break's own radius: a ball of
     # that radius cannot roll along it. It gets a flat break

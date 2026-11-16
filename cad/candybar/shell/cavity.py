@@ -165,9 +165,9 @@ def same(a: Part.Shape | None, b: Part.Shape | None) -> bool:
     return abs(a.Area - b.Area) < SAME and all(abs(p - q) < SAME for p, q in zip((ba.YMin, ba.YMax, ba.ZMin, ba.ZMax), (bb.YMin, bb.YMax, bb.ZMin, bb.ZMax)))
 
 
-def openings(d: Blueprint, o: Openings) -> list[Part.Shape]:
+def openings(d: Blueprint, o: Openings, parts: dict[str, Part.Shape] | None = None) -> list[Part.Shape]:
     """The skin removed under the control panel and behind the bezel plate, inside their ledges (the bezel's at its
-    top and bottom only)."""
+    top and bottom only), and through the wall at the hole of the latch's button (solids.latch_button_hole)."""
     w = d.wall_t
     z1 = d.panel_top - d.panel_t
     panel = so.prism(so.poly(pr.panel_outline(d, -o.panel_ledge)), so.xy(z1 - w - SLAB), V(0, 0, w + SLAB))
@@ -176,7 +176,12 @@ def openings(d: Blueprint, o: Openings) -> list[Part.Shape]:
     origin, up, into = so.screen_frame(d)
     # the face of the body behind the plate lies screen_t behind the screen face; the opening goes SLAB into the cavity
     bezel = so.slab(origin, up, into, (-bx, bx), (s0, s1), (d.mon_setback, d.mon_setback + d.screen_t + w + SLAB))
-    return [panel, bezel]
+    out = [panel, bezel]
+    if parts is not None and "deck" in parts:
+        hole = so.latch_button_hole(d, parts["deck"], w + SLAB + 5.0)
+        if hole is not None:
+            out.append(hole[0])
+    return out
 
 
 def prisms(region: Part.Shape, x0: float, x1: float) -> list[Part.Shape]:
@@ -228,7 +233,7 @@ def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) 
     if lost:
         raise RuntimeError(f"the cavity has no section for the slabs at x = {', '.join(f'{x:g}' for x in lost)}: the offset by wall_t + RIDGE failed there")
     slabs = stepped
-    cut = openings(d, o)
+    cut = openings(d, o, parts)
     pieces = [p for x0, x1, region, _ in slabs if region is not None for p in prisms(region, x0, x1)] + cut
     walls = []
     for x0, x1, region, face in slabs:

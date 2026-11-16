@@ -42,6 +42,7 @@ import Part
 
 V = FreeCAD.Vector
 MIN_WIDTH = 2.0
+SMALL_BREAKS = (0.5, 0.3)   # the breaks on a small feature or a tight place, where the edge break does not fit (docs/adr/0007)
 NEEDLE_DEG = 12.0
 MAX_EDGES = 4
 KINK_DEG = (1.0, 4.5)
@@ -103,6 +104,10 @@ RUN_OUT = ("hood: the round of the rear corner runs out on the roof, where the s
 KINK = ("hood: the wall of the front opening has a concave kink of 11.5 degrees at each lower corner, where the round of the sill "
         "corner ends upright and the leg starts with its lean (the form of R10). The ball of the edge break turns about that "
         "kink between the break along the corner and the break along the leg")
+LATCH = ("deck: the edge break by hand on the rim of the latch button's hole (solids.deck): at each corner, where a flat of the "
+         "hole meets its round (round in plan, solids.LATCH_CORNER), the lofts of the break meet in a narrow patch, and the face of "
+         "the break is split at the top and the bottom of the hole")
+
 KNOWN: tuple[Known, ...] = (
     Known("body", "sliver", (246.8, 549.8, 305.0), "1.20 wide, 4.2 mm2", HIP_TOP, within=0.5),
     Known("body", "sliver", (246.3, 550.7, 304.9), "0.43 wide, 2.0 mm2", HIP_TOP, within=0.5),
@@ -112,6 +117,10 @@ KNOWN: tuple[Known, ...] = (
     Known("body", "kink", (234.8, 297.6, 200.9), "2.5 degrees along 214.5, below the tuck", RAIL),
     Known("body", "kink", (232.6, 390.2, 357.5), "2.5 degrees along 153.9, in the tuck", RAIL),
     Known("body", "kink", (223.9, 438.2, 422.4), "2.2 degrees along 4.2, in the seam bevel", RAIL),
+    Known("deck", "sliver", (6.7, 0.9, 51.6), "0.46 wide, 0.7 mm2: the patch at the lower corner of the hole", LATCH, within=1.0),
+    Known("deck", "sliver", (6.7, 2.3, 59.2), "0.45 wide, 0.8 mm2: the patch at the upper corner of the hole", LATCH, within=1.0),
+    Known("deck", "split", (0.0, 3.0, 62.9), "the face of the break at the top of the hole, split on the centre line, 1.6 long", LATCH, within=1.0),
+    Known("deck", "split", (0.0, 0.4, 47.9), "the face of the break at the bottom of the hole, split on the centre line, 1.0 long", LATCH, within=1.0),
     Known("hood", "sliver", (181.3, 522.6, 572.9), "0.77 wide, 6.4 mm2: the last face of the round, 1.6 wide where it starts, 10 long", RUN_OUT, within=1.0),
     Known("hood", "needle", (176.5, 520.0, 573.4), "the tip of that face: its two edges meet at 10.7 degrees", RUN_OUT, within=1.0),
     Known("hood", "sliver", (210.5, 447.0, 448.6), "0.08 wide, 0.13 mm2: the face of the break in that turn, 0.21 wide on the front "
@@ -242,7 +251,7 @@ def is_break_surface(face: Part.Face, radius: float, tol: float = 0.02) -> bool:
 
 def behind_break(shape: Part.Shape, f: Part.Face, radius: float) -> bool:
     """Whether a narrow face is the wall of a thin plate behind an edge break: it runs on, tangent, from a face of the
-    break (is_break) along one of its long edges. A plate of 2.4 with a break of R 1 on its front keeps a wall of 1.4
+    break (is_break, of the edge break or of a small break, SMALL_BREAKS) along one of its long edges. A plate of 2.4 with a break of R 1 on its front keeps a wall of 1.4
     round each opening and at its rim."""
     if width(f) < 0.5:
         return False
@@ -252,7 +261,7 @@ def behind_break(shape: Part.Shape, f: Part.Face, radius: float) -> bool:
             continue
         m = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
         for g in shape.ancestorsOfType(e, Part.Face):
-            if g.isSame(f) or not is_break(g, radius):
+            if g.isSame(f) or not (is_break(g, radius) or any(is_break(g, b) for b in SMALL_BREAKS)):
                 continue
             na, nb = (x.normalAt(*x.Surface.parameter(m)) for x in (f, g))
             if math.degrees(math.acos(max(-1.0, min(1.0, abs(na.dot(nb)))))) < 1.0:   # tangent
@@ -278,6 +287,8 @@ def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = (), break_rad
             add("sliver", f.CenterOfMass, f"{type(f.Surface).__name__} {w:.2f} wide, area {f.Area:.1f} mm2", [i + 1])
             if break_radius and is_break(f, break_radius):
                 found[-1].allowed = "edge break"
+            elif break_radius and any(is_break(f, b) for b in SMALL_BREAKS):
+                found[-1].allowed = "small break"
             elif break_radius and behind_break(shape, f, break_radius):
                 found[-1].allowed = "the wall of a thin plate behind its edge break"
         for a, v in corners(f):

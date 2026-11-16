@@ -204,6 +204,12 @@ class Blueprint(Dims):
     rear_round_r: float = 3.0
     edge_min_turn: float = 40.0
     edge_break: float = 1.0
+    # the hole of the button of the control panel's latch (latch B, the push bolt; the owner, 2026-11-15) in the
+    # leaning band of the deck's front face, on the centre line, along the slide of the bolt (y): its diameter (0: no
+    # hole), the distance between its two upright flats, and the height of its centre
+    latch_button_d: float = 14.6
+    latch_button_flats: float = 12.6
+    latch_button_z: float = 55.3
     edge_break_turn: float = 45.5
     # the facet round the foot of the cabinet (deck front and sides, the band's foot, the lower body)
     base_facet: float = 5.0

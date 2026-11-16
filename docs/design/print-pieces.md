@@ -394,6 +394,14 @@ CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.face_check      # 
 - **Edge finish: one finding on each lower piece.** At the lower rim of the bezel recess, x ±199 to ±235, z 133.7, one sharp edge of 66.5 degrees, 35.4 long, between the sill and a flat of 0.2 at the seam L1. The default build has the same rim: its tool hides it because the middle of the long rim lies under the stand-in of the bezel plate, and here the rim is cut at the seam. The stand-in plate stands 1.9 from it. To break the rim changes the outer form, so this unit did not change it. It is open (see the roadmap).
 - **Face check: 3184 findings on the outside faces, not changed.** They are in the faces of the skin, not in its form: 1134 on the underside (z 0, the face on the table), 212 at the seam on the body top, 62 along the line where the deck and the body meet (y 207), and 1776 at other places. The samples of these that were read are at the levels of the slabs of the cavity (z 65, 70, 72), at the cut-ins and at the bezel recess; not all 1776 were read. 2562 are splits (one surface cut into several faces), 248 crowded vertices, 224 slivers, 116 needles and 34 kinks. They do not change the printed form or the fit. The face check of the default build has none of them, because its parts are the outer form, not the skin.
 
+## A trial: merged faces on one piece
+
+Date: 2026-11-16. On `lower_R`, `Shape.removeSplitter()` merges the faces that lie in one surface. It takes 0.2 s. The piece stays one valid, closed solid (226562.7 and 226562.8 mm3). Its faces go from 1263 to 1149, and the findings of the face check on the outside of the shell from 241 to 61: splits 162 to 8, slivers 30 to 15, crowded corners 21 to 14, needles 25 to 22, kinks 3 to 2. It is not applied to the other pieces: the owner decides.
+
+## The hole of the latch's button
+
+Since 2026-11-15 the deck nose has the hole of the button of the control panel's latch (`Blueprint.latch_button_d`): it comes from the skin, so the piece needs nothing of its own. No seam is near (F1 and F2 at x 137).
+
 ## Assumptions
 
 1. The pilot hole of joint 1 is 2.25 (`Joint.pilot_d_pet`). The coupon decides between 2.25 and 2.4.

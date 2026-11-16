@@ -222,7 +222,8 @@ class ShellEdgeFinishTest(unittest.TestCase):
 
     def test_every_named_joint_holds_a_sharp_edge(self) -> None:
         """A list that names a joint with nothing in it is not honest."""
-        used = {(part, g["against"]) for part, r in self.rows.items() if r["class"] == "printed" for g in r["sharp"] if g["against"]}
+        used = {(part, g["against"]) for part, r in self.rows.items() if r["class"] == "printed" for g in r["sharp"]
+                if g["against"] and not g["against"].startswith(ef.NOT_FINISHED)}
         # the joints of this build: a part of it against another part or the seam. The joints of a work package (its
         # parts, and the deck behind the socket plate) are held on its own parts (test_panel_frame, test_cradle,
         # test_socket_plate)
@@ -296,7 +297,15 @@ class ShellEdgeFinishTest(unittest.TestCase):
         self.assertEqual(len(flats), 2, self.log)
 
     def test_the_build_names_no_edge_that_is_still_sharp(self) -> None:
-        self.assertEqual([line for line in self.log if "still sharp" in line or "stays sharp" in line or "stay sharp" in line], [])
+        """But for the places that the edge finish names as not finished, with their reason (docs/adr/0007): each edge
+        that the build leaves sharp lies at one of them."""
+        import re
+
+        sharp = [line for line in self.log if "still sharp" in line or "stays sharp" in line or "stay sharp" in line]
+        for line in sharp:
+            for x, y, z in re.findall(r"\((-?[\d.]+), (-?[\d.]+), (-?[\d.]+)\)", line):
+                with self.subTest(line=line[:80], at=(x, y, z)):
+                    self.assertTrue(ef.not_finished(V(float(x), float(y), float(z)), self.d))
 
     def test_the_provisional_forms_are_listed_as_provisional_and_are_still_sharp(self) -> None:
         """When a form on the hood band gets its design, it leaves this list."""

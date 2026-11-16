@@ -193,12 +193,40 @@ def solid_cut(shapes: list[Part.Shape], axis: int, at: float) -> np.ndarray:
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
 
 
-def compare(solid: np.ndarray, ref: np.ndarray) -> dict:
-    """Largest distance from the solid's cut to the faces' cut and back, with the points that fall in a bridge."""
+def openings(d: Blueprint) -> dict[str, list[tuple[float, float, float, float]]]:
+    """What the build has and the faces of the blueprint do not draw, by plane: boxes in the two other coordinates of
+    the plane. The hole of the latch's button in the deck's front face (Blueprint.latch_button_d): its pocket and its
+    rim, from the front of the deck to 15 into it. The edge break of the rims of the bezel recess at its bottom and
+    its top (2026-11-15): a break of R 1 on an edge of 83 degrees stands about 0.5 off the sharp edge."""
+    out: dict[str, list] = {"X 0": []}
+    if d.latch_button_d > 0:
+        r = d.latch_button_d / 2 + d.edge_break + 0.5
+        out["X 0"].append((-1.0, 15.0, d.latch_button_z - r, d.latch_button_z + r))
+        out["Z deck"] = [(-r, r, -1.0, 15.0)]
+    return out
+
+
+def rims(d: Blueprint) -> list[tuple[float, float, float, float]]:
+    """The rims of the bezel recess at its bottom and its top, in (y, z): boxes for every plane of constant x that
+    crosses the recess (the edge break of the bottom rim, 2026-11-15)."""
+    fr = pr.front(d)
+    out = []
+    for s in (d.bezel_s0, d.bezel_s1):
+        y, z = fr.on_rail(d, s, 0.0)
+        out.append((y - 1.5, y + 1.5, z - 1.5, z + 1.5))
+    return out
+
+
+def compare(solid: np.ndarray, ref: np.ndarray, skip: list | None = None) -> dict:
+    """Largest distance from the solid's cut to the faces' cut and back, with the points that fall in a bridge. Points
+    in a box of `skip` (an opening that the faces do not draw) are left out."""
     pts = sample(solid)
+    keep = lambda p: ~np.any([(p[:, 0] > a0) & (p[:, 0] < a1) & (p[:, 1] > b0) & (p[:, 1] < b1) for a0, a1, b0, b1 in skip], axis=0) if skip else np.ones(len(p), bool)
+    pts = pts[keep(pts)]
     dist = distance(pts, ref)
     covered = bridged(pts, loose_ends(ref))
     ref_pts = sample(ref)
+    ref_pts = ref_pts[keep(ref_pts)]
     back = distance(ref_pts, solid)
     far = dist[~covered]
     at = lambda p, k: [round(float(v), 1) for v in p[int(np.argmax(k))]] if len(k) else []
@@ -284,7 +312,8 @@ def run(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     shapes = skins(parts)
     sections = {}
     for name, (axis, at) in planes(d).items():
-        sections[name] = {"at": round(at, 2), **compare(solid_cut(shapes, axis, at), face_cut(faces, axis, at))}
+        skip = openings(d).get(name, []) + (rims(d) if axis == 0 and abs(at) < d.bezel_w / 2 else [])
+        sections[name] = {"at": round(at, 2), **compare(solid_cut(shapes, axis, at), face_cut(faces, axis, at), skip)}
     sil = silhouettes(parts, faces)
     over = lambda r: max(r["solid_to_blueprint"], r["blueprint_to_solid"]) > TOL
     ok = (all(s["valid"] and s["solids"] == 1 and s["closed"] and s["check"] and s["volume_mm3"] > 0 for s in state.values())

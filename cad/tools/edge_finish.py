@@ -30,6 +30,7 @@ does not hold:
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections import defaultdict
 
@@ -42,6 +43,7 @@ from candybar.shell import hood_band as hb
 from candybar.shell import joints as jt
 from candybar.shell import mounts as mt
 from candybar.shell import panel_frame as pf
+from candybar.shell import profiles as pr
 from candybar.shell import socket_plate as spm
 from candybar.shell import solids as so
 from candybar.shell import split
@@ -120,6 +122,18 @@ def shell_parts() -> dict[str, Part.Shape]:
     return _FORM
 
 
+_PLATE: list[Part.Shape] = []
+
+
+def real_bezel() -> Part.Shape:
+    """The printed bezel plate of the cradle (cradle.bezel_plate), which the owner chose: the cover of the recess. The
+    plate of the default build is a stand-in, and a stand-in must not hide an edge (2026-11-15: it hid the rims of
+    the recess, which the printed plate leaves open by panel_gap)."""
+    if not _PLATE:
+        _PLATE.append(cr.bezel_plate(Blueprint(), cr.Cradle()))
+    return _PLATE[0]
+
+
 def outer_form() -> dict[str, Part.Shape]:
     """The outer solids of the default build: the outside of the shell."""
     return {k: shell_parts()[k] for k in SHELL_FORM}
@@ -134,7 +148,6 @@ JOINTS = {
     ("deck", "body"): "The deck and the body meet on the plane at the foot of the sweep. They are one bonded shell.",
     ("deck", "control_panel"): "The pocket of the control panel, under the panel.",
     ("body", "deck"): "The deck and the body meet on the plane at the foot of the sweep. They are one bonded shell.",
-    ("body", "bezel"): "The recess and the reveal of the bezel plate, under and beside the plate.",
     ("body", "screen"): "The window of the form behind the bezel plate, where the monitor lies. The screen of the build is a "
                         "plate of 1 mm for the renders.",
     # the control panel (docs/design/control-panel.md): its covers (panel_frame.covers) and the bonded seam of its tiles
@@ -196,7 +209,7 @@ def covers_of(name: str, parts: dict[str, Part.Shape], d: Blueprint, entry: dict
     if name in WALLS:
         # survey uses on_skin first: a face of a piece shows only on the outer form, and there only where no part of
         # the default build lies on it
-        return ({**{k: shell_parts()[k] for k in SHELL_COVERS},
+        return ({**{k: (real_bezel() if k == "bezel" else shell_parts()[k]) for k in SHELL_COVERS},
                  **{f"{PIECE_OF}{k}": s for k, s in parts.items() if k in PIECES and k != name}}, (), {})
     if entry and "to_cabinet" in entry:
         back = V(*entry["to_cabinet"])
@@ -207,7 +220,8 @@ def covers_of(name: str, parts: dict[str, Part.Shape], d: Blueprint, entry: dict
         return others, (), {k: REST_OF_SHELL for k in others}
     if entry and entry.get("coupon") in cp.CONTROL:
         return {"untested": cp.untested(entry["coupon"]).translated(V(*entry["offset"]))}, (), {"untested": UNTESTED}
-    others = {k: s for k, s in parts.items() if k != name}
+    # the plate of the default build is a stand-in: the printed plate of the cradle covers in its place
+    others = {k: (real_bezel() if k == "bezel" and name != "bezel" else s) for k, s in parts.items() if k != name}
     if "socket_plate" in parts and name in ("socket_plate", "deck"):
         # the inside of the shell behind the socket plate (socket_plate.inside_covers)
         others.update(spm.inside_covers(spm.SocketPlate(), d)[name])
@@ -374,6 +388,25 @@ def piece_face(f: Part.Face, covers: dict[str, Part.Shape], d: Blueprint) -> str
     return ""
 
 
+NOT_FINISHED = "not finished: "   # a named place that the edge finish leaves as it is, with its reason (docs/adr/0007)
+
+
+def not_finished(m: FreeCAD.Vector, d: Blueprint) -> str:
+    """The reason when a sharp edge of the body (or of a print piece of the body) at m is a place that the edge finish
+    names and leaves as it is (the edge finish is a guideline, docs/adr/0007), or ""."""
+    fr = pr.front(d)
+    xb = d.bezel_w / 2 + d.panel_gap
+    y0, z0 = fr.on_rail(d, d.bezel_s0, 0.0)
+    y1, z1 = fr.on_rail(d, d.bezel_s1, 0.0)
+    if abs(abs(m.x) - d.bezel_w / 2) < 0.05 and z0 < m.z < z1:
+        return (NOT_FINISHED + "the corner of the plate's seat at the side of the bezel recess, 1 from the break of the rail "
+                "land: R 1 does not build there, and a break of 0.5 by hand left the body failing its strict check")
+    if abs(m.x) < xb + 1.5 and math.dist((m.y, m.z), (y1, z1)) < 0.6:
+        return (NOT_FINISHED + "the top rim of the bezel recess: R 1 meets the round of the rail land in faces that fail the strict "
+                "check, and a break by hand leaves narrow faces and short sharp ends there")
+    return ""
+
+
 def edge_turn(e: Part.Edge, fs: list[Part.Face], m: FreeCAD.Vector) -> tuple[bool, float]:
     """solids.edge_turn with the two faces of the edge given. It is here and not in solids.py because the source of
     solids.py is a part of the fingerprint of the skin cache (split.fingerprint)."""
@@ -434,6 +467,8 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint, meta: dict | None = None)
                 hidden = [k for k in UNDER[name] if k in parts and parts[k].distToShape(Part.Vertex(m))[0] < spm.COVER][:1]
             if not hidden and control is not None and control.distToShape(Part.Vertex(m))[0] < 0.05:
                 hidden = [CONTROL_EDGE]
+            if not hidden and (name == "body" or name in WALLS):
+                hidden = [r] if (r := not_finished(m, d)) else []
             if band is not None and not any((entry.get("coupon", name), h) in JOINTS for h in hidden) \
                     and (hb.in_joint(shape, e, band[0]) or not band[1].shows(m, hb.edge_out(shape, e))):
                 hidden = [HOOD_BAND]   # the band's own rule, where no named joint holds the edge
@@ -464,10 +499,12 @@ def failures(rows: dict) -> list[str]:
             continue
         for g in r["sharp"]:
             if not g["against"] and r.get("open"):
-                continue   # an open item of the build for the owner (the manifest's "open"): the table lists it
+                continue   # not finished, named with its reason in the manifest ("open"): the table lists it
             if not g["against"]:
                 out.append(f"{part}, {g['zone']}: {g['edges']} sharp edges show ({g['length']} mm, {g['turn'][0]:g} to {g['turn'][1]:g} degrees), "
                            f"the longest at {tuple(g['at'][0])}")
+            elif g["against"].startswith(NOT_FINISHED):
+                continue   # a named place that the edge finish leaves as it is: the table lists it
             elif (r.get("joint_name", part), g["against"]) not in JOINTS:
                 out.append(f"{part}, {g['zone']}: {g['edges']} sharp edges lie against {g['against']}, which is not a named joint")
     return out
@@ -475,6 +512,8 @@ def failures(rows: dict) -> list[str]:
 
 def shows(part_class: str, joint: str) -> str:
     """How a group of sharp edges reads in the list."""
+    if joint.startswith(NOT_FINISHED):
+        return joint
     if joint:
         return f"in a joint: against {joint}"
     return {"printed": "outside", "cut plate": "outside (a cut plate)", "provisional, not finished": "provisional, not finished",
@@ -486,7 +525,10 @@ def table(rows: dict, d: Blueprint) -> str:
 
     def verdict(part: str, r: dict) -> str:
         if r["class"] in HELD:
-            return "finished" if not count(r, False) else ("OPEN (see below)" if r.get("open") else "NOT FINISHED")
+            named = any(g["against"].startswith(NOT_FINISHED) for g in r["sharp"])
+            if count(r, False):
+                return "not finished, named (see below)" if r.get("open") else "NOT FINISHED"
+            return "finished but for named places (see the list)" if named else "finished"
         return r["class"] or "IN NO CLASS"
 
     lines = ["# Edge finish of the shell", "",
@@ -505,11 +547,12 @@ def table(rows: dict, d: Blueprint) -> str:
     lines += ["", "The parts that are not printed and painted parts of the exterior:", ""]
     lines += [f"- `{part}`: {why}" for group in (CUT_PLATES, PROVISIONAL, NOT_DECIDED, INSIDE, BOUGHT) for part, why in group.items() if part in rows]
     lines += ["", "The joints in which a sharp edge of a printed part lies:", ""]
-    used = sorted({(r.get("joint_name", part), g["against"]) for part, r in rows.items() if r["class"] in HELD for g in r["sharp"] if g["against"]})
+    used = sorted({(r.get("joint_name", part), g["against"]) for part, r in rows.items() if r["class"] in HELD for g in r["sharp"]
+                   if g["against"] and not g["against"].startswith(NOT_FINISHED)})
     lines += [f"- `{part}` against {joint}: {JOINTS.get((part, joint), 'NOT A NAMED JOINT')}" for part, joint in used]
     held = sorted({r["open"] for r in rows.values() if r.get("open")})
     if held:
-        lines += ["", "Open items for the owner (sharp edges that show, listed and not failed):", ""]
+        lines += ["", "Not finished, named with the reason (sharp edges that show, listed and not failed; the edge finish is a guideline):", ""]
         lines += [f"- {', '.join(f'`{p}`' for p, r in rows.items() if r.get('open') == o)}: {o}" for o in held]
     bad = failures(rows)
     lines += ["", "The edge rule holds: no printed part has a sharp edge that shows." if not bad else "The edge rule does NOT hold:", ""]
