@@ -407,10 +407,10 @@ cad/test.sh test_panel_latch                                                    
 
 ## Where this was built
 
-The latch was built and tested on the server pal9000 (OpenCascade 7.8.1). The laptop (OpenCascade 7.9.3) is the reference and must build it again before a merge.
+The latch was built and tested on the server (OpenCascade 7.8.1). The laptop (OpenCascade 7.9.3) is the reference and must build it again before a merge.
 
-- The default build of the shell does not complete on pal9000: it stops at the edge break of the hood. The study uses the parts and the cached skin that the laptop built (`cad/out/shell-rev7`). The outer form has not changed since then.
-- The edge break of the button, of the rims of the finger hole and of the cam heads tries R 1. For the button and the cam heads a smaller round is the fall-back if R 1 fails. On pal9000, R 1 worked on each part. If the laptop needs the smaller round, the face check reports the break faces, and the test `test_no_check_fails` fails.
+- The default build of the shell does not complete on the server: it stops at the edge break of the hood. The study uses the parts and the cached skin that the laptop built (`cad/out/shell-rev7`). The outer form has not changed since then.
+- The edge break of the button, of the rims of the finger hole and of the cam heads tries R 1. For the button and the cam heads a smaller round is the fall-back if R 1 fails. On the server, R 1 worked on each part. If the laptop needs the smaller round, the face check reports the break faces, and the test `test_no_check_fails` fails.
 - No other part of the code depends on the kernel.
 
 ## Assumptions
