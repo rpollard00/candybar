@@ -214,20 +214,23 @@ class VariantsTest(unittest.TestCase):
 
     def test_the_parts_that_show_have_the_edge_break_and_the_hole_grille_is_an_open_item(self) -> None:
         """The edge rule holds on each part that shows (hood_band.SHOWN), the black grille and the translucent marquee
-        front among them: their front edges have the break. The field of holes (variant A) has webs too narrow for the
-        break, and the rear rims of the upright slots (variant C) show through the slots: these are open items for the
-        owner (hood_band.open_edges), and only the grille holds them."""
+        front among them: their front edges have the break. The rims of the holes of grille A (webs of 1.4) and the rear
+        rims of the slots of grille C have the small break of 0.3; a place where it does not build is listed as not
+        finished (hood_band.open_edges)."""
         for key, v in hb.VARIANTS.items():
             rep = checked(key)
             with self.subTest(variant=key):
                 self.assertEqual(rep["sharp_edges_that_show"], [])
                 held = {e["part"] for e in rep["sharp_edges_open"]}
                 self.assertEqual(held, set(hb.open_edges(v)))
-                self.assertEqual(held, {"grille_right", "grille_left"} if v.grille in ("holes", "upright slots") else set())
-                self.assertEqual(len(rep["open"]), 1 if held else 0)
+                self.assertEqual(held, set())     # the small breaks of grilles A and C build
+                self.assertEqual(rep["open"], [])
                 for name in ("grille_right", "marquee_front_right"):
                     breaks = [f for f in built(key)[name].Faces if fc.is_break(f, Blueprint().edge_break)]
-                    self.assertEqual(bool(breaks), not (name.startswith("grille") and v.grille == "holes"), (key, name))
+                    self.assertTrue(breaks, (key, name))
+                    if name.startswith("grille") and v.grille in ("holes", "upright slots"):
+                        small = [f for f in built(key)[name].Faces if fc.is_break(f, hb.Band().small_break)]
+                        self.assertTrue(small, (key, name))
                     self.assertTrue(built(key)[name].isValid(), (key, name))
 
     def test_the_tools_of_the_shell_pass_on_each_variant(self) -> None:

@@ -94,6 +94,7 @@ class Band:
     wall_t: float = 4.0
     seat_off: float = 0.1           # inside parts stand this far behind the wall, as in the fit study (every second slab of the skin is 0.05 thicker)
     edge_break: float = 1.0
+    small_break: float = 0.3        # on the rims of the holes of grille A and on the rear rims of the slots of grille C
     # --- speakers ---
     spk_half_h: float = 27.0        # half the height of the speaker opening (54: the frame of 51.8 and its pocket pass it)
     spk_w: float = 64.0             # width of the straight opening (variants A and C)
@@ -526,12 +527,39 @@ def grille(b: Band, v: Variant, pl: Places) -> Part.Shape:
         solid = solid.removeSplitter()
     cutters = grille_cutters(b, v, pl, y0 - 1, y1 + 0.001) + [hole(x, z, b.screw_hole, y0 - 1, y_frame + 1) for x, z in screws(pl, b)]
     solid = one(solid.cut(cutters), "the grille")
-    if v.grille == "holes":
-        return solid   # the webs are too narrow for the edge break: OPEN_EDGES
-    # the front face shows: each edge on it (the rim of the plate, the mouth of each slot) has the break. The mouth of a
-    # screw hole lies under the head of its screw (grille_screws), and the bar between two slots leaves no room for it
+    # the front face shows: the rim of the plate and the mouth of each slot have the edge break of edge_break. The
+    # holes of grille A leave webs of 1.4, so their rims have the small break (small_break). The mouth of a screw hole
+    # lies under the head of its screw (grille_screws), and the bar between two slots leaves no room for a break there
     off_screws = lambda p: all(math.hypot(p.x - x, p.z - z) > b.screw_hole / 2 + 0.01 for x, z in screws(pl, b))
-    return rounded(solid, b.edge_break, lambda p: abs(p.y - y0) < 1e-6 and off_screws(p), "the edge break of the grille's front")
+    front = lambda p: abs(p.y - y0) < 1e-6 and off_screws(p)
+    in_field = lambda p: abs(p.x - pl.cx) < b.field_half_w + 0.5 and abs(p.z - pl.zc) < b.spk_half_h - 1.0
+    # the rear rims of the holes and of the upright slots show through them (the room behind the grille is open)
+    rear = lambda p: abs(p.y - y1) < 1e-6 and off_screws(p) and in_field(p)
+    if v.grille == "holes":
+        solid = rounded(solid, b.edge_break, lambda p: front(p) and not in_field(p), "the edge break of the grille's rim")
+        solid = small_round(solid, b.small_break, lambda p: front(p) and in_field(p), "the small break of the holes of the grille")
+        return small_round(solid, b.small_break, rear, "the small break of the rear rims of the holes")
+    solid = rounded(solid, b.edge_break, front, "the edge break of the grille's front")
+    if v.grille == "upright slots":
+        solid = small_round(solid, b.small_break, rear, "the small break of the rear rims of the slots")
+    return solid
+
+
+def small_round(solid: Part.Shape, r: float, test, what: str) -> Part.Shape:
+    """The small break on the edges whose middle and ends pass the test: a round of r, or a chamfer of r when the round
+    does not build. It is left out (the edges stay as they are) when neither builds as one valid solid."""
+    edges = [e for e in solid.Edges if not e.Degenerated and all(test(p) for p in (so.middle(e), *[v.Point for v in e.Vertexes]))]
+    if not edges:
+        return solid
+    for make in (lambda: solid.makeFillet(r, edges), lambda: solid.makeChamfer(r, edges)):
+        try:
+            out = make()
+            if out.isValid() and len(out.Solids) == 1:
+                return out.Solids[0]
+        except Part.OCCError:
+            pass
+    SMALL_LEFT.append(what)
+    return solid
 
 
 def grille_screws(b: Band, pl: Places) -> dict[str, Part.Shape]:
@@ -858,18 +886,16 @@ def in_joint(shape: Part.Shape, e: Part.Edge, others: list[Part.Shape]) -> bool:
 SHOWN = ("painted", "black", "translucent", "plate")   # the classes of the parts that show: the edge rule holds on them
 
 
+SMALL_LEFT: list[str] = []   # the small breaks that did not build in this run (small_round)
+
+
 def open_edges(v: Variant) -> dict[str, str]:
-    """The parts of a variant whose sharp edges that show are an open item for the owner, not a fault of the build."""
-    if v.grille == "holes":
-        why = ("OPEN: the field of holes (3.8 at a pitch of 5.2) leaves webs of 1.4 on the front, and the edge break of R 1 "
-               "needs 2 on each web. The owner chooses: larger holes at a larger pitch (6 at 9 keeps 40% open), slots, or "
-               "sharp hole rims on a black part (docs/design/hood-band.md).")
-    elif v.grille == "upright slots":
-        why = ("OPEN: the rear rims of the upright slots show through the slots, because the frame leaves the room behind "
-               "the grille open. A break on the rear face too leaves 0.4 of wall in a grille of 2.4. The owner chooses: a "
-               "grille of 3.4 with a break on both faces, or sharp rear rims on a black part (docs/design/hood-band.md).")
-    else:
+    """The parts of a variant whose sharp edges that show are not finished, with the reason: a small break that did
+    not build (SMALL_LEFT). The edge finish is a guideline (docs/adr/0007): such a place is listed, not failed."""
+    left = [w for w in SMALL_LEFT if "grille" in w]
+    if not left or v.grille not in ("holes", "upright slots"):
         return {}
+    why = f"not finished: {'; '.join(sorted(set(left)))} did not build, and the rims stay as they are"
     return {f"grille_{s}": why for s in ("right", "left")}
 
 

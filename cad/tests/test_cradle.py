@@ -339,7 +339,7 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertAlmostEqual(off["bezel_plate"].Volume, p["bezel_plate_no_button"].Volume, places=3)
 
     def test_the_rim_of_the_rod_hole_and_the_rod_tip_have_the_small_break(self) -> None:
-        """A feature too small for R 1 gets the small break of 0.3 (the provisional rule for small features): no convex
+        """A feature too small for R 1 gets the small break of 0.3 (the edge finish is a guideline, docs/adr/0007): no convex
         edge in front of the face of the plate turns more than edge_break_turn, and the mark on the face is the hole
         of 4.4 with the break on each side, 5.0 across."""
         from candybar.shell import solids as so

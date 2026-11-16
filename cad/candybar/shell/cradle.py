@@ -166,7 +166,7 @@ class Cradle:
     # mark (2026-11-15): it is in the default. False gives the plain plate, for a monitor with no button on that edge
     push_rod: bool = True
     # the break on a feature too small for the edge break of R 1: the rim of the rod's hole and the rod's tip
-    # (a provisional rule for small features, pending the owner's word; docs/roadmap.md, the edge rule)
+    # (the edge finish is a guideline: a small feature gets a small break; docs/adr/0007)
     small_break: float = 0.3
     rod: float = 4.0                                    # the rod is square
     rod_fit: float = 0.2                                # clearance on each side of the rod and of the striker
@@ -1028,7 +1028,7 @@ def face_known(d: Blueprint, part: str, rule: str, at: tuple[float, float, float
         xb, vb = sockets(d, c, PRESENT)["power button"]
         if abs(x - c.rod_x) < c.rod / 2 + c.rod_fit + 1.0 and abs(v - vb) < c.rod / 2 + c.rod_fit + 1.0 and (part == "button_rod" or t < f.t0):
             return ("the small break of 0.3 at the rod's hole or on the rod's tip: a feature too small for the edge break of R 1 "
-                    "(the provisional rule for small features)")
+                    "(the edge finish is a guideline: docs/adr/0007)")
         if part == "button_rod" and rule == "sliver" and f.t0 - 0.01 < t < f.t0 + c.collar_t + 0.01:
             return "a side face of the rod's collar: the collar is collar_t (1.0) thick by design"
     if part == "button_guide" and rule == "sliver" and "Plane" in detail:

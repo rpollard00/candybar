@@ -147,7 +147,7 @@ The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With 
 
 `hood_band.check` does these checks on each variant and writes `check.md` and `report.json` into the folder of the variant.
 
-- **Edge rule.** The rule holds on each part that shows (`hood_band.SHOWN`): the painted parts (the hood, the lip, the pods and the logo field), the black grilles, the translucent marquee front and the badge. A convex edge that turns more than 45.5 degrees and has no round fails when it shows. An edge does not show when it lies in a joint, or when five rays from it toward the player all meet a part. The sharp edges of a part in `hood_band.open_edges` are an open item for the owner: they are listed and do not fail.
+- **Edge rule.** The rule holds on each part that shows (`hood_band.SHOWN`): the painted parts (the hood, the lip, the pods and the logo field), the black grilles, the translucent marquee front and the badge. A convex edge that turns more than 45.5 degrees and has no round fails when it shows. An edge does not show when it lies in a joint, or when five rays from it toward the player all meet a part. A small break that does not build is named in `hood_band.open_edges` as not finished: it is listed and does not fail.
 - **Face check.** `tools/face_check.py` on each part that shows, with the reveals and the known items of the shell. A finding fails when it shows.
 - **Room.** No inside part and no hardware envelope shares volume with another one or with the skin of the hood.
 - **Open area.** The holes or slots of the grille, inside the circle of the cone, are 40% of that circle or more.
@@ -156,7 +156,7 @@ The front round of a pod is R 2. The blueprint gives R 4 for the stand-in. With 
 | Check | A | B | C |
 | --- | --- | --- | --- |
 | Sharp edges that show, on the parts that show | 0 | 0 | 0 |
-| Sharp edges that are an open item for the owner | the hole grille | 0 | the rear rims of the slots |
+| Sharp edges that are not finished (named) | 0 | 0 | 0 |
 | Face-check findings that show | 0 | 0 | 0 |
 | Face-check findings that do not show | 4 | 4 | 4 |
 | Inside parts or hardware that share volume | 0 | 0 | 0 |
@@ -256,8 +256,6 @@ What the studies do not have:
 5. The lip is 4.5 proud, 0.5 less than the stand-in. Accept?
 6. Two black screw heads show on each grille. Accept, or a snap fit?
 7. Variant B: accept a support in the speaker opening of the hood side?
-8. The hole grille of band A: its webs (1.4) are too narrow for the edge break of R 1. Larger holes at a larger pitch (6 at 9 keeps 40 % open), slots, or sharp hole rims on a black part?
-9. The upright slots of band C: their rear rims show through the slots. A grille of 3.4 with a break on both faces, or sharp rear rims on a black part?
 
 ## 11. Not done
 
@@ -304,14 +302,15 @@ Date: 2026-11-15. The edge rule of the roadmap holds on each face that shows on 
 - **Screw heads.** The two screws of each grille are now in the build as bought parts (`grille_screw_inner_*`, `grille_screw_outer_*`): an M3 button head of 5.7 x 1.65 (ISO 7380, ESTIMATED: the screw is not bought). They cover the mouths of the screw holes.
 - **Marquee front.** Each edge of its front face has the break, before the split into the two halves, so that the halves agree at the lap. The rim behind the break is 1.2 (the front is 2.2 thick, for the groove of the lip).
 - **Badge.** Each edge of its front face has the break.
-- **Grille, holes (A).** No change. The webs are 1.4 on the front, and two breaks need 2. It is an open item (question 8).
-- **Grille, upright slots (C).** The front has the break. The rear rims show through the slots, because the frame leaves the room behind the grille open. It is an open item (question 9).
+- **Grille, holes (A).** The pattern stays (3.8 at a pitch of 5.2). The rim of the plate has the break of R 1, and the rims of the holes, front and rear, a small break of 0.3: the webs are 1.4, and the rear rims show through the holes.
+- **Grille, upright slots (C).** The front has the break of R 1. The rear rims show through the slots, because the frame leaves the room behind the grille open: they have a small break of 0.3.
+- **Outcome (2026-11-15).** The two grille questions are closed without the owner: the edge finish is a guideline (decision record 0007), and a small feature gets a small break.
 
 `tools/face_check.py` now allows a narrow face that runs on, tangent, from a face of the edge break: the wall of a thin plate behind its break (1.4 in a grille of 2.4, 1.2 in the marquee front and the badge). It is listed as allowed with that reason.
 
 | Tool | A | B | C |
 | --- | --- | --- | --- |
-| `hood_band` checks | PASS, 1 open item | PASS | PASS, 1 open item |
-| `tools/edge_finish.py` | holds, 1 open item | holds | holds, 1 open item |
+| `hood_band` checks | PASS | PASS | PASS |
+| `tools/edge_finish.py` | holds | holds | holds |
 | `tools/face_check.py` | PASS | PASS | PASS |
 
