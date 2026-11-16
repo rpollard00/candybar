@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compose_sheet import font  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCENES = ("way-1", "way-2", "places")
+SCENES = ("way-1", "way-2", "places", "built")
 VIEWS = {"plan": "From above, cut at z {cut_z:g} (above the adapter)", "open": "In perspective from the rear right, the duct cut open"}
 
 
@@ -64,10 +64,19 @@ def legend(n: dict) -> dict[str, tuple[str, list[str], list[tuple[str, str]]]]:
             f"z {n['fan_space_top_z']:g} and do not cross the clear space over the PSU fan. Only the duct body changes.",
             f"The present notch (the open cut in the lower side wall, under the green mark, {n['present_notch'][1] - n['present_notch'][0]:g} wide) opens down into that space.",
         ], [("#e08a2a", "A"), ("#3a78c8", "B"), ("#2aa84a", "C (recommended)"), ("#d04040", "edge of the clear space over the PSU fan (z 121)")]),
+        "built": ("Way 1 as built: the adapter in the board's socket, the plug through the end wall", [
+            "The opening of the end wall is 25 x 14.5 (the plug, about 21 x 12, ESTIMATED, with 2 at each side); a pad of closed-cell foam, 3 thick,",
+            "cut to the plug, closes it (blue). Without the pad 1.1 cm2 is open round the plug. A plug 3 deeper or less in the socket still passes.",
+            "In: tray with the board and the duct; adapter into the socket from the door's side; HDMI plug through the opening; pad; lead to the",
+            "left channel (about 205 and 100 of slack: a lead of 0.5 m); door last. Out: the door comes off with nothing unplugged.",
+            "The compute module: door off, plug out (back through the opening, with the pad), adapter out, then the tray.",
+            "The lead after the plug is drawn as a schematic route; it is not checked against the tray, the dock or the leads there.",
+        ], [("#1f4e9c", "adapter"), ("#202020", "HDMI plug and lead"), ("#3a78c8", "foam pad"), ("#b9783a", "exhaust duct"), ("#7d8fa8", "cable channel of the cradle")]),
     }
 
 
-CAPTION = {"way-2": {"open": "From the left, the side wall left out: the adapter, the lead and its socket"}}
+CAPTION = {"way-2": {"open": "From the left, the side wall left out: the adapter, the lead and its socket"},
+           "built": {"open": "From the rear left, the side wall left out: the opening, the pad and the lead"}}
 
 
 def sheet(out: str, scene: str, n: dict, title: str, lines: list[str], keys: list[tuple[str, str]], name: str) -> str:

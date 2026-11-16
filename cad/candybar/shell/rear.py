@@ -159,6 +159,24 @@ class Rear:
     duct_floor_gap: float = 0.3  # the duct's floor to the edge of the board
     cable_notch: tuple[float, float, float] = (-45.0, -5.0, 16.0)  # in the lower wall of the duct: x' from, to, and its height
     cable_notch_cut: float = 10.0  # its two upper corners are cut 45 degrees: the head bridges 20 on the printer
+    # the DisplayPort to HDMI adapter straight in the board's socket (way 1, the owner's choice of 2026-11-15): the
+    # socket in the datum of the board (x' from, to; y' from, to; z' from, to; hardware-envelopes.md, Connectors; its
+    # depth ESTIMATED), how far a plug goes in (ESTIMATED: 8 to 10), and the adapter (measured: length, width, thickness)
+    dp_socket: tuple[float, float, float, float, float, float] = (-1.5, 14.0, 48.61, 66.40, 0.0, 10.96)
+    dp_in: float = 9.0
+    dp_adapter: tuple[float, float, float] = (52.43, 19.88, 9.84)
+    # the right-angle HDMI plug beyond the adapter's face: length, width (along the adapter's width), thickness
+    # (ESTIMATED: the lead is not bought)
+    hdmi_plug: tuple[float, float, float] = (14.0, 21.0, 12.0)
+    # the opening of the end wall for the plug: across (along the adapter's width) and high (along its thickness),
+    # from hdmi_relief below the top of the duct's floor; it passes the plug with 2 at its sides and the adapter's
+    # body if the plug goes 3 deeper than dp_in. The floor has a relief hdmi_relief deep under the plug, from the end
+    # wall hdmi_relief_x into the duct
+    hdmi_open: P2 = (25.0, 14.5)
+    hdmi_relief: float = 1.0
+    hdmi_relief_x: float = 8.0
+    hdmi_seal_t: float = 3.0       # the seal: a pad of closed-cell foam on the outside of the end wall, cut to the plug
+    hdmi_seal_rim: float = 5.0     # it reaches this far beyond the opening on each side
 
     @property
     def pitch(self) -> float:
@@ -597,7 +615,49 @@ def duct_body(r: Rear, p: Place) -> Part.Shape:
     c = r.cable_notch_cut
     notch = [(nx0, 0.0), (nx1, 0.0), (nx1, nh - c), (nx1 - c, nh), (nx0 + c, nh), (nx0, nh - c)]
     face = Part.Face(Part.makePolygon([V(p.x(x), p.y(z), p.z(k["y0"] - PAST)) for x, z in [*notch, notch[0]]]))
-    return body.cut(face.extrude(V(0, 0, t + 2 * PAST)))
+    body = body.cut(face.extrude(V(0, 0, t + 2 * PAST)))
+    # the opening of the end wall for the HDMI plug (way 1), and the relief of the floor under the plug
+    return body.cut(hdmi_cuts(r, p))
+
+
+def socket_axis(r: Rear) -> tuple[float, float]:
+    """(y', z') of the axis of the board's DisplayPort socket, in the datum of the board."""
+    s = r.dp_socket
+    return (s[2] + s[3]) / 2, (s[4] + s[5]) / 2
+
+
+def hdmi_cuts(r: Rear, p: Place) -> list[Part.Shape]:
+    """The opening of the duct's end wall for the HDMI plug and the relief of the floor under it."""
+    k, t = duct_lines(r, p), r.shell_t
+    yc, _ = socket_axis(r)
+    w, h = r.hdmi_open
+    opening = p.box(k["x0"] - PAST, k["x0"] + t + PAST, yc - w / 2, yc + w / 2, -r.hdmi_relief, h - r.hdmi_relief)
+    relief = p.box(k["x0"] + t - PAST, k["x0"] + t + r.hdmi_relief_x, yc - w / 2, yc + w / 2, -r.hdmi_relief, PAST)
+    return [opening, relief]
+
+
+def adapter_parts(r: Rear, p: Place, deeper: float = 0.0) -> dict[str, Part.Shape]:
+    """The adapter in the board's socket and the body of the right-angle HDMI plug in it, `deeper` more than dp_in:
+    envelopes for the checks and the pictures, not printed parts."""
+    yc, zc = socket_axis(r)
+    a_l, a_w, a_t = r.dp_adapter
+    h_l, h_w, h_t = r.hdmi_plug
+    inner = r.dp_socket[0] + r.dp_in + deeper           # x' of the adapter's plug tip in the socket
+    outer = inner - a_l
+    adapter = p.box(outer, inner, yc - a_w / 2, yc + a_w / 2, zc - a_t / 2, zc + a_t / 2)
+    plug = p.box(outer - h_l, outer, yc - h_w / 2, yc + h_w / 2, zc - h_t / 2, zc + h_t / 2)
+    return {"dp_adapter": adapter, "hdmi_plug": plug}
+
+
+def hdmi_seal(r: Rear, p: Place) -> Part.Shape:
+    """The seal of the opening: a pad of closed-cell foam on the outside of the end wall, round the plug."""
+    k = duct_lines(r, p)
+    yc, zc = socket_axis(r)
+    w, h = r.hdmi_open
+    e = r.hdmi_seal_rim
+    pad = p.box(k["x0"] - r.hdmi_seal_t, k["x0"], yc - w / 2 - e, yc + w / 2 + e, -r.hdmi_relief - e, h - r.hdmi_relief + e)
+    h_l, h_w, h_t = r.hdmi_plug
+    return pad.cut(p.box(k["x0"] - r.hdmi_seal_t - PAST, k["x0"] + PAST, yc - h_w / 2, yc + h_w / 2, zc - h_t / 2, zc + h_t / 2))
 
 
 def duct_back(r: Rear, p: Place) -> Part.Shape:
@@ -627,7 +687,7 @@ def build(d: Blueprint, r: Rear, p: Place) -> dict[str, Part.Shape]:
         out[f"door_half_{s.lower()}"] = door_half(d, r, p, side)
         out[f"head_rail_{s.lower()}"] = head_rail(d, r, side)
     out.update({"shroud_base": shroud_base(r, p), "shroud_top": shroud_top(r, p), "fan": fan(r, p),
-                "duct_body": duct_body(r, p), "duct_back": duct_back(r, p)}, **seals(d, r, p))
+                "duct_body": duct_body(r, p), "duct_back": duct_back(r, p), "seal_hdmi": hdmi_seal(r, p)}, **seals(d, r, p))
     return out
 
 
@@ -1133,6 +1193,18 @@ def fit_report(out: Path) -> dict | None:
     return {k: rules[k] for k in ("rear parts", "door service") if k in rules} or None
 
 
+def adapter_rows(r: Rear, p: Place, parts: dict[str, Part.Shape]) -> list:
+    """The adapter and the HDMI plug in the board's socket, at the estimated depth and 3 more and 3 less: no common
+    volume with the duct, its back, the shroud or the seal of the opening."""
+    rows = []
+    for deeper in (-3.0, 0.0, 3.0):
+        for name, shape in adapter_parts(r, p, deeper).items():
+            for k in ("duct_body", "duct_back", "shroud_base", "shroud_top", "seal_hdmi"):
+                v = shape.common(parts[k]).Volume if shape.BoundBox.intersect(parts[k].BoundBox) else 0.0
+                rows.append((check.PASS if v < 0.01 else check.FAIL, f"{name}, {r.dp_in + deeper:g} in the socket / {k}", f"{v:.2f} mm3"))
+    return rows
+
+
 def run(d: Blueprint, r: Rear, p: Place, out: Path, log=print) -> dict:
     """Build the rear, check it and write its files into out: parts/ (BREP and STL of each part and of the finished
     pieces), model-on/ and model-off/ (for the renders), sections.json, report.json and report.md."""
@@ -1156,6 +1228,7 @@ def run(d: Blueprint, r: Rear, p: Place, out: Path, log=print) -> dict:
     size_rows = [(check.PASS if q["fits"] else check.FAIL, q["part"], f"{q['x']} x {q['y']} x {q['z']}") for q in rep["print"]]
     size_rows += [(check.PASS if q["fits"] else check.FAIL, k, f"{q['x']} x {q['y']} x {q['z']}") for k, q in pieces.items()]
     rep["rules"]["open area of the vents"] = area_rows
+    rep["rules"]["the adapter in the board's socket (way 1)"] = adapter_rows(r, p, parts)
     rep["rules"]["size on the printer"] = size_rows
     rep["failures"] = [f"{title}: {subject}: {detail}" for title, rows in rep["rules"].items() for level, subject, detail in rows if level == check.FAIL]
     if rep["fit"]:
@@ -1171,8 +1244,8 @@ def run(d: Blueprint, r: Rear, p: Place, out: Path, log=print) -> dict:
     cams = focus(d, r, p)
     rails = {k: parts[k] for k in ("head_rail_r", "head_rail_l")}
     write_model(out / "model-on", {**shell, **doors, **rails, **fastener_heads(d, r), "psu": hw["psu"]}, cams)
-    inside = {k: parts[k] for k in ("shroud_base", "shroud_top", "fan", "duct_body", "duct_back", "seal_fan", "seal_duct")}
-    write_model(out / "model-off", {**shell, **rails, **inside, **hw}, cams)
+    inside = {k: parts[k] for k in ("shroud_base", "shroud_top", "fan", "duct_body", "duct_back", "seal_fan", "seal_duct", "seal_hdmi")}
+    write_model(out / "model-off", {**shell, **rails, **inside, **hw, **adapter_parts(r, p)}, cams)
     write_model(out / "model-door", {**{k: parts[k] for k in ("door_half_r", "door_half_l", "head_rail_r", "head_rail_l")}}, cams)
     (out / "sections.json").write_text(json.dumps(sections(d, r, p, parts, {**doors, **near})), encoding="utf-8")
     (out / "report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")

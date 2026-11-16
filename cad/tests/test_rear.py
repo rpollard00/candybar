@@ -278,6 +278,36 @@ class RearPartsTest(unittest.TestCase):
         for name in ("door_half_r", "door_half_l", "shroud_base", "shroud_top", "duct_back"):
             self.assertLess(rows[name]["overhang_cm2"], 0.6, name)
 
+    def test_the_adapter_and_the_hdmi_plug_fit_at_any_depth_in_the_socket(self) -> None:
+        """Way 1 (the owner, 2026-11-15): the adapter straight in the board's socket, the right-angle HDMI plug through
+        the opening of the duct's end wall. At the estimated depth of the plug in the socket and 3 more or less, the
+        adapter and the plug have no common volume with the duct, its back, the shroud or the seal, and the plug
+        reaches through the end wall."""
+        rows = rear.adapter_rows(self.r, self.p, self.parts)
+        self.assertEqual([r for r in rows if r[0] != check.PASS], [])
+        end = self.p.x(rear.duct_lines(self.r, self.p)["x0"])         # the outer face of the end wall
+        for deeper in (-3.0, 0.0, 3.0):
+            plug = rear.adapter_parts(self.r, self.p, deeper)["hdmi_plug"].BoundBox
+            with self.subTest(deeper=deeper):
+                self.assertLess(plug.XMin, end - 3.0)                  # the plug stands out of the duct
+
+    def test_the_seal_closes_the_opening_round_the_plug(self) -> None:
+        """The pad of foam on the outside of the end wall covers the opening but for the plug's own section; without
+        the pad the gap round the plug is about 1.1 cm2."""
+        yc, zc = rear.socket_axis(self.r)
+        w, h = self.r.hdmi_open
+        _, pw, pt = self.r.hdmi_plug
+        self.assertAlmostEqual(w * h - pw * pt, 110.5, delta=0.1)
+        seal = self.parts["seal_hdmi"]
+        opening = rear.hdmi_cuts(self.r, self.p)[0]
+        plug = rear.adapter_parts(self.r, self.p)["hdmi_plug"]
+        k = rear.duct_lines(self.r, self.p)
+        face = self.p.box(k["x0"] - self.r.hdmi_seal_t, k["x0"], yc - w / 2, yc + w / 2, -self.r.hdmi_relief, h - self.r.hdmi_relief)
+        open_left = face.cut(seal).cut(plug.translated(V(0, 0, 0)))
+        self.assertLess(open_left.Volume, 1.0)
+        self.assertLess(seal.common(plug).Volume, 1e-3)
+        del opening
+
     def test_the_seals_fill_the_gap_to_the_door(self) -> None:
         for name in ("seal_fan", "seal_duct"):
             self.assertAlmostEqual(self.parts[name].BoundBox.YMax, self.f.y_in, places=6)

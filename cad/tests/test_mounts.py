@@ -121,6 +121,18 @@ class MountsTest(unittest.TestCase):
         thin = mounts.loads(self.design, replace(self.m, arm_t=1.5), self.v)
         self.assertEqual([r["what"].split(" (")[0] for r in thin if not r["ok"]], ["the longest arm of a tray"])
 
+    def test_the_place_of_the_adapter_on_the_dock_is_the_fall_back_and_holds_nothing(self) -> None:
+        """Way 1 (the owner, 2026-11-15): the adapter is in the board's socket. The place on the left dock stays for way 2
+        and is a room, not a part: no hardware item of the default stands in it."""
+        from candybar.shell import rear
+
+        place = mounts.place_boxes(self.design.site, self.m)["PlaceDpAdapter"]
+        self.assertIn("fall-back", place[2])
+        r = rear.Rear()
+        adapter = rear.adapter_parts(r, rear.place(self.d))["dp_adapter"]
+        x0, x1, y0, y1, z0, z1 = place[0]
+        self.assertFalse(adapter.BoundBox.intersect(mounts.bx(x0, x1, y0, y1, z0, z1).BoundBox))
+
     def test_the_tools_of_the_shell_pass_on_the_solids_of_the_mounts(self) -> None:
         """tools/edge_finish.py and tools/face_check.py as they run on cad/out/mounts/parts: each solid is in a class
         (inside parts and places), and the findings of the face check are listed, not failed."""

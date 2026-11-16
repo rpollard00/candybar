@@ -1,6 +1,6 @@
 # A way out of the exhaust duct's zone for a lead
 
-Date: 2026-11-15. Status: a study. Nothing is built. The owner has not chosen the route of the DisplayPort to HDMI adapter (`docs/roadmap.md`, open decisions).
+Date: 2026-11-15. Status: decided. **The owner chose way 1** (the adapter straight in the board's socket, in the exhaust air of the duct): "I think the adapter will be fine in the heat, if it fails they are inexpensive and we can buy a new one and do the lead." Way 2 below is the fall-back for later; it is not built.
 
 All dimensions are in millimetres, in the frame of the cabinet: x to the player's right, y from the front of the deck to the rear, z up from the desk. The values come from `candybar.shell.rear` and `candybar.shell.mounts` as built on 2026-11-15.
 
@@ -51,7 +51,7 @@ The DisplayPort plug of an extension lead is about 20 x 10 in section, and its l
 - **The seal and the air:** the open area is about 3 cm2 less the leads, which is less than the present notch (5.4 cm2: 40 x 16 less its two corner cuts). The seals to the door do not change.
 - **Part that changes:** `duct_body` only (the notch moves). The lower side wall keeps its height of 2.4 behind the notch.
 
-## Recommendation
+## Recommendation (of the study, before the owner chose way 1)
 
 C. It is one opening for every lead of the I/O end, so the present fault (leads across the clear space over the fan of the supply) goes away for all of them, not only for the extension. No plug has to pass an opening, the leak is less than now, and only the duct body changes. A is the second choice: it is as short, but the plug must be put through the slot on the bench.
 
@@ -68,6 +68,18 @@ The owner asked for pictures (2026-11-15). `candybar.shell.duct_lead` writes the
 3. `3-places.png`: A, B and C marked on the duct, C recommended, and the present notch.
 
 The sizes of the plugs, the socket and the leads are estimates. The scenes are not parts of the build.
+
+## Way 1 as built
+
+- **The opening of the end wall** (`rear.hdmi_cuts`): 25 along the adapter's width by 14.5 along its thickness, round the axis of the board's socket, from 1.0 below the top of the duct's floor. It passes the plug of about 21 x 12 (ESTIMATED) with 2 at each side. With the plug 3 deeper in the socket than the estimate of 9, the adapter's own body (19.88 x 9.84) goes 1.1 into the opening, which passes it too; 3 less, and the plug still stands through the wall. The floor has a relief 1.0 deep, 8 long, under the plug: centred on the adapter, a plug of 12 reaches 0.5 below the top of the floor. `rear.adapter_rows` and `tests/test_rear.py` hold this at 6, 9 and 12 in the socket.
+- **The seal** (`rear.hdmi_seal`): a pad of closed-cell foam 3 thick on the outside of the end wall, 5 beyond the opening on each side, with a hole cut to the plug. With the pad nothing is open round the plug; without it, 1.1 cm2 (1.3 % of the hot-air vent).
+- **The order.** In: the board on its tray with the duct; the adapter into the board's socket through the open side of the duct (toward the door); the HDMI plug into the adapter from outside, through the opening; the foam pad over the plug; the lead along the side wall to the left cable channel; the door last. Out: the door first; nothing is unplugged, because the duct, the adapter and the lead stay with the cabinet and the door only presses on the foam strip of the duct. To take the compute module out: the door off, the HDMI plug out of the adapter (it goes back through the opening; the foam pad comes off with it), then the adapter out of the board's socket through the open side of the duct, then the tray. `cad/out/duct-lead/4-built.png` shows the parts and the order.
+- **The lead's path.** The plug turns the lead toward the front of the cabinet, so the lead turns in its plug and not in the room of 26.65 beside the duct; that room needs only the lead's diameter (6, with 16.9 left after the plug). The lead runs along the side wall to the left cable channel and in it to the mini-HDMI socket: about 205, and the monitor needs 100 of slack to come forward. A lead of 0.5 m. The route is a schematic line on the sheet: it is not checked against the tray, the dock or the other leads there. The bend radius of a lead of 6 is about 30 (ESTIMATED: five times its diameter, a common rule for copper leads); its bends are in the open room, not in the 17.
+- **The lead to buy** is in `docs/design/hardware-list.md` ("Video cable"), by the geometry of each end.
+
+## What way 2 would still need
+
+The fix for the extension's socket in the clear space over the supply's fan (2800 mm3 of it is there: the adapter turned over, a lead with a right-angle socket, or the place moved up), and notch C in the duct body. The place on the left dock stays for it and holds nothing.
 
 ## Not done
 

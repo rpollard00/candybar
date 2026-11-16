@@ -145,7 +145,8 @@ class Mounts:
     lead_tie_x: tuple[float, ...] = (-150.0, -50.0, 50.0, 150.0)
     power_tie: tuple[float, float] = (40.0, 397.0)
     # ---- the places of the small items (the owner, 2026-11-14). Each size is an estimate: no part is chosen
-    # the DisplayPort to HDMI adapter (UGREEN, a rigid block, in line: the DisplayPort plug at one end, the HDMI
+    # the fall-back place of the DisplayPort to HDMI adapter (way 2; the owner chose way 1 on 2026-11-15: the adapter in
+    # the board's socket). The adapter (UGREEN, a rigid block, in line: the DisplayPort plug at one end, the HDMI
     # socket at the other): across, thick, long with its plug. MEASURED by the owner, 2026-11-14 (the estimate was
     # 22 x 12 x 55). Its place stands on the rear face of the left dock, the HDMI socket up
     dp_size: tuple[float, float, float] = (19.88, 9.84, 52.43)
@@ -612,7 +613,7 @@ def place_boxes(s: Site, m: Mounts) -> dict[str, tuple[tuple[float, ...], str, s
     amp = (ax1 - w, ax1, ay0, ay0 + t, s.floor, s.floor + h)
     w, t, h = m.sound_size
     sound = (ax1 - w, ax1, amp[3] + m.sound_gap, amp[3] + m.sound_gap + t, s.floor, s.floor + h)
-    return {"PlaceDpAdapter": (dp, "DockL (a cable tie through two slots)", "the DisplayPort to HDMI adapter: its body, with the HDMI socket up"),
+    return {"PlaceDpAdapter": (dp, "DockL (a cable tie through two slots)", "the fall-back place of the DisplayPort to HDMI adapter (way 2, not built): empty in the default, where the adapter is in the board's socket (rear.adapter_parts)"),
             "PlaceCharger": (ch, "two ribs of the floor tile rear side R (a strap from TieChargerFront to TieChargerRear)", "the DC to USB charging hub that feeds the monitor"),
             "PlaceChargerUsbC": (ends[0], "PlaceCharger", "the room at its left end: two USB-C plugs"),
             "PlaceChargerBarrel": (ends[1], "PlaceCharger", "the room at its right end: the 12 V barrel plug and two USB-A plugs"),

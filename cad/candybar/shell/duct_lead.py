@@ -156,6 +156,21 @@ def main() -> int:
         ms.scene(root / "scenes" / name / "plan", items, {"plan": plan}, keep=keep_plan)
         ms.scene(root / "scenes" / name / "open", near or items, {"open": cam}, keep=keep_open)
 
+    # way 1 as built (the owner's choice): the duct with the opening of its end wall and the foam pad, the adapter in
+    # the socket, the plug, and the lead along the side wall to the left cable channel of the cradle
+    ap = rear.adapter_parts(r, p)
+    pb = ap["hdmi_plug"].BoundBox
+    from . import cradle as cr  # noqa: PLC0415
+    chan = cr.channel(d, cr.Cradle(), -1)
+    cb = chan.BoundBox
+    route = [(pb.XMin + LEAD_D / 2 + 1.0, pb.YMin, yc_z := (pb.ZMin + pb.ZMax) / 2), (pb.XMin + LEAD_D / 2 + 1.0, 430.0, yc_z + 5.0),
+             (cb.XMin + 10.0, (cb.YMin + cb.YMax) / 2, (cb.ZMin + cb.ZMax) / 2)]
+    built = [("adapter", ap["dp_adapter"], FIN["adapter"]), ("hdmi_plug", ap["hdmi_plug"], FIN["plug"]), ("seal_hdmi", real["seal_hdmi"], FIN["B"]),
+             ("hdmi_lead", lead(route), FIN["lead"]), ("channel_left", chan, FIN["dock"])]
+    side = ms.cam((-205.0, 470.0, 182.0), 45.0, 230.0, 20.0, 0.8)
+    ms.scene(root / "scenes" / "built" / "plan", common + duct + built, {"plan": plan}, keep=keep_plan)
+    ms.scene(root / "scenes" / "built" / "open", no_skin + duct + built, {"open": side}, keep=keep_open)
+
     numbers = {
         "io_edge_x": round(x_io, 2), "socket_face_x": round(face, 2), "socket_middle_z": round(zc, 2), "socket_middle_y": round(yc, 2),
         "end_wall_in_x": round(end_in, 2), "end_wall_out_x": round(end_out, 2), "side_wall_x": round(x_side, 2),
