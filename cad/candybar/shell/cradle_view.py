@@ -12,7 +12,7 @@ Groups of the document:
   On the body    the lugs and the bosses (added solids), and the skin round the screen face
   Hardware       the monitor, its plug room, the pads, the pins, the magnets and the screws
   Option         the power-button option: the plate with the hole, the push rod, the striker and the guide; on show
-                 in place of the plain plate when Cradle.push_rod is set (it is not)
+                 in place of the plain plate when Cradle.push_rod is set (the default since 2026-11-15)
   Shell          the outer parts of the built shell; the body and the nominal plate are hidden, because the body is a
                  solid form and hides what is inside
 """

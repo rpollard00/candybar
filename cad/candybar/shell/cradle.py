@@ -160,11 +160,14 @@ class Cradle:
     audio_up: float = 30.0                              # 3.5 mm output, right edge
     button_up: float = 63.5                             # power button, right edge: MEASURED by the owner (2026-11-14)
     button_proud: float = 1.5
-    # the option for the power button: a square push rod through the inner frame of the plate, and a striker that
+    # the push rod of the power button: a square push rod through the inner frame of the plate, and a striker that
     # the rod's slope of 45 degrees moves across onto the button. The monitor starts by itself when its USB-C socket
-    # gets power (the owner's test, 2026-11-14); the rod stays as a fallback. push_rod puts it in the document in
-    # place of the plain plate; it is off until the owner has seen its mark on the face of the plate
-    push_rod: bool = False
+    # gets power (the owner's test, 2026-11-14); the rod is a fallback. The owner chose it after the sheet of its
+    # mark (2026-11-15): it is in the default. False gives the plain plate, for a monitor with no button on that edge
+    push_rod: bool = True
+    # the break on a feature too small for the edge break of R 1: the rim of the rod's hole and the rod's tip
+    # (a provisional rule for small features, pending the owner's word; docs/roadmap.md, the edge rule)
+    small_break: float = 0.3
     rod: float = 4.0                                    # the rod is square
     rod_fit: float = 0.2                                # clearance on each side of the rod and of the striker
     rod_x: float = 192.5
@@ -295,12 +298,19 @@ def fit_box(d: Blueprint, fit: float) -> Part.Shape:
 def plate_break_edges(shape: Part.Shape, d: Blueprint) -> list[Part.Edge]:
     """The convex edges of the plate that show and turn more than edge_break_turn: the four edges between the inner
     frame and the rim wall, the four edges round the land, and the four corners of the outline. The edges of the
-    flat back do not show: the back lies on the ledges and in front of the monitor."""
+    flat back do not show: the back lies on the ledges and in front of the monitor. Nor do the edges in the push
+    rod's hole: its rim on the face has the small break, and the rest lies against the rod (ROD_HOLE)."""
     from . import solids as so  # noqa: PLC0415
     f = Frame(d)
+    c = Cradle()
+    _, vb = sockets(d, c, PRESENT)["power button"]
+    w = c.rod / 2 + c.rod_fit + 0.01
+    in_hole = lambda q: abs(f.local(q)[0] - c.rod_x) < w and abs(f.local(q)[1] - vb) < w
     out = []
     for e in shape.Edges:
         if e.Degenerated or len(shape.ancestorsOfType(e, Part.Face)) != 2:
+            continue
+        if c.push_rod and all(in_hole(v.Point) for v in e.Vertexes) and in_hole(so.middle(e)):
             continue
         if all(abs(f.local(e.valueAt(e.FirstParameter + (e.LastParameter - e.FirstParameter) * k / 4))[2] - f.t0) < 1e-4 for k in range(5)):
             continue
@@ -595,7 +605,37 @@ def button_option(d: Blueprint, c: Cradle, u: Unit, plate: Part.Shape) -> dict[s
                        f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (top, c.rod_x + r - k + travel + fit))])
     guide = guide.fuse(f.box((g0, g0 + c.stop_lip), (v - s - fit, v + s + fit), (tb, tb + s + fit))).removeSplitter()
     hole = f.box((c.rod_x - r - fit, c.rod_x + r + fit), (v - r - fit, v + r + fit), (-40.0, f.t0 + 1.0))
-    return {"bezel_plate_button": one(plate.cut(hole)), "button_rod": one(rod), "button_striker": one(striker), "button_guide": one(guide)}
+    # the small break on the rim of the hole in the face of the plate and on the edges of the rod's tip
+    # the rim: the edges at the hole that lie wholly in the front half of the plate (the face of the inner frame
+    # slopes about 3 across the hole; the edges of the wall reach the back)
+    holed = small_break(plate.cut(hole), c.small_break, lambda p: abs(f.local(p)[0] - c.rod_x) < r + fit + 0.01
+                        and abs(f.local(p)[1] - v) < r + fit + 0.01 and f.local(p)[2] < (front + f.t0) / 2)
+    rod = small_break(rod, c.small_break, lambda p: f.local(p)[2] < front - c.rod_proud + 0.01, touch=True)
+    return {"bezel_plate_button": one(holed), "button_rod": one(rod), "button_striker": one(striker), "button_guide": one(guide)}
+
+
+def small_break(shape: Part.Shape, size: float, near, touch: bool = False) -> Part.Shape:
+    """The small break (Cradle.small_break) on the edges of a shape that lie near a feature: a round of `size`, or a
+    chamfer of `size` when the round does not build. An edge is taken when all its points pass `near`, or with
+    `touch` when one of its ends does (the long edges of the rod that end at its tip)."""
+    from . import solids as so  # noqa: PLC0415
+    edges = []
+    for e in shape.Edges:
+        if e.Degenerated:
+            continue
+        pts = [v.Point for v in e.Vertexes] + [so.middle(e)]
+        if (any(near(p) for p in pts[:-1]) if touch else all(near(p) for p in pts)):
+            edges.append(e)
+    if not edges:
+        raise Part.OCCError("cradle: the small break found no edge")
+    for make in (lambda: shape.makeFillet(size, edges), lambda: shape.makeChamfer(size, edges)):
+        try:
+            out = make()
+            if out.isValid() and len(out.Solids) == 1:
+                return out.Solids[0]
+        except Part.OCCError:
+            pass
+    raise Part.OCCError("cradle: the small break does not build")
 
 
 def button_rows(d: Blueprint, c: Cradle, u: Unit, option: dict[str, Part.Shape], parts: dict[str, Part.Shape], skin: Part.Shape) -> dict:
@@ -650,17 +690,24 @@ FINISH = {"bezel_plate": "black", "lugs": "#d8b060", "bosses": "#d8b060", "uprig
 PRINTED = ("bezel_plate", "upright_right", "upright_left", "jaws", "shoes", "channel_right", "channel_left")
 ADDED = ("lugs", "bosses")
 HARDWARE = ("monitor", "plugs", "pads", "pins", "magnets", "screws")
+BUTTON = ("button_rod", "button_striker", "button_guide")   # the printed parts of the push rod, with Cradle.push_rod
 
 
 def build(d: Blueprint, c: Cradle = Cradle(), u: Unit = PRESENT, log: list[str] | None = None) -> dict[str, Part.Shape]:
     """Every part of this package in place in the cabinet frame, and the hardware."""
-    out = {"bezel_plate": bezel_plate(d, c, log), "lugs": lugs(d, c), "bosses": bosses(d, c),
+    plate = bezel_plate(d, c, log)
+    out = {"bezel_plate": plate, "lugs": lugs(d, c), "bosses": bosses(d, c),
            "upright_right": upright(d, c, 1), "upright_left": upright(d, c, -1),
            "jaws": Part.makeCompound([jaw(d, c, u, sx, sv) for sv in (-1, 1) for sx in (1, -1)]),
            "shoes": Part.makeCompound([shoe(d, c, u, sx, sv) for sv in (-1, 1) for sx in (1, -1)]),
            "channel_right": channel(d, c, 1), "channel_left": channel(d, c, -1),
            "monitor": monitor(d, c, u), "plugs": plugs(d, c, u), "pads": pads(d, c, u)}
     out.update(fasteners(d, c, u))
+    if c.push_rod:   # the plate with the rod's hole, the rod, the striker and the guide (button_option)
+        option = button_option(d, c, u, plate)
+        out["bezel_plate"] = option.pop("bezel_plate_button")
+        out["bezel_plate_no_button"] = plate      # the option: the plate with no hole
+        out.update(option)
     return out
 
 
@@ -882,6 +929,9 @@ PRINTS = (
     Print("jaw", 4, (1, 0, 0), (0, 1, 0), "On one side face: the profile lies on the bed.", "A side face: flat, the whole profile."),
     Print("shoe", 4, (0, 0, -1), (0, 1, 0), "On its back: the lip stands up.", "The back: flat, 25 x 14, with the nut pocket open to the bed."),
     Print("channel_right", 2, (0, 1, 0), (1, 0, 0), "On one end: the C section lies on the bed.", "An end face: flat, the whole section."),
+    Print("button_rod", 1, (0, 0, 1), (0, 1, 0), "Standing on its tip. The collar is a ledge of 1.5 all round.", "The tip: 4 x 4 less the small break."),
+    Print("button_striker", 1, (0, 1, 0), (1, 0, 0), "On one side face: its profile lies on the bed.", "A side face: flat, the whole profile."),
+    Print("button_guide", 1, (0, 0, 1), (1, 0, 0), "On the face that lies on the back of the plate.", "That face: flat, with the hole of the rod."),
 )
 
 
@@ -922,9 +972,20 @@ def print_rows(d: Blueprint, shapes: dict[str, Part.Shape]) -> list[dict]:
 # the class of each part for the edge rule: the plate is a printed and painted part of the exterior; the others are
 # inside the body, where the rule does not hold
 EDGE_CLASS = {"bezel_plate": "printed"}
+ROD_HOLE = "the rod's hole"
+
+
+def rod_hole(d: Blueprint, c: Cradle, u: Unit = PRESENT) -> Part.Shape:
+    """The room of the push rod in the plate, from 1 behind the face to the back: a cover for the edge rule."""
+    f = Frame(d)
+    _, v = sockets(d, c, u)["power button"]
+    w = c.rod / 2 + c.rod_fit
+    return f.box((c.rod_x - w, c.rod_x + w), (v - w, v + w), (-40.0, f.t0 + c.collar_t))
 EDGE_JOINTS = {"body": "The recess of the plate: the ledges and the lugs behind it.", "lugs": "The plate lies on the lugs.",
                "screen": "The back of the plate in front of the monitor.", "monitor": "The back of the plate in front of the monitor.",
-               "the other half": "The seam of the two halves of the plate, on the centre line, on pins."}
+               "the other half": "The seam of the two halves of the plate, on the centre line, on pins.",
+               ROD_HOLE: "The wall of the push rod's hole and its rim at the back of the plate: the rod stands in the hole "
+                         "with a fit of 0.2, and its collar lies on the back."}
 
 
 # the printed parts of the print folder (print/), for tools/edge_finish.py: the halves of the plate are painted
@@ -937,7 +998,10 @@ def edge_covers(d: Blueprint, c: Cradle = Cradle(), u: Unit = PRESENT) -> dict[s
     """What the faces of the plate lie against in place (EDGE_JOINTS): the body and the screen of the built shell,
     the lugs and the monitor."""
     shell = shell_parts()
-    return {"body": shell["body"], "screen": shell["screen"], "lugs": lugs(d, c), "monitor": monitor(d, c, u)}
+    out = {"body": shell["body"], "screen": shell["screen"], "lugs": lugs(d, c), "monitor": monitor(d, c, u)}
+    if c.push_rod:
+        out[ROD_HOLE] = rod_hole(d, c, u)
+    return out
 
 
 def edge_rows(d: Blueprint, plate: Part.Shape, shell: dict[str, Part.Shape], parts: dict[str, Part.Shape]) -> dict:
@@ -945,6 +1009,8 @@ def edge_rows(d: Blueprint, plate: Part.Shape, shell: dict[str, Part.Shape], par
     have no round, by what they lie against. A sharp edge passes only against a part of EDGE_JOINTS."""
     from tools import edge_finish  # noqa: PLC0415
     scene = {"bezel_plate": plate, "body": shell["body"], "screen": shell["screen"], "lugs": parts["lugs"], "monitor": parts["monitor"]}
+    if "button_rod" in parts:
+        scene[ROD_HOLE] = rod_hole(d, Cradle())
     rows = edge_finish.survey(scene, d)["bezel_plate"]
     rows["class"] = EDGE_CLASS["bezel_plate"]
     bad = [f"{g['edges']} sharp edges show ({g['length']} mm, {g['turn'][0]:g} to {g['turn'][1]:g} degrees), the longest at {tuple(g['at'][0])}"
@@ -957,6 +1023,17 @@ def face_known(d: Blueprint, part: str, rule: str, at: tuple[float, float, float
     """Why a finding of the face check stays, or "" when it must not. One entry for each kind of finding."""
     f = Frame(d)
     x, v, t = f.local(V(*at))
+    c = Cradle()
+    if c.push_rod and rule in ("sliver", "needle", "crowded") and part in ("button_rod", "bezel_plate", "bezel_half_right"):
+        xb, vb = sockets(d, c, PRESENT)["power button"]
+        if abs(x - c.rod_x) < c.rod / 2 + c.rod_fit + 1.0 and abs(v - vb) < c.rod / 2 + c.rod_fit + 1.0 and (part == "button_rod" or t < f.t0):
+            return ("the small break of 0.3 at the rod's hole or on the rod's tip: a feature too small for the edge break of R 1 "
+                    "(the provisional rule for small features)")
+        if part == "button_rod" and rule == "sliver" and f.t0 - 0.01 < t < f.t0 + c.collar_t + 0.01:
+            return "a side face of the rod's collar: the collar is collar_t (1.0) thick by design"
+    if part == "button_guide" and rule == "sliver" and "Plane" in detail:
+        return ("a face of the guide of the striker, inside the shell: the lip of the stop (stop_lip 1.0) and the steps "
+                "of the fit round the rod, the collar and the striker (0.3 to 1.0) by design")
     if part in ("shoes", "shoe") and rule == "sliver" and "Plane" in detail:
         return "the seat of the M4 nut: a ring 1.25 wide between the hexagon pocket and the screw hole"
     if part not in ("bezel_plate", "bezel_half_right", "bezel_half_left"):
@@ -977,7 +1054,7 @@ def face_rows(d: Blueprint, parts: dict[str, Part.Shape]) -> dict:
     passes as a face of the edge break, or as an item of face_known, which gives the reason."""
     from tools import face_check  # noqa: PLC0415
     out = {}
-    for k in PRINTED + ADDED + tuple(x for x in parts if x.startswith("bezel_half")):
+    for k in PRINTED + ADDED + tuple(k for k in BUTTON if k in parts) + tuple(x for x in parts if x.startswith("bezel_half")):
         found = []
         for s in parts[k].Solids:
             found += face_check.check(s, k, [], d.edge_break)
@@ -1071,12 +1148,12 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
     doc, found = fit_items(d)
     halves = bezel_halves(d, c, parts["bezel_plate"])
     plain = bezel_plate(d, c, back=False)
-    option = button_option(d, c, u, parts["bezel_plate"])
+    option = button_option(d, c, u, parts.get("bezel_plate_no_button", parts["bezel_plate"]))
     rows = clashes(parts, skin, found, c)
     fixed = [skin, parts["lugs"], parts["bosses"], parts["upright_right"], parts["upright_left"], parts["channel_right"], parts["channel_left"]]
     bottom_jaws = Part.makeCompound([jaw(d, c, u, sx, -1) for sx in (1, -1)])
     rep = {"cradle": asdict(c), "unit": asdict(u), "generic": asdict(GENERIC), "log": lines,
-           "solids": solid_rows({k: parts[k] for k in PRINTED + ADDED} | halves),
+           "solids": solid_rows({k: parts[k] for k in PRINTED + ADDED + BUTTON if k in parts} | halves),
            "clashes": rows, "attached": attached(parts, skin), "side_wall": side_wall(d, c, skin),
            "path": path_out(d, c, u, fixed, bottom_jaws, (0.0, 30.0, 60.0, 150.0)), "sweep": sweep_out(d, c, 200.0, fixed),
            "sockets": {k: [round(x, 1), round(v, 1)] for k, (x, v) in sockets(d, c, u).items()}, "clamps": clamp_rows(d, c, u),
@@ -1084,7 +1161,7 @@ def study(d: Blueprint, c: Cradle, u: Unit, out: Path, log=print) -> dict:
            "sight": sight(d, c, shell, parts["bezel_plate"], doc),
            "sight_before": json.loads((shell_dir() / "fit" / "report.json").read_text(encoding="utf-8"))["sight"],
            "print": print_rows(d, {"bezel_half_right": halves["bezel_half_right"], "upright_right": parts["upright_right"], "jaw": jaw(d, c, u, 1, -1),
-                                   "shoe": shoe(d, c, u, 1, -1), "channel_right": parts["channel_right"]}),
+                                   "shoe": shoe(d, c, u, 1, -1), "channel_right": parts["channel_right"]} | {k: parts[k] for k in BUTTON if k in parts}),
            "edge": edge_rows(d, parts["bezel_plate"], shell, parts), "faces": face_rows(d, parts | halves)}
     rep["button"] = button_rows(d, c, u, option, parts, skin)
     bad = [f"{k}: not one valid closed solid each" for k, r in rep["solids"].items() if not (r["valid"] and r["closed"])]

@@ -203,7 +203,9 @@ class BezelPlateTest(unittest.TestCase):
         self.assertEqual(len(halves), 2)
         holes = 8 * math.pi * (C.seam_dowel_d / 2) ** 2 * C.seam_dowel_depth
         self.assertAlmostEqual(sum(h.Volume for h in halves.values()), plate.Volume - holes, delta=5.0)
-        self.assertAlmostEqual(halves["bezel_half_right"].Volume, halves["bezel_half_left"].Volume, delta=5.0)
+        # the right half has the push rod's hole: with it filled, the halves are mirror images
+        rod_hole = parts()["bezel_plate_no_button"].Volume - plate.Volume
+        self.assertAlmostEqual(halves["bezel_half_right"].Volume + rod_hole, halves["bezel_half_left"].Volume, delta=5.0)
         for h in halves.values():
             self.assertTrue(h.isValid())
             self.assertEqual(len(h.Solids), 1)
@@ -297,7 +299,7 @@ class LeadsAndButtonTest(unittest.TestCase):
         the striker just past its travel. The full travel is free."""
         f = cr.Frame(D)
         p = parts()
-        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate"])
+        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate_no_button"])
         rod, striker, guide, plate = (option[k] for k in ("button_rod", "button_striker", "button_guide", "bezel_plate_button"))
         travel = C.striker_gap + 1.0
         self.assertLess(cr.gap(rod, plate), C.rod_fit + 1e-3)                    # the collar lies on the back of the plate
@@ -326,12 +328,43 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertEqual(fc.failures(found), [])
         self.assertEqual(stale, [])
 
-    def test_the_push_rod_moves_the_striker_onto_the_button(self) -> None:
-        # the option is complete and off: the monitor starts by itself, and the owner has not seen the rod's mark
-        self.assertFalse(C.push_rod)
+    def test_the_default_has_the_rod_and_the_plate_with_no_hole_is_the_option(self) -> None:
+        p = parts()
+        for k in cr.BUTTON:
+            self.assertIn(k, p)
+        self.assertLess(p["bezel_plate"].Volume, p["bezel_plate_no_button"].Volume - 50.0)   # the hole of the rod
+        off = cr.build(D, replace(C, push_rod=False), cr.PRESENT)
+        self.assertFalse(set(cr.BUTTON) & set(off))
+        self.assertNotIn("bezel_plate_no_button", off)
+        self.assertAlmostEqual(off["bezel_plate"].Volume, p["bezel_plate_no_button"].Volume, places=3)
+
+    def test_the_rim_of_the_rod_hole_and_the_rod_tip_have_the_small_break(self) -> None:
+        """A feature too small for R 1 gets the small break of 0.3 (the provisional rule for small features): no convex
+        edge in front of the face of the plate turns more than edge_break_turn, and the mark on the face is the hole
+        of 4.4 with the break on each side, 5.0 across."""
+        from candybar.shell import solids as so
+
         f = cr.Frame(D)
         p = parts()
-        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate"])
+        x_b, v = cr.sockets(D, C, cr.PRESENT)["power button"]
+        window = lambda q: abs(f.local(q)[0] - C.rod_x) < 4.0 and abs(f.local(q)[1] - v) < 4.0
+        # the face of the plate at the hole: the most forward point of the plate round it
+        front = min(f.local(q.Point)[2] for q in p["bezel_plate"].Vertexes if window(q.Point))
+        near = lambda q: window(q) and f.local(q)[2] < (front + f.t0) / 2
+        for name in ("bezel_plate", "button_rod"):
+            with self.subTest(part=name):
+                sharp = [e for e, _ in so.sharp_edges(p[name], D, near)]
+                self.assertEqual(sharp, [])
+        # the mark: the outer line of the break on the face of the plate, across
+        xs = [f.local(q.Point)[0] for e in p["bezel_plate"].Edges if all(near(q.Point) for q in e.Vertexes) for q in e.Vertexes]
+        self.assertAlmostEqual(max(xs) - min(xs), C.rod + 2 * C.rod_fit + 2 * C.small_break, delta=0.05)
+
+    def test_the_push_rod_moves_the_striker_onto_the_button(self) -> None:
+        # the rod is in the default: the owner chose it after the sheet of its mark (2026-11-15)
+        self.assertTrue(C.push_rod)
+        f = cr.Frame(D)
+        p = parts()
+        option = cr.button_option(D, C, cr.PRESENT, p["bezel_plate_no_button"])
         for name, shape in option.items():
             with self.subTest(part=name):
                 self.assertTrue(shape.isValid())

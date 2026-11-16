@@ -161,7 +161,7 @@ The plug room is 22 beside each side edge, as in the fit study. Right-angle plug
 
 The channels do not touch the cable zones of the fit study (`MonitorCables_Left`, `MonitorCables_Right`): the gap is 1.0.
 
-## The power button of the monitor (an option)
+## The power button of the monitor: the push rod
 
 The power button is on the right edge of the monitor, 63.5 above the bottom edge of its housing (measured by the owner, 2026-11-14). With the bezel plate on, it is behind the right bar of the plate.
 
@@ -174,15 +174,15 @@ The ways to the button, without a change to the outer form:
 | Through the reveal | Not possible. The reveal is 1 wide and 2 deep, and its floor is the body. The gap between the plate and the jamb is 0.5. |
 | From below the bezel plate | Not possible. The apron below the plate is closed, and the gap at the end of the plate is 0.5. |
 | The plate off | Possible with no part. Pull the plate off (magnets), push the button with a finger, put the plate back. |
-| Through the plate (the option) | A push rod in the inner frame of the right bar. It puts one mark of 4.4 x 4.4 on the face of the plate. |
+| Through the plate (the default since 2026-11-15) | A push rod in the inner frame of the right bar. It puts one mark on the face of the plate: the hole of 4.4 x 4.4 with its small break of 0.3, 5.0 across. |
 
-The option has three printed parts, and they leave with the plate:
+The push rod has three printed parts, and they leave with the plate:
 
 - A square push rod of 4 x 4 goes through a hole in the inner frame at `x` 192.5. It stands 1.5 out of the face. Its inner end has a slope of 45 degrees.
 - A striker of 6 x 6 moves across the face in a guide. The slope of the rod moves it onto the button. Its nose is 1.0 from the button, and the travel is 2.0.
 - The guide is bonded to the back of the plate, in the plug room of the right edge. The present unit has no socket at that height.
 
-The spring of the button moves the striker and the rod back. The option is in `cradle.button_option`. It is not in the default plate. The rod and the striker follow the button: with the measured height of 63.5 they stand 2.5 lower than with the estimate of 66. At that height the checks find no clash with the monitor, the jaws, the skin, the right channel, the lugs, and the pins and the magnets of the plate, and the striker is 1.0 from the button.
+The spring of the button moves the striker and the rod back. The parts are made by `cradle.button_option`. **The owner chose the rod after the sheet of its mark (2026-11-15): "Pushrod looks fine, we can include it."** `Cradle.push_rod` is now true: `cradle.build` gives the plate with the hole, the rod, the striker and the guide, and the view document shows them. False gives the plain plate (`bezel_plate_no_button` in the build), for a monitor with no button on that edge. The rod and the striker follow the button: with the measured height of 63.5 they stand 2.5 lower than with the estimate of 66. At that height the checks find no clash with the monitor, the jaws, the skin, the right channel, the lugs, and the pins and the magnets of the plate, and the striker is 1.0 from the button.
 
 **The stop** (2026-11-15). When the plate is off, the rod and the striker stay in their places:
 
@@ -191,6 +191,12 @@ The spring of the button moves the striker and the rod back. The option is in `c
 - The guide has a lip of 1.0 across the upper half of its open end. The upper half of the striker is cut back near its nose, so that its step stops on the lip just past the travel. The lower half of the striker still reaches the button.
 
 **The sheet for the owner** (`cad/out/push-rod-mark/push-rod-mark.png`, made by `candybar.shell.rod_mark` and `tools/draw_push_rod.py`): the front of the cabinet with the printed bezel plate, without the rod and with it, from one camera 1.0 m in front of the screen; the same place of the two views at the size of the render (3.5 pixels for each mm); and a close view of the right bar with the mark and a ruler of 1 mm ticks. Every face edge is drawn.
+
+**The small break** (2026-11-15). The rim of the rod's hole on the face of the plate and the edges of the rod's tip are too small for the edge break of R 1: with R 1 the mark would be about 6.4 across, not the 4.4 that the owner saw. They have a break of 0.3 (`Cradle.small_break`; a round, or a chamfer where the round does not build). The mark on the face is then 5.0 across. This is a provisional rule for small features, pending the owner's word (the roadmap, open decisions). The face check accepts the narrow faces of this break only at the rod's hole and on the rod (`cradle.face_known`); the edge rule names the wall and the back rim of the hole as the joint "the rod's hole" (`cradle.ROD_HOLE`).
+
+**Print.** The rod stands on its tip (the collar is a ledge of 1.5 all round, a short overhang). The striker lies on a side face. The guide lies on the face that is bonded to the plate. Each is a few grams.
+
+**Not proved yet.** The fit of the rod of 4 x 4 in the hole of 4.4 in ABS (0.2 on each side, through the inner frame and the guide), and the travel on the real button: the force of the button, and whether 2.0 of travel presses it. The coupon `rod-fit` of the coupon set proves the fit (the rebuild of the coupons after the joints).
 
 `tests/test_cradle.py` holds the stop: the rod cannot go out to the front, the full travel of the rod and of the striker is free, and each one is stopped 0.5 past its travel and the fit.
 
@@ -355,7 +361,7 @@ Date: 2026-11-14. The package was merged on the laptop after the control panel. 
 
 - **The owner's measurements and facts.** The power button is 63.5 above the bottom edge of the housing (it was an estimate of 66). The bottom bezel is 8.9 (it was an estimate of 9.6), so the cradle puts the bottom edge of the housing 8.9 below the lit picture. The side bezels are 4.0 and the top bezel 3.4; across the face the monitor is set by hand on its pads, so the side bezels change no value of the model. The width and the height of the housing stay the maker's 354 x 230 until the owner measures them, and the reserved room of 356 x 231 x 11 stays. The top jaws hold the top edge of the housing, which the model puts 230 above the bottom edge: that value needs the real height of the housing, and it is in the list of things to measure.
 - **The window and the picture.** The rim of the window lies on the edge of the lit area (BZ3 is made from the lit area). With the monitor where the cradle puts it, the margin between the window and the lit picture is 0 at the left, at the right, at the bottom and at the top. With the old bottom bezel of 9.6 the picture would have stood 0.7 low: 0.7 of it behind the rim at the bottom, and 0.7 of black bezel in the window at the top. The jaws move 8 each way, so a person sets the picture to the window by hand in any case.
-- **The push rod.** `Cradle.push_rod` (off) puts the option in the document. It is tested as before, at the new height of the button.
+- **The push rod.** `Cradle.push_rod` was off here; since 2026-11-15 it is on (the section "The power button of the monitor: the push rod").
 - **The mini HDMI plug** is described by its geometry (see "The cable channel").
 - **The plug order** is in the steps "How to put the monitor in".
 - **ABS.** The density is 1.05, the shrink 0.59 % to 0.69 %, and the print limit that of the Q2.

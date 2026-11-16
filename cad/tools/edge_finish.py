@@ -141,6 +141,7 @@ JOINTS = {
     **{(part, cover): pf.JOINTS[cover] for part in pf.PARTS for cover in pf.joints_of(part)},
     # the bezel plate of the cradle (docs/design/monitor-cradle-and-bezel.md), in its two printed halves
     **{(part, cover): cr.EDGE_JOINTS[cover] for part in cr.HALVES for cover in ("screen", "the other half")},
+    ("bezel_half_right", cr.ROD_HOLE): cr.EDGE_JOINTS[cr.ROD_HOLE],
     # the print pieces (docs/design/print-pieces.md): the bonded seams, and the inside, which is not painted
     **{(p, INSIDE_SHELL): "A face of the piece that is not on the outer form of the shell: the cavity, a flange, a key, a rib "
                           "(not painted), or the face of a bonded seam (filled)." for p in WALLS},
