@@ -176,7 +176,7 @@ The study had a housing and a cover with two screws. Now the tunnel of the bolt 
 - The right wall stands back from yl 34.7 to the rear, so that the stop block of the bolt goes in from the rear. A shoulder in it stops the bolt 0.3 in front of its locked place when no panel is in.
 - At the rear, a slot through the roof and into the walls takes the gate.
 
-The cover could also snap on, but a snap stays bent or must bend each time. The gate needs no snap: the spring pushes it against the rear face of its slot, and the plate of the panel stands above it.
+A cover that snaps on is possible, but a snap stays bent or must bend each time. The gate needs no snap: the spring pushes it against the rear face of its slot, and the plate of the panel stands above it.
 
 ### What the frame print gains and loses
 
@@ -201,7 +201,7 @@ To service the bolt, take the panel out, pull the gate up by its tab, and slide 
 
 ## Putting the panel in: no self-latching slope
 
-A slope on the nose of the bolt or on the strike could let the panel push the bolt back as it goes down. This is not done:
+A slope on the nose of the bolt or on the strike can let the panel push the bolt back as it goes down. This is not done:
 
 - The bolt must move 5 for the lips to pass. A slope that does this needs 5 of height. The lock section of the bolt is 6 high, and the lips are 2.3 high. A slope of 5 on the bolt leaves 0.7 to 1.2 of material over the front of the lips, so the hold drops below 2. A slope on the lips can give only 2.3.
 - With no slope, a panel that is not latched cannot sit flush: it stands 8 high at the front. With a slope and a bolt that sticks, a panel can sit flush and not be latched, and nothing shows it.
@@ -395,7 +395,7 @@ cad/.venv-tools/bin/python cad/tools/draw_panel_latch.py                        
 cad/test.sh test_panel_latch                                                                 # 34 tests, 6 minutes
 ```
 
-`CANDYBAR_LATCH=B` builds only B; the results of the other candidates stay in `summary.json`. `CANDYBAR_LATCH_SCENES=0` writes no scenes. `draw_panel_latch.py B` renders B only and makes sheets 03 and 06. The first command needs the skin of the shell in `cad/out/shell-rev7/split/cache`, as `panel_frame` does.
+`CANDYBAR_LATCH=B` builds only B. The results of the other candidates stay in `summary.json`. `CANDYBAR_LATCH_SCENES=0` writes no scenes. `draw_panel_latch.py B` renders B only and makes sheets 03 and 06. The first command needs the skin of the shell in `cad/out/shell-rev7/split/cache`, as `panel_frame` does.
 
 | Output | Content |
 | --- | --- |
@@ -464,7 +464,7 @@ The hole for the button in the deck nose: x 0, z 55.3, 14.6 across with two flat
 
 ### Roadmap (`docs/roadmap.md`)
 
-- Step 12: the latch of the control panel is the push bolt (the owner, 2026-11-15; `docs/design/control-panel-latch.md`). Screws stay as the fall-back.
+- Step 12: the latch of the control panel is the push bolt (the owner, 2026-11-15, `docs/design/control-panel-latch.md`). Screws stay as the fall-back.
 - Open decision "The latch": settled on 2026-11-15.
 - Next: move the push bolt into `panel_frame.py` as the default, and cut the button hole into the deck nose. Print the test piece of the front centre.
 
