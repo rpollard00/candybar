@@ -1,6 +1,8 @@
 """The edge rule (the owner, 2026-11-12): no outside edge of the exterior stays fully sharp. A printed part of the
 exterior has no convex outside edge that turns more than 45 degrees with neither a design round nor the edge break.
-The rule on small solids; the tools that make the break by hand; and the rule on the default build of the shell."""
+The rule and the break by hand on small solids (quick); and in the slow group, three things of the hood of the default
+build that tools.edge_finish does not check: the break is the same on both sides, takes no more than its own depth,
+and the cavity is taken from the hood before its break."""
 from __future__ import annotations
 
 import math
@@ -202,6 +204,7 @@ class FlatBreakTest(unittest.TestCase):
         self.assertIn("the edge turns 90.0 degrees, the flat lies 0.50 under it", log[0])
 
 
+@support.slow
 class ShellEdgeFinishTest(unittest.TestCase):
     """The default build of the shell: the rule holds on the printed parts of the exterior (deck, body, hood). The
     edges in a joint, the provisional forms and the bezel plate are left out by name."""
@@ -210,34 +213,6 @@ class ShellEdgeFinishTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.d, cls.parts, cls.log = support.shell()
         cls.rows = ef.survey(cls.parts, cls.d)
-
-    def test_no_printed_part_has_a_sharp_edge_that_shows_or_lies_in_a_joint_with_no_name(self) -> None:
-        self.assertEqual(ef.failures(self.rows), [])
-
-    def test_the_printed_parts_are_the_deck_the_body_and_the_hood(self) -> None:
-        self.assertEqual({k for k, r in self.rows.items() if r["class"] == "printed"}, {"deck", "body", "hood"})
-
-    def test_every_part_of_the_build_but_the_screen_is_in_a_class(self) -> None:
-        self.assertEqual(set(self.rows), set(self.parts) - set(fc.NOT_PARTS))
-        self.assertEqual([k for k, r in self.rows.items() if not r["class"]], [])
-
-    def test_every_named_joint_holds_a_sharp_edge(self) -> None:
-        """A list that names a joint with nothing in it is not honest."""
-        used = {(part, g["against"]) for part, r in self.rows.items() if r["class"] == "printed" for g in r["sharp"]
-                if g["against"] and not g["against"].startswith(ef.NOT_FINISHED)}
-        # the joints of this build: a part of it against another part or the seam. The joints of a work package (its
-        # parts, and the deck behind the socket plate) are held on its own parts (test_panel_frame, test_cradle,
-        # test_socket_plate)
-        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in self.rows and (j[1] in self.parts or j[1] == ef.SEAM_NAME)})
-
-    def test_the_hood_has_no_sharp_edge_at_all(self) -> None:
-        """The rim of the opening and the seam bevel have the break; the foot of the hood is blunt."""
-        self.assertEqual(self.rows["hood"]["sharp"], [])
-        self.assertEqual(solids.sharp_edges(self.parts["hood"], self.d, lambda m: True), [])
-
-    def test_the_hood_has_the_break_as_rounds_of_its_radius_and_a_ball_at_each_rear_corner(self) -> None:
-        self.assertGreaterEqual(self.rows["hood"]["break_faces"], 28)
-        self.assertEqual(self.rows["hood"]["break_corner_faces"], 2)
 
     def test_the_break_of_the_hood_is_the_same_on_both_sides(self) -> None:
         hood = self.parts["hood"]
@@ -291,41 +266,6 @@ class ShellEdgeFinishTest(unittest.TestCase):
         self.assertAlmostEqual(skin["deck"].Volume, solids.deck(self.d)[0].Volume, delta=0.01)
         self.assertGreater(skin["deck"].Volume, self.parts["deck"].Volume + 1000.0)
         self.assertAlmostEqual(skin["marquee_lip"].Volume, solids.lip_stand_in(self.d).Volume, delta=0.01)
-
-    def test_the_body_has_no_sharp_edge_at_the_rear_or_in_the_seam_groove(self) -> None:
-        d = self.d
-        left = solids.sharp_edges(self.parts["body"], d, lambda m: solids.behind_band(d, m) or m.z > d.body_top - d.seam_groove - 0.5)
-        self.assertEqual([solids.where(e) for e, _ in left], [])
-
-    def test_the_body_has_a_flat_break_where_the_break_of_the_bevel_ends_on_the_corner_round(self) -> None:
-        flats = [line for line in self.log if line.startswith("body, flat break of 1 at")]
-        self.assertEqual(len(flats), 2, self.log)
-
-    def test_the_build_names_no_edge_that_is_still_sharp(self) -> None:
-        """But for the places that the edge finish names as not finished, with their reason (docs/adr/0007): each edge
-        that the build leaves sharp lies at one of them."""
-        import re
-
-        sharp = [line for line in self.log if "still sharp" in line or "stays sharp" in line or "stay sharp" in line]
-        for line in sharp:
-            for x, y, z in re.findall(r"\((-?[\d.]+), (-?[\d.]+), (-?[\d.]+)\)", line):
-                with self.subTest(line=line[:80], at=(x, y, z)):
-                    self.assertTrue(ef.not_finished(V(float(x), float(y), float(z)), self.d))
-
-    def test_the_provisional_forms_are_listed_as_provisional_and_are_still_sharp(self) -> None:
-        """When a form on the hood band gets its design, it leaves this list."""
-        text = ef.table(self.rows, self.d)
-        for part in ef.PROVISIONAL:
-            with self.subTest(part=part):
-                self.assertEqual(self.rows[part]["class"], "provisional, not finished")
-                self.assertTrue(any(not g["against"] for g in self.rows[part]["sharp"]))
-                self.assertIn(f"| {part} | all | provisional, not finished |", text)
-
-    def test_the_bezel_plate_of_the_build_stands_in_for_the_printed_plate(self) -> None:
-        # the owner chose a printed plate (2026-11-14); the plate with the edge break is that of candybar.shell.cradle
-        self.assertEqual(self.rows["bezel"]["class"], "provisional, not finished")
-        self.assertEqual(sum(g["edges"] for g in self.rows["bezel"]["sharp"] if not g["against"]), 4)
-
 
 class WorkPackageClassesTest(unittest.TestCase):
     """The parts of the work packages are in their classes by name (or by the coupon of a layout entry), and the

@@ -5,7 +5,6 @@ import json
 import os
 import subprocess
 import unittest
-from pathlib import Path
 from unittest import mock
 
 import FreeCAD as App

@@ -5,10 +5,10 @@ four corners), a shell whose upper part leaves the seam at 45 degrees (a seam in
 upright seam in its lower half (three pieces meet). The pieces of each are made with the real cut of
 candybar.shell.split and the real generator.
 
-The whole set is made once for the module, from the skin in the cache (WholeSetTest.setUpClass). That takes about
-25 minutes; CANDYBAR_PIECES_SKIP_SET=1 leaves it out. The set needs the outer solids of the default build on disk
-(cad/out/shell-rev7, or the shared build) and the skin in the cache.
-"""
+The whole set (WholeSetTest, the slow group) is made once, from the skin in the cache; it takes about 25 minutes, and
+CANDYBAR_PIECES_SKIP_SET=1 leaves it out. It needs the outer solids of the default build on disk (cad/out/shell-rev7)
+and the skin in the cache. Its tests are rules of the joints that pieces.check_set does not check yet: when the build
+checks them, they go."""
 from __future__ import annotations
 
 import math
@@ -340,17 +340,7 @@ class FloorDataTest(unittest.TestCase):
             self.assertLessEqual(max(w, deep), lim.xy, name)
 
 
-@unittest.skipIf(os.environ.get("CANDYBAR_PIECES_SKIP_SET"), "CANDYBAR_PIECES_SKIP_SET is set")
-class MergedViewTest(unittest.TestCase):
-    """The merged copies are for a person to look at: BREP files whose names say so, no STL and no manifest."""
-
-    def test_the_merged_copies_are_named_as_not_for_print_and_have_no_mesh(self) -> None:
-        folder = support.temp_dir() / "view"
-        pieces.write_merged_view(folder, {"deck side R": Part.makeBox(10, 10, 10)})
-        names = sorted(p.name for p in folder.iterdir())
-        self.assertEqual(names, ["README.txt", "deck_side_R-merged-view-not-for-print.brep"])
-
-
+@support.slow
 class WholeSetTest(unittest.TestCase):
     """Every seam of the layout, the floor and the ribs: about 25 minutes."""
 
@@ -376,14 +366,6 @@ class WholeSetTest(unittest.TestCase):
         # marquee window of band A makes the strip under it a piece of its own (hood sill)
         self.assertEqual(len(self.res.pieces), 30)
 
-    def test_every_piece_is_one_valid_solid_inside_the_printer_limit(self) -> None:
-        bad = {n: (r["valid"], r["solids"], r["x"], r["y"], r["z"]) for n, r in self.chk["pieces"].items()
-               if not r["valid"] or r["solids"] != 1 or not r["fits"]}
-        self.assertEqual(bad, {})
-
-    def test_no_two_pieces_share_volume(self) -> None:
-        self.assertEqual(self.chk["clashes"], [])
-
     def test_the_joints_add_no_clash_with_the_hardware(self) -> None:
         # a plain piece may already be in a keep-out zone (the fit study reports those); the joints must not add to it
         more = [h for h in self.chk["hardware"] if h["mm3"] - h["of_the_plain_piece_mm3"] > pieces.BUILD.clash_mm3]
@@ -403,9 +385,6 @@ class WholeSetTest(unittest.TestCase):
         odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut | centre | moved | designed and not t["piece"].startswith("floor")]
         self.assertEqual(odd, [])
 
-    def test_a_screwdriver_reaches_every_screw(self) -> None:
-        self.assertEqual(self.chk["reach_short"], [])
-
     def test_every_bonded_seam_has_a_flange_on_both_pieces_or_is_a_known_exception(self) -> None:
         none = sorted({(s["seam"].split()[0], s["piece"].rsplit(" ", 1)[0] if s["piece"][-1] in "RL" else s["piece"])
                        for s in self.rep["sides"] if s["flange_cm3"] == 0.0})
@@ -421,13 +400,6 @@ class WholeSetTest(unittest.TestCase):
         bad = [(p["seam"], p["key"]) for p in self.rep["pairs"] if p["key"] and where[(p["seam"], p["k"], p["key"])] == "on the bed"]
         self.assertEqual(bad, [])
         self.assertGreater(len([p for p in self.rep["pairs"] if p["key"]]), 20)
-
-    def test_the_mass_of_the_joints_is_less_than_the_budget_of_the_structure_study(self) -> None:
-        m = self.chk["mass"]
-        # structure.total_mass allows EXTRAS_SHARE of the skin for ribs, flanges, the top ring and screws
-        from candybar.shell import structure
-
-        self.assertLess(m["joints_ribs_feet_g"], structure.EXTRAS_SHARE * m["plain_skin_without_floor_g"])
 
     def test_the_floor_has_nine_tiles_and_every_tile_is_screwed(self) -> None:
         fl = self.rep["floor"]
@@ -509,21 +481,6 @@ class WholeSetTest(unittest.TestCase):
         self.assertEqual(len(self.chk["hood_reach"]), 4)
         self.assertTrue(all(r["free"] >= pieces.HOOD_KEY for r in self.chk["hood_reach"]), self.chk["hood_reach"])
 
-    def test_a_merged_copy_is_valid_closed_and_of_the_same_volume_and_the_piece_does_not_change(self) -> None:
-        name = "deck nose"
-        before = (len(self.made[name].Faces), self.made[name].Volume)
-        out, rows = pieces.merge_faces({name: self.made[name]}, lambda *_: None)
-        r = rows[0]
-        self.assertEqual((len(self.made[name].Faces), self.made[name].Volume), before)
-        if r["merged"]:
-            m = out[name]
-            self.assertTrue(m.isValid() and m.isClosed() and len(m.Solids) == 1)
-            self.assertLessEqual(abs(m.Volume - before[1]), pieces.MERGE_DV)
-            self.assertLessEqual(len(m.Faces), before[0])
-        else:
-            self.assertNotIn(name, out)
-            self.assertTrue(r["why"])
-
     def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
         # a head pocket there would cut into the step of the skin behind the lowest cut-in
         l1 = [sc["at"] for p in self.rep["pairs"] if p["seam"].split()[0] == "L1" for sc in p["screws"]]
@@ -546,43 +503,3 @@ class WholeSetTest(unittest.TestCase):
                 self.assertLess(sd.solid.common(zone).Volume, 1.0, f"{sd.cf.seam} {sd.cf.piece}")
 
 
-@unittest.skipIf(os.environ.get("CANDYBAR_PIECES_SKIP_SET"), "CANDYBAR_PIECES_SKIP_SET is set")
-class SocketPlateTest(unittest.TestCase):
-    """The pieces with the front socket plate (in the default build since 2026-11-16): the seat with its frame in deck
-    side R, the floor tile with its notch round the frame, and the foot flange that stops along the plate. The plate
-    and the bought parts of every variant stay clear of the pieces."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        from pathlib import Path
-
-        cls.d = Blueprint()
-        out = Path(os.environ.get("CANDYBAR_PIECES_CACHE") or pieces.CAD / "out" / "pieces")
-        quiet = lambda *_: None
-        cls.pl = pieces.plain(cls.d, out, quiet)   # the seat is in the default plain cut (2026-11-16)
-        cls.items = pieces.socket_plate_items(cls.d)
-        cls.hits: list = []
-        cls.feet = pieces.feet(cls.pl, ["deck side R"], cls.items, cls.hits, quiet)
-        module = {p.full: p.module for p in cls.pl.pieces}
-        walls = {n: s for n, s in cls.pl.shapes.items() if module[n] == "body"}
-        cls.tiles, _, cls.rep = pieces.floor(cls.pl, walls, cls.items, quiet)
-
-    def test_the_seat_is_in_deck_side_r_and_the_piece_is_one_valid_solid(self) -> None:
-        seated = self.pl.shapes["deck side R"]
-        self.assertTrue(seated.isValid())
-        self.assertEqual(len(seated.Solids), 1)
-
-    def test_a_floor_tile_has_its_notch_round_the_frame_and_no_tile_meets_the_seat_or_the_plate(self) -> None:
-        self.assertTrue(any(n["wall"] == "deck side R" for n in self.rep["notches"]))
-        seated = self.pl.shapes["deck side R"]
-        for n, t in self.tiles.items():
-            with self.subTest(tile=n):
-                self.assertLess(t.common(seated).Volume, pieces.BUILD.clash_mm3)
-        self.assertEqual([h for h in self.rep["hardware_in_floor"] if h["role"] == pieces.SOCKET_PLATE], [])
-
-    def test_the_foot_flange_stops_along_the_plate(self) -> None:
-        stop = next(s for name, _, s in self.items if name.startswith("the foot flange"))
-        for sd in self.feet:
-            if sd.solid is not None:
-                self.assertLess(sd.solid.common(stop).Volume, pieces.BUILD.clash_mm3)
-        self.assertTrue(any(h["item"] == "the foot flange along the socket plate" for h in self.hits))

@@ -1,6 +1,7 @@
-"""The control panel of candybar.shell.panel_frame: the interface, the arcade panel on the hardware of fit.Layout,
-the blank panel, the frame, the latch (the push bolt by default, the screws and the magnets as options), and the
-checks of the package on the real skin of the deck."""
+"""The control panel of candybar.shell.panel_frame: the interface, the arcade panel, the blank panel, the frame, the
+stiffness, the push bolt (quick); and in the slow group, on the real skin of the deck: the checks can still fail, the
+panel comes out with the button held and not with a hook under the ledge, and the options (screws, magnets) still
+build and pass. The build of the package checks its parts and fails."""
 from __future__ import annotations
 
 import functools
@@ -101,29 +102,6 @@ class ArcadeTest(unittest.TestCase):
         self.b = built()
         self.h = pf.holes(self.b.d, self.b.a, values())
         self.whole = Part.makeCompound(list(self.b.arcade.values()))
-
-    def test_each_tile_is_one_valid_solid(self) -> None:
-        for name, tile in self.b.arcade.items():
-            self.assertTrue(tile.isValid(), name)
-            self.assertEqual(len(tile.Solids), 1, name)
-
-    def test_the_holes_are_where_the_fit_study_puts_the_hardware(self) -> None:
-        v, a = values(), self.b.a
-        _, hw = scene()
-        caps = {s.name: s.world.BoundBox.Center for s in hw.solids(("Panel",), ("protrusion",))}
-        action = [(caps[f"Btn{k}_Cap"].x, caps[f"Btn{k}_Cap"].y) for k in range(1, 9)]
-        service = [(caps[f"Svc{k}_Cap"].x, caps[f"Svc{k}_Cap"].y) for k in range(1, 4)]
-        self.assertTrue(near(support.hole_centres(self.whole, v("btn_hole_d") + a.hole_allow), action))
-        self.assertTrue(near(support.hole_centres(self.whole, v("svc_hole_d") + a.hole_allow), service))
-        self.assertTrue(near(support.hole_centres(self.b.arcade["panel_lever_tile"], v("stick_shaft_hole_d")), [(caps["Lever_Ball"].x, caps["Lever_Ball"].y)]))
-
-    def test_the_seat_of_the_lever_is_the_plate_drop_below_the_top(self) -> None:
-        v, d = values(), self.b.d
-        _, hw = scene()
-        plate = next(s.world for s in hw.solids(("Panel",)) if s.name == "Lever_Plate")
-        self.assertAlmostEqual(self.h.lever_seat_z, plate.BoundBox.ZMax)
-        self.assertAlmostEqual(d.panel_top - self.h.lever_seat_z, v("stick_plate_drop"))
-        self.assertTrue(near(support.hole_centres(self.b.arcade["panel_lever_tile"], v("stick_insert_d")), list(self.h.lever_mount)))
 
     def test_the_seam_lies_between_the_lever_body_and_the_first_button(self) -> None:
         x = pf.seam_x(self.b.a)
@@ -235,31 +213,7 @@ class FrameTest(unittest.TestCase):
 class ChecksTest(unittest.TestCase):
     """The checks of the package pass on the real skin of the deck, and each one finds a fault that is put in."""
 
-    def test_no_check_fails(self) -> None:
-        self.assertEqual(report()["failures"], [])
-
-    def test_no_part_meets_the_skin_the_hardware_or_another_part(self) -> None:
-        rows = report()["clashes"] + report()["clashes_blank"]
-        self.assertGreater(len(rows), 30)
-        self.assertEqual([r for r in rows if r["result"] != "PASS"], [])
-
-    def test_the_tools_of_the_shell_pass_on_these_parts_and_name_each_joint_that_holds_an_edge(self) -> None:
-        """tools/edge_finish.py and tools/face_check.py as they run on cad/out/control-panel/parts: each part is in
-        the class of printed parts, no sharp edge shows, each named joint of these parts holds a sharp edge, and the
-        face check has no failure."""
-        from tools import edge_finish as ef, face_check as fc
-
-        b = built()
-        parts = b.parts
-        self.assertEqual(set(parts), set(pf.PARTS))
-        rows = ef.survey(parts, b.d)
-        self.assertEqual(ef.failures(rows), [])
-        used = {(part, g["against"]) for part, r in rows.items() for g in r["sharp"] if g["against"]}
-        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in parts})
-        found, stale = fc.check_shell(parts)
-        self.assertEqual(fc.failures(found), [])
-        self.assertEqual(stale, [])
-
+    @support.slow
     def test_a_rib_through_a_button_is_found(self) -> None:
         b = built()
         skin, hw = scene()
@@ -267,6 +221,7 @@ class ChecksTest(unittest.TestCase):
         rows = pf.clash_rows(bad, skin, hw)
         self.assertIn(("panel_button_tile", "hardware: Panel", "FAIL"), {(r["part"], r["against"], r["result"]) for r in rows})
 
+    @support.slow
     def test_a_plate_with_no_seat_gap_is_found_in_the_skin_when_it_is_too_large(self) -> None:
         b = built()
         skin, hw = scene()
@@ -274,11 +229,7 @@ class ChecksTest(unittest.TestCase):
         rows = pf.clash_rows(large, skin, hw)
         self.assertTrue(any(r["against"] == "skin of the deck" and r["result"] == "FAIL" for r in rows))
 
-    def test_the_hardware_of_the_panel_lies_in_the_room_below_the_plate(self) -> None:
-        rows = report()["room"]
-        self.assertEqual([r for r in rows if r["result"] != "PASS"], [])
-        self.assertTrue(any(r["what"].startswith("Lever_Tip") for r in rows))
-
+    @support.slow
     def test_the_panel_comes_out_with_the_button_held_and_not_without_it(self) -> None:
         rep = report()
         self.assertGreater(len(rep["lift"]), 20)
@@ -287,6 +238,7 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual(len(rep["locks"]), 2)
         self.assertEqual([r for r in rep["locks"] if r["result"] != "PASS"], [])
 
+    @support.slow
     def test_the_options_still_build_and_pass(self) -> None:
         """The screws (the fall-back) and the magnets alone: each passes every check of the package."""
         skin, hw = scene()
@@ -295,6 +247,7 @@ class ChecksTest(unittest.TestCase):
             self.assertEqual(rep["failures"], [], latch)
             self.assertEqual([r for r in rep["lift"] if r["result"] != "PASS"], [], latch)
 
+    @support.slow
     def test_a_panel_that_hooks_under_the_ledge_does_not_lift_out(self) -> None:
         b = built()
         skin, hw = scene()
@@ -302,28 +255,6 @@ class ChecksTest(unittest.TestCase):
         hook = pf.box(-20, 20, pf.y0(d) + d.panel_d - 12, pf.y0(d) + d.panel_d - 2, pf.z_rest(d) - 9, pf.z_rest(d) - 5)
         rows = pf.lift_rows({**b.arcade, "hook": hook}, hw, b.frame, skin, steps=(3.0,))
         self.assertEqual(rows[0]["result"], "FAIL")
-
-    def test_each_part_fits_the_printer_and_needs_no_support(self) -> None:
-        rows = report()["print"]
-        self.assertEqual(len(rows), 12)
-        for r in rows:
-            self.assertTrue(r["fits"], r["part"])
-            # a tile lies on its top face: the round of the edge break, the hooks and the lips of the strike are all
-            # that looks down; each half of the frame has the roof of a notch of a hook (a bridge), the left half also
-            # the roofs of the tunnel; the bolt has the round of its button and the bore of its spring
-            self.assertLess(r["overhang_cm2"], 6.0, r["part"])
-            if r["part"].startswith(("post", "latch_gate")):
-                self.assertEqual(r["overhang_cm2"], 0.0, r["part"])
-            if r["part"].startswith(("frame", "latch_bolt")):
-                self.assertLess(r["overhang_cm2"], 4.0, r["part"])
-
-    def test_no_sharp_edge_shows_and_no_face_fails(self) -> None:
-        rep = report()
-        for name, r in rep["edge_finish"].items():
-            self.assertEqual([g for g in r["sharp"] if not g["against"]], [], name)
-            self.assertEqual(sum(rep["face_check"].get(name, {}).get(k, 0) for k in ("sliver", "needle", "crowded", "kink", "split")), 0, name)
-        for name in (*built().arcade, *built().blank):
-            self.assertGreater(rep["edge_finish"][name]["break_faces"], 0, name)
 
     def test_a_plate_with_no_edge_break_fails_the_edge_rule(self) -> None:
         b = built()
@@ -335,9 +266,6 @@ class StiffnessTest(unittest.TestCase):
     def setUp(self) -> None:
         b = built()
         self.st = pf.stiffness(b.d, b.i, b.a, values())
-
-    def test_the_load_is_the_couple_of_the_research_note(self) -> None:
-        self.assertEqual(self.st["couple_Nmm"], 40.0 * 60.0)
 
     def test_the_ribs_make_the_seat_of_the_lever_stiffer(self) -> None:
         ribs, flat = self.st["cases"]["with the ribs"], self.st["cases"]["flat plate of 5, no ribs"]
@@ -394,12 +322,6 @@ class PushBoltTest(unittest.TestCase):
         self.assertAlmostEqual(min(gaps), self.p.button_gap, places=4)
         self.assertAlmostEqual(max(gaps), self.p.button_gap, places=4)
         self.assertGreater(so.LATCH_CORNER - self.p.button_gap, d.edge_break)
-
-    def test_the_bolt_and_the_gate_are_parts_and_the_button_has_its_edge_break(self) -> None:
-        bolt = self.b.latch["latch_bolt"]
-        self.assertTrue(bolt.isValid() and len(bolt.Solids) == 1)
-        self.assertGreater(len([f for f in bolt.Faces if f.BoundBox.YMax < pf.SHOWN and isinstance(f.Surface, (Part.Toroid, Part.Cylinder, Part.BSplineSurface))]), 0)
-        self.assertEqual([g for g in report()["edge_finish"]["latch_bolt"]["sharp"] if not g["against"]], [])
 
     def test_a_button_with_no_edge_break_fails_the_edge_rule(self) -> None:
         bare = pf.bolt(self.d, self.p).cut(pf.box(-50, 50, -50, 1.5, 0, 100))

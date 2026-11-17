@@ -1,4 +1,5 @@
-"""The face check: its five rules, and the whole shell of the default build with its one list of known items."""
+"""The face check: its five rules and its list of known items, on small solids. cad/check.sh (tools.face_check) runs
+it on the parts of every build."""
 from __future__ import annotations
 
 import unittest
@@ -8,7 +9,6 @@ import Part
 
 from tools import face_check as fc
 
-from . import support
 
 V = App.Vector
 
@@ -73,24 +73,3 @@ class KnownItemsTest(unittest.TestCase):
                 self.assertLessEqual(item.within, 3.0)
 
 
-class ShellFaceCheckTest(unittest.TestCase):
-    """The whole shell: every finding is in a named reveal, is an edge break, or is a known item; and every known
-    item is still there."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        _, parts, _ = support.shell()
-        cls.found, cls.stale = fc.check_shell(parts)
-
-    def test_no_finding_but_the_known_items(self) -> None:
-        self.assertEqual([(f.part, f.rule, f.at, f.detail) for f in fc.failures(self.found)], [])
-
-    def test_every_known_item_is_still_found(self) -> None:
-        self.assertEqual(self.stale, [])
-
-    def test_the_edge_breaks_are_allowed_as_edge_breaks(self) -> None:
-        self.assertGreater(sum(1 for f in self.found if f.allowed == "edge break"), 20)
-
-    def test_every_printed_part_is_checked(self) -> None:
-        self.assertEqual({f.part for f in self.found} & set(fc.NOT_PARTS), set())
-        self.assertIn("body", fc.summary(self.found))

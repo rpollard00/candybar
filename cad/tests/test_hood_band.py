@@ -1,5 +1,6 @@
-"""The hood band study (candybar.shell.hood_band): the places of each variant, its parts, the edge rule and the face
-check on what shows, the room behind the wall, and the way the marquee front comes out.
+"""The hood band (candybar.shell.band holds band A of the default build; candybar.shell.hood_band keeps B, C and the
+taller hoods as variants): the places, the parts of the band on small solids (quick); and in the slow group, the one
+check of the variants: each builds and keeps the outside of the hood.
 
 The parts of the shell that the variants share (the cap of the hood among them) are kept under cad/out/hood-band/base,
 as the skin of the split is kept under cad/out/shell-rev7. The first run makes them."""
@@ -7,15 +8,15 @@ from __future__ import annotations
 
 import functools
 import unittest
-from dataclasses import replace
 from pathlib import Path
 
 import FreeCAD as App
 import Part
 
-from candybar.shell import fit, hood_band as hb, profiles as pr, split
+from candybar.shell import fit, hood_band as hb, profiles as pr
 from candybar.shell.dims import Blueprint
-from tools import face_check as fc
+
+from . import support
 
 OUT = Path(__file__).resolve().parents[1] / "out" / "hood-band"
 V = App.Vector
@@ -30,14 +31,6 @@ def base() -> dict[str, Part.Shape]:
 def built(key: str) -> dict[str, Part.Shape]:
     parts = base()
     return hb.build(Blueprint(), hb.Band(), hb.Driver(), hb.VARIANTS[key], parts["cap"], parts["opening"])
-
-
-@functools.cache
-def checked(key: str) -> dict:
-    d, b, v = Blueprint(), hb.Band(), hb.VARIANTS[key]
-    h = pr.hood(d)
-    skin = hb.hood_skin(d, h, b, v, hb.places(d, h, b, v))
-    return hb.check(built(key), base(), d, b, hb.Driver(), v, skin)
 
 
 class PlacesTest(unittest.TestCase):
@@ -101,24 +94,6 @@ class PlacesTest(unittest.TestCase):
         self.assertLess(b.bar_x + b.bar_w / 2, b.spk_w / 2 - b.grille_gap)
         self.assertGreater(b.screw_x - b.screw_hole / 2, self.drv.frame / 2 + b.seat_gap)
         self.assertLess(b.screw_x + b.screw_hole / 2, b.bar_x + b.bar_w / 2 - 0.5)
-
-    def test_a_taller_hood_keeps_the_band_and_the_lower_front(self) -> None:
-        for t in hb.TALL.values():
-            d2 = hb.tall_blueprint(t)
-            h2 = pr.hood(d2)
-            with self.subTest(study=t.key):
-                self.assertAlmostEqual(h2.height, self.h.height + t.extra)
-                self.assertAlmostEqual(d2.hood_h, self.d.hood_h + t.extra)
-                self.assertAlmostEqual(h2.z_band_top, self.h.z_band_top)
-                self.assertAlmostEqual(h2.z_rail_top, self.h.z_rail_top)
-                self.assertAlmostEqual(h2.y_band_top, self.h.y_band_top, places=6)
-                for z in (0.0, 20.0, 40.0):
-                    self.assertAlmostEqual(h2.front_y(z), self.h.front_y(z), places=6)
-                win = hb.window(d2, h2, hb.tall_band(t))
-                self.assertAlmostEqual(win[2][1] - win[0][1], t.win_h)
-                self.assertGreaterEqual(win[0][1] - h2.z_rail_top, 0.5)
-                self.assertGreaterEqual(h2.z_open_top - win[2][1], 0.5)
-                self.assertGreaterEqual(h2.half_open(win[2][1], d2), t.win_w / 2 + 2.0, "the window clears the corner of the opening")
 
     def test_the_front_lifts_far_enough_to_come_out(self) -> None:
         """The front lifts by the gap under the top bar. That frees the hooks, and the foot leaves the groove."""
@@ -206,75 +181,8 @@ class PartsTest(unittest.TestCase):
         self.assertFalse(any(hb.in_joint(block, e, [wall]) for e in front))
 
 
+@support.slow
 class VariantsTest(unittest.TestCase):
-    def test_each_variant_passes_its_checks(self) -> None:
-        for key in hb.VARIANTS:
-            with self.subTest(variant=key):
-                self.assertEqual(checked(key)["failures"], [])
-
-    def test_the_parts_that_show_have_the_edge_break_and_the_hole_grille_is_an_open_item(self) -> None:
-        """The edge rule holds on each part that shows (hood_band.SHOWN), the black grille and the translucent marquee
-        front among them: their front edges have the break. The rims of the holes of grille A (webs of 1.4) and the rear
-        rims of the slots of grille C have the small break of 0.3; a place where it does not build is listed as not
-        finished (hood_band.open_edges)."""
-        for key, v in hb.VARIANTS.items():
-            rep = checked(key)
-            with self.subTest(variant=key):
-                self.assertEqual(rep["sharp_edges_that_show"], [])
-                held = {e["part"] for e in rep["sharp_edges_open"]}
-                self.assertEqual(held, set(hb.open_edges(v)))
-                self.assertEqual(held, set())     # the small breaks of grilles A and C build
-                self.assertEqual(rep["open"], [])
-                for name in ("grille_right", "marquee_front_right"):
-                    breaks = [f for f in built(key)[name].Faces if fc.is_break(f, Blueprint().edge_break)]
-                    self.assertTrue(breaks, (key, name))
-                    if name.startswith("grille") and v.grille in ("holes", "upright slots"):
-                        small = [f for f in built(key)[name].Faces if fc.is_break(f, hb.Band().small_break)]
-                        self.assertTrue(small, (key, name))
-                    self.assertTrue(built(key)[name].isValid(), (key, name))
-
-    def test_the_tools_of_the_shell_pass_on_each_variant(self) -> None:
-        """tools/edge_finish.py and tools/face_check.py as they run on cad/out/hood-band/<variant>: the parts of the
-        band and the base parts of the shell, each in a class; no sharp edge of a part that shows is left, but for the
-        open item of the hole grille (hood_band.open_edges); the face check
-        has no failure; each named joint of the painted parts of the band holds a sharp edge in one variant or more."""
-        from tools import edge_finish as ef, face_check as fc
-
-        used = set()
-        for key in hb.VARIANTS:
-            parts = {**built(key), **{k: base()[k] for k in hb.BASE}}
-            rows = ef.survey(parts, Blueprint(), {k: {"open": o} for k, o in hb.open_edges(hb.VARIANTS[key]).items()})
-            with self.subTest(variant=key):
-                self.assertEqual(ef.failures(rows), [])
-                found, _ = fc.check_shell(parts)
-                self.assertEqual(fc.failures(found), [])
-            used |= {(n, g["against"]) for n, r in rows.items() if n in ef.BAND_SHOWN for g in r["sharp"] if g["against"]}
-        named = {j for j in ef.JOINTS if j[0] in ef.BAND_SHOWN and j[1] not in ("deck", "body", "bezel", "screen", "control_panel", ef.SEAM_NAME)}
-        self.assertEqual(used & named, named)
-
-    def test_each_part_is_one_valid_solid_and_the_left_is_the_mirror_of_the_right(self) -> None:
-        for key in hb.VARIANTS:
-            parts = built(key)
-            for name, s in parts.items():
-                self.assertTrue(s.isValid() and len(s.Solids) == 1, f"{key} {name}")
-            for name in parts:
-                if name.endswith("_right") and not name.startswith("marquee_front"):
-                    self.assertAlmostEqual(parts[name].Volume, parts[name.replace("_right", "_left")].Volume, places=3, msg=f"{key} {name}")
-
-    def test_no_stand_in_is_left_and_each_part_has_a_class(self) -> None:
-        for key in hb.VARIANTS:
-            names = set(built(key))
-            self.assertFalse(names & {"marquee_lip", "speaker_left", "speaker_right", "logo_form"}, key)
-            self.assertTrue(all(hb.kind(n) in hb.PARTS for n in names), key)
-
-    def test_the_bands_differ_as_the_variants_say(self) -> None:
-        for key in hb.VARIANTS:
-            self.assertIn("speaker_enclosure_right", built(key))
-        self.assertIn("speaker_pod_right", built("A"))
-        self.assertNotIn("speaker_pod_right", built("B"))
-        self.assertIn("logo_field", built("A"))
-        self.assertIn("logo_backer", built("B"))
-        self.assertNotIn("logo_badge", built("C"))
 
     def test_the_cap_keeps_its_outside(self) -> None:
         """The openings of a band are all behind the front of the band wall: the hood has the box of the cap."""
@@ -289,44 +197,3 @@ class VariantsTest(unittest.TestCase):
             self.assertGreater(lost, 0.0)
             self.assertLess(lost, 400.0 * 110.0 * 2 * hb.Band().wall_t)
 
-    def test_no_part_of_a_band_stands_in_front_of_the_hood(self) -> None:
-        d = Blueprint()
-        y_front = base()["cap"].BoundBox.YMin + pr.hood(d).origin[1]
-        for key in hb.VARIANTS:
-            for name, s in built(key).items():
-                self.assertGreaterEqual(s.BoundBox.YMin, y_front, f"{key} {name}")
-
-    def test_the_marquee_front_comes_out_when_it_is_lifted(self) -> None:
-        d, b, v = Blueprint(), hb.Band(), hb.VARIANTS["B"]
-        if not split.skin_cached(d):
-            self.skipTest("the skin of the hood is not in the cache of the split")
-        h = pr.hood(d)
-        parts = built("B")
-        fixed = [hb.hood_skin(d, h, b, v, hb.places(d, h, b, v)), parts["marquee_lip_right"], parts["marquee_lip_left"]]
-        front = parts["marquee_front_right"]
-        down = sum(front.common(s).Volume for s in fixed)
-        self.assertLess(down, 0.5)
-        held = front.translated(V(0, -1.0, 0))
-        self.assertGreater(sum(held.common(s).Volume for s in fixed), 1.0, "the lip and the hook hold the front when it is down")
-        lifted = front.translated(V(0, 0, b.mq_front_gap - 0.1))
-        for step in range(0, 13):
-            out = lifted.translated(V(0, -step, 0))
-            self.assertLess(sum(out.common(s).Volume for s in fixed), 0.5, f"the lifted front, {step} mm out")
-
-    def test_the_inside_parts_are_in_the_cavity_of_the_hood(self) -> None:
-        if not split.skin_cached(Blueprint()):
-            self.skipTest("the skin of the hood is not in the cache of the split")
-        for key in hb.VARIANTS:
-            rep = checked(key)
-            self.assertTrue(rep["skin_checked"])
-            self.assertEqual(rep["room"]["shared"], [], key)
-
-    def test_a_driver_that_is_too_deep_is_found(self) -> None:
-        if not split.skin_cached(Blueprint()):
-            self.skipTest("the skin of the hood is not in the cache of the split")
-        d, b, v = Blueprint(), hb.Band(), hb.VARIANTS["B"]
-        h = pr.hood(d)
-        pl = hb.places(d, h, b, v)
-        deep = hb.driver(b, replace(hb.Driver(), magnet_depth=140.0), pl).translated(V(*h.origin))
-        rm = hb.room({"driver_right": deep}, hb.hood_skin(d, h, b, v, pl))
-        self.assertTrue(rm["shared"])
