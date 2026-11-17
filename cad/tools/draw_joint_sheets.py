@@ -1,7 +1,7 @@
 """The sheet of the second pass on the joints of the print pieces: the closing gap and the top ring (joint 7).
 
     CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.joint_sheets
-    cad/.venv-tools/bin/python cad/tools/draw_joint_sheets.py cad/out/pieces     # --no-render: compose only
+    cad/.venv-tools/bin/python cad/tools/draw_joint_sheets.py cad/out/pieces     # --no-render: render only the views with no picture
 
 It renders the scenes of <out>/joints-2/scenes with tools/render_views.py (Blender, one at a time under the lock of
 tools/cad-lock.sh) and writes <out>/joints-2/joints-2.png. Every face edge is drawn.
@@ -29,20 +29,22 @@ VIEWS = [  # (scene, view, caption)
 ]
 
 
-def render(out: str) -> None:
-    scenes = sorted({s for s, _, _ in VIEWS})
-    for s in scenes:
-        views = ",".join(v for sc, v, _ in VIEWS if sc == s)
+def render(out: str, views_of: list, size: int = 1200, missing_only: bool = False) -> None:
+    """Render the views (scene, view, caption) of a sheet, one scene at a time under the lock. missing_only: only the
+    scenes with a view that has no picture yet (the composing step, --no-render, then never stops on a new view)."""
+    for s in sorted({sc for sc, _, _ in views_of}):
+        views = [v for sc, v, _ in views_of if sc == s]
+        if missing_only and all(os.path.exists(os.path.join(out, "joints-2", "renders", s, f"{v}.png")) for v in views):
+            continue
         subprocess.run([os.path.join(HERE, "cad-lock.sh"), sys.executable, os.path.join(HERE, "render_views.py"),
-                        os.path.join(out, "joints-2", "renders", s), os.path.join(out, "joints-2", "scenes", s), "--views", views, "--size", "1200"],
-                       check=True)
+                        os.path.join(out, "joints-2", "renders", s), os.path.join(out, "joints-2", "scenes", s), "--views", ",".join(views),
+                        "--size", str(size)], check=True)
 
 
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     out = os.path.abspath(args[0] if args else "cad/out/pieces")
-    if "--no-render" not in argv:
-        render(out)
+    render(out, VIEWS, missing_only="--no-render" in argv)
     seams = json.load(open(os.path.join(out, "seams.json")))
     imgs = [(Image.open(os.path.join(out, "joints-2", "renders", s, f"{v}.png")).convert("RGB"), cap) for s, v, cap in VIEWS]
     cw = 760
@@ -87,7 +89,8 @@ def main(argv: list[str]) -> int:
     sheet.save(path)
     print(f"draw_joint_sheets: {path}")
     if seams.get("hood_screws"):
-        hood_sheet(out, seams, "--no-render" not in argv)
+        render(out, HOOD_VIEWS, 1400, missing_only="--no-render" in argv)
+        hood_sheet(out, seams)
     return 0
 
 
@@ -96,14 +99,8 @@ HOOD_VIEWS = [("hood-reach", "reach", "The right side cut open inside its wall, 
               ("hood-screw", "screw", "Section through the front screw: the ring's boss, the screw, the insert's hole in the foot's boss")]
 
 
-def hood_sheet(out: str, seams: dict, render_now: bool) -> None:
+def hood_sheet(out: str, seams: dict) -> None:
     """The sheet of the bolted hood: how a key from the rear door reaches each screw."""
-    if render_now:
-        for s in sorted({s for s, _, _ in HOOD_VIEWS}):
-            views = ",".join(v for sc, v, _ in HOOD_VIEWS if sc == s)
-            subprocess.run([os.path.join(HERE, "cad-lock.sh"), sys.executable, os.path.join(HERE, "render_views.py"),
-                            os.path.join(out, "joints-2", "renders", s), os.path.join(out, "joints-2", "scenes", s), "--views", views, "--size", "1400"],
-                           check=True)
     imgs = [(Image.open(os.path.join(out, "joints-2", "renders", s, f"{v}.png")).convert("RGB"), cap) for s, v, cap in HOOD_VIEWS]
     cw = 760
     imgs = [(i.resize((cw, int(i.size[1] * cw / i.size[0]))), cap) for i, cap in imgs]

@@ -442,62 +442,14 @@ CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh tools.face_check      # 
 - **Edge finish: one finding on each lower piece.** At the lower rim of the bezel recess, x ±199 to ±235, z 133.7, one sharp edge of 66.5 degrees, 35.4 long, between the sill and a flat of 0.2 at the seam L1. The default build has the same rim: its tool hides it because the middle of the long rim lies under the stand-in of the bezel plate, and here the rim is cut at the seam. The stand-in plate stands 1.9 from it. To break the rim changes the outer form, so this unit did not change it. It is open (see the roadmap).
 - **Face check: 3184 findings on the outside faces, not changed.** They are in the faces of the skin, not in its form: 1134 on the underside (z 0, the face on the table), 212 at the seam on the body top, 62 along the line where the deck and the body meet (y 207), and 1776 at other places. The samples of these that were read are at the levels of the slabs of the cavity (z 65, 70, 72), at the cut-ins and at the bezel recess; not all 1776 were read. 2562 are splits (one surface cut into several faces), 248 crowded vertices, 224 slivers, 116 needles and 34 kinks. They do not change the printed form or the fit. The face check of the default build has none of them, because its parts are the outer form, not the skin.
 
-## Merged faces on every piece
+## Merged faces: a copy to look at, not a print file
 
-Date: 2026-11-16. `pieces.merge_faces` merges the faces that lie in one surface (`Shape.removeSplitter()`) on each piece, after its joints are made and before it is written. It works on a deep copy of the piece. A piece keeps its faces when the merged piece is not one valid, closed solid, or when its volume changes by more than 0.5 mm3 (or 1e-6 of it). The pieces as the joints leave them are written to `cad/out/pieces/unmerged/` too, for the count of the face check. The trial of 2026-11-16 on `lower_R` (1263 to 1149 faces, 241 to 61 findings) came first.
+Date: 2026-11-16. A print piece has many faces that lie in one surface (the skin is cut in slabs, and the joints add their own faces). `Shape.removeSplitter()` merges them, and the piece is easier to read in FreeCAD. The merge of OpenCascade is not the same in each run, and on the merged piece a boolean can fail (three clash tests of the build of 2026-11-16 gave a null shape on the merged lower L). So the merge is in no print file and in no check (the decision of 2026-11-16):
 
-**The result of the build of 2026-11-16.** 26 of the 32 pieces have their faces merged; the faces of the set go from 25339 to 23397. Six pieces keep their faces, because the merge changes their volume:
+- The STL and BREP files of `cad/out/pieces`, the checks of the set, the clash tests, the edge tool, the face check and the coupons use each piece as the joints leave it. That piece is the same in each run.
+- `pieces.merge_faces` makes a merged copy of each piece, and `cad/out/pieces/merged-view/` holds it as `<piece>-merged-view-not-for-print.brep`, with a README. The folder has no STL and no manifest, so no slicer and no tool takes it. It is for a person to look at in FreeCAD (File > Open). A copy is kept only when it is one valid closed solid whose volume is within 0.5 mm3 of the piece; a piece whose merge fails has no copy.
 
-| Piece | Faces before | Faces after the merge | Merged |
-| --- | --- | --- | --- |
-| deck nose | 1045 | 893 | yes |
-| deck side R | 1643 | 1129 | no: the volume changes by 2.897 mm3 |
-| deck side L | 1622 | 1108 | no: the volume changes by 9.480 mm3 |
-| apron | 879 | 813 | yes |
-| lower R | 1263 | 1149 | yes |
-| lower L | 1267 | 1150 | yes |
-| middle R | 1375 | 1303 | no: the volume changes by -4548.112 mm3 |
-| middle L | 1382 | 1304 | no: the volume changes by -3053.523 mm3 |
-| upper R | 1245 | 1183 | no: the volume changes by 112.646 mm3 |
-| upper L | 1247 | 1183 | no: the volume changes by 182.032 mm3 |
-| brow | 442 | 413 | yes |
-| upper rear R | 1158 | 982 | yes |
-| upper rear L | 1148 | 965 | yes |
-| rear lower R | 882 | 804 | yes |
-| rear lower L | 950 | 796 | yes |
-| door half R | 120 | 120 | yes |
-| door half L | 104 | 104 | yes |
-| hood centre | 1786 | 1710 | yes |
-| hood side R | 2741 | 2345 | yes |
-| hood side L | 2656 | 2255 | yes |
-| speaker form R | 6 | 6 | yes |
-| speaker form L | 6 | 6 | yes |
-| logo form | 6 | 6 | yes |
-| floor front side R | 36 | 36 | yes |
-| floor front side L | 36 | 36 | yes |
-| floor front centre | 46 | 46 | yes |
-| floor middle side R | 42 | 42 | yes |
-| floor middle side L | 42 | 42 | yes |
-| floor middle centre | 48 | 48 | yes |
-| floor rear side R | 37 | 37 | yes |
-| floor rear side L | 37 | 37 | yes |
-| floor rear centre | 42 | 42 | yes |
-
-**The merge is not the same in each run.** In the build before this one six pieces kept their faces too, but not the same six (lower L, middle L, upper R, upper L, rear lower L, hood side L). OpenCascade's merge on these pieces gives a different result from run to run; the rule of the volume catches each bad one.
-
-**The face check** (`tools/face_check.py` on `cad/out/pieces` and on `cad/out/pieces/unmerged`): 4845 findings before the merge, 1801 after.
-
-| Rule | Before | After |
-| --- | --- | --- |
-| split | 4153 | 1264 |
-| sliver | 283 | 174 |
-| crowded | 245 | 211 |
-| needle | 130 | 119 |
-| kink | 34 | 33 |
-
-The findings that stay are in the faces of the skin (the narrow step faces of the cavity) and at the seams. They were not looked at one by one.
-
-**A boolean on a merged piece.** The common of the merged lower L with rear lower L and two floor tiles gave a null shape. `check_set` then measures that clash on the unmerged pair (the merge does not change the form) and names it in `check.json` ("merged_boolean_fallback"). Each clash is 0.
+The trial of 2026-11-16, before this rule (the merged pieces were then the print files): 26 of the 32 pieces of that set merged, and the faces of the set went from 25339 to 23397. Six pieces kept their faces, because the merge changed their volume by 2.9 to 4548 mm3, and the six were not the same in two runs. The face check found 4845 findings on the pieces as the joints leave them and 1801 on the merged ones (splits 4153 to 1264, slivers 283 to 174, crowded 245 to 211, needles 130 to 119, kinks 34 to 33): the merge removes splits and narrow faces, but the files that are printed and checked are the unmerged ones.
 
 ## The hole of the latch's button
 

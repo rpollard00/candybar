@@ -86,7 +86,9 @@ class FitChecksTest(unittest.TestCase):
         names = {it.name for it in self.found}
         for name in ("Monitor", "Compute", "PSU", "CableBundle", "Lever", "Encoder", "Hub", "SpeakerR", "SpeakerL", "Marquee"):
             self.assertIn(name, names)
-        self.assertEqual(len([n for n in names if n.startswith("USB_")]), len(fit.USB_ORDER))
+        # the hardware of the front socket plate b-knob (2026-11-16): four sockets, the power button and the knob
+        self.assertEqual(len([n for n in names if n.startswith("USB_")]), 4)
+        self.assertTrue({"PowerButton", "VolumeKnob"} <= names)
 
 
 def placed_with(name: str, **changes: float) -> App.Document:

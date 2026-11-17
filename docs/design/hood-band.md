@@ -314,3 +314,14 @@ Date: 2026-11-15. The edge rule of the roadmap holds on each face that shows on 
 | `tools/edge_finish.py` | holds | holds | holds |
 | `tools/face_check.py` | PASS | PASS | PASS |
 
+## 15. In the default build
+
+Date: 2026-11-16. The owner chose band A on the hood as it is (2026-11-14), and it is now in the default build of the cabinet.
+
+- **The module.** The values of the band, its geometry and variant A are in `cad/candybar/shell/band.py` (`band.DEFAULT`); `solids.build` makes the hood with the openings of band A and every part of the band (`band.default_parts`). `hood_band.py` keeps the variants B and C and the taller hoods, and builds each variant, A among them, with its checks and sheets, from the functions of `band.py`.
+- **The stand-ins are gone**: `marquee_lip`, `speaker_right`, `speaker_left` and `logo_form` are no longer parts of the build, and the split has no pieces "speaker form R/L" and "logo form" (29 pieces). The band's own parts take their places.
+- **The skin.** The skin of the hood is made as before, with the stand-in of the lip in front of the band wall (`solids.lip_stand_in`), and `cavity.openings` then cuts the openings of band A through the band wall and the stand-in off (`band.skin_cutters`). The hood pieces of the split have the openings. The skin of the cache has the openings of A, so the study cuts the openings of B and C into a skin that has A's openings already: the sections of B and C show both.
+- **The fit study** keeps its envelopes of the speakers and of the marquee (the room that the band uses: the driver's frame of 51.8 is inside the largest frame of 53.9, and the mouth of the light box is the marquee room).
+- **Assembly.** After the three hood pieces are bonded (H1), the lip halves, the pods and the logo field are bonded on the band wall of the hood, apart from the cabinet; the hood is filled and painted with them. The light boxes, the driver seats and the enclosures go in behind the wall from inside; the drivers, the grilles with their screws, the marquee front and the badge go in last, from the front.
+- **The leads.** The two speakers and the light of the marquee each have a lead to one multi-pin plug at the foot of the hood (`docs/design/hardware-list.md`, "Plug at the foot of the hood"). The hood is bolted (`docs/design/print-pieces.md`, "The bolted hood"): with the rear door off and the four screws out, the hood lifts and tips back on 200 of slack, and the plug comes apart before the hood is lifted away. The leads are not modelled.
+

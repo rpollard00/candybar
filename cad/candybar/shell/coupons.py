@@ -22,7 +22,8 @@ The parts, each in its print orientation (z up, on the bed):
   floor-tile            a plate of the size of the smallest floor tile of the split, as the 10 mm sandwich
   latch-*               the first test piece of the control panel's latch (docs/design/control-panel-latch.md): a
                         strip of the deck nose with the button's hole (cut from the real skin), the middle of the
-                        frame's front bar with the tunnel, the bolt, the gate and a strip of a tile with the strike
+                        frame's front bar with the tunnel, the bolt, the gate and a strip of a tile with the strike;
+                        and a strip of the rear bar with one notch and a strip of a tile's rear edge with one hook
 
 Values. The joints come from candybar.shell.joints (JOINT, OTHER_JOINTS) and the form from dims.Blueprint. A value
 that the concept does not have yet is derived from those or named here as PROPOSED, with its reason; the hand-over
@@ -528,6 +529,32 @@ def latch_strike():
     return turned(pf.one_solid(tile.common(keep).removeSplitter(), "latch strike strip"), (1, 0, 0), 180)
 
 
+# the strips of the rear hook: from x 82 to x 113, round the hook at x +100 (PushBolt.hook_x). The pad of the cone at
+# x 120 starts at x 108; the strips stop before the cone and its slot
+HOOK_STRIP = (82.0, 113.0)
+
+
+def latch_notch():
+    """A strip of the rear bar of the right half of the frame with the notch of the hook at x +100: the bar, its
+    notch and a part of the pad of the cone at x 120. As the frame prints: the lower face of the bar on the bed."""
+    from . import panel_frame as pf
+    b = latch_build()
+    rear = pf.rear_bar_face(b.d, b.i)
+    keep = box(*HOOK_STRIP, rear - 6.0, rear + 30.0, 0.0, 200.0)
+    return pf.one_solid(b.frame["frame_right"].common(keep).removeSplitter(), "latch notch strip")
+
+
+def latch_hook():
+    """A strip of the rear edge of the button tile with the hook at x +100: the plate, the rear rib and the hook.
+    Top face down, as the tiles print."""
+    from . import panel_frame as pf
+    b = latch_build()
+    d = b.d
+    keep = box(*HOOK_STRIP, pf.y0(d) + b.i.rib_rear_yl - 4.0, pf.y0(d) + d.panel_d + 5.0, 0.0, 200.0)
+    tile = next(t for t in b.arcade.values() if t.BoundBox.XMin < 100.0 < t.BoundBox.XMax)
+    return turned(pf.one_solid(tile.common(keep).removeSplitter(), "latch hook strip"), (1, 0, 0), 180)
+
+
 # ---------- joint 2: floor tile to floor tile (assembled: seam along x, z up from the table) ----------
 
 def lap_stations() -> list[float]:
@@ -897,6 +924,11 @@ def items() -> list[Item]:
              stated=(Stated(0.0, 1.0, "the edge break of the button's rim at the bed"),
                      Stated(3.8, 8.4, "the side of the neck (a step of 4) and the top of the spring's bore: short bridges"))),
         Item("latch-gate", "latch", "10", latch_gate, "flat: its rear face on the bed, the peg up"),
+        Item("latch-notch", "latch", "10", latch_notch, "as the frame prints: the lower face of the bar on the bed", view=(150.0, 30.0),
+             stated=(Stated(7.0, 7.4, "the roof of the notch: a bridge of 16, as in the frame"),)),
+        Item("latch-hook", "latch", "10", latch_hook, "top face down, as the tiles print", view=(150.0, 30.0),
+             stated=(Stated(0.0, 0.4, "the edge break of the plate's rear edge at the bed"),
+                     Stated(13.8, 16.0, "the top arc of the toe of the hook: it looks down, as on each tile (about 0.7 cm2)"))),
         Item("latch-strike", "latch", "10", latch_strike, "top face down, as the tiles print", view=(-35.0, 35.0),
              stated=(Stated(0.0, 0.4, "the edge break of the plate's front edge at the bed"),
                      Stated(17.4, 18.0, "the lips of the strike: an overhang of 3.4, as on each panel"))),

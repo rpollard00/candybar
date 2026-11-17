@@ -341,6 +341,16 @@ class FloorDataTest(unittest.TestCase):
 
 
 @unittest.skipIf(os.environ.get("CANDYBAR_PIECES_SKIP_SET"), "CANDYBAR_PIECES_SKIP_SET is set")
+class MergedViewTest(unittest.TestCase):
+    """The merged copies are for a person to look at: BREP files whose names say so, no STL and no manifest."""
+
+    def test_the_merged_copies_are_named_as_not_for_print_and_have_no_mesh(self) -> None:
+        folder = support.temp_dir() / "view"
+        pieces.write_merged_view(folder, {"deck side R": Part.makeBox(10, 10, 10)})
+        names = sorted(p.name for p in folder.iterdir())
+        self.assertEqual(names, ["README.txt", "deck_side_R-merged-view-not-for-print.brep"])
+
+
 class WholeSetTest(unittest.TestCase):
     """Every seam of the layout, the floor and the ribs: about 25 minutes."""
 
@@ -361,8 +371,10 @@ class WholeSetTest(unittest.TestCase):
         cls.made = pieces.read_parts(folder)[0]
         cls.chk = pieces.check_set(cls.d, cls.pl, cls.made, cls.rep, cls.items, quiet)
 
-    def test_there_are_32_pieces(self) -> None:
-        self.assertEqual(len(self.res.pieces), 32)
+    def test_there_are_30_pieces(self) -> None:
+        # 2026-11-16: the three stand-ins of the hood band left the split (band A has its own printed parts), and the
+        # marquee window of band A makes the strip under it a piece of its own (hood sill)
+        self.assertEqual(len(self.res.pieces), 30)
 
     def test_every_piece_is_one_valid_solid_inside_the_printer_limit(self) -> None:
         bad = {n: (r["valid"], r["solids"], r["x"], r["y"], r["z"]) for n, r in self.chk["pieces"].items()
@@ -497,16 +509,19 @@ class WholeSetTest(unittest.TestCase):
         self.assertEqual(len(self.chk["hood_reach"]), 4)
         self.assertTrue(all(r["free"] >= pieces.HOOD_KEY for r in self.chk["hood_reach"]), self.chk["hood_reach"])
 
-    def test_merged_faces_keep_a_piece_valid_closed_and_of_the_same_volume(self) -> None:
+    def test_a_merged_copy_is_valid_closed_and_of_the_same_volume_and_the_piece_does_not_change(self) -> None:
         name = "deck nose"
+        before = (len(self.made[name].Faces), self.made[name].Volume)
         out, rows = pieces.merge_faces({name: self.made[name]}, lambda *_: None)
         r = rows[0]
-        self.assertLessEqual(r["faces_after"], r["faces_before"])
+        self.assertEqual((len(self.made[name].Faces), self.made[name].Volume), before)
         if r["merged"]:
-            self.assertTrue(out[name].isValid() and out[name].isClosed() and len(out[name].Solids) == 1)
-            self.assertLessEqual(abs(out[name].Volume - self.made[name].Volume), pieces.MERGE_DV)
+            m = out[name]
+            self.assertTrue(m.isValid() and m.isClosed() and len(m.Solids) == 1)
+            self.assertLessEqual(abs(m.Volume - before[1]), pieces.MERGE_DV)
+            self.assertLessEqual(len(m.Faces), before[0])
         else:
-            self.assertIs(out[name], self.made[name])
+            self.assertNotIn(name, out)
             self.assertTrue(r["why"])
 
     def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
@@ -533,7 +548,7 @@ class WholeSetTest(unittest.TestCase):
 
 @unittest.skipIf(os.environ.get("CANDYBAR_PIECES_SKIP_SET"), "CANDYBAR_PIECES_SKIP_SET is set")
 class SocketPlateTest(unittest.TestCase):
-    """The pieces with the front socket plate (an option, not in the default build): the seat with its frame in deck
+    """The pieces with the front socket plate (in the default build since 2026-11-16): the seat with its frame in deck
     side R, the floor tile with its notch round the frame, and the foot flange that stops along the plate. The plate
     and the bought parts of every variant stay clear of the pieces."""
 
@@ -544,7 +559,7 @@ class SocketPlateTest(unittest.TestCase):
         cls.d = Blueprint()
         out = Path(os.environ.get("CANDYBAR_PIECES_CACHE") or pieces.CAD / "out" / "pieces")
         quiet = lambda *_: None
-        cls.pl = pieces.with_socket_plate(pieces.plain(cls.d, out, quiet), cls.d)
+        cls.pl = pieces.plain(cls.d, out, quiet)   # the seat is in the default plain cut (2026-11-16)
         cls.items = pieces.socket_plate_items(cls.d)
         cls.hits: list = []
         cls.feet = pieces.feet(cls.pl, ["deck side R"], cls.items, cls.hits, quiet)

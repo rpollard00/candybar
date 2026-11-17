@@ -68,10 +68,6 @@ UNDER = {"socket_plate": spm.BOUGHT,
 BOUGHT = {name: "A bought part of the front socket plate (docs/design/front-socket-plate.md)." for name in spm.BOUGHT}
 CUT_PLATES = {"control_panel": "The top of a control panel is a cut plate (roadmap, settled by the owner)."}
 PROVISIONAL = {
-    "marquee_lip": "A stand-in for the lower frame of the marquee window. The marquee is not designed yet.",
-    "speaker_right": "A stand-in for the speaker grille on the hood band. The grille is not designed yet.",
-    "speaker_left": "A stand-in for the speaker grille on the hood band. The grille is not designed yet.",
-    "logo_form": "A stand-in for the logo on the hood band. The logo is not designed yet.",
     "bezel": "A stand-in for the printed bezel plate. The owner chose a printed plate (2026-11-14). candybar.shell.cradle "
              "makes it, in two halves with the edge break (docs/design/monitor-cradle-and-bezel.md). The default build keeps "
              "the plain plate of the form.",
@@ -100,11 +96,13 @@ HOOD_BAND = "a joint of the hood band, or behind one of its parts (hood_band.in_
 BAND_SHOWN = ("hood", "marquee_lip_right", "marquee_lip_left", "speaker_pod_right", "speaker_pod_left", "logo_field", "logo_badge",
               "grille_right", "grille_left", "marquee_front_right", "marquee_front_left")
 HELD = ("printed", "printed, not painted")   # the classes on which the edge rule holds
-SHELL_FORM = ("deck", "body", "hood", "marquee_lip")
+SHELL_FORM = ("deck", "body", "hood")
+# the parts of the hood band (band A, in the default build since 2026-11-16) that lie on the hood
+BAND_COVERS = tuple(f"{k}_{s}" for k in ("marquee_lip", "speaker_pod", "grille", "marquee_front") for s in ("right", "left")) + ("logo_field",)
 # the parts of the default build that lie on the outside of the shell's form: on a print piece they cover the faces of
-# the pocket of the panel, the recess of the bezel and the pockets of the stand-ins of the hood band
-SHELL_COVERS = ("control_panel", "bezel", "screen", "marquee_lip", "speaker_right", "speaker_left", "logo_form")
-# the print pieces of the walls, by their rules; the piece "logo form" has the name of the stand-in of the default build
+# the pocket of the panel, the recess of the bezel, the band wall of the hood and the seat of the socket plate
+SHELL_COVERS = ("control_panel", "bezel", "screen", "socket_plate") + BAND_COVERS
+# the print pieces of the walls, by their rules
 WALLS = tuple(p for p in PIECES if p not in FLOOR_TILES and p not in SHELL_FORM + SHELL_COVERS)
 _FORM: dict[str, Part.Shape] = {}
 
@@ -162,8 +160,9 @@ JOINTS = {
        for c, why in (("control_panel", "the pocket of the control panel, under the panel."),
                       ("bezel", "the recess and the reveal of the bezel plate, under and beside the plate."),
                       ("screen", "the window of the form behind the bezel plate, where the monitor lies."),
-                      *((k, "a pocket of a stand-in of the hood band, which hood_band.py replaces.")
-                        for k in ("marquee_lip", "speaker_right", "speaker_left", "logo_form")),
+                      *((k, "a part of the hood band (band A) on the band wall of the hood: bonded, or held in its opening.")
+                        for k in BAND_COVERS),
+                      ("socket_plate", "the front socket plate in its seat in the right side of the deck."),
                       (SEAM_NAME, "the top of the body and the foot of the hood lie on each other in the seam groove."),
                       (SEAM_PIECE, "the face of a bonded seam between two pieces, thin where it meets the outside; the seam is filled."),
                       (SEAM_V, "a face in the V on the outer edge of a seam (joints.vgroove_profile): the owner fills the V."),

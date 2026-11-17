@@ -31,7 +31,7 @@ thumb. It is not a slicer result. Nothing was printed, and no piece was sliced.
    14 spools of 1 kg and about 540 hours.
 2. ABS adds time in which the printer does not print: a heat soak before each job and a slow
    cool-down after it. This is about 150 hours more for the printer.
-3. Each of the 32 pieces fits the Q2 with more room than on the A1. The Q2 is not taller than the
+3. Each of the 30 pieces (since 2026-11-16) fits the Q2 with more room than on the A1. The Q2 is not taller than the
    A1, so no piece changes.
 4. No piece needs support on a large seen face. Support touches 22.7 cm2 of seen face in total, as in
    the first plan.
@@ -76,7 +76,7 @@ thumb. It is not a slicer result. Nothing was printed, and no piece was sliced.
 | Density of ABS | 1.05 g/cm3 | MAKER [M1], and the slicer's profiles of two ABS filaments [Q5]. One ABS has 1.12 g/cm3 [M3]: with it, each mass is 7 % more. |
 | Skin mass of a piece | Its volume in `measurements.json` times 1.05 g/cm3 | REPORT and ESTIMATED |
 | Printed mass of a wall piece or a door half | Skin mass x 1.30 | As the first plan: 25 % for ribs, flanges and plates, 5 % for the brim and waste |
-| Printed mass of a trim piece (speaker form, logo form, bezel half) | Skin mass x 1.10 | As the first plan |
+| Printed mass of a trim piece (a part of the hood band, the socket plate, a bezel half) | Skin mass x 1.10 | As the first plan |
 | Printed mass of a floor tile | Mass as a 4 mm skin x 1.42 x 1.05 | As the first plan: the sandwich of 10 mm against the 4 mm skin, and 5 % of waste |
 | Print rate of a seen piece | 22.7 g in 1 hour | An average flow of 6 mm3/s, as the first plan. The slicer's limit for ABS on the Q2 is 17 mm3/s [Q5]. |
 | Print rate of a hidden piece (floor tile) | 34 g in 1 hour | An average flow of 9 mm3/s, as the first plan |
@@ -109,8 +109,17 @@ bed and 250 mm high. "Spare to the limit" is the limit less the box, in x, y and
 | 16, 17 | door half R, L | outer face on the bed | 211 x 165 x 4 | 39, 85, 246 | 147 each | 191 each | 8.4 each | No | A thin flat plate: risk 1. The door is in design, and its box changes. |
 | 18 | hood centre | on a cut face | 148 x 139 x 212 | 102, 111, 38 | 354 | 460 | 20.3 | No | Tall: cracks between layers. The longest print. |
 | 19, 20 | hood side R, L | upright | 139 x 129 x 148 | 111, 121, 102 | 277 each | 360 each | 15.9 each | Yes, 7.2 cm2 each | - |
-| 21, 22 | speaker form R, L | front face on the bed | 94 x 76 x 13 | 156, 174, 237 | 71 each | 78 each | 3.4 each | No | Stand-ins |
-| 23 | logo form | front face on the bed | 160 x 160 x 5 | 90, 90, 245 | 46 | 51 | 2.2 | No | A stand-in |
+| 21 | hood sill | upright | see the pieces report | - | - | - | - | - | New on 2026-11-16: band A's marquee window cuts the band wall across the centre, so the strip under it between the bays is its own piece |
+| - | marquee lip R, L | on its rear face | 197 x 6 x 4.5 | 53, 244, 246 | 5 each | 6 each | 0.3 each | No | Band A: bonded on the band wall |
+| - | speaker pod R, L | front face on the bed | 96 x 66 x 13 | 154, 184, 237 | 31 each | 34 each | 1.5 each | No | Band A: bonded on the band wall |
+| - | logo field | rear face on the bed | 177 x 51 x 5 | 73, 199, 245 | 24 | 26 | 1.2 | No | Band A: bonded on the band wall |
+| - | grille R, L | front face on the bed | 64 x 54 x 15 | 186, 196, 235 | 15 each | 16 each | 0.7 each | No | Band A, black ABS, not painted: held by two M3 screws |
+| - | logo badge | flat | 166 x 40 x 2.2 | 84, 210, 248 | 15 | 16 | 0.7 | No | Band A: the owner's mark |
+| - | marquee front R, L | flat, front face on the bed | 198 x 36 x 8.6 | 52, 214, 241 | 16 each | 17 each | 0.8 each | No | Band A, translucent |
+| - | light box R, L | mouth on the bed | 183 x 44 x 27 | 67, 206, 223 | 38 each | 41 each | 1.8 each | Not seen | Band A, black, inside |
+| - | driver seat R, L | baffle on the bed | 110 x 69 x 5.6 | 140, 181, 244 | 29 each | 32 each | 1.4 each | Not seen | Band A, inside |
+| - | speaker enclosure R, L | rear wall on the bed | 110 x 90 x 67 | 140, 160, 183 | 87 each | 96 each | 4.2 each | Not seen | Band A, inside, sealed |
+| - | socket plate | outer face on the bed | 144 x 35 x 4 | 106, 215, 246 | 13 | 14 | 0.6 | No | The front socket plate b-knob |
 | - | floor front side R, L | flat | 188 x 132 x 10 | 62, 118, 240 | 100 each, as a 4 mm skin | 150 each | 4.4 each | Not seen | Flat: risk 1 |
 | - | floor front centre | flat | 212 x 188 x 10 | 38, 62, 240 | 167, as a 4 mm skin | 249 | 7.3 | Not seen | The largest flat piece: coupon C9 |
 | - | floor middle side R, L | flat | 163 x 137 x 10 | 87, 113, 240 | 94 each, as a 4 mm skin | 139 each | 4.1 each | Not seen | Flat: risk 1 |
@@ -240,7 +249,7 @@ then weaker [M4].
 | 4. The front, low | apron, lower R, L | 27 h | Seams D1, D2, P1 and S1. |
 | 5. The middle | middle R, L | 28 h | Seam L1. Measure the door opening (422.7 mm x 165 mm) and the opening behind the bezel (434.7 mm). |
 | 6. The head | upper R, L, brow, upper rear R, L | 44 h | Seams B1, W1, R1, R3 and R5. Lift the cabinet by the two hand-holds, with no hardware in it. |
-| 7. The parts that come off | door half R, L, hood centre, hood side R, L, speaker form R, L, logo form, bezel half R, L | 109 h | Fit them with screws. |
+| 7. The parts that come off | door half R, L, hood centre, hood side R, L, hood sill, the parts of band A, the socket plate, bezel half R, L | 109 h | Fit them with screws. The hood is bolted: it goes on last, after the band's parts are bonded on it. |
 
 The two openings of group 5 show if the shrink compensation is correct. If an opening is more than
 1 mm from the model, correct "Shrinkage" before group 6.
@@ -303,7 +312,7 @@ The coupon can change each product. The classes and their sources are in the ABS
 
 Sand each edge break by hand. ABS sands fast, and a machine removes a break of R 1 in seconds.
 
-The parts that come off (the bezel plate, the speaker forms, the rear door) are painted alone and
+The parts that come off (the bezel plate, the socket plate, the rear door) and the hood with its band parts are painted alone and
 fastened last. The inside does not get the finish of the exterior.
 
 From the last weld to the last coat, the wait times are about three weeks. ESTIMATED: 3 days, 7 days,

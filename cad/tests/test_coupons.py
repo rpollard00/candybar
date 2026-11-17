@@ -53,7 +53,7 @@ class CouponSetTest(unittest.TestCase):
         """Plate 10: the strip of the deck nose has the button's hole (its round and its two flats), and the bolt, the
         gate, the frame strip and the strike strip are the parts of the control panel's build."""
         names = {it.name for it in self.items if it.coupon == "latch"}
-        self.assertEqual(names >= {"latch-frame", "latch-bolt", "latch-gate", "latch-strike"}, True)
+        self.assertEqual(names >= {"latch-frame", "latch-bolt", "latch-gate", "latch-strike", "latch-notch", "latch-hook"}, True)
         b = coupons.latch_build()
         self.assertAlmostEqual(self.shapes["latch-bolt"].Volume, b.latch["latch_bolt"].Volume, delta=0.01)
         self.assertAlmostEqual(self.shapes["latch-gate"].Volume, b.latch["latch_gate"].Volume, delta=0.01)
@@ -62,6 +62,20 @@ class CouponSetTest(unittest.TestCase):
             nose = self.shapes["latch-nose"]
             rounds = [f for f in nose.Faces if type(f.Surface).__name__ == "Cylinder" and abs(f.Surface.Radius - d.latch_button_d / 2) < 1e-3]
             self.assertTrue(rounds)
+
+    def test_the_hook_strip_holds_the_whole_hook_and_seats_in_the_notch_strip(self) -> None:
+        """The pair of the rear corner: in the cabinet the hook strip holds the whole hook at x +100, it seats in the
+        notch strip with no common volume, and a lift of 1 makes the toe meet the roof of the notch (the lock)."""
+        from candybar.shell import panel_frame as pf
+
+        b = coupons.latch_build()
+        hook_strip = coupons.turned(coupons.latch_hook(), (1, 0, 0), 180)
+        notch_strip = coupons.latch_notch()
+        hook = pf.hook(b.d, b.i, b.i.push.hook_x, b.i.push)
+        self.assertAlmostEqual(hook_strip.common(hook).Volume, hook.Volume, delta=0.01 * hook.Volume)
+        self.assertLess(hook_strip.common(notch_strip).Volume, 1e-3)
+        lifted = hook_strip.translated(pf.V(0, 0, 1.0))
+        self.assertGreater(lifted.common(notch_strip).Volume, pf.TOL)
 
     def test_every_stl_is_a_closed_mesh(self) -> None:
         for name, shape in self.shapes.items():

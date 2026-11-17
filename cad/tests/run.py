@@ -1,11 +1,11 @@
-"""The test runner, called by cad/test.sh and by cad/tests/parallel.py (through freecad-run.sh tests.run).
+"""The test runner, called by cad/test.sh (through freecad-run.sh tests.run). After the results it prints the
+slowest tests, each with the time of the set-up of its class or module (setUpClass is the larger part of the time of
+most slow tests, and unittest's own durations leave it out).
 
 Environment:
   CANDYBAR_TESTS     run only the tests whose name contains this fragment
-  CANDYBAR_TEST_IDS  run only the tests whose name contains one of these fragments (separated by spaces)
-  CANDYBAR_RESULTS   write the result of each test to this JSON file: the outcome, the time, the text of a failure
-  CANDYBAR_LIST      only list the names of the tests that would run, one on each line, to this file
   CANDYBAR_GROUP     quick (the default of cad/test.sh), slow (the tests marked with support.slow) or all
+  CANDYBAR_RESULTS   write the result of each test to this JSON file: the outcome, the time, the text of a failure
 """
 from __future__ import annotations
 
@@ -98,11 +98,8 @@ def tests_of(suite) -> list:
 def main() -> int:
     started = time.monotonic()
     loader = unittest.TestLoader()
-    patterns = os.environ.get("CANDYBAR_TEST_IDS", "").split()
     if only := os.environ.get("CANDYBAR_TESTS"):
-        patterns.append(only)
-    if patterns:
-        loader.testNamePatterns = [f"*{p}*" for p in patterns]
+        loader.testNamePatterns = [f"*{only}*"]
     suite = loader.discover(str(TESTS), top_level_dir=str(TESTS.parent))
     group = os.environ.get("CANDYBAR_GROUP", "all")
     if group in ("quick", "slow"):
@@ -115,10 +112,6 @@ def main() -> int:
         print(f"CANDYBAR_GROUP must be quick, slow or all, not {group!r}")
         return 2
     loaded = time.monotonic() - started
-    if listing := os.environ.get("CANDYBAR_LIST"):
-        # A module that does not import shows as a _FailedTest: it is listed, so that the caller runs it and sees why.
-        Path(listing).write_text("".join(f"{t.id()}\n" for t in tests_of(suite)), encoding="utf-8")
-        return 0
     from . import support
 
     runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2, resultclass=TimedResult)
@@ -134,4 +127,9 @@ def main() -> int:
             Path(results).write_text(json.dumps({"load_s": round(loaded, 3), "wall_s": round(time.monotonic() - started, 3),
                                                  "tests_run": result.testsRun if result else 0, "records": records}, indent=1),
                                      encoding="utf-8")
+    if result is not None and result.records:
+        slowest = sorted(result.records, key=lambda r: -(r.get("seconds", 0.0) + r["setup_s"]))[:20]
+        print(f"\nThe slowest tests (of {len(result.records)}; the set-up of a class counts in its first test), in s:")
+        for r in slowest:
+            print(f"{r.get('seconds', 0.0) + r['setup_s']:8.1f}  set-up {r['setup_s']:7.1f}  {r['id'].removeprefix('tests.')}")
     return 0 if result.wasSuccessful() and result.testsRun else 1

@@ -59,14 +59,16 @@ CLASS_WORDS = {HIDDEN: "in a design line", FACE: "on an open face"}
 # the seams that the outer form already has: no cut is needed for them
 EXISTING = (
     ("G", "hood on the body: the level groove FB5 / HC15", "service",
-     "The hood lifts off. Two pins at the front of the body top, two M4 screws through the foot of the hood's rear "
-     "wall into inserts in the upper rear of the body (on the back)."),
+     "The hood lifts off, after the rear door: four cones on the top ring locate it, and four M4 screws from below, "
+     "up through the ring into inserts in its foot, hold it down (the bolted hood, 2026-11-16)."),
     ("BZ4", "bezel plate in its reveal", "service",
      "The plate lifts out to the front. It rests on the ledge below it and is held by magnets and two pins (trim: no "
      "load). With the plate out, the opening behind it (422.7 x 293.4) is the service path of the monitor."),
-    ("DK8", "control panel in its pocket", "service", "The panel latch is not designed yet (roadmap step 11)."),
-    ("USB", "USB socket plate in the right side of the deck", "service",
-     "A removable printed plate (fit study). Its outline is a seam of its own and ends 5 mm in front of D2."),
+    ("DK8", "control panel in its pocket", "service", "The push bolt: two rear hooks and a bolt with a flush button in the "
+     "front of the deck (docs/design/control-panel-latch.md)."),
+    ("USB", "front socket plate in the right side of the deck", "service",
+     "The printed plate b-knob in its seat in deck side R (docs/design/front-socket-plate.md). Its recess ends 5 mm in "
+     "front of D2."),
 )
 
 
@@ -351,14 +353,6 @@ def door_outline(L: Lines) -> Seam:
                 f"The rear door: its own gap (the opening of dims.Blueprint, {2 * x:.1f} x {z1 - z0:.0f}).")
 
 
-def trim_pieces() -> list[Piece]:
-    why = "Front face on the bed: the face that is seen is the smoothest one."
-    bed = "front face on the bed"
-    return [Piece("speaker form", "speaker_right", (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), why, side="R", bed=bed),
-            Piece("speaker form", "speaker_left", (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), why, side="L", bed=bed),
-            Piece("logo form", "logo_form", (0.0, 0.0, 0.0), (0.0, 1.0, 0.0), why, bed=bed)]
-
-
 # ---------- the print orientations, in words ----------
 
 UP = (0.0, 0.0, 1.0)
@@ -388,6 +382,9 @@ WHY = {
                    "and the rear arc and the front lean are smooth. No support, no layer steps."),
     "hood side": ("upright", "Upright: the side and the leg are near-upright walls; the top corner steps near the roof and the "
                  "end of the soffit needs a small support inside the marquee opening."),
+    "hood sill": ("upright", "Upright, as in the cabinet: the band wall under the marquee window and the front of the hood are walls, "
+                 "the sill and the ledge are level. Band A's marquee window cuts the band wall across the whole centre, so this "
+                 "strip between the bays is a piece of its own (2026-11-16)."),
 }
 
 
@@ -417,7 +414,8 @@ def layout(d: Blueprint) -> Layout:
         piece("door half", "body", (110.0, L.y_rear - 2.0, 200.0), (0.0, -1.0, 0.0), "door", mirror=True),
         piece("hood centre", "hood", (0.0, 520.0, 571.0), (1.0, 0.0, 0.0), "hood centre"),
         piece("hood side", "hood", (219.0, 520.0, 500.0), UP, "hood side", mirror=True),
-    ] + trim_pieces() + base_pieces()
+        piece("hood sill", "hood", (0.0, 452.0, 472.0), UP, "hood sill"),
+    ] + base_pieces()
     return Layout(
         SHELL, "The split of the shell (the owner's choice of 2026-11-11, on revision 7)",
         "Every seam lies in a line that the form has, or carries such a line on: the deck's flank break and the "
@@ -477,7 +475,7 @@ def fingerprint(d: Blueprint) -> str:
 
     h = hashlib.sha256(repr(d).encode())
     h.update(repr(cavity.Openings()).encode())
-    for name in ("dims.py", "profiles.py", "solids.py", "cavity.py"):
+    for name in ("dims.py", "profiles.py", "solids.py", "cavity.py", "band.py"):
         h.update((Path(__file__).parent / name).read_bytes())
     return h.hexdigest()[:16]
 
@@ -571,8 +569,11 @@ def build_modules(d: Blueprint, log=print, parts: dict | None = None, cav=None) 
     key = fingerprint(d)
     cache = cache_dir()
     parts = parts or so.build(d)
-    outer_body = so.unsplit(parts["deck"].fuse(parts["body"]))
-    outer_hood = so.unsplit(parts["hood"].fuse(parts["marquee_lip"]))
+    # the skin is made from the form without the seat of the socket plate and with the stand-in of the lip
+    # (solids.skin_parts); the band's openings go through it by cavity.openings
+    form = so.skin_parts(d, parts)
+    outer_body = so.unsplit(form["deck"].fuse(form["body"]))
+    outer_hood = so.unsplit(form["hood"].fuse(form["marquee_lip"]))
     files = skin_files(d)
     if skin_cached(d):
         log(f"split: skin from the cache {key}")
@@ -602,7 +603,8 @@ def build_modules(d: Blueprint, log=print, parts: dict | None = None, cav=None) 
     return Modules(skin, outer, parts, key)
 
 
-TRIMS = ("speaker_right", "speaker_left", "logo_form", "bezel")
+# the plates of the form that the split cuts as they are (the stand-ins of the hood band left the build on 2026-11-16)
+TRIMS = ("bezel",)
 DEBRIS_MM3 = 50.0
 
 

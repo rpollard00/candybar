@@ -84,11 +84,12 @@ class EdgeRuleTest(unittest.TestCase):
         self.assertTrue(all("not a named joint" in f for f in found))
 
     def test_a_provisional_form_is_not_a_failure_and_reads_as_provisional(self) -> None:
-        rows = ef.survey({"logo_form": box()}, self.d)
+        # the plain bezel plate of the default build stands in for the printed plate of the cradle
+        rows = ef.survey({"bezel": box()}, self.d)
         self.assertEqual(ef.failures(rows), [])
         text = ef.table(rows, self.d)
-        self.assertIn("| logo_form | all | provisional, not finished | 12 |", text)
-        self.assertNotIn("| logo_form | all | outside |", text)
+        self.assertIn("| bezel | all | provisional, not finished | 12 |", text)
+        self.assertNotIn("| bezel | all | outside |", text)
 
     def test_a_part_that_nobody_named_fails(self) -> None:
         found = self.failures({"new_part": broken(box(), self.d.edge_break)})
@@ -284,8 +285,12 @@ class ShellEdgeFinishTest(unittest.TestCase):
         self.assertEqual(sum(1 for f in skin["hood"].Faces if fc.is_break_surface(f, self.d.edge_break)), 0)
         self.assertGreaterEqual(len(solids.sharp_edges(skin["hood"], self.d, lambda m: m.z > self.d.body_top + self.d.seam_gap + 0.05)), 24)
         self.assertGreater(skin["hood"].Volume, self.parts["hood"].Volume + 200.0)
-        for k in ("deck", "body", "marquee_lip"):
-            self.assertTrue(skin[k].isSame(self.parts[k]))
+        # the body is the built one; the deck is the deck before the seat of the socket plate, and the lip the
+        # stand-in in front of the band wall (solids.skin_parts)
+        self.assertTrue(skin["body"].isSame(self.parts["body"]))
+        self.assertAlmostEqual(skin["deck"].Volume, solids.deck(self.d)[0].Volume, delta=0.01)
+        self.assertGreater(skin["deck"].Volume, self.parts["deck"].Volume + 1000.0)
+        self.assertAlmostEqual(skin["marquee_lip"].Volume, solids.lip_stand_in(self.d).Volume, delta=0.01)
 
     def test_the_body_has_no_sharp_edge_at_the_rear_or_in_the_seam_groove(self) -> None:
         d = self.d
@@ -340,7 +345,8 @@ class WorkPackageClassesTest(unittest.TestCase):
         self.assertEqual(ef.finish_class("p6_cut_in", {"group": "cut-in"}), "printed")
         self.assertEqual(ef.finish_class("p8_finish_lower_c02_1", {"group": "finish"}), "a test print")
         self.assertEqual(ef.finish_class("p4_joint1_lower_c01", {"group": "joint1"}), "a test print")
-        self.assertEqual(ef.finish_class("marquee_lip"), "provisional, not finished")
+        self.assertEqual(ef.finish_class("bezel"), "provisional, not finished")
+        self.assertEqual(ef.finish_class("usb_sockets"), "bought")
 
     def test_the_control_edge_and_the_untested_faces_of_an_edge_bar(self) -> None:
         from candybar.shell import coupons as cp

@@ -46,7 +46,12 @@ PX_PER_MM = 6.0
 STEP = 0.2
 MARKS = {"RB6", "MQ2", "SP2", "LG2"}
 VIEWS = {"front": (0, 2), "right side": (1, 2), "top": (0, 1)}
-GROUPS = (("deck", "control_panel", "body", "bezel", "screen"), ("hood", "marquee_lip"))
+GROUPS = (("deck", "control_panel", "body", "bezel", "screen"), ("hood",))
+# the parts of the outer form that the blueprint draws. The parts of the hood band (band A) and the front socket plate
+# are designed parts that the blueprint does not draw (the owner's choices of 2026-11-14 and 2026-11-16): they are
+# not compared, and neither are the faces of the blueprint's stand-ins for them (BAND_FACES)
+FORM = ("deck", "control_panel", "body", "bezel", "screen", "hood")
+BAND_FACES = ("SP1", "SP2", "SP3", "LG1", "LG2", "LG3", "HC13")   # the speaker forms, the logo form and the lip
 
 
 def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
@@ -198,11 +203,32 @@ def openings(d: Blueprint) -> dict[str, list[tuple[float, float, float, float]]]
     the plane. The hole of the latch's button in the deck's front face (Blueprint.latch_button_d): its pocket and its
     rim, from the front of the deck to 15 into it. The edge break of the rims of the bezel recess at its bottom and
     its top (2026-11-15): a break of R 1 on an edge of 83 degrees stands about 0.5 off the sharp edge."""
-    out: dict[str, list] = {"X 0": []}
+    out: dict[str, list] = {name: [] for name in planes(d)}
     if d.latch_button_d > 0:
         r = d.latch_button_d / 2 + d.edge_break + 0.5
         out["X 0"].append((-1.0, 15.0, d.latch_button_z - r, d.latch_button_z + r))
-        out["Z deck"] = [(-r, r, -1.0, 15.0)]
+        out["Z deck"].append((-r, r, -1.0, 15.0))
+    # the band wall of the hood with the openings of band A, and the seat of the socket plate in the deck's right side
+    for name, (axis, at) in planes(d).items():
+        for x0, y0, z0, x1, y1, z1 in designed_boxes(d):
+            lo, hi = (x0, y0, z0), (x1, y1, z1)
+            if lo[axis] <= at <= hi[axis]:
+                keep = [i for i in range(3) if i != axis]
+                out[name].append((lo[keep[0]], hi[keep[0]], lo[keep[1]], hi[keep[1]]))
+    return out
+
+
+def designed_boxes(d: Blueprint) -> list[tuple[float, float, float, float, float, float]]:
+    """The boxes (x0, y0, z0, x1, y1, z1), 2 larger than what they hold, where the build has designed parts that the
+    blueprint does not draw: the band of the hood (the cutters of band A, which reach from the stand-in of the lip into
+    the wall) and the seat of the front socket plate with the edge break of its rim."""
+    from candybar.shell import band
+    from candybar.shell import socket_plate as spm
+
+    out = []
+    for c in band.skin_cutters(d) + [spm.cutter(spm.SocketPlate(), d)]:
+        b = c.BoundBox
+        out.append((b.XMin - 2.0, b.YMin - 2.0, b.ZMin - 2.0, b.XMax + 2.0, b.YMax + 2.0, b.ZMax + 2.0))
     return out
 
 
@@ -307,7 +333,8 @@ def solid_state(parts: dict[str, Part.Shape]) -> tuple[dict[str, dict], list[dic
 
 def run(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     """Every number of the check, and whether all of them are inside the tolerances."""
-    faces = pr.faces(d)
+    faces = {k: f for k, f in pr.faces(d).items() if k not in BAND_FACES}
+    parts = {k: s for k, s in parts.items() if k in FORM}
     state, overlaps = solid_state(parts)
     shapes = skins(parts)
     sections = {}

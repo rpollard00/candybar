@@ -26,8 +26,9 @@ corner).
 
     CANDYBAR_OUT=cad/out/pieces cad/candybar/freecad-run.sh candybar.shell.pieces
 
-CANDYBAR_PIECES_SOCKET_PLATE=1 builds the pieces with the front socket plate in deck side R (it is not in the default
-build): the seat and its frame, the notch of the floor tile, and the foot flange that stops along the plate.
+The front socket plate is in the default build (the owner's plate b-knob, 2026-11-16): deck side R has its seat and
+frame (plain, with_socket_plate), the floor tile under the frame its notch, and the foot flange stops along the plate
+(the items of hardware(), socket_plate_items).
 CANDYBAR_PIECES names what to do: "all" (default: every piece, the files and the checks), "pilot" (the two pilot
 pairs only), "check" (the checks again, on the files of a build) or "views" (the folders that tools/draw_pieces.py
 renders). No FreeCAD at import.
@@ -107,7 +108,7 @@ def outer_parts() -> dict:
 
     from . import solids as so  # noqa: PLC0415
 
-    names = ("deck", "body", "hood", "marquee_lip", "speaker_right", "speaker_left", "logo_form", "bezel")
+    names = ("deck", "body", "hood", "bezel")
     here = Path(os.environ.get("CANDYBAR_SHELL", CAD / "out" / "shell-rev7"))
     folder = here if all((here / f"{k}.brep").exists() for k in names) else None
     if folder is None:
@@ -132,8 +133,10 @@ def modules(d: Blueprint, log=print) -> split.Modules:
         skin[k].importBinary(str(f))
         if not skin[k].isValid():
             raise RuntimeError(f"pieces: the skin {f} is not a valid shape as read")
-    body = so.unsplit(parts["deck"].fuse(parts["body"]))
-    hood = so.unsplit(parts["hood"].fuse(parts["marquee_lip"]))
+    # as split.build_modules: the form of the skin (solids.skin_parts)
+    form = so.skin_parts(d, parts)
+    body = so.unsplit(form["deck"].fuse(form["body"]))
+    hood = so.unsplit(form["hood"].fuse(form["marquee_lip"]))
     outer = {"body": body, "base": body, "hood": hood}
     for k in split.TRIMS:
         skin[k] = outer[k] = parts[k]
@@ -182,10 +185,11 @@ def plain(d: Blueprint, out: Path, log=print) -> Plain:
     shapes = {n: load_binary(f) for n, f in files.items()}
     outer = {k: load_binary(f) for k, f in outer_files.items()}
     outer["base"] = outer["body"]
-    return Plain(shapes, outer, seams, pieces, key)
+    # the seat of the front socket plate in deck side R (it is cut on the piece, not in the skin of the cache)
+    return with_socket_plate(Plain(shapes, outer, seams, pieces, key), d)
 
 
-# ---------- the front socket plate (an option; not in the default build) ----------
+# ---------- the front socket plate (in the default build since 2026-11-16) ----------
 
 SOCKET_PLATE = "socket plate"   # the role of its parts among the items; the stop of the foot flange is a "zone"
 
@@ -1077,7 +1081,8 @@ def hardware(root: Path | None = None) -> list[tuple[str, str, object]]:
     d = Blueprint()
     parts = rear.build(d, rear.Rear(), rear.place(d))
     out += [(name, "rear", shape) for name, shape in parts.items() if not name.startswith("door_half")]
-    return out
+    # the front socket plate of every variant, with its bought parts and the stretch where the foot flange stops
+    return out + socket_plate_items(d)
 
 
 def grown(shape, by: float):
@@ -1233,7 +1238,7 @@ def generate(d: Blueprint, pl: Plain, names: list[str] | None = None, seams: lis
 # ---------- joint 7: the top ring of the body and the foot of the hood ----------
 
 RING_PIECES = ("brow", "upper R", "upper L", "upper rear R", "upper rear L")   # the pieces that carry the body top
-FOOT_PIECES = ("hood centre", "hood side R", "hood side L")
+FOOT_PIECES = ("hood centre", "hood side R", "hood side L", "hood sill")   # the hood sill: since band A (2026-11-16)
 RING_CONE_X = 150.0      # the four cones of the ring: at x +-RING_CONE_X, at the front and at the rear
 # the screws of the bolted hood (the owner, 2026-11-16: "for the hood - we can bolt it on"): (side, y), on the middle
 # line of the side ring at that y. Each is an M4 screw from below, up through a boss of the ring into a heat-set insert
@@ -1926,12 +1931,10 @@ def split_rows() -> dict:
     return {}
 
 
-def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=print, b: Build = BUILD, unmerged: dict | None = None) -> dict:
+def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=print, b: Build = BUILD) -> dict:
     """The checks of the whole set: every piece is one valid solid inside the printer's limit; no two pieces share
     volume; no piece is in the hardware; a screwdriver reaches each screw past the finished pieces; the mass; the
-    screws; what each print orientation overhangs. made: the finished pieces; rep: seam_report of the build;
-    unmerged: the same pieces before their faces were merged (merge_faces), for a boolean that fails on a merged piece:
-    the merge does not change the form, so the clash is measured on the unmerged pair, and the pair is named."""
+    screws; what each print orientation overhangs. made: the finished pieces; rep: seam_report of the build."""
     import FreeCAD as App  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
@@ -1961,22 +1964,14 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             row["overhang_plain_cm2"] = round(before[name].get("overhang_seen", 0.0) + before[name].get("overhang_inside", 0.0), 1)
         rows[name] = row
     log(f"pieces: boxes and overhangs [{time.time() - t0:.0f} s]")
-    import Part  # noqa: PLC0415
-
     names = list(made)
-    clashes, fallback = [], []
+    clashes = []
     for i, a in enumerate(names):
         for c in names[i + 1:]:
             (alo, ahi), (clo, chi) = boxes[a], boxes[c]
             if np.any(alo > chi + 0.1) or np.any(clo > ahi + 0.1):
                 continue
-            try:
-                v = made[a].common(made[c]).Volume
-            except (ValueError, Part.OCCError) as e:
-                if not unmerged:
-                    raise
-                v = unmerged[a].common(unmerged[c]).Volume
-                fallback.append({"a": a, "b": c, "why": str(e)})
+            v = made[a].common(made[c]).Volume
             if v > b.clash_mm3:
                 clashes.append({"a": a, "b": c, "mm3": round(v, 1)})
     log(f"pieces: clashes between pieces: {clashes} [{time.time() - t0:.0f} s]")
@@ -1987,13 +1982,7 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             lo, hi = boxes[name]
             if sb.XMin > hi[0] or sb.XMax < lo[0] or sb.YMin > hi[1] or sb.YMax < lo[1] or sb.ZMin > hi[2] or sb.ZMax < lo[2]:
                 continue
-            try:
-                v = shape.common(solid).Volume
-            except (ValueError, Part.OCCError) as e:
-                if not unmerged:
-                    raise
-                v = unmerged[name].common(solid).Volume
-                fallback.append({"a": name, "b": iname, "why": str(e)})
+            v = shape.common(solid).Volume
             if v > b.clash_mm3:
                 plain_v = pl.shapes[name].common(solid).Volume if name in pl.shapes and not name.startswith("floor") else 0.0
                 hard.append({"piece": name, "item": iname, "role": role, "mm3": round(v, 1), "of_the_plain_piece_mm3": round(plain_v, 1)})
@@ -2009,7 +1998,7 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
             reach.append({"seam": p["seam"], "head": p["head"], "at": sc["at"], "free": round(free)})
     short = [r for r in reach if r["free"] < b.driver_len]
     log(f"pieces: screws that a screwdriver does not reach: {short} [{time.time() - t0:.0f} s]")
-    hood = hood_reach(rep.get("hood_screws", []), unmerged or made, items)
+    hood = hood_reach(rep.get("hood_screws", []), made, items)
     log(f"pieces: the screws of the hood, free under the head: {[r['free'] for r in hood]} [{time.time() - t0:.0f} s]")
     fl = rep.get("floor", {})
     wall_g = sum(r["mass_g"] for n, r in rows.items() if not n.startswith("floor"))
@@ -2018,7 +2007,7 @@ def check_set(d: Blueprint, pl: Plain, made: dict, rep: dict, items: list, log=p
     twins = [{"piece": n[:-2], "right_cm3": r["volume_cm3"], "left_cm3": rows[n[:-1] + "L"]["volume_cm3"]} for n, r in rows.items()
              if n.endswith(" R") and n[:-1] + "L" in rows and abs(r["volume_cm3"] - rows[n[:-1] + "L"]["volume_cm3"]) > 0.05]
     return {"pieces": rows, "twins_that_differ": twins, "clashes": clashes, "hardware": hard, "reach": reach, "reach_short": short,
-            "hood_reach": hood, "merged_boolean_fallback": fallback,
+            "hood_reach": hood,
             "screws": {"joint 1, 3.0 x 16": sum(len(p["screws"]) for p in rep["pairs"]),
                        "floor, 3.5 x 9.5 countersunk": len(fl.get("lap_screws", [])) + len(fl.get("foot_screws", []))},
             "cones": len(fl.get("cones", [])),
@@ -2070,12 +2059,16 @@ def summary(chk: dict, log=print) -> int:
 
 
 MERGE_DV = 0.5   # mm3: the volume of a piece may change by this much (or 1e-6 of it) when its faces are merged
+# the folder of the merged copies, and the end of their file names: a copy to look at in FreeCAD, never a print file
+MERGED_VIEW = "merged-view"
+MERGED_SUFFIX = "-merged-view-not-for-print"
 
 
 def merge_faces(shapes: dict, log=print) -> tuple[dict, list[dict]]:
-    """Each piece with the faces that continue each other merged into one (removeSplitter), after the joints are made
-    and before it is written. A piece keeps its faces when the merged piece is not one valid closed solid, or when
-    its volume changes by more than MERGE_DV; the row of that piece names the reason. The merge runs on a deep copy."""
+    """Each piece with the faces that continue each other merged into one (removeSplitter), as a copy to look at. The
+    merge of OpenCascade is not the same in each run, and a boolean on a merged piece can fail, so the merged shape is
+    in no print file and no check. Returns the merged copies (none for a piece whose merge is not one valid closed
+    solid of the same volume, within MERGE_DV) and a row for each piece."""
     out, rows = {}, []
     for name, shape in shapes.items():
         t0 = time.time()
@@ -2095,32 +2088,44 @@ def merge_faces(shapes: dict, log=print) -> tuple[dict, list[dict]]:
         except Exception as e:  # noqa: BLE001
             ok, m = False, shape
             row.update({"merged": False, "why": f"removeSplitter failed: {e}"})
-        out[name] = m if ok else shape
+        if ok:
+            out[name] = m
         row["seconds"] = round(time.time() - t0, 1)
         rows.append(row)
         log(f"pieces: {name}: faces merged {row.get('faces_before')} -> {row.get('faces_after')}, merged {row['merged']} {row.get('why', '')}")
     return out, rows
 
 
+def write_merged_view(folder: Path, shapes: dict) -> None:
+    """The merged copies as BREP files only (no STL, no manifest: no tool and no slicer takes them), each named
+    <piece>-merged-view-not-for-print.brep, and a README that says what they are."""
+    import shutil  # noqa: PLC0415
+
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    for name, shape in shapes.items():
+        shape.exportBrep(str(folder / f"{name.replace(' ', '_')}{MERGED_SUFFIX}.brep"))
+    (folder / "README.txt").write_text(
+        "The print pieces with their merged faces, to look at in FreeCAD (File > Open, or Part > Import).\n"
+        "They are not print files: print the STL files of the folder above. The merge of OpenCascade is not the same in\n"
+        "each run, so no check reads these copies. A piece whose merge failed has no copy here.\n", encoding="utf-8")
+
+
 def build_all(out: Path, log=print) -> int:
     d = Blueprint()
     pl = plain(d, out, log)
     items = hardware()
-    if os.environ.get("CANDYBAR_PIECES_SOCKET_PLATE") == "1":
-        # the front socket plate is not in the default build; with it, deck side R has the seat (with_socket_plate)
-        pl = with_socket_plate(pl, d)
-        items += socket_plate_items(d)
     res = generate(d, pl, None, None, items, log)
-    # the pieces as the joints leave them, for the count of the face check before the faces are merged
-    write_parts(out / "unmerged", res.pieces)
-    res.pieces, res.extra["merged"] = merge_faces(res.pieces, log)
     write_parts(out, res.pieces)
+    # the merged copies, to look at in FreeCAD only (merge_faces)
+    view, res.extra["merged"] = merge_faces(res.pieces, log)
+    write_merged_view(out / MERGED_VIEW, view)
     # the joints alone, for tools/face_check.py: the skin has narrow step faces of its own, which hide the joints' faces
     write_parts(out / "joints", res.added, {n: "#9ec5e8" for n in res.added})
     rep = seam_report(res)
     (out / "seams.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     # the checks are on the pieces as the files hold them
-    chk = check_set(d, pl, read_parts(out)[0], rep, items, log, unmerged=read_parts(out / "unmerged")[0])
+    chk = check_set(d, pl, read_parts(out)[0], rep, items, log)
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 
@@ -2131,8 +2136,7 @@ def check_files(out: Path, log=print) -> int:
     pl = plain(d, out, log)
     shapes, _ = read_parts(out)
     rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
-    old = read_parts(out / "unmerged")[0] if (out / "unmerged" / "manifest.json").exists() else None
-    chk = check_set(d, pl, shapes, rep, hardware(), log, unmerged=old)
+    chk = check_set(d, pl, shapes, rep, hardware(), log)
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 
@@ -2156,8 +2160,8 @@ class View:
 
 CENTRE = (0.0, 290.0, 250.0)
 VIEWS = (
-    View("exploded-front", "The 32 pieces, moved apart, from the front right", (), (0.0, 290.0, 235.0), 640.0, 38.0, 22.0, explode=0.45, aspect=0.85),
-    View("exploded-rear", "The 32 pieces, moved apart, from the rear left", (), (0.0, 290.0, 235.0), 640.0, -142.0, 22.0, explode=0.45, aspect=0.85),
+    View("exploded-front", "The 30 pieces, moved apart, from the front right", (), (0.0, 290.0, 235.0), 640.0, 38.0, 22.0, explode=0.45, aspect=0.85),
+    View("exploded-rear", "The 30 pieces, moved apart, from the rear left", (), (0.0, 290.0, 235.0), 640.0, -142.0, 22.0, explode=0.45, aspect=0.85),
     View("pilot-front-closed", "Pilot, front: deck side R on lower R at seam D2, closed, seen from inside", ("deck side R", "lower R"),
          (195.0, 207.0, 38.0), 85.0, -128.0, 28.0),
     View("pilot-front-open", "Pilot, front: seam D2 open by 40 mm", ("deck side R", "lower R"),

@@ -303,16 +303,19 @@ def mounts() -> list[Mount]:
               "adjustment each way, set from the front with the bezel plate off; it slides out forward through the opening. "
               "The fixed part of the cradle is screwed at four corners to the inner flanges of the two middle pieces at the rails.",
               "middle R and L"),
-        Mount("speakers", "Each driver screws to a printed baffle bonded behind the speaker opening of the hood band.", "hood"),
-        Mount("marquee modules", "On a printed rail across the hood behind the marquee cover, screwed to the hood's inner "
-              "flanges at the legs; the controller beside it.", "hood"),
+        Mount("speakers", "Each driver lies in the seat of a printed baffle behind the speaker opening of the hood band, "
+              "clamped by its grille and two M3 screws; a sealed enclosure behind it (band A, candybar.shell.band).", "hood"),
+        Mount("marquee light", "In a closed light box behind the marquee window, bonded on the rear of the band wall; "
+              "the printed front lies in the groove of the lip (band A).", "hood"),
         Mount("encoder", "On the control panel frame under the panel, so that it leaves with the panel (one encoder for each "
               "panel).", "control panel"),
         Mount("USB hub", f"On the {FLOOR_T:g} mm floor behind the USB row (fit study), in a printed clip.", "floor"),
-        Mount("USB socket plate", "Screwed from inside into a frame of inserts round its opening in the deck side.", "deck side R"),
-        Mount("control panel frame and latch", "The ledge under the plate takes the load; two pins at the front, a latch at "
-              "the back into the deck frame D1/D2.", "deck"),
-        Mount("hood", "Two pins at the front, two M4 screws through the foot of the rear wall into the top ring.", "body top"),
+        Mount("front socket plate", "The plate b-knob in its seat: two M3 screws from outside into inserts in the frame "
+              "behind the skin (candybar.shell.socket_plate).", "deck side R"),
+        Mount("control panel frame and latch", "The ledge under the plate takes the load; the frame is bonded under the "
+              "ledge; the push bolt and two rear hooks hold the panel (candybar.shell.panel_frame).", "deck"),
+        Mount("hood", "Four cones on the top ring; four M4 screws from below, up through the ring into inserts in the "
+              "hood's foot, reached through the rear door (the bolted hood).", "body top"),
         Mount("non-slip pads", f"Thin adhesive non-slip pads ({PAD_T[0]:g} to {PAD_T[1]:g} mm) under the floor tiles; the floor "
               "stands on the table. No feet.", "the floor"),
     ]

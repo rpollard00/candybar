@@ -37,7 +37,8 @@ MODEL = os.environ.get("CANDYBAR_OUT") or os.path.join(ROOT, "out", "cradle")
 SHELL = os.environ.get("CANDYBAR_SHELL") or os.path.join(ROOT, "out", "shell-rev7")
 SCENES, RENDERS, SHEETS = (os.path.join(MODEL, k) for k in ("scenes", "renders", "sheets"))
 INK, MUTED = (30, 30, 34), (110, 110, 118)
-SHELL_PARTS = ("deck", "control_panel", "body", "hood", "marquee_lip", "speaker_right", "speaker_left", "logo_form")
+SHELL_PARTS = ("deck", "control_panel", "body", "hood", "marquee_lip_right", "marquee_lip_left", "speaker_pod_right", "speaker_pod_left",
+               "grille_right", "grille_left", "logo_field", "logo_badge", "marquee_front_right", "marquee_front_left", "socket_plate", "knob", "power_button")
 CRADLE = ("lugs", "bosses", "upright_right", "upright_left", "jaws", "shoes", "channel_right", "channel_left", "pins", "magnets", "screws")
 COLOUR = {"bezel_plate_button": "#303030", "button_rod": "#d03030", "button_striker": "#e0a030", "button_guide": "#6080c0", "skin": "#c8c8c8", "bezel_plate": "#303030", "lugs": "#d8b060", "bosses": "#d8b060", "upright_right": "#5a7fb5", "upright_left": "#5a7fb5",
           "jaws": "#d0703a", "shoes": "#8a5a30", "channel_right": "#6aa06a", "channel_left": "#6aa06a", "monitor": "#3a4250", "plugs": "#e0c890",
