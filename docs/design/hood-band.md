@@ -244,7 +244,7 @@ What the studies do not have:
 4. The grilles, the badge, the light box and the seats are black ABS as printed (the owner may print every part in ABS), and they are not painted. The edge rule holds on each of them that shows (section 14).
 5. The marquee light is one LED strip, 10 wide. The diffuser distance of 26.6 gives even light for a strip of 60 LEDs for each metre or more.
 6. The pods, the logo field and the lip are bonded to the hood, filled and painted with it.
-7. The hood form in the build folders is the solid outer form with the openings as pockets 8 deep, as the default build writes its parts. The sections use the printed skin from the cache of the split.
+7. The hood form in the build folders is the solid outer form with the openings as pockets 8 deep, as the default build writes its parts. The sections use the printed skin from the cache of the split. That skin has the openings of band A (the default build), so the sections of B and C (`03-sections.png`) show band A's openings too; they were not built again.
 8. The seat, the light box and the logo backer are bonded behind the wall before the hood pieces are bonded.
 
 ## 10. Open questions for the owner
