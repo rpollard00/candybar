@@ -19,6 +19,18 @@ PARAMS = CAD / "params"
 FREECAD_RUN = CAD / "candybar" / "freecad-run.sh"
 
 
+def slow(item):
+    """Mark a test class or a test as one of the slow group: it needs a build of the shell, the skin or a study, and
+    it protects something that no build checks. cad/test.sh runs the quick group; cad/test.sh --slow runs these."""
+    item._candybar_slow = True
+    return item
+
+
+def is_slow(test) -> bool:
+    method = getattr(test, getattr(test, "_testMethodName", ""), None)
+    return bool(getattr(method, "_candybar_slow", False) or getattr(type(test), "_candybar_slow", False))
+
+
 _temp_dirs: list[Path] = []
 
 

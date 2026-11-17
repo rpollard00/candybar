@@ -5,6 +5,7 @@ Environment:
   CANDYBAR_TEST_IDS  run only the tests whose name contains one of these fragments (separated by spaces)
   CANDYBAR_RESULTS   write the result of each test to this JSON file: the outcome, the time, the text of a failure
   CANDYBAR_LIST      only list the names of the tests that would run, one on each line, to this file
+  CANDYBAR_GROUP     quick (the default of cad/test.sh), slow (the tests marked with support.slow) or all
 """
 from __future__ import annotations
 
@@ -103,6 +104,16 @@ def main() -> int:
     if patterns:
         loader.testNamePatterns = [f"*{p}*" for p in patterns]
     suite = loader.discover(str(TESTS), top_level_dir=str(TESTS.parent))
+    group = os.environ.get("CANDYBAR_GROUP", "all")
+    if group in ("quick", "slow"):
+        from . import support
+
+        # a module that does not import (unittest.loader._FailedTest) stays in both groups, so that its error shows
+        keep = [t for t in tests_of(suite) if type(t).__module__ == "unittest.loader" or support.is_slow(t) == (group == "slow")]
+        suite = unittest.TestSuite(keep)
+    elif group != "all":
+        print(f"CANDYBAR_GROUP must be quick, slow or all, not {group!r}")
+        return 2
     loaded = time.monotonic() - started
     if listing := os.environ.get("CANDYBAR_LIST"):
         # A module that does not import shows as a _FailedTest: it is listed, so that the caller runs it and sees why.
