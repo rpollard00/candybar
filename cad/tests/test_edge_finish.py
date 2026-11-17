@@ -204,6 +204,30 @@ class FlatBreakTest(unittest.TestCase):
         self.assertIn("the edge turns 90.0 degrees, the flat lies 0.50 under it", log[0])
 
 
+class OverEdgeTest(unittest.TestCase):
+    """over_edge: a part of the default build that lies over a convex edge of a print piece hides it, also when the
+    middle of each face of the edge is not under that part (a narrow strip of the skin at the rim of a cover)."""
+
+    def setUp(self):
+        # a piece with its top edge at y 0, z 10; a strip of face 2 high above the edge, as a slab step leaves it
+        self.piece = Part.makeBox(10.0, 4.0, 10.0, App.Vector(0.0, 0.0, 0.0))
+        self.edge = next(e for e in self.piece.Edges if abs(e.BoundBox.Center.y) < 1e-9 and abs(e.BoundBox.Center.z - 10.0) < 1e-9)
+        self.faces = [f for f in self.piece.Faces if any(e.isSame(self.edge) for e in f.Edges)]
+        self.m = self.edge.BoundBox.Center
+
+    def test_a_flange_in_front_of_the_edge_hides_it(self):
+        flange = Part.makeBox(10.0, 2.0, 1.0, App.Vector(0.0, -2.0, 9.5))   # in front of the face, 0.5 over the edge
+        self.assertEqual(ef.over_edge(self.faces, self.m, {"marquee_front_right": flange}), "marquee_front_right")
+
+    def test_a_part_beside_the_edge_does_not(self):
+        beside = Part.makeBox(10.0, 2.0, 5.0, App.Vector(0.0, -2.0, 0.0))   # in front of the face, below the edge
+        self.assertEqual(ef.over_edge(self.faces, self.m, {"marquee_front_right": beside}), "")
+
+    def test_the_next_piece_does_not_count(self):
+        flange = Part.makeBox(10.0, 2.0, 1.0, App.Vector(0.0, -2.0, 9.5))
+        self.assertEqual(ef.over_edge(self.faces, self.m, {f"{ef.PIECE_OF}hood_centre": flange}), "")
+
+
 @support.slow
 class ShellEdgeFinishTest(unittest.TestCase):
     """The default build of the shell: the rule holds on the printed parts of the exterior (deck, body, hood). The

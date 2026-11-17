@@ -26,6 +26,7 @@ Run headless. It writes edge-finish.json and edge-finish.md into the build's dir
 does not hold:
 
     CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.edge_finish
+    CANDYBAR_EDGE_PARTS=hood,deck ...   (only these parts; the others are read as neighbours)
 """
 from __future__ import annotations
 
@@ -322,6 +323,19 @@ def against(face: Part.Face, others: dict[str, Part.Shape], d: Blueprint, near: 
     return next((name for name, o in others.items() if o.BoundBox.isInside(q) and o.isInside(q, 1e-3, True)), "")
 
 
+def over_edge(fs: list[Part.Face], m: FreeCAD.Vector, others: dict[str, Part.Shape], near: float = NEAR) -> str:
+    """The part of the default build that lies over a convex edge of a print piece: a point just outside the middle
+    of the edge, along the mean of the normals of its two faces, is inside that part; or "". The other print pieces
+    do not count: a seam has its own tests."""
+    n = FreeCAD.Vector()
+    for f in fs:
+        n += f.normalAt(*f.Surface.parameter(m))
+    if n.Length < 1e-9:
+        return ""
+    q = m + n.normalize() * near
+    return next((k for k, o in others.items() if not k.startswith(PIECE_OF) and o.BoundBox.isInside(q) and o.isInside(q, 1e-3, True)), "")
+
+
 def zone(part: str, m: FreeCAD.Vector, d: Blueprint) -> str:
     """A plain name for the place of an edge on its part."""
     g = d.seam_groove
@@ -418,12 +432,13 @@ def edge_turn(e: Part.Edge, fs: list[Part.Face], m: FreeCAD.Vector) -> tuple[boo
     return away.dot(n[1]) < 0, so.crease_angle(fs, m)
 
 
-def survey(parts: dict[str, Part.Shape], d: Blueprint, meta: dict | None = None) -> dict:
+def survey(parts: dict[str, Part.Shape], d: Blueprint, meta: dict | None = None, only: set[str] | None = None) -> dict:
     """For each part: its class, the sharp convex edges that turn more than edge_break_turn, grouped by place and by
-    what they lie against; and how many of its faces are rounds. `meta` is the manifest of the folder."""
+    what they lie against; and how many of its faces are rounds. `meta` is the manifest of the folder. With `only`,
+    only those parts are surveyed; all parts stay neighbours."""
     out = {}
     for name, shape in parts.items():
-        if name in face_check.NOT_PARTS:
+        if name in face_check.NOT_PARTS or (only is not None and name not in only):
             continue
         entry = (meta or {}).get(name, {})
         cls = finish_class(name, entry)
@@ -466,6 +481,10 @@ def survey(parts: dict[str, Part.Shape], d: Blueprint, meta: dict | None = None)
                 hidden = [k for k in UNDER[name] if k in parts and parts[k].distToShape(Part.Vertex(m))[0] < spm.COVER][:1]
             if not hidden and control is not None and control.distToShape(Part.Vertex(m))[0] < 0.05:
                 hidden = [CONTROL_EDGE]
+            if not hidden and name in WALLS:
+                # a narrow face of the skin (a slab step) can end at the rim of a part that covers the edge: the test
+                # of the face's middle misses the part, so test the edge itself, just outside it
+                hidden = [k for k in [over_edge(fs, m, others)] if k]
             if not hidden and (name == "body" or name in WALLS):
                 hidden = [r] if (r := not_finished(m, d)) else []
             if band is not None and not any((entry.get("coupon", name), h) in JOINTS for h in hidden) \
@@ -562,7 +581,8 @@ def table(rows: dict, d: Blueprint) -> str:
 def main() -> int:
     out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")
     d = Blueprint()
-    rows = survey(load(out), d, manifest_of(out))
+    only = {p for p in os.environ.get("CANDYBAR_EDGE_PARTS", "").split(",") if p} or None
+    rows = survey(load(out), d, manifest_of(out), only)
     json.dump({"parts": rows, "failures": failures(rows)}, open(os.path.join(out, "edge-finish.json"), "w"), indent=1)
     text = table(rows, d)
     open(os.path.join(out, "edge-finish.md"), "w").write(text)
