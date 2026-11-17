@@ -45,7 +45,7 @@ The quick group (272 tests) tests logic and small shapes. It builds no shell and
 | `test_blueprint_solids.PlanarRearTest` (5) | The flat faces of decision record 0007, which a check at 0.5 mm cannot tell from a slight curve; the hand-holds print without support; the head and the hood line up across the seam |
 | `test_blueprint_solids.BlueprintSolidsTest` (1) | The check of the solids against the blueprint can still fail |
 | `test_edge_finish.ShellEdgeFinishTest` (3) | The edge break of the hood is the same on both sides, takes no more than its depth, and the cavity is taken from the hood before the break |
-| `test_pieces.WholeSetTest` (14) | The rules of the joints on the whole set, and the 30 pieces. `pieces.check_set` does not check them yet. When it does, these tests go |
+| `test_pieces.WholeSetTest` (13) | The rules of the joints on the whole set, and the 30 pieces. `pieces.check_set` does not check them yet. When it does, these tests go |
 | `test_split.SplitTest` (1) | Each hand-hold stays whole in one piece |
 | `test_panel_frame.ChecksTest` (5) | The checks can still fail on the real skin of the deck; the panel comes out with the button held and not with a hook under the ledge; the options still build |
 | `test_rear` (2) | The door tilts out and lifts off; the rear changes no piece that it does not finish |
