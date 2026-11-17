@@ -47,7 +47,8 @@ SKIN = ("deck", "body", "hood", "marquee_lip")
 SAME = 1e-3
 # the fuzzy tolerance of a boolean that failed without it, mm
 FUZZY = 1e-3
-# a section whose offset fails is offset again as a polygon that stands at most this far off its edges, mm
+# the spline and ellipse edges of a section are offset as a polyline that stands at most this far off them, and a
+# section whose offset fails is offset again as a polygon within it, mm
 POLY_DEFLECTION = 0.02
 # every second slab of the cavity stands this far inside the offset by wall_t, so that no two neighbour slabs share
 # a part of their outline (see the module text), mm
@@ -117,14 +118,42 @@ def closed_points(wire: Part.Wire) -> list[FreeCAD.Vector]:
     return pts if (pts[0] - pts[-1]).Length < 1e-6 else pts + [pts[0]]
 
 
+def plain(face: Part.Face) -> Part.Face:
+    """The face with each edge that is not a line or a circle replaced by a polyline within POLY_DEFLECTION; the
+    lines, the arcs and the ends of every edge stay as they are.
+
+    The 2D offset of OpenCascade makes the offset of a spline or an ellipse as an offset curve that is only C0 at the
+    knots of its basis, and its curve on the plane does not follow it (BOPAlgo_InvalidCurveOnSurface). The skin then
+    has step faces with such edges, and the mesh of a piece of the split puts a node of such a face hundreds of mm
+    off it, at a place that changes from run to run: the box of the piece, its print box and the check of its twin
+    changed with it. The offset of lines and arcs is lines and arcs, exactly."""
+    wires = []
+    for wire in face.Wires:
+        edges = []
+        for e in wire.OrderedEdges:
+            if isinstance(e.Curve, (Part.Line, Part.Circle)):
+                edges.append(e)
+                continue
+            pts = e.discretize(Deflection=POLY_DEFLECTION)
+            ends = [v.Point for v in e.Vertexes]
+            pts[0] = min(ends, key=lambda v: (v - pts[0]).Length)
+            pts[-1] = min(ends, key=lambda v: (v - pts[-1]).Length)
+            if e.Orientation == "Reversed":
+                pts.reverse()
+            edges += [Part.makeLine(a, b) for a, b in zip(pts, pts[1:]) if (b - a).Length > 1e-9]
+        wires.append(Part.Wire(edges))
+    return Part.makeFace(wires, "Part::FaceMakerBullseye")
+
+
 def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
-    """The section offset inward by w, moved into the plane x = 0."""
+    """The section offset inward by w, moved into the plane x = 0. Its spline and ellipse edges are offset as
+    polylines (plain): the inner face of the wall stands at most POLY_DEFLECTION off the exact offset."""
     if face is None:
         return None
     out = []
     for f in face.Faces:
         try:
-            out.append(f.makeOffset2D(-w, 0, False, False, False))
+            out.append(plain(f).makeOffset2D(-w, 0, False, False, False))
             continue
         except (FreeCAD.Base.CADKernelError, ValueError):
             pass
