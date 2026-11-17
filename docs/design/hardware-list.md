@@ -121,11 +121,11 @@ A price is in the list only where a source gave it. The source and the date are 
 
 | Item | Size or standard | Qty | Why this kind | Alternatives | Open |
 | --- | --- | --- | --- | --- | --- |
-| Speaker | Full range, 8 ohm. The room behind each speaker form takes a round frame of 53.9 mm and 109 mm of depth (fit report). | 2 | Roadmap: no hardware is chosen | See 2.5 | The driver |
-| Speaker screws | M3 into heat-set inserts in a printed baffle | 4 for each driver | "Each driver screws to a printed baffle" (split report) | Thread-forming screws | Follows the driver |
+| Speaker | Tectonic TEBM35C10-4, square frame 51.8 mm, in a sealed enclosure of 0.45 l (band A, docs/design/hood-band.md). The room behind each pod takes a round frame of 53.9 mm and 109 mm of depth (fit report). | 2 | The audio research of 2026-11-14 | Visaton FRS 5 X (frame 50: it needs its own seat pocket) | The driver's body is an envelope, not checked against a data sheet |
+| Grille screws and inserts | M3 button head (ISO 7380) into M3 heat-set inserts in the driver seat; the grille clamps the driver's frame | 2 for each grille | Band A: the driver and the grille come out to the front | A snap fit | The length of the screw |
 | Amplifier | Stereo class D board, on the 5 V or the 12 V of the supply | 1 | See 2.5 | The speakers of the monitor (2 x 1 W), with no amplifier | The board. The volume control. |
 | Audio source | The 3.5 mm output of the monitor, or a USB audio adapter | 1 | The board has no analogue audio output (envelopes, section 2: port list) | Audio over HDMI to the monitor only | A bench test of the monitor's output |
-| Plug at the foot of the hood | One multi-pin connector for the speakers and the marquee | 1 pair | "The hood lifts off: one multi-pin plug at the hood's foot" (split report) | Two small connectors | The pin count: 4 for the speakers, and the marquee's wires |
+| Plug at the foot of the hood | One multi-pin connector for the speakers and the marquee light, with about 200 mm of slack on the hood's side: the hood lifts and tips back, then the plug comes apart (the bolted hood, 2026-11-16) | 1 pair | "The hood lifts off: one multi-pin plug at the hood's foot" (split report) | Two small connectors | The pin count: 4 for the speakers, and the marquee's wires |
 
 ### 1.7 Marquee
 

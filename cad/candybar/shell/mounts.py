@@ -168,7 +168,9 @@ class Mounts:
     button_size: tuple[float, float, float] = (60.0, 25.0, 20.0)
     button_at: tuple[float, float] = (11.35, 18.9)    # right of the power supply, in front of the bundle
     button_tie: float = 6.0                           # its staple in front of it
-    deck_tie: tuple[float, float] = (190.0, 170.0)    # the lead of the button on its way to the USB socket plate
+    # the lead of the button on its way to the socket plate: inward of the rooms behind its sockets (they reach x 184.6;
+    # 190 met the room of USB_C4 when the plate came into the default build, 2026-11-16)
+    deck_tie: tuple[float, float] = (170.0, 170.0)
     # the audio amplifier: on the floor beside the hub, toward the centre
     amp_size: tuple[float, float, float] = (54.0, 41.0, 20.0)   # Adafruit MAX9744, fed from 12 V
     # the USB sound adapter on its short lead: on the floor behind the amplifier, beside the hub
@@ -565,7 +567,7 @@ def ties(s: Site, m: Mounts, x_bay: float) -> tuple[list[Solid], list[dict]]:
     button, amp = pb["PlaceButtonAdapter"][0], pb["PlaceAmplifier"][0]
     spots.append(("TieButton", ((button[0] + button[1]) / 2, button[2] - m.button_tie, s.floor), (0, 0, 1), (1, 0, 0), False, "floor rear centre",
                   "the strap of the power button's adapter, with TieBundleFrontL behind it"))
-    spots.append(("TieDeck", (*m.deck_tie, s.floor), (0, 0, 1), (0, 1, 0), False, "floor front side R", "the lead of the power button, on its way to the USB socket plate"))
+    spots.append(("TieDeck", (*m.deck_tie, s.floor), (0, 0, 1), (0, 1, 0), False, "floor front side R", "the lead of the power button, on its way to the socket plate"))
     for tag, y in (("Front", amp[2] - m.amp_tie), ("Rear", amp[3] + m.amp_tie)):
         spots.append((f"TieAmp{tag}", ((amp[0] + amp[1]) / 2, y, s.floor), (0, 0, 1), (1, 0, 0), False, "floor middle side R",
                       "the strap of the amplifier" + (", and the tie of the USB sound adapter" if tag == "Rear" else "")))
@@ -678,7 +680,8 @@ def stand_in(parts: dict[str, Part.Shape], skin: dict[str, Part.Shape], d: Bluep
     """A cavity for the rules of the fit study, without the 6 minutes of cavity.build: its walls are the zones of
     the real skin round the mounts and the floor of the skin, and a point is in the cavity when it is in the outer
     form. So an item is tested against the skin near the mounts only; the fit study tests it against all the skin."""
-    return cavity.Cavity([parts[k] for k in cavity.SKIN] + [cavity.seam_filler(parts, d)], list(skin.values()), [])
+    form = so.skin_parts(d, parts)
+    return cavity.Cavity([form[k] for k in cavity.SKIN] + [cavity.seam_filler(parts, d)], list(skin.values()), [])
 
 
 def room_values(shell_out: Path) -> dict[str, float]:

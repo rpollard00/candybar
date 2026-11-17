@@ -16,7 +16,12 @@ def main() -> int:
     from . import support
 
     try:
-        result = unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite)
+        # the time of every test, slowest first, after the results (unittest durations: Python 3.12 and later)
+        try:
+            runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2, durations=0)
+        except TypeError:
+            runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2)
+        result = runner.run(suite)
     finally:
         support.remove_temp_dirs()
     return 0 if result.wasSuccessful() and result.testsRun else 1

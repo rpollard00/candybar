@@ -96,7 +96,8 @@ def form_parts(parts: dict[str, Part.Shape], d: Blueprint) -> list[Part.Shape]:
     cap of solids.cap_unbroken, which the build breaks as its last step)."""
     h = pr.hood(d)
     hood = so.hood_frame(h)(so.cap_unbroken(d, h)[0])
-    return [hood if k == "hood" else parts[k] for k in SKIN]
+    skin = so.skin_parts(d, parts)
+    return [hood if k == "hood" else skin[k] for k in SKIN]
 
 
 def section(skin: list[Part.Shape], x: float) -> Part.Shape | None:
@@ -167,7 +168,9 @@ def same(a: Part.Shape | None, b: Part.Shape | None) -> bool:
 
 def openings(d: Blueprint, o: Openings, parts: dict[str, Part.Shape] | None = None) -> list[Part.Shape]:
     """The skin removed under the control panel and behind the bezel plate, inside their ledges (the bezel's at its
-    top and bottom only), and through the wall at the hole of the latch's button (solids.latch_button_hole)."""
+    top and bottom only), through the wall at the hole of the latch's button (solids.latch_button_hole), and through
+    the band wall of the hood at the openings of the hood band, with the stand-in of the lip in front of it
+    (band.skin_cutters)."""
     w = d.wall_t
     z1 = d.panel_top - d.panel_t
     panel = so.prism(so.poly(pr.panel_outline(d, -o.panel_ledge)), so.xy(z1 - w - SLAB), V(0, 0, w + SLAB))
@@ -176,7 +179,9 @@ def openings(d: Blueprint, o: Openings, parts: dict[str, Part.Shape] | None = No
     origin, up, into = so.screen_frame(d)
     # the face of the body behind the plate lies screen_t behind the screen face; the opening goes SLAB into the cavity
     bezel = so.slab(origin, up, into, (-bx, bx), (s0, s1), (d.mon_setback, d.mon_setback + d.screen_t + w + SLAB))
-    out = [panel, bezel]
+    from . import band  # noqa: PLC0415
+
+    out = [panel, bezel, *band.skin_cutters(d)]
     if parts is not None and "deck" in parts:
         hole = so.latch_button_hole(d, parts["deck"], w + SLAB + 5.0)
         if hole is not None:

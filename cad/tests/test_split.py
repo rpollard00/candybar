@@ -126,7 +126,8 @@ class SplitTest(unittest.TestCase):
 
     def test_the_shell_has_its_pieces(self) -> None:
         names = set(self.cuts[split.SHELL]["pieces"])
-        self.assertEqual(len(names), 32)
+        # the three stand-ins of the hood band left the split, and band A's marquee window makes the hood sill a piece (2026-11-16)
+        self.assertEqual(len(names), 30)
         for name in ("upper rear R", "upper rear L", "rear lower R", "middle L", "door half R", "hood centre"):
             self.assertIn(name, names)
 

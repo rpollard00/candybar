@@ -19,9 +19,20 @@ There is one model: the blueprint shell (`candybar/shell/`). `docs/blueprint/ind
 Requirements: FreeCAD 1.1 (`freecadcmd` and `freecad`). The drawing tools use the Python of `cad/.venv-tools`, and the renders use Blender.
 
 ```sh
-cad/build.sh    # build the model (2 minutes)
+cad/build.sh    # build the model (3 minutes)
 cad/check.sh    # run the checks of the design on the build (about 1 hour)
-cad/test.sh     # run the tests of the code (about 30 minutes)
+cad/compare.sh  # compare the build with the accepted outer form, the commit in cad/BASELINE (0.000001)
+cad/test.sh     # run the tests of the code (about 2 hours)
+```
+
+The default build is the cabinet as the owner chose it: the hood band A (`candybar/shell/band.py`) and the front socket plate `b-knob` (`candybar/shell/socket_plate.py`) are in it since 2026-11-16. `cad/compare.sh` builds the outer form of the baseline commit once into `cad/out/baseline/<commit>` and writes `compare-<commit>/compare.md` beside the build; it fails when a part moved or has no partner. A decided change of the form gets a new baseline: the commit that makes it goes into `cad/BASELINE`.
+
+The whole cabinet, with the printed bezel plate, the monitor and the control panel in, for the owner:
+
+```sh
+CANDYBAR_OUT=cad/out/cabinet cad/candybar/freecad-run.sh candybar.shell.cabinet          # after the builds of the shell, the cradle and the panel
+CANDYBAR_OUT=cad/out/cabinet cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc    # cad/out/cabinet/shell.FCStd
+cad/.venv-tools/bin/python cad/tools/draw_cabinet.py cad/out/cabinet                     # cad/out/cabinet/cabinet.png
 ```
 
 `cad/build.sh` writes these files into `cad/out/shell-rev7/`. Git ignores `cad/out/`. `CANDYBAR_OUT` sets a different directory.
@@ -121,12 +132,12 @@ CANDYBAR_OUT=cad/out/duct-lead cad/candybar/freecad-run.sh candybar.shell.duct_l
 cad/.venv-tools/bin/python cad/tools/draw_duct_lead.py cad/out/duct-lead                              # renders and 1-way-1.png, 2-way-2.png, 3-places.png
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.edge_finish                      # the edge rule on its print parts
 CANDYBAR_OUT=cad/out/cradle/print cad/candybar/freecad-run.sh tools.face_check                       # the face check on its print parts
-# the front socket plate, four variants (about 20 minutes; not in the default build; docs/design/front-socket-plate.md)
+# the front socket plate, four variants (about 20 minutes; b-knob is in the default build; docs/design/front-socket-plate.md)
 CANDYBAR_SHELL=cad/out/shell-rev7 CANDYBAR_OUT=cad/out/socket-plate cad/candybar/freecad-run.sh candybar.shell.socket_plate
 cad/.venv-tools/bin/python cad/tools/draw_socket_plate.py all                                        # shell.FCStd, renders, sheets
 CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.edge_finish               # the edge rule on the default variant
 CANDYBAR_OUT=cad/out/socket-plate/b-knob cad/candybar/freecad-run.sh tools.face_check                # the face check on it
-# the hood band: bands A (the owner's choice), B and C, and the studies of a taller hood (7 minutes; not in the default build; docs/design/hood-band.md)
+# the hood band: bands A (the owner's choice, in the default build), B and C, and the studies of a taller hood (7 minutes; docs/design/hood-band.md)
 CANDYBAR_OUT=cad/out/hood-band cad/candybar/freecad-run.sh candybar.shell.hood_band                  # HOOD_BAND_VARIANTS=A, HOOD_BAND_TALL=
 CANDYBAR_OUT=cad/out/hood-band/A cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc            # shell.FCStd of one variant
 cad/.venv-tools/bin/python cad/tools/draw_hood_band.py                                               # the sheets

@@ -219,8 +219,19 @@ def anchors(d: Blueprint, lay: Layout, v, side_in: float) -> dict[str, float]:
 USB_ORDER = "ACAC"
 
 
+def socket_plate() -> list[Assembly]:
+    """The hardware of the front socket plate in the right side of the deck (the owner's plate b-knob, in the default
+    build since 2026-11-16): the four sockets in two rows, the power button and the volume knob, each with its body,
+    the room of its lead behind it and what stands outside (socket_plate.assemblies)."""
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    return spm.assemblies(spm.SocketPlate(), Blueprint(), spm.variant(spm.DEFAULT))
+
+
 def usb_row() -> Assembly:
-    """Four sockets in the right side of the deck: each body behind the inner wall face, then its cable bend."""
+    """Four sockets in a row in the right side of the deck, each body behind the inner wall face, then its cable bend:
+    the plan before the socket plate. It is no longer in the items (socket_plate); its anchors stay, because the
+    side wall at the first socket (side_in) is measured there."""
     prims = []
     for k, kind in enumerate(USB_ORDER):
         w, h = f"usb_{kind.lower()}_back_w", f"usb_{kind.lower()}_back_h"
@@ -370,7 +381,7 @@ def build_items(rows: list[params.Param]) -> App.Document:
     if count not in controls.BUTTON_COUNTS:
         raise params.ParamError(f"btn_count must be one of {controls.BUTTON_COUNTS}, not {count:g}")
     count = int(count)
-    for spec in (hardware.MONITOR, MONITOR_ANY, MONITOR_CABLES, hardware.COMPUTE, hardware.PSU, hardware.CABLE_BUNDLE, controls.control_panel(count), usb_row(), HUB, *speakers(), MARQUEE):
+    for spec in (hardware.MONITOR, MONITOR_ANY, MONITOR_CABLES, hardware.COMPUTE, hardware.PSU, hardware.CABLE_BUNDLE, controls.control_panel(count), *socket_plate(), HUB, *speakers(), MARQUEE):
         m.assembly(spec)
     doc.recompute()
     broken = model.errors(doc)
@@ -530,8 +541,12 @@ def first_hit(shapes: list[Part.Shape], start: App.Vector, direction: App.Vector
 
 
 def ray_wall(parts: dict[str, Part.Shape], cav: cavity.Cavity, start: App.Vector, direction: App.Vector) -> float:
-    """The wall along a ray that comes from outside the form: from where it enters the skin to where it enters the cavity."""
-    return first_hit(cav.pieces, start, direction) - first_hit([parts[k] for k in cavity.SKIN], start, direction)
+    """The wall along a ray that comes from outside the form: from where it enters the skin to where it enters the cavity.
+    The skin is the form that the cavity reads (solids.skin_parts): the deck before the seat of the socket plate."""
+    from . import solids as so  # noqa: PLC0415
+
+    form = so.skin_parts(Blueprint(), parts)
+    return first_hit(cav.pieces, start, direction) - first_hit([form[k] for k in cavity.SKIN], start, direction)
 
 
 # ---------- the monitor: margins at the tuck and at the sweep, straight plugs ----------
@@ -914,6 +929,10 @@ def place(d: Blueprint, lay: Layout, params_dir: Path, parts: dict[str, Part.Sha
     values.update({k: marquee[k] for k in ("fit_mq_w", "fit_mq_h", "fit_mq_y", "fit_mq_z0")}, **speaker)
     doc = build_items(sheet_rows(params_dir, values))
     found = items(doc)
+    # the opening of the socket plate is room, and its frame and the plate are walls (socket_plate.opened)
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    cav = spm.opened(cav, spm.SocketPlate(), d, spm.variant(spm.DEFAULT))
     rules = run_checks(doc, found, cav, parts["bezel"], parts["control_panel"])
     door = door_outline(d)
     rules["door service"] = door_service(found, door, d, lay)
@@ -952,7 +971,10 @@ def study(d: Blueprint, lay: Layout, params_dir: Path, out: Path, parts: dict[st
     pv = lambda name: params.value(doc, name)
     reach = d.width
     table = clearances(found, cav, rules, reach)
-    measured = sorted(t for t, _ in cavity.measure_wall(parts, cav, cavity.seam_filler(parts, d), WALL_STEP, WALL_EVERY))
+    # the wall of the skin is measured on the form that the cavity reads (solids.skin_parts)
+    from . import solids as so  # noqa: PLC0415
+
+    measured = sorted(t for t, _ in cavity.measure_wall(so.skin_parts(d, parts), cav, cavity.seam_filler(parts, d), WALL_STEP, WALL_EVERY))
     wall = {"points": len(measured), "min": measured[0], "median": measured[len(measured) // 2], "max": measured[-1],
             "probes": {name: ray_wall(parts, cav, p, n) for name, p, n in wall_probes(d, h)}}
     margins = monitor_margins(doc, found, cav, d, pv)

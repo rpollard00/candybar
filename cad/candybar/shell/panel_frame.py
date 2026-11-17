@@ -956,7 +956,7 @@ class Hardware:
 
 
 def hardware(d: Blueprint, skin: Part.Shape, a: Arcade | None = None) -> Hardware:
-    """The lever, the buttons, the encoder, the USB sockets and the hub, as fit.Layout places them: the envelopes
+    """The lever, the buttons, the encoder, the socket plate's hardware and the hub, as fit.Layout places them: the envelopes
     and the keep-out zones of the fit study, with its anchors. With the spread layout of the buttons (Arcade) the
     envelopes of the action buttons stand at the spread places, where the holes are."""
     a = a or Arcade()
@@ -971,7 +971,7 @@ def hardware(d: Blueprint, skin: Part.Shape, a: Arcade | None = None) -> Hardwar
     rows = fit.sheet_rows(PARAMS, values)
     doc = fit.sheet(rows, "PanelFit")
     m = model.Model(doc, [r.name for r in rows])
-    for spec in (controls.control_panel(int(params.value(doc, "btn_count"))), fit.usb_row(), fit.HUB):
+    for spec in (controls.control_panel(int(params.value(doc, "btn_count"))), *fit.socket_plate(), fit.HUB):
         m.assembly(spec)
     doc.recompute()
     return Hardware(doc, base, fit.items(doc))

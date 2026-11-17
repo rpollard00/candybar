@@ -132,7 +132,10 @@ _Avoid_: billboard, topper, marquee (for the whole cap)
 The flange inside the top of the body that the foot of the hood lies on (joint 7). It has the four cones that locate the hood and the bosses of its screws.
 
 **Hood band**:
-The strip across the front of the hood that holds the two speaker grilles and the marquee.
+The strip across the front of the hood that holds the two speaker grilles and the marquee. The default build has band A: two pods with black grilles, the logo field between them, and the marquee with its lip.
+
+**Stand-in**:
+A simple form that held the place of a part that was not designed yet. The four stand-ins of the hood band left the build on 2026-11-16; the plain bezel plate of the form is still one.
 
 **Marquee**:
 The display in the middle of the hood band.

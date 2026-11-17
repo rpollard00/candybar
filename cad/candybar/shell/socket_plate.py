@@ -15,8 +15,10 @@ Frame of the plate: s along +y (toward the rear) and t along +z (up) from the ce
 of the deck side; depth is the distance inward from that face (-x). Seen from outside, the front of the cabinet is on
 the left.
 
-This module changes no shared file. seat() is the cut that solids.deck must make, and fitted() runs the rules of
-fit.py on the hardware of the plate in place of fit.usb_row().
+The owner chose b-knob (2026-11-14), and since 2026-11-16 it is in the default build: solids.build cuts seat() in the
+deck and has the plate and its bought parts, the fit study has assemblies() in place of fit.usb_row(), and the print
+pieces cut the seat with its frame in deck side R (pieces.with_socket_plate). The other variants, the outlines and
+the knob on the left stay here as the study.
 """
 from __future__ import annotations
 
@@ -502,22 +504,26 @@ def is_room(name: str) -> bool:
     return name.endswith(ROOM)
 
 
-SHELL_PARTS = ("deck", "control_panel", "body", "hood", "marquee_lip", "speaker_right", "speaker_left", "logo_form", "bezel", "screen")
+SHELL_PARTS = ("deck", "control_panel", "body", "hood", "bezel", "screen")
 
 
 def shell_parts(d: Blueprint, built: str | None = None) -> dict:
-    """The parts of the outer form: a new build of solids.py, or the BREP files of a build in the folder `built`."""
+    """The parts of the outer form: a new build of solids.py, or the BREP files of a build in the folder `built`.
+    The deck is the deck before the seat of the plate (solids.deck): the default build has the seat of b-knob
+    since 2026-11-16, and this module cuts the seat of each form of the plate itself."""
     import Part  # noqa: PLC0415
 
     from . import solids as so  # noqa: PLC0415
 
     if not built:
-        return so.build(d)
-    out = {}
-    for k in SHELL_PARTS:
-        out[k] = Part.Shape()
-        out[k].read(os.path.join(built, f"{k}.brep"))
-        out[k] = out[k].Solids[0] if len(out[k].Solids) == 1 else out[k]
+        out = so.build(d)
+    else:
+        out = {}
+        for k in SHELL_PARTS:
+            out[k] = Part.Shape()
+            out[k].read(os.path.join(built, f"{k}.brep"))
+            out[k] = out[k].Solids[0] if len(out[k].Solids) == 1 else out[k]
+    out["deck"] = so.deck(d)[0]
     return out
 
 

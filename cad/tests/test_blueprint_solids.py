@@ -35,9 +35,19 @@ class BlueprintSolidsTest(unittest.TestCase):
         cls.d, cls.parts, _ = support.shell()
         cls.baseline = check_solids.run(cls.parts, cls.d)
 
-    def test_the_parts_are_those_of_revision_7(self) -> None:
-        self.assertEqual(list(self.parts), ["deck", "control_panel", "body", "hood", "marquee_lip", "speaker_right", "speaker_left",
-                                            "logo_form", "bezel", "screen"])
+    def test_the_parts_are_those_of_revision_7_with_band_a_and_the_socket_plate(self) -> None:
+        """The form of revision 7, the hood band A (2026-11-16, in place of the four stand-ins of the band) and the
+        front socket plate b-knob with its bought parts. check_solids compares the form (check_solids.FORM)."""
+        from candybar.shell import band, socket_plate as spm
+
+        self.assertTrue({"deck", "control_panel", "body", "hood", "bezel", "screen"} <= set(self.parts))
+        self.assertTrue(set(check_solids.FORM) <= set(self.parts))
+        for k in ("marquee_lip_right", "speaker_pod_left", "logo_field", "grille_right", "marquee_front_left", "light_box_right"):
+            self.assertIn(k, self.parts)
+            self.assertIn(band.kind(k), band.PARTS)
+        self.assertIn("socket_plate", self.parts)
+        self.assertTrue(set(spm.BOUGHT) <= set(self.parts))
+        self.assertFalse({"marquee_lip", "speaker_right", "speaker_left", "logo_form"} & set(self.parts))
 
     def test_every_part_is_one_valid_closed_solid(self) -> None:
         for name, state in self.baseline["parts"].items():

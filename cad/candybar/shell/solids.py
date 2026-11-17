@@ -95,9 +95,19 @@ CUT_LEFT = 0.02
 CUT_LEFT_MM3 = 0.01
 # the edges of the BREP are written to edges.json as polylines with points this far apart
 EDGE_STEP = 0.6
-FINISH = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black",
-          "screen": "#3a4250", "hood": "white", "marquee_lip": "white", "speaker_left": "black", "speaker_right": "black",
-          "logo_form": "#2f4f3a"}
+FINISH = {"deck": "white", "control_panel": "black", "body": "white", "bezel": "black", "screen": "#3a4250", "hood": "white"}
+
+
+def finish(name: str) -> str:
+    """The colour of a part of the default build: the shell's, the hood band's (band.PARTS) or the socket plate's."""
+    from . import band  # noqa: PLC0415
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    if name in FINISH:
+        return FINISH[name]
+    if band.kind(name) in band.PARTS:
+        return band.PARTS[band.kind(name)][0]
+    return spm.FINISH[name]
 
 
 # ---------- paths to edges ----------
@@ -1879,32 +1889,24 @@ def cap(d: Blueprint, h: pr.Hood, log: list[str]) -> tuple[Part.Shape, Part.Shap
 
 
 def hood(d: Blueprint, log: list[str] | None = None) -> dict[str, Part.Shape]:
-    """The cap and what stands in its opening, in the cabinet frame."""
+    """The hood with the owner's band (band A, candybar.shell.band) and every part of the band, in the cabinet frame.
+    Before 2026-11-16 the band had four stand-ins: the lip (lip_stand_in), two speaker forms and a logo form."""
+    from . import band  # noqa: PLC0415 - band builds on this module
+
     log = log if log is not None else []
+    solid, opening = cap(d, pr.hood(d), log)
+    return band.default_parts(d, solid, opening)
+
+
+def lip_stand_in(d: Blueprint) -> Part.Shape:
+    """The stand-in of the marquee's lip, in the cabinet frame: a bar in the opening of the hood, in front of the band
+    wall. The skin of the hood is made with it, as before band A, and the band's cutters then cut it off (cavity.openings),
+    so that the skin of the hood changes only by the openings of the band."""
     h = pr.hood(d)
-    solid, opening = cap(d, h, log)
+    _, opening = cap_unbroken(d, h)
     xr = h.half_open(h.z_band_top, d) + OVER
     lip = Part.makeBox(2 * xr, d.hood_rail_proud, h.z_rail_top - h.z_band_top, V(-xr, h.y_band_top - d.hood_rail_proud, h.z_band_top)).common(opening)
-    out = {"hood": solid, "marquee_lip": lip.removeSplitter()}
-    out.update(band_forms(d, h))
-    return {k: hood_frame(h)(s) for k, s in out.items()}
-
-
-def band_forms(d: Blueprint, h: pr.Hood) -> dict[str, Part.Shape]:
-    """The speaker forms and the logo form: quads on the hood band, raised square to it."""
-    tb = math.radians(d.hood_band_tilt)
-    up, out = V(0, math.sin(tb), math.cos(tb)), V(0, -math.cos(tb), math.sin(tb))
-    origin = V(0, h.y_band_foot, h.z_sill)
-    raised = lambda quad, n: Part.Face(Part.makePolygon([origin + V(x, 0, 0) + up * v for x, v in quad + quad[:1]])).extrude(out * n)
-    length = (h.z_band_top - h.z_sill) / math.cos(tb)
-    v0, v1 = d.speaker_foot_gap, length - d.speaker_head_gap
-    leg = lambda v: h.half_width(max(h.z_sill + v * math.cos(tb), h.z_sill + d.hood_sill_corner_r), h.opening) - d.speaker_side_gap
-    xi = d.logo_w / 2 + d.logo_gap
-    form = [(xi, v0), (leg(v0), v0), (leg(v1), v1), (xi, v1)]
-    lw, le = d.logo_w / 2, d.logo_end_gap
-    right = raised(form, d.speaker_proud)
-    return {"speaker_right": right, "speaker_left": right.mirror(V(0, 0, 0), V(1, 0, 0)),
-            "logo_form": raised([(-lw, v0 + le), (lw, v0 + le), (lw, v1 - le), (-lw, v1 - le)], d.logo_proud)}
+    return hood_frame(h)(lip.removeSplitter())
 
 
 # ---------- all parts ----------
@@ -1912,15 +1914,34 @@ def band_forms(d: Blueprint, h: pr.Hood) -> dict[str, Part.Shape]:
 def build(d: Blueprint, log: list[str] | None = None) -> dict[str, Part.Shape]:
     """Every part of the outer form, by name, in the cabinet frame. log takes one line for each step that finds its
     edges on the solid (how many it found)."""
+    from . import socket_plate as spm  # noqa: PLC0415 - the plate builds on this module
+
     log = log if log is not None else []
     fr = pr.front(d)
     out: dict[str, Part.Shape] = {}
-    out["deck"], out["control_panel"] = deck(d, log)
+    plain, out["control_panel"] = deck(d, log)
+    # the seat of the front socket plate in the right side of the deck (the owner's plate b-knob, 2026-11-16)
+    sp, v = spm.SocketPlate(), spm.variant(spm.DEFAULT)
+    out["deck"] = spm.seat(plain, sp, d, hollow=False)
+    log.append(f"deck: the seat of the socket plate ({spm.DEFAULT}), {plain.Volume - out['deck'].Volume:.1f} mm3 out of the deck")
     out["body"] = body(d, fr, log)
     out.update(hood(d, log))
     out["bezel"] = bezel(d, fr)
     out["screen"] = screen(d)
+    out["socket_plate"] = spm.plate(sp, d, v)
+    out.update(spm.groups(sp, d, v))
     return {k: s.Solids[0] if len(s.Solids) == 1 else s for k, s in out.items()}
+
+
+# the parts of the default build that make the skin, and what each one is read from (skin_parts)
+SKIN_FORM = ("deck", "body", "hood", "marquee_lip")
+
+
+def skin_parts(d: Blueprint, parts: dict[str, Part.Shape]) -> dict[str, Part.Shape]:
+    """The outer form as the cavity and the skin read it: the deck without the seat of the socket plate (the print
+    piece deck side R gets the seat, its frame and its rim break: pieces.with_socket_plate), the body, the hood, and
+    the stand-in of the lip (lip_stand_in). The openings of the band go through the skin by cavity.openings."""
+    return {"deck": deck(d)[0], "body": parts["body"], "hood": parts["hood"], "marquee_lip": lip_stand_in(d)}
 
 
 def focus(d: Blueprint) -> dict[str, dict]:
@@ -1985,7 +2006,7 @@ def export(out: str, parts: dict[str, Part.Shape], d: Blueprint, log: list[str] 
     for k, s in parts.items():
         MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.05).write(os.path.join(out, f"{k}.stl"))
         s.exportBrep(os.path.join(out, f"{k}.brep"))
-        manifest[k] = {"file": f"{k}.stl", "finish": FINISH[k], "brep": f"{k}.brep"}
+        manifest[k] = {"file": f"{k}.stl", "finish": finish(k), "brep": f"{k}.brep"}
     Part.makeCompound(list(parts.values())).exportStep(os.path.join(out, "shell.step"))
     json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), indent=1)
     json.dump(focus(d), open(os.path.join(out, "focus.json"), "w"), indent=1)
@@ -2009,4 +2030,7 @@ def main() -> int:
     for k, r in report["parts"].items():
         print(f"{k:14s} valid {r['valid']}  solids {r['solids']}  faces {r['faces']:4d}  volume {r['volume_mm3']:>12.1f}  {', '.join(r['surfaces'])}")
     print("outside", " x ".join(f"{v:.1f}" for v in report["outside"]))
-    return 0 if all(r["valid"] and r["solids"] == 1 for r in report["parts"].values()) else 1
+    from . import socket_plate as spm  # noqa: PLC0415
+
+    # a bought part of the socket plate is a compound (the four sockets, the screws); every other part is one solid
+    return 0 if all(r["valid"] and (r["solids"] == 1 or k in spm.BOUGHT) for k, r in report["parts"].items()) else 1
