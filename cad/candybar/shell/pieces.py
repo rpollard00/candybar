@@ -30,7 +30,8 @@ The front socket plate is in the default build (the owner's plate b-knob, 2026-1
 frame (plain, with_socket_plate), the floor tile under the frame its notch, and the foot flange stops along the plate
 (the items of hardware(), socket_plate_items).
 CANDYBAR_PIECES names what to do: "all" (default: every piece, the files and the checks), "pilot" (the two pilot
-pairs only), "check" (the checks again, on the files of a build) or "views" (the folders that tools/draw_pieces.py
+pairs only), "check" (the checks again, on the files of a build), "rules" (the rules of the set again, on the
+files of a build: seconds) or "views" (the folders that tools/draw_pieces.py
 renders). No FreeCAD at import.
 """
 from __future__ import annotations
@@ -1008,6 +1009,10 @@ def vee(side: Side, j: Joint):
 # (seam, piece) with no flange, and seams with a run for screws but no screw
 NO_FLANGE: tuple = ()
 NO_SCREW: tuple = ("F2",)   # the deck is 72 high: no screwdriver gets behind a screw in the flank break
+# a pair of one seam that has the weld and the key alone, by (seam, piece): the other pairs of the seam have screws
+NO_SCREW_PAIRS = {("H1", "hood sill"): "the owner, 2026-11-17: the seam is 96 long, the sill is a strip of the band wall under the marquee "
+                  "window with no load of its own, the lip and the pods are bonded over that zone, and a screw pocket would come "
+                  "within 1.2 of the outside. The weld holds 7.7 kN (docs/design/print-pieces.md)"}
 # the pieces that close a ring (docs/blueprint/index.md, "Where each ring closes"): each goes in last, into two
 # seams at once. On the seams named here its grooves get the closing gap at each side in place of the groove
 # clearance; and where `face` is true (an upright seam that the piece drops into) its seam face, with the flange
@@ -2099,8 +2104,10 @@ def set_rules(d: Blueprint, pl: Plain, made: dict, rep: dict, chk: dict, items: 
         return none == sorted(NO_FLANGE), {"without a flange": none, "known exceptions": list(NO_FLANGE)}
 
     def screws_on_long_seams():
-        bare = sorted({p["seam"].split()[0] for p in rep["pairs"] if p["run_mm"] >= 2 * BUILD.run_screw and not p["screws"]})
-        return bare == sorted(NO_SCREW), {"long seams with no screw": bare, "known exceptions": list(NO_SCREW)}
+        excepted = lambda p: any(p["seam"].split()[0] == label and piece in (p["head"], p["pilot"]) for label, piece in NO_SCREW_PAIRS)
+        bare = sorted({p["seam"].split()[0] for p in rep["pairs"] if p["run_mm"] >= 2 * BUILD.run_screw and not p["screws"] and not excepted(p)})
+        return bare == sorted(NO_SCREW), {"long seams with no screw": bare, "known exceptions": list(NO_SCREW),
+                                          "known pairs": [f"{k[0]} at {k[1]}" for k in NO_SCREW_PAIRS]}
 
     def joint_7():
         bad = []
@@ -2305,6 +2312,27 @@ def build_all(out: Path, log=print) -> int:
     return summary(chk, log)
 
 
+def check_rules(out: Path, log=print) -> int:
+    """The rules of the set again on the files of a build (set_rules), with the rest of its check.json as it is: a
+    few seconds, where check_files runs every check of the set again. The rules that need the generation stay as the
+    build wrote them."""
+    d = Blueprint()
+    pl = plain(d, out, log)
+    made, _ = read_parts(out)
+    rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
+    chk = json.loads((out / "check.json").read_text(encoding="utf-8"))
+    built = chk.get("rules", {})
+    rules = set_rules(d, pl, made, rep, chk, hardware(), None, log)
+    for k, r in rules.items():
+        if r["ok"] is None and k in built:
+            rules[k] = {**built[k], "detail": f"as the build wrote it: {built[k]['detail']}"}
+    chk["rules"] = rules
+    chk["ok"] = all(r["valid"] and r["solids"] == 1 and r["fits"] for r in chk["pieces"].values()) and not chk["clashes"] \
+        and not chk["reach_short"] and all(r["free"] >= HOOD_KEY for r in chk["hood_reach"]) and all(r["ok"] is not False for r in rules.values())
+    (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
+    return summary(chk, log)
+
+
 def check_files(out: Path, log=print) -> int:
     """The checks of the whole set again, on the BREP files and seams.json of a build folder."""
     d = Blueprint()
@@ -2449,4 +2477,6 @@ def main() -> int:
         return views(out)
     if what == "check":
         return check_files(out)
+    if what == "rules":
+        return check_rules(out)
     return build_all(out)
