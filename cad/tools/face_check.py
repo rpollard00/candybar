@@ -116,7 +116,7 @@ KNOWN: tuple[Known, ...] = (
     Known("body", "sliver", (245.2, 579.1, 333.4), "1.69 wide, 7.2 mm2", HEAD_FOOT, within=0.8),
     Known("body", "kink", (234.8, 234.9, 80.5), "2.5 degrees along 59.3, round the sweep", RAIL),
     Known("body", "kink", (234.8, 297.6, 200.9), "2.5 degrees along 214.5, below the tuck", RAIL),
-    Known("body", "kink", (232.6, 390.2, 357.5), "2.5 degrees along 153.9, in the tuck", RAIL),
+    Known("body", "kink", (232.5, 391.4, 359.2), "2.5 degrees along 153.9, in the tuck", RAIL),
     Known("body", "kink", (223.9, 438.2, 422.4), "2.2 degrees along 4.2, in the seam bevel", RAIL),
     Known("deck", "sliver", (6.2, 5.4, 51.6), "0.89 wide, 6.9 mm2: the face of the lower corner of the hole", LATCH, within=1.0),
     Known("deck", "sliver", (6.2, 6.1, 59.0), "0.89 wide, 5.6 mm2: the face of the upper corner of the hole", LATCH, within=1.0),
@@ -315,7 +315,9 @@ def check(shape: Part.Shape, part: str = "", allow: list[Reveal] = (), break_rad
             if ka is None or kb is None or any(abs(x - y) > SPLIT_CURVATURE * max(abs(x), abs(y), 1e-3) + 1e-4 for x, y in zip(ka, kb)):
                 same = False
         ids = [index.get(fa.hashCode(), -2) + 1, index.get(fb.hashCode(), -2) + 1]
-        mid = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        # the middle of the edge by its length: the middle of its parameter range moves along the edge when the curve
+        # has another parameterization (2.4 mm on the kink in the tuck, from one build to another)
+        mid = e.valueAt(e.getParameterByLength(e.Length / 2))
         if KINK_DEG[0] <= worst < KINK_DEG[1]:
             add("kink", mid, f"faces meet at {worst:.1f} deg along {e.Length:.1f}", ids)
         elif CREASE_DEG[0] <= worst < CREASE_DEG[1]:
