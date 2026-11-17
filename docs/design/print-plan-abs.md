@@ -3,16 +3,18 @@
 Date: 2026-11-14. Each source was read on this date unless the text gives a different date.
 
 The owner decided on 2026-11-14: the shell is ABS, and the printer is a Qidi Q2. This plan is
-`docs/design/print-plan.md` (the "first plan", for PETG on the Bambu A1) done again for that decision.
+`docs/design/print-plan.md` (the "first plan", for PETG on the Bambu A1; replaced, now in the git history) done again for that decision.
 `docs/research/abs-on-the-q2.md` (the "ABS note") has the research and the sources. The source numbers
 in square brackets, for example [Q5], are those of section 8 of the ABS note.
 
-The shell is that of revision 7, as `cad/out/shell-rev7/split/report.md` cuts it: 23 printed pieces,
-9 floor tiles and 2 halves of a bezel plate. The split does not change for this plan.
+The shell is the default build (since 2026-11-16: hood band A and the front socket plate b-knob), as
+`cad/candybar/shell/pieces.py` cuts it: 21 pieces of the walls, the hood and the door, and 9 floor
+tiles (30 pieces, with their flanges, keys and screws: `docs/design/print-pieces.md`), the parts of
+band A, the socket plate and 2 halves of a bezel plate. The pieces of 2026-11-14 were the bare 4 mm
+skin with stand-ins for the band; the rows of section 4 for the walls keep the values of that skin.
 
-The pieces are not ready to print. The split is the bare 4 mm skin: the flanges, the keys, the ribs
-and the carriers are not modelled. Each mass and each time in this plan is an estimate by a rule of
-thumb. It is not a slicer result. Nothing was printed, and no piece was sliced.
+Each mass and each time in this plan is an estimate by a rule of thumb. It is not a slicer result.
+Nothing was printed, and no piece was sliced.
 
 ## Status tags
 
@@ -149,7 +151,7 @@ Notes on the table:
 
 | Group | Printed mass | Time |
 | --- | --- | --- |
-| The 23 pieces of the shell | 5.1 kg | 225 h |
+| The 23 pieces of the shell (the split of 2026-11-14, with the stand-ins of the band; not calculated again for band A, the hood sill and the socket plate) | 5.1 kg | 225 h |
 | The 9 floor tiles | 1.55 kg | 46 h |
 | One bezel plate (2 halves) | 0.69 kg | 31 h |
 | Inside parts (allowance) | 1.7 kg | 57 h |
