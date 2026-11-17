@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Compare the default build of the outer form with an accepted one (tools/compare_parts.py, tolerance 0.000001).
+# A first pass compares the numbers of each part (counts, volume, area, box); only a part that differs in them gets
+# the measure of the distance (CANDYBAR_FULL=1: every part).
 #
 # The accepted outer form is the build of a commit: cad/BASELINE names it. The first run builds that commit's outer
 # form once, from its own source (git archive), into cad/out/baseline/<commit>, and keeps it there. The comparison
