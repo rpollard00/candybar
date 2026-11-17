@@ -2051,10 +2051,182 @@ def hood_reach(screws: list[dict], made: dict, items: list) -> list[dict]:
     return out
 
 
+PIECE_COUNT = 30   # the pieces of the split since 2026-11-16 (band A: no stand-ins, the hood sill)
+
+
+def set_rules(d: Blueprint, pl: Plain, made: dict, rep: dict, chk: dict, items: list, res: "Result | None" = None, log=print) -> dict:
+    """The joint rules of the whole set, each with its result: {rule: {"ok": bool, "detail": ..., "seconds": t}}. The
+    rules that need the sides, ribs and added solids of the generation (res) are skipped when it is not given (a check
+    of the files alone, check_files): their "ok" is None. made: the pieces as the files hold them."""
+    import FreeCAD as App  # noqa: PLC0415
+    import Part  # noqa: PLC0415
+    from .joints import OTHER_JOINTS as oj  # noqa: PLC0415
+
+    V = App.Vector
+    out: dict[str, dict] = {}
+
+    def rule(name, fn, needs_res=False):
+        t0 = time.time()
+        if needs_res and res is None:
+            out[name] = {"ok": None, "detail": "needs the generation (the build), not checked on the files alone", "seconds": 0.0}
+            return
+        ok, detail = fn()
+        out[name] = {"ok": bool(ok), "detail": detail, "seconds": round(time.time() - t0, 1)}
+        log(f"pieces: rule {name}: {'pass' if ok else 'FAIL'}{'' if ok else ': ' + str(detail)} [{out[name]['seconds']} s]")
+
+    def piece_count():
+        return len(made) == PIECE_COUNT, {"pieces": len(made), "expected": PIECE_COUNT}
+
+    def closing_gap():
+        gap = oj.closing_gap
+        done = {c["piece"]: c for c in rep.get("closing", [])}
+        want = {"brow": ["W1"], "upper rear R": ["R3", "R5"]}
+        bad = [] if {k: done[k]["seams"] for k in done} == want else [f"closing pieces {sorted(done)} with their seams: expected {want}"]
+        for side in res.sides:
+            label = side.cf.seam.split()[0]
+            if not closing(side.cf.piece, label)[1]:
+                continue
+            if done.get(side.cf.piece, {}).get("removed_mm3", 0.0) <= 0.0:
+                bad.append(f"{side.cf.piece}: nothing removed at {side.cf.seam}")
+            v = made[side.cf.piece].common(closing_slab(side.cf, gap - 0.02)).Volume
+            if v >= 0.05:
+                bad.append(f"{side.cf.piece} at {side.cf.seam}: {v:.2f} mm3 nearer to the seam plane than the closing gap {gap:g}")
+        return not bad, bad
+
+    def flange_both():
+        none = sorted({(sd["seam"].split()[0], sd["piece"].rsplit(" ", 1)[0] if sd["piece"][-1] in "RL" else sd["piece"])
+                       for sd in rep["sides"] if sd["flange_cm3"] == 0.0})
+        return none == sorted(NO_FLANGE), {"without a flange": none, "known exceptions": list(NO_FLANGE)}
+
+    def screws_on_long_seams():
+        bare = sorted({p["seam"].split()[0] for p in rep["pairs"] if p["run_mm"] >= 2 * BUILD.run_screw and not p["screws"]})
+        return bare == sorted(NO_SCREW), {"long seams with no screw": bare, "known exceptions": list(NO_SCREW)}
+
+    def joint_7():
+        bad = []
+        ringed = {r["piece"] for r in rep.get("ring", []) if r["cm3"] > 10.0}
+        if ringed != set(RING_PIECES) | set(FOOT_PIECES):
+            bad.append(f"ring or foot on {sorted(ringed)}, expected {sorted(set(RING_PIECES) | set(FOOT_PIECES))}")
+        cones = rep.get("ring_cones", [])
+        if len(cones) != 4 or not all(c["foot"] in FOOT_PIECES for c in cones):
+            bad.append(f"cones: {cones}")
+        if res is not None:
+            # the gap between the body top and the foot of the hood stays open outside the wall: 1 and 3 inside the
+            # outer line of the body top, in the middle of the gap, no piece of the ring or the foot has material
+            body = pl.outer["body"]
+            wire = max(body.slice(V(0, 0, 1), d.body_top - 0.01), key=lambda w: w.Length)
+            z = d.body_top + d.seam_gap / 2
+            points = []
+            for e in wire.Edges:
+                for t in (0.25, 0.5, 0.75):
+                    u = e.FirstParameter + (e.LastParameter - e.FirstParameter) * t
+                    q, tan = e.valueAt(u), e.tangentAt(u)
+                    n = V(-tan.y, tan.x, 0.0)
+                    if not body.isInside(V(q.x, q.y, d.body_top - 1.0) + n * 1.0, 1e-4, True):
+                        n = n * -1.0
+                    points += [V(q.x, q.y, z) + n * k for k in (1.0, 3.0)]
+            for name in RING_PIECES + FOOT_PIECES:
+                shape = made[name]
+                inside = [q for q in points if shape.BoundBox.isInside(q) and shape.isInside(q, 1e-4, True)]
+                if inside:
+                    bad.append(f"{name} has material in the seam gap at {len(inside)} of {len(points)} points")
+        return not bad, bad
+
+    def no_flange_in_rear():
+        rear = {n for n, role, _ in items if role == "rear"}
+        more = [h for h in chk["hardware"] if h["item"] in rear and h["mm3"] - h["of_the_plain_piece_mm3"] > BUILD.clash_mm3]
+        return not more, more
+
+    def no_key_on_bed():
+        where = {(sd["seam"], sd["k"], sd["piece"]): sd["in_print"] for sd in rep["sides"]}
+        bad = [(p["seam"], p["key"]) for p in rep["pairs"] if p["key"] and where[(p["seam"], p["k"], p["key"])] == "on the bed"]
+        keys = len([p for p in rep["pairs"] if p["key"]])
+        return not bad and keys > 20, {"keys on the bed": bad, "keys": keys}
+
+    def l1_screws():
+        l1 = [sc["at"] for p in rep["pairs"] if p["seam"].split()[0] == "L1" for sc in p["screws"]]
+        inside = [at for at in l1 if in_cut_in_span(V(*at), d)]
+        return bool(l1) and not inside, {"L1 screws": len(l1), "in the span of the cut-ins": inside}
+
+    def door_zone():
+        x = d.door_w / 2 + BUILD.door_stop - 0.5
+        zone = Part.makeBox(2 * x, 30.0, d.door_z1 - d.door_z0 + 2 * BUILD.door_stop - 1.0, V(-x, d.body_d - d.wall_t - 28.0, d.door_z0 - BUILD.door_stop + 0.5))
+        bad = []
+        for sd in res.sides + res.ribs:
+            if sd.solid is not None and sd.solid.BoundBox.intersect(zone.BoundBox):
+                v = sd.solid.common(zone).Volume
+                if v >= 1.0:
+                    bad.append(f"{sd.cf.seam} {sd.cf.piece}: {v:.1f} mm3 in the zone of the door opening")
+        return not bad, bad
+
+    def floor_tiles():
+        fl = rep.get("floor", {})
+        tiles = sorted(n for n in made if n.startswith("floor"))
+        used = sorted({sc["upper"] for sc in fl.get("lap_screws", [])} | {sc["lower"] for sc in fl.get("lap_screws", [])}
+                      | {sc["tile"] for sc in fl.get("foot_screws", [])})
+        # a "zone" is not hardware: it marks where a foot flange stops (the stretch along the socket plate, at the floor)
+        inside = [h for h in fl.get("hardware_in_floor", []) if h.get("role") != "zone"]
+        ok = len(tiles) == 9 and used == tiles and not inside
+        return ok, {"tiles": len(tiles), "tiles with no screw": sorted(set(tiles) - set(used)), "hardware in the floor": inside}
+
+    def hood_bolted():
+        rows = rep.get("hood_screws", [])
+        bad = [] if len(rows) == 4 else [f"{len(rows)} screws, expected 4"]
+        for r in rows:
+            x, y, _ = r["at"]
+            if r["ring"] not in RING_PIECES or r["foot"] not in FOOT_PIECES or r["ring_boss_cm3"] <= 1.0 or r["foot_boss_cm3"] <= 1.0:
+                bad.append(f"the screw at {r['at']}: ring {r['ring']}, foot {r['foot']}, bosses {r['ring_boss_cm3']} and {r['foot_boss_cm3']} cm3")
+            holes = [f for f in made[r["foot"]].Faces if isinstance(f.Surface, Part.Cylinder) and abs(f.Surface.Radius - oj.insert_hole_d / 2) < 1e-3
+                     and abs(abs(f.Surface.Axis.z) - 1.0) < 1e-6 and math.hypot(f.Surface.Center.x - x, f.Surface.Center.y - y) < 0.05]
+            if not holes:
+                bad.append(f"no hole of the insert in {r['foot']} at ({x:g}, {y:g})")
+        xs = sorted(round(r["at"][0], 3) for r in rows)
+        if len(xs) == 4 and xs[:2] != [-xs[3], -xs[2]]:
+            bad.append(f"the screws are not a mirror pair on each side: {xs}")
+        short = [r for r in chk.get("hood_reach", []) if r["free"] < HOOD_KEY]
+        if len(chk.get("hood_reach", [])) != 4 or short:
+            bad.append(f"a key does not reach: {short}")
+        return not bad, bad
+
+    def joints_no_clash():
+        more = [h for h in chk["hardware"] if h["role"] != "zone" and h["mm3"] - h["of_the_plain_piece_mm3"] > BUILD.clash_mm3]
+        return not more, more
+
+    def twins():
+        twin = lambda n: n[:-2] if n.endswith((" R", " L")) else n
+        cut = {twin(h["piece"]) for h in rep["hits"]}
+        # the two pieces of a seam on the centre line: one has the key and the pilot holes, its twin the groove
+        centre = {twin(p["head"]) for p in rep["pairs"] if twin(p["head"]) == twin(p["pilot"])}
+        # a piece whose key moved off the bed (the hood centre prints on a cut face)
+        moved = {twin(n) for p in rep["pairs"] if p["key"] and p["key"] != p["pilot"] for n in (p["head"], p["pilot"])}
+        # the door halves are the designed halves of candybar.shell.rear, and this generator adds nothing to them
+        bad = [n for n in res.added if n.startswith("door half")]
+        bad += [t for t in chk["twins_that_differ"] if t["piece"] not in cut | centre | moved | {"door half"} and not t["piece"].startswith("floor")]
+        return not bad, bad
+
+    rule("piece_count", piece_count)
+    rule("closing_gap", closing_gap, needs_res=True)
+    rule("flange_on_both_pieces", flange_both)
+    rule("screws_on_long_seams", screws_on_long_seams)
+    rule("joint_7_ring_and_foot", joint_7, needs_res=True)
+    rule("no_flange_in_the_rear", no_flange_in_rear)
+    rule("no_key_on_the_bed", no_key_on_bed)
+    rule("l1_screws_clear_of_the_cut_ins", l1_screws)
+    rule("flanges_clear_of_the_door", door_zone, needs_res=True)
+    rule("floor_nine_tiles_screwed", floor_tiles)
+    rule("hood_bolted_four_screws", hood_bolted)
+    rule("joints_add_no_clash_with_hardware", joints_no_clash)
+    rule("twins_differ_only_by_hardware", twins, needs_res=True)
+    return out
+
+
 def summary(chk: dict, log=print) -> int:
     bad = [n for n, r in chk["pieces"].items() if not r["valid"] or r["solids"] != 1 or not r["fits"]]
     log(f"pieces: {len(chk['pieces'])} pieces, screws {chk['screws']}, not one valid solid in the limit: {bad}, clashes {len(chk['clashes'])}, "
         f"in hardware {len(chk['hardware'])}, screws out of reach {len(chk['reach_short'])}, twins that differ {chk['twins_that_differ']}, mass {chk['mass']}")
+    failed = [k for k, r in chk.get("rules", {}).items() if r["ok"] is False]
+    if failed:
+        log(f"pieces: rules of the set that fail: {failed}")
     return 0 if chk["ok"] else 1
 
 
@@ -2125,7 +2297,10 @@ def build_all(out: Path, log=print) -> int:
     rep = seam_report(res)
     (out / "seams.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     # the checks are on the pieces as the files hold them
-    chk = check_set(d, pl, read_parts(out)[0], rep, items, log)
+    made = read_parts(out)[0]
+    chk = check_set(d, pl, made, rep, items, log)
+    chk["rules"] = set_rules(d, pl, made, rep, chk, items, res, log)
+    chk["ok"] = chk["ok"] and all(r["ok"] is not False for r in chk["rules"].values())
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 
@@ -2136,7 +2311,10 @@ def check_files(out: Path, log=print) -> int:
     pl = plain(d, out, log)
     shapes, _ = read_parts(out)
     rep = json.loads((out / "seams.json").read_text(encoding="utf-8"))
-    chk = check_set(d, pl, shapes, rep, hardware(), log)
+    items = hardware()
+    chk = check_set(d, pl, shapes, rep, items, log)
+    chk["rules"] = set_rules(d, pl, shapes, rep, chk, items, None, log)
+    chk["ok"] = chk["ok"] and all(r["ok"] is not False for r in chk["rules"].values())
     (out / "check.json").write_text(json.dumps(chk, indent=1), encoding="utf-8")
     return summary(chk, log)
 
