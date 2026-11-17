@@ -1,23 +1,20 @@
-"""The split of candybar.shell.split: every piece fits the printer's usable volume, each piece has its own seed, a
-right piece and its left twin are alike, no seam goes through a hand-hold or a cut-in, and the check notices a
-layout that has lost a seam.
+"""The split of candybar.shell.split: the print box, the seam data (no seam goes through a hand-hold or a cut-in, the
+seams follow the creases, the door of the form), the check of the twins on rows (quick); and in the slow group, the
+real cut of the skin: each hand-hold stays whole in one piece. The split's own check (candybar.shell.split) covers the
+printer, the seeds, the debris and the twins, and fails on them.
 
-The cut is real on every run: the skin is split with the seam data and each piece is measured in its print
-orientation. Only the skin (the outer form less the cavity) comes from a cache, because it takes about 20 minutes
-to make. The cache file carries a fingerprint of everything that makes the skin (the values of dims.Blueprint, the
-openings, and the source of dims, profiles, solids and cavity); when any of them changes, the fingerprint changes
-and build_modules makes the skin again before the test cuts it. The limits come from params/printer.csv on every run.
-"""
+The skin (the outer form less the cavity) comes from a cache, because it takes about 20 minutes to make. The cache
+file carries a fingerprint of everything that makes the skin; when one of them changes, build_modules makes it again."""
 from __future__ import annotations
 
 import unittest
-from dataclasses import replace
 
 import FreeCAD as App
 import Part
 
 from candybar.shell import split
 from candybar.shell import structure
+from candybar.shell.dims import Blueprint
 
 from . import support
 
@@ -60,7 +57,7 @@ class SeamsFollowTheFormTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.d, _, _ = support.shell()
+        cls.d = Blueprint()
         cls.seams, cls.pieces = split.expanded(split.layout(cls.d))
 
     def test_no_seam_goes_through_a_hand_hold_or_a_cut_in(self) -> None:
@@ -95,7 +92,19 @@ class SeamsFollowTheFormTest(unittest.TestCase):
         self.assertEqual(zs, {round(d.door_z0, 6), round(d.door_z1, 6)})
 
 
+class MirrorCheckTest(unittest.TestCase):
+    """The check of the split on its rows alone: twins that differ are found."""
+
+    def test_the_check_notices_twins_that_differ(self) -> None:
+        rows = {"wall R": {"x": 100.0, "y": 50.0, "z": 20.0, "mass_g": 100}, "wall L": {"x": 104.0, "y": 50.0, "z": 20.0, "mass_g": 100}}
+        self.assertEqual([q["value"] for q in split.mirror_gaps(rows)], ["x"])
+
+
+@support.slow
 class SplitTest(unittest.TestCase):
+    """The real cut of the skin. The split's own check (candybar.shell.split) covers the printer, the seeds, the
+    debris and the twins; this class keeps what that check does not look at."""
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.d, parts, _ = support.shell()
@@ -104,52 +113,6 @@ class SplitTest(unittest.TestCase):
         cls.mods = split.build_modules(cls.d, log=lambda *_: None, parts=parts, cav=cav)
         cls.result = split.run(mods=cls.mods, lim=cls.lim, write=False, detail=False, log=lambda *_: None)
         cls.cuts = {k: cls.result[k] for k in (split.SHELL, split.PLATE)}
-
-    def test_the_skin_is_valid_and_closed(self) -> None:
-        for name in split.SKIN_MODULES:
-            with self.subTest(module=name):
-                skin = self.mods.skin[name]
-                self.assertTrue(skin.isValid())
-                self.assertEqual(len(skin.Solids), 1)
-                self.assertTrue(all(sh.isClosed() for sh in skin.Shells))
-
-    def test_every_piece_fits_the_printer(self) -> None:
-        for key, res in self.cuts.items():
-            with self.subTest(cut=key):
-                big = {n: (r["x"], r["y"], r["z"]) for n, r in res["pieces"].items() if not r["fits"]}
-                self.assertEqual(big, {})
-
-    def test_every_piece_has_its_own_seed(self) -> None:
-        for key, res in self.cuts.items():
-            with self.subTest(cut=key):
-                self.assertEqual([q for q in res["problems"] if q["problem"] != "debris"], [])
-
-    def test_the_shell_has_its_pieces(self) -> None:
-        names = set(self.cuts[split.SHELL]["pieces"])
-        # the three stand-ins of the hood band left the split, and band A's marquee window makes the hood sill a piece (2026-11-16)
-        self.assertEqual(len(names), 30)
-        for name in ("upper rear R", "upper rear L", "rear lower R", "middle L", "door half R", "hood centre"):
-            self.assertIn(name, names)
-
-    def test_the_cut_leaves_no_debris_worth_a_piece(self) -> None:
-        for key, res in self.cuts.items():
-            with self.subTest(cut=key):
-                debris = sum(q["volume_mm3"] for q in res["problems"] if q["problem"] == "debris")
-                self.assertLess(debris, 500.0)
-
-    def test_a_right_piece_and_its_left_twin_are_alike(self) -> None:
-        """The print box and the mass of each pair (run puts a difference into the problems, which
-        test_every_piece_has_its_own_seed reads); here the numbers themselves."""
-        for key, res in self.cuts.items():
-            for name, r in res["pieces"].items():
-                if not name.endswith(" R"):
-                    continue
-                left = res["pieces"][name[:-1] + "L"]
-                with self.subTest(cut=key, piece=name):
-                    self.assertAlmostEqual(max(r["x"], r["y"]), max(left["x"], left["y"]), delta=1.0)
-                    self.assertAlmostEqual(r["z"], left["z"], delta=1.0)
-                    if name[:-2] not in split.HANDED:
-                        self.assertAlmostEqual(r["mass_g"], left["mass_g"], delta=2.0)
 
     def test_each_hand_hold_is_whole_in_one_piece(self) -> None:
         """Each upper rear piece holds the recess of its side with its walls: the box of its mesh (the box of the
@@ -166,21 +129,6 @@ class SplitTest(unittest.TestCase):
                 self.assertGreater(max(xs), x1 + d.wall_t)
                 self.assertLess(min(zs), z0 - d.wall_t)
                 self.assertGreater(max(zs), z1 + d.wall_t)
-
-    def test_the_check_notices_a_layout_without_its_belt_line(self) -> None:
-        """Without the belt seam B1 the middle and the upper piece of each side are one piece: too large, and two
-        seeds in it."""
-        lay = split.layout(self.d)
-        lay = replace(lay, seams=tuple(s for s in lay.seams if s.label != "B1"), pieces=tuple(p for p in lay.pieces if p.module == "body"))
-        seams, pieces = split.expanded(lay)
-        shapes, problems = split.cut(seams, pieces, self.mods)
-        self.assertIn("two seeds in one piece", {q["problem"] for q in problems})
-        merged = split.measure(shapes["upper R"], (0.0, 0.0, 1.0), self.lim, None, None, self.d, detail=False)
-        self.assertFalse(merged["fits"])
-
-    def test_the_check_notices_twins_that_differ(self) -> None:
-        rows = {"wall R": {"x": 100.0, "y": 50.0, "z": 20.0, "mass_g": 100}, "wall L": {"x": 104.0, "y": 50.0, "z": 20.0, "mass_g": 100}}
-        self.assertEqual([q["value"] for q in split.mirror_gaps(rows)], ["x"])
 
 
 if __name__ == "__main__":

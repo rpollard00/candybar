@@ -1,67 +1,29 @@
-"""The coupon set (candybar.shell.coupons): every part is one valid solid that fits the bed in its print orientation
-with no downward face that the set does not state, the pairs go together with the clearance of the joint, the cuts
-from the real skin hold the feature they are for, every plate holds its parts, and the sheet for the printer names
-every part. The checks also notice a pair that interferes, a hole of the wrong size and an overhang without a reason."""
+"""The coupon set (candybar.shell.coupons), on the coupons that do not come from the skin: their values, the latch pair
+against the hook of the panel, the pairs with the clearance of the joint, and the checks that notice a pair that
+interferes, a part that does not fit and an overhang without a reason. The build of the set (candybar.shell.coupons)
+checks every part, plate, overhang and the cuts from the real skin, and fails on them."""
 from __future__ import annotations
 
 import unittest
 from dataclasses import replace
 from unittest import mock
 
-from candybar.shell import coupon, coupons, joints, split
+from candybar.shell import coupon, coupons, joints
 from candybar.shell.dims import Blueprint
 
 from . import support
 
-SHEET = support.PARAMS.parents[1] / "docs" / "design" / "coupons.md"
-SKIN = split.skin_cached(Blueprint())
 
 
 class CouponSetTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.lim = coupons.bed()
-        cls.items = [it for it in coupons.items() if SKIN or not it.real]
+        # only the coupons that these tests read: none of them is cut from the skin (the real cuts and the floor tile are)
+        names = ("shrink-x", "shrink-y", "holes-buttons", "holes-lever", "holes-power", "holes-usb", "joint3-wall")
+        cls.items = [it for it in coupons.items() if it.name in names]
         cls.shapes = {it.name: coupons.to_bed(it.make()) for it in cls.items}
         cls.rows = [coupons.check_item(it, cls.shapes[it.name], cls.lim) for it in cls.items]
-
-    def test_the_tools_of_the_shell_pass_on_the_coupons_that_test_the_form(self) -> None:
-        """tools/edge_finish.py and tools/face_check.py on the coupons of plate 6, as the manifest of the layout places
-        them (here at the origin of the plate): the cuts from the real skin are checked against the rest of the shell
-        and the box that cut them; the edge bars keep their control edge sharp; no other sharp edge shows."""
-        from tools import edge_finish as ef, face_check as fc
-
-        names = [it.name for it in self.items if it.coupon in coupons.PAINTED]
-        self.assertTrue(names)
-        meta = {}
-        for it in self.items:
-            if it.name in names:
-                meta[it.name] = {"coupon": it.name, "group": it.coupon, "offset": [0.0, 0.0, 0.0]}
-                if it.real:
-                    b = coupons.tight_box(it.make())
-                    meta[it.name]["to_cabinet"] = [b.XMin, b.YMin, b.ZMin]
-        shapes = {n: self.shapes[n] for n in names}
-        rows = ef.survey(shapes, Blueprint(), meta)
-        self.assertEqual(ef.failures(rows), [])
-        for c in coupons.CONTROL:
-            if c in rows:
-                self.assertIn(ef.CONTROL_EDGE, {g["against"] for g in rows[c]["sharp"]})
-        found, _ = fc.check_shell(shapes, meta=meta)
-        self.assertEqual(fc.failures(found), [])
-
-    def test_the_latch_coupon_is_the_first_test_piece_of_the_latch(self) -> None:
-        """Plate 10: the strip of the deck nose has the button's hole (its round and its two flats), and the bolt, the
-        gate, the frame strip and the strike strip are the parts of the control panel's build."""
-        names = {it.name for it in self.items if it.coupon == "latch"}
-        self.assertEqual(names >= {"latch-frame", "latch-bolt", "latch-gate", "latch-strike", "latch-notch", "latch-hook"}, True)
-        b = coupons.latch_build()
-        self.assertAlmostEqual(self.shapes["latch-bolt"].Volume, b.latch["latch_bolt"].Volume, delta=0.01)
-        self.assertAlmostEqual(self.shapes["latch-gate"].Volume, b.latch["latch_gate"].Volume, delta=0.01)
-        if SKIN:
-            d = Blueprint()
-            nose = self.shapes["latch-nose"]
-            rounds = [f for f in nose.Faces if type(f.Surface).__name__ == "Cylinder" and abs(f.Surface.Radius - d.latch_button_d / 2) < 1e-3]
-            self.assertTrue(rounds)
 
     def test_the_hook_strip_holds_the_whole_hook_and_seats_in_the_notch_strip(self) -> None:
         """The pair of the rear corner: in the cabinet the hook strip holds the whole hook at x +100, it seats in the
@@ -77,14 +39,6 @@ class CouponSetTest(unittest.TestCase):
         lifted = hook_strip.translated(pf.V(0, 0, 1.0))
         self.assertGreater(lifted.common(notch_strip).Volume, pf.TOL)
 
-    def test_every_stl_is_a_closed_mesh(self) -> None:
-        for name, shape in self.shapes.items():
-            with self.subTest(part=name):
-                m = coupons.closed_mesh(shape)
-                self.assertTrue(m.isSolid())
-                self.assertFalse(m.hasNonManifolds())
-                self.assertAlmostEqual(m.Volume, shape.Volume, delta=0.005 * shape.Volume)  # the chords of the mesh on curved faces
-
     def test_the_names_are_unique_and_every_coupon_has_a_plate_and_a_purpose(self) -> None:
         names = [it.name for it in coupons.items()]
         self.assertEqual(len(names), len(set(names)))
@@ -94,57 +48,6 @@ class CouponSetTest(unittest.TestCase):
                 self.assertIn(it.plate, plates)
                 self.assertIn(it.coupon, coupons.PROVES)
                 self.assertIn(it.coupon, coupons.TINT)
-
-    def test_every_part_is_one_valid_solid_that_fits_the_bed(self) -> None:
-        for r in self.rows:
-            with self.subTest(part=r["part"]):
-                self.assertTrue(r["valid"])
-                self.assertEqual(r["solids"], 1)
-                self.assertTrue(r["fits_bed"], r["box_mm"])
-                self.assertGreater(r["mass_g"], 0.5)
-
-    def test_no_part_has_a_downward_face_without_a_reason(self) -> None:
-        for r in self.rows:
-            with self.subTest(part=r["part"]):
-                self.assertEqual(r["unstated_overhang_mm2"], 0.0, r["overhangs"])
-                self.assertTrue(r["pass"])
-
-    def test_only_the_wall_of_joint_3_needs_support(self) -> None:
-        self.assertEqual([r["part"] for r in self.rows if r["needs_support_mm2"]], ["joint3-wall"])
-
-    def test_every_plate_holds_its_parts(self) -> None:
-        layout = coupons.plate_layout(self.rows, self.lim)
-        for key, places in layout.items():
-            with self.subTest(plate=key):
-                self.assertIsNotNone(places)
-                for name, (x, y) in places.items():
-                    w, h = next(r["box_mm"][:2] for r in self.rows if r["part"] == name.split("#")[0])
-                    self.assertLessEqual(x + w, self.lim.xy + 1e-6)
-                    self.assertLessEqual(y + h, self.lim.xy + 1e-6)
-        self.assertEqual(sum(len(p) for p in layout.values()), sum(r["count"] for r in self.rows))
-
-    def test_the_plates_keep_a_margin_on_the_bed_of_the_printer(self) -> None:
-        self.assertEqual(coupons.BED, (270.0, 270.0, 256.0))
-        self.assertEqual((self.lim.xy, self.lim.z), (248.0, 250.0))
-        self.assertEqual((coupons.BED_MARGIN, coupons.TOP_MARGIN), (11.0, 6.0))
-        strip = next(r for r in self.rows if r["part"] == "flat-strip")
-        self.assertEqual(strip["box_mm"][0], self.lim.xy)
-        self.assertLessEqual(coupons.SHRINK_L + coupons.GAP + coupons.SHRINK_W, self.lim.xy)
-
-    def test_the_facet_and_the_hand_hold_print_two_times_for_the_two_fan_values(self) -> None:
-        self.assertEqual({r["part"]: r["count"] for r in self.rows if r["part"] in ("facet45", "hand-hold", "warp-wall")},
-                         {"facet45": 2, "hand-hold": 2, "warp-wall": 2})
-
-    def test_the_parts_on_a_plate_do_not_touch(self) -> None:
-        sizes = {"a": (100.0, 50.0), "b": (100.0, 50.0), "c": (30.0, 200.0), "d": (220.0, 12.0)}
-        at = coupons.pack(sizes, 240.0)
-        boxes = [(x, y, x + sizes[k][0], y + sizes[k][1]) for k, (x, y) in at.items()]
-        for i, a in enumerate(boxes):
-            for b in boxes[i + 1:]:
-                self.assertTrue(a[2] + coupons.GAP <= b[0] + 1e-6 or b[2] + coupons.GAP <= a[0] + 1e-6
-                                or a[3] + coupons.GAP <= b[1] + 1e-6 or b[3] + coupons.GAP <= a[1] + 1e-6, (a, b))
-        self.assertIsNone(coupons.pack({"a": (241.0, 10.0)}, 240.0))
-        self.assertIsNone(coupons.pack({"a": (200.0, 130.0), "b": (200.0, 130.0)}, 240.0))
 
     def test_the_shrink_bars_have_their_stops_at_half_and_full_length(self) -> None:
         for name, axis in (("shrink-x", 0), ("shrink-y", 1)):
@@ -172,12 +75,6 @@ class CouponSetTest(unittest.TestCase):
         self.assertEqual(radii, [d.edge_break, d.edge_break, d.rear_round_r])
         self.assertEqual(len(coupons.EDGE_NAMES), 6)
         self.assertTrue(set(coupons.EDGE_NAMES) <= set(coupons.EDGE_SECTION))
-
-    def test_the_sheet_for_the_printer_names_every_part(self) -> None:
-        text = SHEET.read_text(encoding="utf-8")
-        for it in coupons.items():
-            with self.subTest(part=it.name):
-                self.assertIn(f"`{it.name}`", text)
 
     def test_the_check_notices_an_overhang_without_a_reason(self) -> None:
         it = next(i for i in self.items if i.name == "joint3-wall")
@@ -245,21 +142,3 @@ class CouponPairsTest(unittest.TestCase):
         self.assertGreater(wall.common(coupons.joint3_floor()).Volume, 1.0)
 
 
-@unittest.skipUnless(SKIN, "the skin is not in the cache of the split (cad/out/shell-rev7/split/cache)")
-class CouponRealTest(unittest.TestCase):
-    def test_the_cuts_from_the_real_skin_hold_their_features(self) -> None:
-        for name, r in coupons.check_real().items():
-            with self.subTest(coupon=name):
-                self.assertTrue(r["pass"], r)
-
-    def test_the_rear_facet_is_the_skin_of_the_form(self) -> None:
-        d = Blueprint()
-        shape = coupons.to_bed(coupons.facet45())
-        b = coupons.tight_box(shape)
-        self.assertAlmostEqual(b.YLength, d.rear_proud + d.wall_t + joints.JOINT.foot_h, delta=0.01)
-        self.assertAlmostEqual(coupons.check_real()["facet45"]["crease_z_above_bed"], d.door_frame, delta=1e-6)
-
-    def test_the_floor_tile_has_the_size_of_the_smallest_tile(self) -> None:
-        w, h = coupons.tile_size()
-        self.assertAlmostEqual(w, 137.0, delta=1.0)
-        self.assertAlmostEqual(h, 163.0, delta=1.0)

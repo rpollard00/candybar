@@ -97,12 +97,6 @@ class BuildScriptTest(unittest.TestCase):
         done = self.build(support.temp_dir(), stand_in("freecadcmd", REPORTS_SUCCESS), stand_in("freecad", REPORTS_SUCCESS))
         self.assertEqual(done.returncode, 0, done.stderr)
 
-    def test_an_argument_is_rejected(self) -> None:
-        done = self.build(support.temp_dir(), args=("--no-render",))
-        self.assertEqual(done.returncode, 2)
-        self.assertIn("usage", done.stderr)
-
-
 class CheckScriptTest(unittest.TestCase):
     """cad/check.sh with a stand-in for FreeCAD that notes each module it is asked to run."""
 

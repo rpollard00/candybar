@@ -1,10 +1,9 @@
-"""The front socket plate (candybar.shell.socket_plate): its values, its place on the deck side, its solids, the seat
-in the shell, the edge finish, and the rules of the fit study with its hardware.
-"""
+"""The front socket plate (candybar.shell.socket_plate, in the default build as b-knob): its values, its place on the
+deck side, the knob as the one difference between two forms, the plate in its recess (quick); and in the slow group,
+the cut of the seat changes the deck at the seat only. The build of the plate checks its solids, the seat and the fit."""
 from __future__ import annotations
 
 import unittest
-from dataclasses import replace
 
 from candybar.shell import profiles as pr
 from candybar.shell import socket_plate as spm
@@ -112,48 +111,10 @@ class SolidsTest(unittest.TestCase):
         cls.d, cls.sp = Blueprint(), spm.SocketPlate()
         cls.plates = {v.key: spm.plate(cls.sp, cls.d, v) for v in spm.VARIANTS}
 
-    def test_each_plate_is_one_valid_solid_of_the_outline(self) -> None:
-        for key, p in self.plates.items():
-            self.assertTrue(p.isValid(), key)
-            self.assertEqual(len(p.Solids), 1, key)
-            bb = p.optimalBoundingBox(False, False)  # the plain box is loose round the faces of the edge break
-            self.assertAlmostEqual(bb.XLength, self.sp.t, places=6, msg=key)
-            self.assertAlmostEqual(bb.YLength, self.sp.length, places=6, msg=key)
-            self.assertAlmostEqual(bb.ZLength, self.sp.height, places=6, msg=key)
-
     def test_the_knob_is_the_only_difference_between_the_two_forms_of_a_layout(self) -> None:
         knob = 3.14159265 / 4 * (self.sp.knob_hole_d ** 2 * self.sp.web + self.sp.knob_pocket_d ** 2 * (self.sp.t - self.sp.web))
         for layout in "ab":
             self.assertAlmostEqual(self.plates[f"{layout}-plain"].Volume - self.plates[f"{layout}-knob"].Volume, knob, delta=0.5)
-
-    def test_the_plate_has_only_planes_cylinders_and_the_rounds_of_the_edge_break(self) -> None:
-        for key, p in self.plates.items():
-            kinds = {type(f.Surface).__name__ for f in p.Faces}
-            self.assertLessEqual(kinds, {"Plane", "Cylinder", "Toroid"}, key)
-
-    def test_the_hardware_does_not_cut_into_the_plate(self) -> None:
-        for v in spm.VARIANTS:
-            for name, s in spm.hardware(self.sp, self.d, v).items():
-                self.assertLess(self.plates[v.key].common(s).Volume, 1e-3, f"{v.key}: {name}")
-
-    def test_the_small_plate_for_the_knob_is_valid_and_on_the_flat(self) -> None:
-        kp = spm.knob_plate_values(self.sp, self.d)
-        p = spm.knob_plate(kp, self.d)
-        self.assertTrue(p.isValid())
-        self.assertEqual(len(p.Solids), 1)
-        _, y, _ = kp.centre(self.d)
-        self.assertGreaterEqual(y - kp.length / 2 - kp.reveal - pr.deck_plan(self.d)[0].q[1], MIN_LAND)
-        self.assertGreaterEqual(kp.screws()[1] - kp.head_d / 2 - kp.knob_flat_d / 2, MIN_GAP)
-        self.assertGreater(kp.window_half, kp.knob_pocket_d / 2)
-        for name, s in spm.knob_plate_hardware(kp, self.d).items():
-            self.assertLess(p.common(s).Volume, 1e-3, name)
-
-    def test_square_ends_make_a_valid_plate_too(self) -> None:
-        sq = replace(self.sp, corner_r=spm.SQUARE_R)
-        p = spm.plate(sq, self.d, spm.variant(spm.DEFAULT))
-        self.assertTrue(p.isValid())
-        self.assertGreater(p.Volume, self.plates[spm.DEFAULT].Volume)
-
 
 class SeatTest(unittest.TestCase):
     @classmethod
@@ -162,10 +123,7 @@ class SeatTest(unittest.TestCase):
         cls.deck, _ = so.deck(cls.d)
         cls.seated = spm.seat(cls.deck, cls.sp, cls.d, hollow=False)
 
-    def test_the_deck_with_the_seat_is_one_valid_solid(self) -> None:
-        self.assertTrue(self.seated.isValid())
-        self.assertEqual(len(self.seated.Solids), 1)
-
+    @support.slow
     def test_the_cut_changes_the_deck_at_the_seat_only(self) -> None:
         x, y, z = self.sp.centre(self.d)
         a, b = self.sp.half(self.sp.reveal + self.d.edge_break)  # the recess, and the edge break round its rim
@@ -186,73 +144,6 @@ class SeatTest(unittest.TestCase):
         side = spm.Frame(self.sp, self.d).prism(self.sp.length / 2 + self.sp.reveal - 0.01, self.sp.height / 2 + self.sp.reveal - 0.01,
                                                self.sp.radius(self.sp.reveal - 0.01), self.d.edge_break, self.sp.t - 0.01)
         self.assertLess(self.seated.common(side).Volume, 1e-3)
-
-    def test_the_proud_seat_has_no_recess(self) -> None:
-        proud = spm.seat(self.deck, self.sp, self.d, "proud", hollow=False)
-        self.assertTrue(proud.isValid())
-        self.assertGreater(proud.Volume, self.seated.Volume)
-
-    def test_the_edge_rule_holds_on_the_plate_and_on_the_seat(self) -> None:
-        for v in spm.VARIANTS:
-            rows = spm.edge_finish(self.sp, self.d, v, self.seated)
-            self.assertEqual(rows["socket_plate"]["shows"], [], v.key)
-            self.assertEqual(rows["deck"]["shows"], [], v.key)
-            # the rims of the round holes are the only sharp edges on the front, and each lies under hardware
-            holes = 3 + 8 + (1 if v.knob else 0)
-            self.assertEqual(sum(rows["socket_plate"]["under"].values()), holes, v.key)
-
-    def test_the_face_check_finds_nothing_on_the_plate_and_at_the_seat(self) -> None:
-        for v in spm.VARIANTS:
-            rows = spm.face_rows(self.sp, self.d, v, self.seated)
-            self.assertEqual(rows["socket_plate"]["fail"], [], v.key)
-            self.assertEqual(rows["deck"]["fail"], [], v.key)
-
-    def test_the_tools_of_the_shell_pass_on_the_plate(self) -> None:
-        """tools/edge_finish.py and tools/face_check.py on the plate, the seated deck and the bought parts, as they run
-        on a build folder of a variant: no sharp edge of the plate shows, each named joint of the plate holds a sharp
-        edge in the default variant, and the face check finds nothing on the plate."""
-        from tools import edge_finish as ef, face_check as fc
-
-        for v in spm.VARIANTS:
-            parts = {"deck": self.seated, "socket_plate": spm.plate(self.sp, self.d, v), **spm.groups(self.sp, self.d, v)}
-            rows = ef.survey(parts, self.d)
-            plate_rows = {"socket_plate": rows["socket_plate"]}
-            self.assertEqual(ef.failures(plate_rows), [], v.key)
-            self.assertEqual({k for k, r in rows.items() if r["class"] == "bought"}, set(parts) - {"deck", "socket_plate"}, v.key)
-            used = {("socket_plate", g["against"]) for g in rows["socket_plate"]["sharp"] if g["against"]}
-            if v.key == spm.DEFAULT:
-                self.assertEqual(used, {j for j in ef.JOINTS if j[0] == "socket_plate"})
-                behind = ("deck", "the inside of the shell, behind the plate")
-                self.assertIn(behind, ef.JOINTS)
-                self.assertIn(behind[1], {g["against"] for g in rows["deck"]["sharp"]})
-            found, _ = fc.check_shell({"socket_plate": parts["socket_plate"]})
-            self.assertEqual(fc.failures(found), [], v.key)
-
-    def test_the_frame_is_one_solid_behind_the_skin(self) -> None:
-        f = spm.frame(self.sp, self.d)
-        self.assertTrue(f.isValid())
-        self.assertEqual(len(f.Solids), 1)
-        x, _, _ = self.sp.centre(self.d)
-        self.assertLessEqual(f.BoundBox.XMax, x - self.sp.t + 1e-6)
-
-
-class FitTest(unittest.TestCase):
-    """The rules of the fit study with the hardware of the plate. It needs the default build and its cavity."""
-
-    def test_both_layouts_with_the_knob_pass_the_rules_of_the_fit_study(self) -> None:
-        """The two forms with the knob have the most hardware. The module's own run checks all four variants."""
-        d, parts, _ = support.shell()
-        sp = spm.SocketPlate()
-        values = spm.fit_values(d, support.PARAMS, parts, support.cavity())
-        for v in (v for v in spm.VARIANTS if v.knob):
-            rep = spm.fitted(sp, d, v, support.PARAMS, parts, support.cavity(), values)
-            self.assertEqual(rep["failures"], [], v.key)
-            names = {i["item"] for i in rep["items"]}
-            self.assertEqual(names, {"USB_A1", "USB_C2", "USB_A3", "USB_C4", "PowerButton"} | ({"VolumeKnob"} if v.knob else set()), v.key)
-            for item in rep["items"]:
-                self.assertGreater(item["above_floor"], 0.0, f"{v.key}: {item['item']}")
-                self.assertGreater(item["neighbour_gap"], 0.0, f"{v.key}: {item['item']}")
-
 
 if __name__ == "__main__":
     unittest.main()

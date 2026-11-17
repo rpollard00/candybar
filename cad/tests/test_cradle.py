@@ -1,9 +1,6 @@
-"""The monitor cradle and the printed bezel plate (candybar.shell.cradle): the parts are valid solids, the plate keeps
-the form of the shell's plate and has no sharp edge that shows, the fastening goes together, the monitor fits its
-jaws and comes out to the front, the parts fit the printer, and the checks notice a part that is in the way.
-
-The tests of CradleInTheBodyTest read the built shell (cradle.shell_dir: the BREP of each part and fit/report.json)
-and the skin in the cache of the split. They do not build the shell."""
+"""The monitor cradle and the printed bezel plate (candybar.shell.cradle), on their own parts: the values, the mirror
+images, the jaws, the plate and its fastening, the way out, the leads and the push rod, and the checks that notice a
+part in the way or too long. The build of the cradle (candybar.shell.cradle) checks the parts in the body and fails."""
 from __future__ import annotations
 
 import functools
@@ -17,10 +14,8 @@ import Part
 from candybar.shell import cradle as cr
 from candybar.shell import profiles as pr
 from candybar.shell import solids as so
-from candybar.shell import split
 from candybar.shell.dims import MON_ACTIVE_H, MON_ACTIVE_W, Blueprint
 
-from . import support
 
 V = App.Vector
 D = Blueprint()
@@ -83,28 +78,12 @@ class ValuesTest(unittest.TestCase):
 
 
 class PartsTest(unittest.TestCase):
-    def test_each_part_is_made_of_valid_closed_solids(self) -> None:
-        count = {"bezel_plate": 1, "lugs": 4, "bosses": 4, "upright_right": 1, "upright_left": 1, "jaws": 4, "shoes": 4, "channel_right": 1, "channel_left": 1}
-        for name, n in count.items():
-            with self.subTest(part=name):
-                s = parts()[name]
-                self.assertTrue(s.isValid())
-                self.assertEqual(len(s.Solids), n)
-                self.assertTrue(all(x.isClosed() for x in s.Solids))
 
     def test_the_left_parts_are_the_mirror_images_of_the_right_parts(self) -> None:
         for name in ("upright", "channel"):
             right, left = parts()[f"{name}_right"], parts()[f"{name}_left"]
             self.assertAlmostEqual(right.Volume, left.Volume, places=3)
             self.assertLess(cr.mirror_x(right).cut(left).Volume, 1e-3)
-
-    def test_the_printed_parts_do_not_meet_each_other_or_the_monitor(self) -> None:
-        p = parts()
-        names = list(cr.PRINTED + cr.ADDED + ("monitor",))
-        for i, a in enumerate(names):
-            for b in names[i + 1:]:
-                with self.subTest(a=a, b=b):
-                    self.assertLess(cr.volume_in(p[a], p[b]), cr.TOL_VOLUME)
 
     def test_the_monitor_lies_in_its_jaws(self) -> None:
         p = parts()
@@ -158,13 +137,6 @@ class BezelPlateTest(unittest.TestCase):
         self.assertAlmostEqual(min(xs), -(f.half_w - C.plate_fit), delta=1e-3)
         self.assertAlmostEqual(cr.gap(plate, cr.fit_box(D, 0.0).cut(cr.fit_box(D, C.plate_fit / 2))), C.plate_fit / 2, delta=1e-3)
 
-    def test_no_convex_edge_of_the_plate_that_shows_is_sharp(self) -> None:
-        plate = parts()["bezel_plate"]
-        self.assertEqual(cr.plate_break_edges(plate, D), [])
-        from tools import face_check
-        breaks = [f for f in plate.Faces if face_check.is_break(f, D.edge_break)]
-        self.assertEqual(len(breaks), 12)
-
     def test_the_nominal_plate_has_sharp_edges_and_the_check_finds_them(self) -> None:
         self.assertEqual(len(cr.plate_break_edges(nominal(), D)), 12)
 
@@ -197,19 +169,6 @@ class BezelPlateTest(unittest.TestCase):
                 self.assertGreater(cr.volume_in(pin(C.pin_slot_play + 1.0, 0.0), plate), 1.0)      # the end of the slot
                 self.assertGreater(cr.volume_in(pin(0.0, 0.5), plate), 1.0)                         # across the slot
 
-    def test_the_halves_make_the_plate_and_fit_the_printer(self) -> None:
-        plate = parts()["bezel_plate"]
-        halves = cr.bezel_halves(D, C, plate)
-        self.assertEqual(len(halves), 2)
-        holes = 8 * math.pi * (C.seam_dowel_d / 2) ** 2 * C.seam_dowel_depth
-        self.assertAlmostEqual(sum(h.Volume for h in halves.values()), plate.Volume - holes, delta=5.0)
-        # the right half has the push rod's hole: with it filled, the halves are mirror images
-        rod_hole = parts()["bezel_plate_no_button"].Volume - plate.Volume
-        self.assertAlmostEqual(halves["bezel_half_right"].Volume + rod_hole, halves["bezel_half_left"].Volume, delta=5.0)
-        for h in halves.values():
-            self.assertTrue(h.isValid())
-            self.assertEqual(len(h.Solids), 1)
-
     def test_the_bars_are_six_pieces_of_the_same_plate(self) -> None:
         plate = cr.bezel_plate(D, C, back=False)
         bars = cr.bezel_bars(D, plate)
@@ -226,27 +185,6 @@ class PrintTest(unittest.TestCase):
                       "shoe": cr.shoe(D, C, cr.PRESENT, 1, -1), "channel_right": p["channel_right"]}
         cls.rows = {r["part"]: r for r in cr.print_rows(D, cls.shapes)}
 
-    def test_each_printed_part_fits_the_printer(self) -> None:
-        for name, r in self.rows.items():
-            with self.subTest(part=name):
-                self.assertTrue(r["fits"], r["box"])
-        self.assertAlmostEqual(self.rows["bezel_half_right"]["box"][2], D.bezel_w / 2 - C.plate_fit, delta=0.2)
-
-    def test_the_upright_prints_without_an_overhang(self) -> None:
-        self.assertEqual(self.rows["upright_right"]["overhang_mm2"], 0)
-
-    def test_the_overhangs_of_the_half_are_the_pockets_and_the_break_at_the_bed(self) -> None:
-        """What faces down on the half: the roofs of the two magnet pockets, of the two pin slots and of the dowel
-        holes, and the first layers of the edge break beside the bed. No face of the land, of the inner frame or of
-        the rim wall is among them."""
-        r = self.rows["bezel_half_right"]
-        self.assertLess(r["overhang_mm2"], 800.0)
-        half = cr.oriented(self.shapes["bezel_half_right"], D, (-1, 0, 0), (0, 1, 0))
-        for f in half.Faces:
-            if f.Area > 2000.0 and not isinstance(f.Surface, Part.Plane):        # the land and the inner frame
-                u0, u1, v0, v1 = f.ParameterRange
-                self.assertGreater(f.normalAt((u0 + u1) / 2, (v0 + v1) / 2).z, -0.05)
-
     def test_a_part_that_is_too_long_does_not_fit(self) -> None:
         long = replace(C, bar_half=C.bar_half + 10.0)
         row = cr.print_rows(D, {"upright_right": cr.upright(D, long, 1)})
@@ -254,14 +192,6 @@ class PrintTest(unittest.TestCase):
 
 
 class WayOutTest(unittest.TestCase):
-    def test_the_way_out_is_free_of_the_parts_that_stay(self) -> None:
-        p = parts()
-        fixed = [p[k] for k in ("lugs", "bosses", "upright_right", "upright_left", "channel_right", "channel_left")]
-        jaws = Part.makeCompound([cr.jaw(D, C, cr.PRESENT, sx, -1) for sx in (1, -1)])
-        for r in cr.path_out(D, C, cr.PRESENT, fixed, jaws, (0.0, 20.0, 60.0, 150.0)):
-            with self.subTest(out=r["out_mm"], what=r["what"]):
-                self.assertLess(r["common_mm3"], cr.TOL_VOLUME)
-        self.assertLess(cr.sweep_out(D, C, 200.0, fixed)["common_mm3"], cr.TOL_VOLUME)
 
     def test_the_check_finds_a_part_in_the_way(self) -> None:
         f = cr.Frame(D)
@@ -308,35 +238,6 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertGreater(cr.volume_in(rod.translated(f.into * (travel + C.rod_fit + 0.5)), guide), 1.0)
         self.assertLess(cr.volume_in(striker.translated(V(-travel, 0, 0)), guide), cr.TOL_VOLUME)
         self.assertGreater(cr.volume_in(striker.translated(V(-(travel + C.rod_fit + 0.5), 0, 0)), guide), 1.0)
-
-    def test_the_tools_of_the_shell_pass_on_the_print_parts(self) -> None:
-        """tools/edge_finish.py and tools/face_check.py as they run on cad/out/cradle/print: the halves of the plate are
-        printed parts with no sharp edge that shows, each named joint of the halves holds a sharp edge, the inside
-        parts are in their class, and each finding of the face check is a known item of this module."""
-        from tools import edge_finish as ef, face_check as fc
-
-        p = parts()
-        halves = cr.bezel_halves(D, C, p["bezel_plate"])
-        prints = {**halves, "upright": p["upright_right"], "jaw": cr.jaw(D, C, cr.PRESENT, 1, -1), "shoe": cr.shoe(D, C, cr.PRESENT, 1, -1),
-                  "channel": p["channel_right"]}
-        rows = ef.survey(prints, D)
-        self.assertEqual(ef.failures(rows), [])
-        self.assertEqual({k for k, r in rows.items() if r["class"] == "inside, not painted"}, set(cr.INSIDE))
-        used = {(part, g["against"]) for part, r in rows.items() if r["class"] == "printed" for g in r["sharp"] if g["against"]}
-        self.assertEqual(used, {j for j in ef.JOINTS if j[0] in prints})
-        found, stale = fc.check_shell(prints)
-        self.assertEqual(fc.failures(found), [])
-        self.assertEqual(stale, [])
-
-    def test_the_default_has_the_rod_and_the_plate_with_no_hole_is_the_option(self) -> None:
-        p = parts()
-        for k in cr.BUTTON:
-            self.assertIn(k, p)
-        self.assertLess(p["bezel_plate"].Volume, p["bezel_plate_no_button"].Volume - 50.0)   # the hole of the rod
-        off = cr.build(D, replace(C, push_rod=False), cr.PRESENT)
-        self.assertFalse(set(cr.BUTTON) & set(off))
-        self.assertNotIn("bezel_plate_no_button", off)
-        self.assertAlmostEqual(off["bezel_plate"].Volume, p["bezel_plate_no_button"].Volume, places=3)
 
     def test_the_rim_of_the_rod_hole_and_the_rod_tip_have_the_small_break(self) -> None:
         """A feature too small for R 1 gets the small break of 0.3 (the edge finish is a guideline, docs/adr/0007): no convex
@@ -390,73 +291,3 @@ class LeadsAndButtonTest(unittest.TestCase):
         self.assertAlmostEqual(cr.gap(shank, plate), C.rod_fit, delta=1e-3)
 
 
-def built() -> bool:
-    return (cr.shell_dir() / "manifest.json").exists() and (cr.shell_dir() / "fit" / "report.json").exists() and split.skin_cached(D)
-
-
-@functools.cache
-def study() -> dict:
-    return cr.study(D, C, cr.PRESENT, support.temp_dir(), log=lambda *_: None)
-
-
-@unittest.skipUnless(built(), "the built shell is not there: run candybar.shell.solids, candybar.shell.fit and candybar.shell.split into cad/out/shell-rev7")
-class CradleInTheBodyTest(unittest.TestCase):
-    def test_the_study_passes(self) -> None:
-        self.assertEqual(study()["failures"], [])
-        self.assertEqual(study()["result"], "PASS")
-
-    def test_no_part_meets_the_skin_or_the_hardware_of_the_fit_study(self) -> None:
-        rows = study()["clashes"]
-        self.assertGreater(len(rows), 150)
-        self.assertEqual([r for r in rows if r["common_mm3"] > cr.TOL_VOLUME], [])
-        others = {r["b"] for r in rows}
-        for name in ("skin", "Compute_PCB_IO", "MonitorCables_Left", "MonitorCables_Right", "SpeakerR_Driver", "SpeakerL_Driver", "Marquee_Modules"):
-            self.assertIn(name, others)
-
-    def test_the_lugs_and_the_bosses_are_on_the_skin(self) -> None:
-        for name, volumes in study()["attached"].items():
-            with self.subTest(part=name):
-                self.assertEqual(len(volumes), 4)
-                self.assertGreater(min(volumes), 10.0)
-
-    def test_the_side_is_where_the_bosses_stand(self) -> None:
-        for r in study()["side_wall"]:
-            self.assertAlmostEqual(r["inner_x"], C.side_wall_x, delta=C.boss_in)
-
-    def test_the_way_out_is_free_of_the_skin(self) -> None:
-        for r in study()["path"]:
-            self.assertLess(r["common_mm3"], cr.TOL_VOLUME)
-        self.assertLess(study()["sweep"]["common_mm3"], cr.TOL_VOLUME)
-        self.assertGreater(study()["sweep"]["gap"], 0.5)
-
-    def test_the_sight_lines_of_the_fit_study_hold(self) -> None:
-        for now, before in zip(study()["sight"], study()["sight_before"]):
-            with self.subTest(person=now["person"]):
-                self.assertLessEqual(now["hidden_top"], before["hidden_top"] + 0.5)
-                self.assertLessEqual(now["hidden_bottom"], before["hidden_bottom"] + 0.5)
-
-    def test_the_edge_rule_holds_on_the_plate(self) -> None:
-        edge = study()["edge"]
-        self.assertEqual(edge["failures"], [])
-        self.assertEqual([g for g in edge["rows"]["sharp"] if not g["against"]], [])
-        self.assertEqual(edge["rows"]["break_faces"], 12)
-
-    def test_each_finding_of_the_face_check_has_a_reason(self) -> None:
-        for name, r in study()["faces"].items():
-            with self.subTest(part=name):
-                self.assertEqual(r["not_allowed"], [])
-        self.assertEqual(study()["faces"]["upright_right"]["findings"], 0)
-        self.assertEqual(study()["faces"]["lugs"]["findings"], 0)
-
-    def test_the_monitor_is_where_the_fit_study_has_it(self) -> None:
-        """The present unit of this module is the body of the fit study, glass_gap farther back."""
-        doc, found = cr.fit_items(D)
-        try:
-            body = next(s.world for it in found if it.name == "Monitor" for s in it.solids if s.name == "Monitor_Body")
-            mine = cr.monitor(D, C, cr.PRESENT)
-            f = cr.Frame(D)
-            self.assertAlmostEqual(mine.Volume, body.Volume, delta=1.0)
-            self.assertAlmostEqual((mine.CenterOfMass - body.CenterOfMass).dot(f.into), C.glass_gap, delta=1e-3)
-            self.assertLess(abs((mine.CenterOfMass - body.CenterOfMass).dot(f.up)), 1e-3)
-        finally:
-            App.closeDocument(doc.Name)

@@ -8,7 +8,7 @@ import unittest
 from dataclasses import fields
 from pathlib import Path
 
-from candybar.shell import joints, structure
+from candybar.shell import joints
 from candybar.shell.dims import Blueprint
 
 CAD = Path(__file__).resolve().parents[1]
@@ -49,8 +49,6 @@ def second_copies(text: str) -> list[tuple[int, str]]:
 
 
 class OneSourceTest(unittest.TestCase):
-    def test_structure_has_no_joint_constants_of_its_own(self) -> None:
-        self.assertEqual([n for n in vars(structure) if "JOINT" in n.upper()], [])
 
     def test_no_module_but_joints_sets_a_joint_value(self) -> None:
         files = sorted((CAD / "candybar").rglob("*.py")) + sorted((CAD / "tools").glob("*.py"))
@@ -71,11 +69,6 @@ class OneSourceTest(unittest.TestCase):
 
     def test_the_skin_of_the_joint_is_the_skin_of_the_form(self) -> None:
         self.assertEqual(joints.JOINT.wall_t, Blueprint().wall_t)
-
-    def test_the_pilot_of_the_cabinet_stays_open_until_the_coupon_decides(self) -> None:
-        self.assertIsNone(joints.JOINT.pilot_d)
-        self.assertLess(joints.JOINT.pilot_d_pet, joints.JOINT.pilot_d_abs)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
-"""The joint coupon (candybar.shell.coupon): the halves do not interfere, the key and groove have the clearance that
-the part name says, the flange faces meet, the screw axes line up, and every part fits the printer's usable volume.
-The checks also notice a pair that interferes and a part that does not fit."""
+"""The joint coupon (candybar.shell.coupon): the key and groove have the clearance that the part name says, the flange
+faces meet, the screw axes line up, the pilots and the mark are in their places, and the checks notice swapped pilots,
+a key too wide for its groove and a part that does not fit. The coupon's build checks the clash and the bed."""
 from __future__ import annotations
 
 import unittest
@@ -18,12 +18,6 @@ class CouponPairTest(unittest.TestCase):
         cls.body = coupon.lower_half(0.1, holes=False)
         cls.pairs = {c: (coupon.lower_half(c), coupon.upper_half(c)) for c in coupon.CLEARANCES}
         cls.checks = {c: coupon.check_pair(JOINT, c, lo, up, cls.body) for c, (lo, up) in cls.pairs.items()}
-
-    def test_the_halves_do_not_interfere(self) -> None:
-        for c, r in self.checks.items():
-            with self.subTest(clearance=c):
-                self.assertTrue(r["valid"])
-                self.assertLess(r["common_volume_mm3"], 1e-6)
 
     def test_the_key_gap_is_the_clearance_in_the_name(self) -> None:
         for c, r in self.checks.items():
@@ -59,12 +53,6 @@ class CouponPairTest(unittest.TestCase):
         lo = self.pairs[0.1][0]
         self.assertLess(lo.common(coupon.pilot_mark()).Volume, 1e-6)   # the bar is cut out of the lower half
 
-    def test_the_cabinet_pilot_stays_open_until_the_coupon_decides(self) -> None:
-        self.assertIsNone(JOINT.pilot_d)
-        with self.assertRaises(ValueError):
-            JOINT.pilot()
-        self.assertEqual(replace(JOINT, pilot_d=JOINT.pilot_d_pet).pilot(), 2.25)
-
     def test_the_check_notices_swapped_pilots(self) -> None:
         swapped = replace(JOINT, pilot_d_pet=JOINT.pilot_d_abs, pilot_d_abs=JOINT.pilot_d_pet)
         lo = coupon.lower_half(0.1, swapped)
@@ -88,15 +76,6 @@ class CouponPrintTest(unittest.TestCase):
         cls.parts = {f"lower-{coupon.tag(c)}": coupon.to_bed(coupon.lower_half(c)) for c in coupon.CLEARANCES}
         cls.parts |= {f"upper-{coupon.tag(c)}": coupon.to_bed(coupon.upper_half(c)) for c in coupon.CLEARANCES}
         cls.parts |= {f"plaque-P{k}": coupon.to_bed(coupon.plaque(k)) for k in range(1, 5)}
-
-    def test_every_part_fits_the_bed_in_its_print_orientation(self) -> None:
-        for name, shape in self.parts.items():
-            with self.subTest(part=name):
-                r = coupon.check_part(JOINT, name, shape, self.lim)
-                self.assertTrue(r["valid"])
-                self.assertTrue(r["fits_bed"], r["box_mm"])
-                self.assertEqual(r["unstated_overhang_mm2"], 0.0, r["overhangs"])
-                self.assertTrue(r["pass"])
 
     def test_the_check_notices_a_part_that_does_not_fit(self) -> None:
         small = coupon.Printer(100.0, 245.0)

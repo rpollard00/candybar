@@ -17,6 +17,13 @@ whose nearest face in the other build is one, goes into the columns "at the edge
 other points. A face of the edge break is a round of its radius along an edge, the ball at a corner where three
 broken edges meet, or the face on which the ball turns about a kink in a wall (face_check.is_break_surface).
 
+The first pass: before the distance, each pair is compared by its numbers: the count of faces, edges and vertexes,
+the volume and the area (within FIRST_REL of the value), and the six limits of the true bounding box (within
+FIRST_BOX). A pair that is equal in all of them counts as the same part, and its distance is not measured; only a
+pair that differs in one of them gets the full measure. One kernel gives the same numbers from run to run within
+2.5e-9 of the volume and 2.3e-8 mm on the box (the hood of 36bc344, built two times; the other parts were the same
+file). CANDYBAR_FULL=1 measures the distance of every pair.
+
 Run headless. It writes compare.json and compare.md into CANDYBAR_OUT and exits 1 when a distance is more than
 CANDYBAR_TOL (default 0.3) or a part of the first build has no partner:
 
@@ -41,6 +48,8 @@ STEP = 0.5
 NEAR = 1.0
 TIE = 1e-6
 SURE = 1e-4
+FIRST_REL = 1e-7     # of the volume and of the area: 40 times what one kernel gives from run to run
+FIRST_BOX = 1e-4     # mm, on each limit of the bounding box
 
 
 def load(folder: str) -> dict[str, Part.Shape]:
@@ -158,13 +167,36 @@ def table(rows: dict[str, dict | None], title: str, tol: float) -> str:
             continue
         ok = max(r["a_to_b"], r["b_to_a"]) <= tol
         at = r["break_a_to_b_at"] if r["break_a_to_b"] >= r["break_b_to_a"] else r["break_b_to_a_at"]
+        if r.get("first_pass"):
+            lines.append(f"| {k} | {r['volume_a']:.1f} | {r['volume_b']:.1f} | {r['volume_diff']:+.1f} | {r['faces_a']} / {r['faces_b']} | {r['box_diff']:.4f} | "
+                         "the same by the first pass | | | | | | yes |")
+            continue
         lines.append(f"| {k} | {r['volume_a']:.1f} | {r['volume_b']:.1f} | {r['volume_diff']:+.1f} | {r['faces_a']} / {r['faces_b']} | {r['box_diff']:.4f} | "
                      f"{r['a_to_b']:.4f} | {r['a_to_b_at']} | {r['b_to_a']:.4f} | {r['b_to_a_at']} | {r['break_a_to_b']:.4f} / {r['break_b_to_a']:.4f} | {at} | "
                      f"{'yes' if ok else 'NO'} |")
     return "\n".join(lines) + "\n"
 
 
-def run(dir_a: str, dir_b: str, spec: str = "", only: list[str] | None = None) -> dict[str, dict | None]:
+def first_pass(a: Part.Shape, b: Part.Shape) -> dict | None:
+    """The row of a pair that is equal in its numbers (see the first pass above), or None when one number differs."""
+    if (len(a.Faces), len(a.Edges), len(a.Vertexes)) != (len(b.Faces), len(b.Edges), len(b.Vertexes)):
+        return None
+    if abs(a.Volume - b.Volume) > FIRST_REL * abs(a.Volume) or abs(a.Area - b.Area) > FIRST_REL * a.Area:
+        return None
+    ba, bb = a.optimalBoundingBox(False, False), b.optimalBoundingBox(False, False)
+    la = (ba.XMin, ba.YMin, ba.ZMin, ba.XMax, ba.YMax, ba.ZMax)
+    lb = (bb.XMin, bb.YMin, bb.ZMin, bb.XMax, bb.YMax, bb.ZMax)
+    box = max(abs(p - q) for p, q in zip(la, lb))
+    if box > FIRST_BOX:
+        return None
+    return {"volume_a": round(a.Volume, 1), "volume_b": round(b.Volume, 1), "volume_diff": round(a.Volume - b.Volume, 1),
+            "area_a": round(a.Area, 1), "area_b": round(b.Area, 1), "faces_a": len(a.Faces), "faces_b": len(b.Faces),
+            "box_a": [round(v, 3) for v in la], "box_b": [round(v, 3) for v in lb], "box_diff": round(box, 4),
+            "a_to_b": 0.0, "a_to_b_at": [], "b_to_a": 0.0, "b_to_a_at": [], "break_a_to_b": 0.0, "break_a_to_b_at": [],
+            "break_b_to_a": 0.0, "break_b_to_a_at": [], "points_a": 0, "points_b": 0, "first_pass": True}
+
+
+def run(dir_a: str, dir_b: str, spec: str = "", only: list[str] | None = None, full: bool = False) -> dict[str, dict | None]:
     from candybar.shell.dims import Blueprint
     radius = Blueprint().edge_break
     a, b = load(dir_a), load(dir_b)
@@ -176,7 +208,7 @@ def run(dir_a: str, dir_b: str, spec: str = "", only: list[str] | None = None) -
             rows[k] = None
             continue
         other = b[names[0]] if len(names) == 1 else b[names[0]].fuse([b[n] for n in names[1:]])
-        rows[k] = compare(a[k], other, radius)
+        rows[k] = (None if full else first_pass(a[k], other)) or compare(a[k], other, radius)
     return rows
 
 
@@ -185,7 +217,7 @@ def main() -> int:
     out = os.environ.get("CANDYBAR_OUT", os.path.join(dir_a, "compare"))
     tol = float(os.environ.get("CANDYBAR_TOL", "0.3"))
     only = [p for p in os.environ.get("CANDYBAR_PARTS", "").split(",") if p] or None
-    rows = run(dir_a, dir_b, os.environ.get("PAIR", ""), only)
+    rows = run(dir_a, dir_b, os.environ.get("PAIR", ""), only, full=bool(os.environ.get("CANDYBAR_FULL")))
     os.makedirs(out, exist_ok=True)
     json.dump({"a": dir_a, "b": dir_b, "tolerance_mm": tol, "parts": rows}, open(os.path.join(out, "compare.json"), "w"), indent=1)
     text = table(rows, f"Parts of {dir_a} (A) against {dir_b} (B)", tol)

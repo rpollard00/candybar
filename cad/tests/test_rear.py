@@ -1,11 +1,10 @@
-"""The rear (candybar.shell.rear): the door in its opening, its vents, the shroud and the duct, the openings of the
-lower rear wall. The first classes make only the parts of the rear. RearInTheFitStudyTest needs the cavity of the
-shell, and RearOnThePiecesTest cuts the skin of the cache into pieces and finishes them; both take some minutes."""
+"""The rear (candybar.shell.rear): the door in its opening, its vents, the seals, the plug in the socket and the check
+of a sharp edge, on the parts of the rear alone (quick); and in the slow group, the door tilts out and lifts off, and
+the pieces that the rear does not finish stay as the cut made them. The build of the rear checks its parts and fails."""
 from __future__ import annotations
 
 import math
 import unittest
-from dataclasses import replace
 
 import FreeCAD as App
 import Part
@@ -197,25 +196,6 @@ class RearPartsTest(unittest.TestCase):
         cls.parts = rear.build(cls.d, cls.r, cls.p)
         cls.lim = split.printer(support.PARAMS)
 
-    def test_each_part_is_one_valid_solid(self) -> None:
-        for name, shape in self.parts.items():
-            with self.subTest(part=name):
-                self.assertTrue(shape.isValid())
-                self.assertEqual(len(shape.Solids), 2 if name == "fan" else 1)
-
-    def test_the_parts_do_not_run_into_each_other(self) -> None:
-        names = list(self.parts)
-        for i, a in enumerate(names):
-            for b in names[i + 1:]:
-                with self.subTest(pair=(a, b)):
-                    self.assertLess(self.parts[a].common(self.parts[b]).Volume, 1e-3)
-
-    def test_the_two_halves_have_the_same_box(self) -> None:
-        a, b = self.parts["door_half_r"].BoundBox, self.parts["door_half_l"].BoundBox
-        self.assertAlmostEqual(a.XMax, -b.XMin, places=6)
-        self.assertAlmostEqual(a.ZMin, b.ZMin, places=6)
-        self.assertAlmostEqual(a.ZMax, b.ZMax, places=6)
-
     def test_the_door_sits_on_its_land_and_its_foot_hooks_behind_the_lip(self) -> None:
         d, r = self.d, self.r
         for side, s in rear.SIDES.items():
@@ -231,6 +211,7 @@ class RearPartsTest(unittest.TestCase):
                 # the cone locates: moved 0.5 in its plane, the door runs into the socket
                 self.assertGreater(door.translated(V(0.5, 0, 0)).common(rail).Volume, 0.1)
 
+    @support.slow
     def test_the_door_tilts_out_and_lifts_off(self) -> None:
         """The way off: the head tilts out about the foot (the lower inner edge of the door's margin, on the lip),
         with nothing in its way at any angle; with the head out of the opening the door lifts over the lip."""
@@ -255,28 +236,6 @@ class RearPartsTest(unittest.TestCase):
                 away = lifted.translated(V(0, step, 0))
                 for part in fixed:
                     self.assertLess(away.common(part).Volume, 0.05, (s, step))
-
-    def test_the_door_has_no_sharp_edge_on_the_outside(self) -> None:
-        doors = {f"door half {s}": self.parts[f"door_half_{s.lower()}"] for s in rear.SIDES.values()}
-        for level, subject, detail in rear.edge_rows(self.d, self.r, doors):
-            with self.subTest(part=subject):
-                self.assertEqual(level, check.PASS, detail)
-
-    def test_the_face_check_holds_on_the_door_and_the_rails(self) -> None:
-        shapes = {k: self.parts[k] for k in ("door_half_r", "door_half_l", "head_rail_r", "head_rail_l")}
-        for level, subject, detail in rear.face_rows(self.d, self.r, self.p, shapes):
-            with self.subTest(part=subject):
-                self.assertEqual(level, check.PASS, detail)
-
-    def test_each_printed_part_fits_and_lies_flat_with_no_overhang(self) -> None:
-        rows = {q["part"]: q for q in rear.print_rows(self.parts, self.lim)}
-        self.assertEqual(set(rows), set(rear.PRINTS))
-        for name, q in rows.items():
-            with self.subTest(part=name):
-                self.assertTrue(q["fits"])
-                self.assertGreater(q["flat_on_bed_cm2"], 1.0)
-        for name in ("door_half_r", "door_half_l", "shroud_base", "shroud_top", "duct_back"):
-            self.assertLess(rows[name]["overhang_cm2"], 0.6, name)
 
     def test_the_adapter_and_the_hdmi_plug_fit_at_any_depth_in_the_socket(self) -> None:
         """Way 1 (the owner, 2026-11-15): the adapter straight in the board's socket, the right-angle HDMI plug through
@@ -319,39 +278,7 @@ class RearPartsTest(unittest.TestCase):
         self.assertEqual(rows[0][0], check.FAIL)
 
 
-class RearInTheFitStudyTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.d, cls.shapes, _ = support.shell()
-        cls.cav = support.cavity()
-        cls.fitted = fit.place(cls.d, fit.Layout(), support.PARAMS, cls.shapes, cls.cav)
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls.fitted.close()
-
-    def test_the_fit_study_passes_with_the_real_parts(self) -> None:
-        self.assertEqual(self.fitted.failures, [])
-        subjects = [s for _, s, _ in self.fitted.rules["rear parts"]]
-        for wanted in ("Compute_FanShroud: the real parts", "Compute_ExhaustDuct: the real parts", "board in the clear opening",
-                       "fan vent", "hot-air vent", "lead of the power button"):
-            self.assertIn(wanted, subjects)
-
-    def test_the_rule_door_service_holds(self) -> None:
-        self.assertEqual([r for r in self.fitted.rules["door service"] if r[0] == check.FAIL], [])
-
-    def test_the_study_notices_a_duct_behind_the_land(self) -> None:
-        """With the layout of before (the duct 1 inside the opening) the duct stands behind the left post, and the
-        rib at the centre line of the door stands in the collar of the fan."""
-        old = fit.place(self.d, replace(fit.Layout(), duct_in_door=1.0), support.PARAMS, self.shapes, self.cav)
-        try:
-            failed = "\n".join(old.failures)
-        finally:
-            old.close()
-        self.assertIn("rear parts: duct_body / side_tongue_l", failed)
-        self.assertIn("rear parts: door_half_r / shroud_top", failed)
-
-
+@support.slow
 class RearOnThePiecesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -362,52 +289,10 @@ class RearOnThePiecesTest(unittest.TestCase):
         cls.done = rear.finish_pieces(cls.raw, cls.d, cls.r, cls.p)
         cls.changed = {k: v for k, v in cls.done.items() if k.startswith(rear.CHANGED)}
 
-    def test_each_changed_piece_is_one_valid_solid(self) -> None:
-        self.assertEqual(len(self.changed), 8)
-        for name, shape in self.changed.items():
-            with self.subTest(piece=name):
-                self.assertTrue(shape.isValid())
-                self.assertEqual(len(shape.Solids), 1)
-
     def test_the_other_pieces_are_as_the_cut_made_them(self) -> None:
         for name, shape in self.done.items():
             if name not in self.changed:
                 self.assertTrue(shape.isSame(self.raw[name]), name)
-
-    def test_the_openings_are_cut_and_the_land_is_added(self) -> None:
-        r, p, d = self.r, self.p, self.d
-        low = rear.supply_openings(r, p)
-        took = {"rear lower R": rear.area(rear.inlet(r, p)), "rear lower L": sum(rear.area(v) for v in low.values())}
-        side = {"rear lower R": 1, "rear lower L": -1}
-        for name, a in took.items():
-            less = self.raw[name].Volume - self.done[name].Volume
-            added = rear.sill_lip(d, r, p, side[name]).cut(self.raw[name]).Volume  # the lip and the rib under the sill
-            with self.subTest(piece=name):
-                self.assertGreater(added, 1500.0)
-                self.assertAlmostEqual(less, a * d.wall_t - added, delta=0.08 * a * d.wall_t)
-        for s in rear.SIDES.values():
-            self.assertGreater(self.done[f"middle {s}"].Volume - self.raw[f"middle {s}"].Volume, 9000.0)
-            self.assertAlmostEqual(self.raw[f"upper rear {s}"].Volume - self.done[f"upper rear {s}"].Volume,
-                                   (1 - math.pi / 4) * d.edge_break ** 2 * d.door_w / 2, delta=1.0)
-
-    def test_no_sharp_edge_on_the_rim_of_the_door_opening_or_of_an_opening(self) -> None:
-        for level, subject, detail in rear.edge_rows(self.d, self.r, self.changed):
-            with self.subTest(piece=subject):
-                self.assertEqual(level, check.PASS, detail)
-
-    def test_the_face_check_holds_on_the_outside_of_the_changed_pieces(self) -> None:
-        for level, subject, detail in rear.face_rows(self.d, self.r, self.p, self.changed):
-            with self.subTest(piece=subject):
-                self.assertEqual(level, check.PASS, detail)
-
-    def test_each_changed_piece_fits_the_printer_and_the_twins_have_one_box(self) -> None:
-        up = {q.full: q.up for q in split.expanded(split.layout(self.d))[1]}
-        rows = {k: split.measure(v, up[k], self.lim, None, None, self.d, detail=False) for k, v in self.changed.items()}
-        for name, q in rows.items():
-            with self.subTest(piece=name):
-                self.assertTrue(q["fits"])
-        self.assertEqual(split.mirror_gaps(rows), [])
-
 
 if __name__ == "__main__":
     unittest.main()

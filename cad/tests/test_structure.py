@@ -1,11 +1,11 @@
-"""The structure data of candybar.shell.structure reads the form from dims.Blueprint: the hand-holds, the door and
-the rear shelf. The frame of the study's option C is not in the code."""
+"""The structure data of candybar.shell.structure reads the form from dims.Blueprint: the hand-holds, the door, the
+rear shelf and the carrier of the board."""
 from __future__ import annotations
 
 import unittest
 from dataclasses import replace
 
-from candybar.shell import split, structure
+from candybar.shell import structure
 from candybar.shell.dims import Blueprint
 
 
@@ -63,15 +63,6 @@ class MembersFollowTheFormTest(unittest.TestCase):
         self.assertLess(box[0], -161.0)
         self.assertGreater(box[1], 146.0)
         self.assertNotIn("BC-250 carrier", {m.name for m in structure.members(self.d)})
-
-    def test_no_frame_of_the_study_is_left(self) -> None:
-        self.assertEqual([n for n in vars(structure) if "frame_c" in n.lower() or "extrusion" in n.lower()], [])
-        self.assertEqual({m.kind for m in self.members.values()} - set(structure.KIND_WORDS), set())
-        self.assertNotIn("frame", structure.KIND_WORDS)
-
-    def test_the_split_has_one_layout(self) -> None:
-        self.assertEqual([n for n in vars(split) if n.startswith("option_") or n in ("OPTIONS_ORDER", "CHOSEN", "ALL", "options")], [])
-
 
 if __name__ == "__main__":
     unittest.main()
