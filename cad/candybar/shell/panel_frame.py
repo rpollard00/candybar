@@ -104,6 +104,7 @@ class PushBolt:
     bolt_end_y: float = 66.0
     stop_y: float = 61.0           # the stop block on the bolt (it limits the forward travel with the panel out)
     stop_w: float = 18.0
+    stop_l: float = 2.5            # along y: the side of the bolt behind it is then 2.5 long (3 left a face of 2, the limit of the face check)
     # the tunnel of the bolt: one print with the left half of the frame. Its floor lies in the plane of the lower
     # face of the bar (the frame prints on that plane), under the bolt; its walls and roof close round the bolt
     # behind the strike. A gate dropped into a slot at its rear holds the spring; the panel keeps the gate in.
@@ -439,7 +440,7 @@ def bolt(d: Blueprint, p: PushBolt = PB0, s: float = 0.0) -> Part.Shape:
     narrow = box(-p.neck_w / 2, p.neck_w / 2, neck0, neck1, under(p, neck1), z1)
     lock = side_prism([(neck1, under(p, neck1)), (yw1, z0), (p.bolt_end_y, z0), (p.bolt_end_y, z1), (neck1, z1)], -hw, hw)
     # the stop block stands out on the +x side only: the -x side of the bolt is one plane, which lies on the bed
-    stop = box(-hw, p.stop_w / 2, p.stop_y, p.stop_y + 3.0, z0, z1)
+    stop = box(-hw, p.stop_w / 2, p.stop_y, p.stop_y + p.stop_l, z0, z1)
     solid = so.unsplit(head.fuse([front, narrow, lock, stop]))
     bore = ycyl(p.bolt_spring_bore, p.bolt_end_y - 10.0, p.bolt_end_y + 1, 0.0, (z0 + z1) / 2)
     solid = one_solid(solid.cut(bore), "push bolt")
