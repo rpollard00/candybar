@@ -122,7 +122,7 @@ The photo tools are in `cad/tools/`, their picked points in `cad/reference/`, an
 
 - [ ] A review of the edge finish (unit 3): the renders in `cad/out/shell-rev7/renders/` show every edge (`closeup-hood-opening`, `closeup-hood-opening-corner`, `closeup-seam-corner-near`). Unit 3 made four choices, and the owner can change each one. (1) The upper edge of the seam bevel on the rear wall of the hood has the break, although it turns 45 degrees only. Thus the break goes all round the foot of the hood. (2) The two short edges of the body at the seam bevel have a flat break of 1, not a round. (3) The corner of the hood where three broken edges meet is a ball of R 1. (4) The bezel plate has no break until the owner says how the plate is made.
 
-`cad/out/shell-rev7/fit/warnings.md` has the full list of dimensions to measure (a build output of the fit study).
+`cad/out/shell-rev7/fit/warnings.md` has the full list of dimensions to measure (a build output of the fit study). [docs/design/to-buy-and-measure.md](design/to-buy-and-measure.md) has what to buy, to measure, to try on the bench and to print first, in one place.
 
 ## Open decisions
 

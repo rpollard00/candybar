@@ -265,12 +265,7 @@ To print, in the cabinet (once):
 
 To print, on each panel: the tiles, with the two rear hooks and the strike.
 
-To buy:
-
-- 4 disc magnets N52 12 x 2, axial, for the frame (once).
-- 4 disc magnets N52 12 x 2, axial, for each panel. Steel discs 12 x 2 are the alternative: no polarity to mind, about 10 % less pull.
-- 1 compression spring, steel, 4 outside, 22 free, about 1.2 N/mm.
-- Epoxy for the magnets.
+To buy: see [to-buy-and-measure.md](to-buy-and-measure.md) 1.4. The panels carry steel discs 12 x 2 (the user, 2026-11-16).
 
 No screw, no insert.
 

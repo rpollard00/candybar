@@ -27,15 +27,9 @@ All parts are printed in ABS. The mass is the mass of the solid volume at 1.05 g
 
 The rear hooks and the strike print with the tiles of each panel. The outer form changes in one place only: the hole of the button in the deck nose (`Blueprint.latch_button_d`, a decision of 2026-11-15). All other parts are inside the opening that `cavity.Openings` makes below the control panel.
 
-Bought parts for the arcade panel and the frame:
+The bought parts for the arcade panel and the frame, the fall-back screws included, are in [to-buy-and-measure.md](to-buy-and-measure.md) 1.4.
 
-- 4 disc magnets N52 12 x 2, axial, for the frame (once), and 4 steel discs 12 x 2 for each panel (the user's decision of 2026-11-16: no pole to mind). Epoxy for both.
-- 1 compression spring, steel, 4 outside, 22 free, about 1.2 N/mm, for the push bolt.
-- 4 heat-set inserts M4 for the lever, and 4 screws M4 for its plate.
-- 4 screws M3 x 12 with nuts for the seam between the two tiles.
-- 4 thread-forming screws 3.0 for the encoder.
-
-The latch has no screw and no insert. The fall-back option (screws) needs 4 screws M4 x 16, countersunk (ISO 10642), and 4 heat-set inserts M4 x 8.
+The latch has no screw and no insert.
 
 ## The plate
 

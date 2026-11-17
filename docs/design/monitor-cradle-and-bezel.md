@@ -33,7 +33,7 @@ The fit study has two monitor bodies. The present unit is 354 x 230 x 10.6 (the 
 | Cable channel | 2 | A C section on the inner face of each side, 100 long, with slots for cable ties. |
 | Boss | 4 | An added solid on the inner face of each side. It holds an M3 heat-set insert for a cable channel. |
 
-Bought parts: 4 screws M4 x 25 and 4 screws M4 x 12 with a button head (ISO 7380), 4 hexagon nuts M4, 4 washers M4, 4 heat-set inserts M4, 4 heat-set inserts M3, 4 screws M3 x 8, 4 dowel pins 4 x 12, 4 dowel pins 4 x 16 for the seams, 8 disc magnets 8 x 3, cable ties 2.5 wide, cellular rubber strip 2 thick, felt 1 thick.
+Bought parts: see [to-buy-and-measure.md](to-buy-and-measure.md) 1.5. The things to measure on the monitor are in section 2 of that sheet.
 
 ### How the monitor is held
 

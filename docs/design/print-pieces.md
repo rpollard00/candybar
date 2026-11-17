@@ -394,7 +394,7 @@ Date: 2026-11-16. The owner: "for the hood - we can bolt it on". The hood comes 
 | From below at the front cones (x ±150, y 450.8) | The rear door, and the monitor | The cradle of the monitor stands 48 below the ring there, and the monitor is in front of the hand | Not taken: a screw that needs the monitor out |
 | From below on the rear ring (beside the hand-holds) | The rear door | The ring lies over the rear shelf (45 degrees, from y 540 to 580): under the ring the shelf is about 85 below the head, and a key from the door comes in at 25 degrees or more | Not taken: at the limit of a ball end |
 | From above through a speaker opening | The grille (two screws) and the driver | The key reaches only the inside of the sealed enclosure of 0.45 l. Its floor is about 10 above the foot; a screw through it opens the enclosure | Not taken |
-| **From below on the side rings, behind the monitor (taken)** | **The rear door** (four thumb screws) | **A hex key of 3 with a ball end, long arm 100 or more, straight up from inside the body (see "The reach")** | **Four screws, all from one opening** |
+| **From below on the side rings, behind the monitor (taken)** | **The rear door** (two quarter-turn fasteners) | **A hex key of 3 with a ball end, long arm 100 or more, straight up from inside the body (see "The reach")** | **Four screws, all from one opening** |
 
 ### What is built
 
@@ -426,7 +426,7 @@ The ring now rises 1.5 inside the wall, to the foot of the hood. With the screws
 
 The hood is the last part of the shell to go on and the first to come off, after the rear door, which opens to reach its screws:
 
-- Off: the rear door (four thumb screws); the four screws of the hood from below; unplug the multi-pin plug at the hood's foot; lift the hood up. The body is then open from above: the monitor, the cradle and the top of the bay can be reached from above.
+- Off: the rear door (two quarter-turn fasteners); the four screws of the hood from below; unplug the multi-pin plug at the hood's foot; lift the hood up. The body is then open from above: the monitor, the cradle and the top of the bay can be reached from above.
 - On: the hood down onto its four cones; the plug; the four screws from below; the rear door.
 
 The sheet: `cad/out/pieces/joints-2/hood-screws.png` (`candybar.shell.joint_sheets`, `tools/draw_joint_sheets.py`): the right side cut open just inside its wall with the door off and a key in each screw, and a section through the front screw. Every face edge is drawn.

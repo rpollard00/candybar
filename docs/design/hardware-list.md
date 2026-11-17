@@ -2,6 +2,8 @@
 
 Date: 2026-11-14. Each source was read on this date unless the text gives a different date.
 
+For the desk list of what to buy, measure, try and print first, use [to-buy-and-measure.md](to-buy-and-measure.md).
+
 This is the list of all that is bought and not printed. Part 1 is the list, one table for each
 subsystem, with the same columns in each table. Part 2 is the research for the items that the design
 does not fix yet, as options with a recommendation. The owner decides looks, hardware and money.
