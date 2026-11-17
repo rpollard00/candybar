@@ -23,7 +23,7 @@ cad/build.sh    # build the model (3 minutes)
 cad/check.sh    # run the checks of the design on the build (about 1 hour)
 cad/compare.sh  # compare the build with the accepted outer form, the commit in cad/BASELINE (0.000001)
 cad/test.sh     # the quick tests of the code (about 1 minute)
-cad/test.sh --slow   # the slow tests: they read the builds and the skin (SLOW_TIME)
+cad/test.sh --slow   # the slow tests: they read the builds and the skin (61 minutes on the server; WholeSetTest is 37 of them)
 ```
 
 ### What runs when

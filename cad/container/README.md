@@ -44,6 +44,8 @@ The arch build (generic x86-64) and the FreeCAD 1.1.4 AppImage (OpenCascade 7.8.
 
 One kernel gives nearly the same geometry from run to run, but not always the same file. Two builds of 36bc344 in the container: 34 of 35 BREP files are the same byte for byte. In the hood, the volume differs by 0.018 mm3 (2.5e-9 of the volume), the area by 0.0002 mm2 and the box by 2.3e-8 mm. The first pass of `tools/compare_parts.py` has a tolerance of 1e-7 of the volume and the area, and 1e-4 mm on the box.
 
+The cut of the split is not the same from run to run in the container. `test_split.SplitTest.test_each_hand_hold_is_whole_in_one_piece` cut the same skin six times: it passed two times and failed four times, with the left upper rear piece 0.88 mm to 116 mm past the centre line. The split's own measurement of the same commit was symmetric.
+
 ## Pins and disk
 
 The base image is pinned by its digest, the Arch packages by the date of the snapshot of the Arch Linux Archive (2026-11-16), and the CachyOS packages by their checksums. The build stops when the version of `freecad` or `opencascade` is not the pinned one. The image takes 4.7 GB. `run.sh` builds it when it is not there (about 4 minutes), with a tag that contains the build of OpenCascade and a hash of the Dockerfile.
