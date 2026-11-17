@@ -23,7 +23,7 @@ cad/build.sh    # build the model (3 minutes)
 cad/check.sh    # run the checks of the design on the build (about 1 hour)
 cad/compare.sh  # compare the build with the accepted outer form, the commit in cad/BASELINE (0.000001)
 cad/test.sh     # the quick tests of the code (about 1 minute)
-cad/test.sh --slow   # the slow tests: they read the builds and the skin (61 minutes on the server; WholeSetTest is 37 of them)
+cad/test.sh --slow   # the slow tests: they read the builds and the skin
 ```
 
 ### What runs when
@@ -38,21 +38,20 @@ Before a push, run `cad/test.sh --slow`. It needs the builds of the unit in `cad
 
 Do not write a test that asserts on a real output what the build of that output already checks and fails on. Put the check in the build.
 
-The quick group (272 tests) tests logic and small shapes. It builds no shell and reads no cache, and it runs in one process in 101 s on the server (Zen 2, 2.4 GHz). The slow group (32 tests, marked with `tests.support.slow`) protects what no build checks yet:
+The quick group (272 tests) tests logic and small shapes. It builds no shell and reads no cache, and it runs in one process in 101 s on the server (Zen 2, 2.4 GHz). The slow group (19 tests, marked with `tests.support.slow`) protects what no build checks yet:
 
 | Tests | What they protect |
 | --- | --- |
 | `test_blueprint_solids.PlanarRearTest` (5) | The flat faces of decision record 0007, which a check at 0.5 mm cannot tell from a slight curve; the hand-holds print without support; the head and the hood line up across the seam |
 | `test_blueprint_solids.BlueprintSolidsTest` (1) | The check of the solids against the blueprint can still fail |
 | `test_edge_finish.ShellEdgeFinishTest` (3) | The edge break of the hood is the same on both sides, takes no more than its depth, and the cavity is taken from the hood before the break |
-| `test_pieces.WholeSetTest` (13) | The rules of the joints on the whole set, and the 30 pieces. `pieces.check_set` does not check them yet. When it does, these tests go |
 | `test_split.SplitTest` (1) | Each hand-hold stays whole in one piece |
 | `test_panel_frame.ChecksTest` (5) | The checks can still fail on the real skin of the deck; the panel comes out with the button held and not with a hook under the ledge; the options still build |
 | `test_rear` (2) | The door tilts out and lifts off; the rear changes no piece that it does not finish |
 | `test_socket_plate.SeatTest` (1) | The cut of the seat changes the deck at the seat only |
 | `test_hood_band.VariantsTest` (1) | The variants B and C still build and keep the outside of the hood |
 
-The rules of the joints in `WholeSetTest` that go into `pieces.check_set`: the joints add no clash with the hardware; a right piece and its left twin differ only where the hardware differs; every bonded seam has a flange on both pieces or is a known exception; every seam longer than a screw run has screws; no key stands on a face that lies on the printer bed; the floor has nine tiles and each is screwed; each closing piece has the closing gap; joint 7 rings the body top; the hood is bolted with four screws that a key reaches; seam L1 has no screw in the span of the cut-ins; no flange is in a part of the rear; the flanges stop short of the door opening; and the split has 30 pieces.
+The rules of the joints on the whole set (the 30 pieces, the closing gap, the flanges, the screws, the keys, joint 7, the bolted hood, L1, the rear, the door, the floor, the hardware and the twins) are checked by the build of the pieces itself (`pieces.set_rules`, `check.json` "rules"); they have no test. `CANDYBAR_PIECES=rules` checks them again on the files of a build in seconds.
 
 `tests.support.shell()` and `tests.support.cavity()` keep the default shell and its cavity on disk in `cad/out/test-cache`, under a key of the values of `Blueprint()`, the source of the modules that build them, and the versions of FreeCAD and OpenCascade. `CANDYBAR_TEST_CACHE=off` makes them in the process. After the results, `cad/test.sh` prints the twenty slowest tests, each with the time of the set-up of its class.
 

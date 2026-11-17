@@ -5,14 +5,10 @@ four corners), a shell whose upper part leaves the seam at 45 degrees (a seam in
 upright seam in its lower half (three pieces meet). The pieces of each are made with the real cut of
 candybar.shell.split and the real generator.
 
-The whole set (WholeSetTest, the slow group) is made once, from the skin in the cache; it takes about 25 minutes, and
-CANDYBAR_PIECES_SKIP_SET=1 leaves it out. It needs the outer solids of the default build on disk (cad/out/shell-rev7)
-and the skin in the cache. Its tests are rules of the joints that pieces.check_set does not check yet: when the build
-checks them, they go."""
+The rules of the joints on the whole set are checked by the build itself (pieces.set_rules, check.json "rules"),
+since 2026-11-17; they have no test here."""
 from __future__ import annotations
 
-import math
-import os
 import unittest
 
 import FreeCAD as App
@@ -22,7 +18,6 @@ from candybar.shell import pieces, split
 from candybar.shell.dims import Blueprint
 from candybar.shell.joints import JOINT
 
-from . import support
 
 V = App.Vector
 WALL = JOINT.wall_t
@@ -338,168 +333,3 @@ class FloorDataTest(unittest.TestCase):
             w = min(x1, half) - max(x0, -half) + (lap if "side" in name else 0.0)
             deep = min(y1, d.body_d) - max(y0, 0.0) + (2 * lap if "middle" in name else 0.0)
             self.assertLessEqual(max(w, deep), lim.xy, name)
-
-
-@support.slow
-class WholeSetTest(unittest.TestCase):
-    """Every seam of the layout, the floor and the ribs: about 25 minutes."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        from pathlib import Path
-
-        cls.d = Blueprint()
-        out = Path(os.environ.get("CANDYBAR_PIECES_CACHE") or pieces.CAD / "out" / "pieces")
-        quiet = lambda *_: None
-        cls.pl = pieces.plain(cls.d, out, quiet)
-        cls.items = pieces.hardware()
-        cls.res = pieces.generate(cls.d, cls.pl, None, None, cls.items, quiet)
-        cls.rep = pieces.seam_report(cls.res)
-        # as the build does it: the pieces go through their BREP files, and the checks are on what the files hold
-        folder = support.temp_dir()
-        pieces.write_parts(folder, cls.res.pieces)
-        cls.made = pieces.read_parts(folder)[0]
-        cls.chk = pieces.check_set(cls.d, cls.pl, cls.made, cls.rep, cls.items, quiet)
-
-    def test_there_are_30_pieces(self) -> None:
-        # 2026-11-16: the three stand-ins of the hood band left the split (band A has its own printed parts), and the
-        # marquee window of band A makes the strip under it a piece of its own (hood sill)
-        self.assertEqual(len(self.res.pieces), 30)
-
-    def test_the_joints_add_no_clash_with_the_hardware(self) -> None:
-        # a plain piece may already be in a keep-out zone (the fit study reports those); the joints must not add to it
-        more = [h for h in self.chk["hardware"] if h["mm3"] - h["of_the_plain_piece_mm3"] > pieces.BUILD.clash_mm3]
-        self.assertEqual(more, [])
-
-    def test_a_right_piece_and_its_left_twin_differ_only_where_the_hardware_differs(self) -> None:
-        twin = lambda n: n[:-2] if n.endswith((" R", " L")) else n
-        cut = {twin(h["piece"]) for h in self.rep["hits"]}
-        # the two pieces of a seam on the centre line: one has the key and the pilot holes, its twin the groove and the pockets
-        centre = {twin(p["head"]) for p in self.rep["pairs"] if twin(p["head"]) == twin(p["pilot"])}
-        # the hood centre prints on one of its two cut faces: the key is on the hood side there, and on the hood centre at the other end
-        moved = {twin(n) for p in self.rep["pairs"] if p["key"] and p["key"] != p["pilot"] for n in (p["head"], p["pilot"])}
-        # the door halves are the designed halves of candybar.shell.rear: the fan vent is in R and the hot-air vent in L,
-        # and this generator adds nothing to them (seams DR and R4 are skipped)
-        designed = {"door half"}
-        self.assertFalse(any(n.startswith("door half") for n in self.res.added))
-        odd = [t for t in self.chk["twins_that_differ"] if t["piece"] not in cut | centre | moved | designed and not t["piece"].startswith("floor")]
-        self.assertEqual(odd, [])
-
-    def test_every_bonded_seam_has_a_flange_on_both_pieces_or_is_a_known_exception(self) -> None:
-        none = sorted({(s["seam"].split()[0], s["piece"].rsplit(" ", 1)[0] if s["piece"][-1] in "RL" else s["piece"])
-                       for s in self.rep["sides"] if s["flange_cm3"] == 0.0})
-        self.assertEqual(none, sorted(pieces.NO_FLANGE))
-
-    def test_every_seam_longer_than_a_screw_run_has_screws(self) -> None:
-        bare = sorted({p["seam"].split()[0] for p in self.rep["pairs"] if p["run_mm"] >= 2 * pieces.BUILD.run_screw and not p["screws"]})
-        # a seam of this list has a flange and a key on both pieces; clamps hold it while the bond sets
-        self.assertEqual(bare, sorted(pieces.NO_SCREW))
-
-    def test_no_key_stands_on_a_face_that_lies_on_the_printer_bed(self) -> None:
-        where = {(sd["seam"], sd["k"], sd["piece"]): sd["in_print"] for sd in self.rep["sides"]}
-        bad = [(p["seam"], p["key"]) for p in self.rep["pairs"] if p["key"] and where[(p["seam"], p["k"], p["key"])] == "on the bed"]
-        self.assertEqual(bad, [])
-        self.assertGreater(len([p for p in self.rep["pairs"] if p["key"]]), 20)
-
-    def test_the_floor_has_nine_tiles_and_every_tile_is_screwed(self) -> None:
-        fl = self.rep["floor"]
-        tiles = [n for n in self.res.pieces if n.startswith("floor")]
-        self.assertEqual(len(tiles), 9)
-        used = {s["upper"] for s in fl["lap_screws"]} | {s["lower"] for s in fl["lap_screws"]} | {s["tile"] for s in fl["foot_screws"]}
-        self.assertEqual(sorted(used), sorted(tiles))
-        self.assertEqual(fl["hardware_in_floor"], [])
-
-    def test_each_closing_piece_has_the_closing_gap_at_its_upright_closing_seams(self) -> None:
-        """The brow and the upper rear R go in last, each into two upright seams at once (docs/blueprint/index.md,
-        "Where each ring closes"): their seam faces stand the closing gap back from the seam plane, flange faces
-        included. No material of the piece is nearer to the plane than that."""
-        from candybar.shell.joints import OTHER_JOINTS
-
-        gap = OTHER_JOINTS.closing_gap
-        done = {c["piece"]: c for c in self.rep["closing"]}
-        self.assertEqual(set(done), {"brow", "upper rear R"})
-        self.assertEqual(done["brow"]["seams"], ["W1"])
-        self.assertEqual(done["upper rear R"]["seams"], ["R3", "R5"])
-        for side in self.res.sides:
-            label = side.cf.seam.split()[0]
-            if not pieces.closing(side.cf.piece, label)[1]:
-                continue
-            with self.subTest(piece=side.cf.piece, seam=side.cf.seam):
-                self.assertGreater(done[side.cf.piece]["removed_mm3"], 0.0)
-                near = pieces.closing_slab(side.cf, gap - 0.02)
-                self.assertLess(self.res.pieces[side.cf.piece].common(near).Volume, 0.05)
-
-    def test_joint_7_rings_the_body_top_and_the_hood_lies_on_it(self) -> None:
-        """The top ring on every piece of the body top and the foot on every hood piece (docs/blueprint/index.md,
-        joint 7); four cones on the ring, each in a socket of the foot; the seam gap of the form stays open outside
-        the wall: nothing of the ring or the foot is in the outer part of the gap."""
-        made = {r["piece"] for r in self.rep["ring"] if r["cm3"] > 10.0}
-        self.assertEqual(made, set(pieces.RING_PIECES) | set(pieces.FOOT_PIECES))
-        cones = self.rep["ring_cones"]
-        self.assertEqual(len(cones), 4)
-        self.assertTrue(all(c["foot"] in pieces.FOOT_PIECES for c in cones), cones)
-        # the gap between the body top and the foot of the hood: at points 1 and 3 inside the outer line of the body
-        # top, in the middle of the gap, no piece has material
-        body = self.pl.outer["body"]
-        wire = max(body.slice(V(0, 0, 1), self.d.body_top - 0.01), key=lambda w: w.Length)
-        z = self.d.body_top + self.d.seam_gap / 2
-        points = []
-        for e in wire.Edges:
-            for t in (0.25, 0.5, 0.75):
-                u = e.FirstParameter + (e.LastParameter - e.FirstParameter) * t
-                p, tan = e.valueAt(u), e.tangentAt(u)
-                n = V(-tan.y, tan.x, 0.0)
-                if not body.isInside(V(p.x, p.y, self.d.body_top - 1.0) + n * 1.0, 1e-4, True):
-                    n = n * -1.0
-                points += [V(p.x, p.y, z) + n * k for k in (1.0, 3.0)]
-        self.assertGreater(len(points), 40)
-        for name in pieces.RING_PIECES + pieces.FOOT_PIECES:
-            with self.subTest(piece=name):
-                shape = self.made[name]
-                inside = [q for q in points if shape.BoundBox.isInside(q) and shape.isInside(q, 1e-4, True)]
-                self.assertEqual(inside, [])
-
-    def test_the_hood_is_bolted_with_four_screws_that_a_key_reaches_from_below(self) -> None:
-        """The bolted hood (2026-11-16): four screws, each with a boss in a piece of the ring and a boss with the hole
-        of the insert in a piece of the foot, a mirror pair on each side; a hex key goes straight up to each head
-        through HOOD_KEY of free room."""
-        from candybar.shell.joints import OTHER_JOINTS as oj
-
-        rows = self.rep["hood_screws"]
-        self.assertEqual(len(rows), 4)
-        for r in rows:
-            with self.subTest(at=r["at"]):
-                self.assertIn(r["ring"], pieces.RING_PIECES)
-                self.assertIn(r["foot"], pieces.FOOT_PIECES)
-                self.assertGreater(r["ring_boss_cm3"], 1.0)
-                self.assertGreater(r["foot_boss_cm3"], 1.0)
-                x, y, _ = r["at"]
-                holes = support.hole_centres(self.made[r["foot"]], oj.insert_hole_d)
-                self.assertTrue(any(math.dist(h, (x, y)) < 0.05 for h in holes), holes)
-        xs = sorted(round(r["at"][0], 3) for r in rows)
-        self.assertEqual(xs[:2], [-xs[3], -xs[2]])
-        self.assertEqual(len(self.chk["hood_reach"]), 4)
-        self.assertTrue(all(r["free"] >= pieces.HOOD_KEY for r in self.chk["hood_reach"]), self.chk["hood_reach"])
-
-    def test_seam_l1_has_no_screw_in_the_span_of_the_cut_ins(self) -> None:
-        # a head pocket there would cut into the step of the skin behind the lowest cut-in
-        l1 = [sc["at"] for p in self.rep["pairs"] if p["seam"].split()[0] == "L1" for sc in p["screws"]]
-        self.assertGreater(len(l1), 0)
-        inside = [at for at in l1 if pieces.in_cut_in_span(V(*at), self.d)]
-        self.assertEqual(inside, [])
-
-    def test_no_flange_is_in_a_part_of_the_rear(self) -> None:
-        rear = {n for n, role, _ in self.items if role == "rear"}
-        self.assertIn("head_rail_r", rear)
-        more = [h for h in self.chk["hardware"] if h["item"] in rear and h["mm3"] - h["of_the_plain_piece_mm3"] > pieces.BUILD.clash_mm3]
-        self.assertEqual(more, [])
-
-    def test_the_flanges_stop_short_of_the_door_opening(self) -> None:
-        d, b = self.d, pieces.BUILD
-        x = d.door_w / 2 + b.door_stop - 0.5
-        zone = Part.makeBox(2 * x, 30.0, d.door_z1 - d.door_z0 + 2 * b.door_stop - 1.0, V(-x, d.body_d - d.wall_t - 28.0, d.door_z0 - b.door_stop + 0.5))
-        for sd in self.res.sides + self.res.ribs:
-            if sd.solid is not None and sd.solid.BoundBox.intersect(zone.BoundBox):
-                self.assertLess(sd.solid.common(zone).Volume, 1.0, f"{sd.cf.seam} {sd.cf.piece}")
-
-
