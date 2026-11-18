@@ -142,8 +142,7 @@ def blueprint_profile(d: Blueprint) -> dict:
     rail = np.array([fr.rail.at(fr.rail.a0 + (fr.rail.a1 - fr.rail.a0) * k / 60) for k in range(61)])
     sweep = np.array([fr.sweep.at(fr.sweep.a0 + (fr.sweep.a1 - fr.sweep.a0) * k / 20) for k in range(21)])
     side = np.array([(oy + y, oz + z) for y, z in h.side])
-    t = math.tan(math.radians(d.step_lean))
-    step = np.array([(d.step_y0 + d.width / 2 - d.rear_w / 2 + z * t, z) for z in np.linspace(0.0, d.body_top, 30)])
+    step = np.array(pr.band_crease(d)[:4])  # the inner crease of the band: its stub, its kick and its lean, up to the level run
     crease = np.array([(y + ny * d.deck_lean_h, z + nz * d.deck_lean_h) for y, z, (ny, nz) in fr.chain()[:49]])
     rear = np.array(pr.rear_profile(d)[1:5])
     outline = np.vstack([[(0.0, 0.0), (0.0, d.deck_top)], sweep, rail, [(d.seam_y + d.hood_shoulder_front, d.body_top)], side, rear, [(0.0, 0.0)]])

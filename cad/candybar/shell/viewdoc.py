@@ -1,6 +1,6 @@
 """Write a FreeCAD document of the built solids, with their colours, for a person to open.
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh --gui candybar.shell.viewdoc
 
 Reads manifest.json and the BREP files that candybar.shell.solids wrote into the output directory, and writes
 shell.FCStd beside them. It needs the GUI binary: a document saved headless opens with every solid hidden.
@@ -26,9 +26,13 @@ def colour(finish: str) -> tuple[float, float, float]:
 
 
 def main() -> int:
+    # This switches off backup files and thumbnails in FreeCAD's user settings, so it refuses to run outside the
+    # throwaway user directory that freecad-run.sh provides.
+    throwaway = os.environ.get("CANDYBAR_THROWAWAY_HOME")
+    if not throwaway or Path(App.getUserAppDataDir()).resolve() != Path(throwaway).resolve():
+        raise RuntimeError("viewdoc changes FreeCAD's user settings: run it with freecad-run.sh, in a throwaway user directory")
     if not App.GuiUp:
-        print("view settings need FreeCAD's GUI binary: run this with freecad-run.sh --gui")
-        return 1
+        raise RuntimeError("view settings need FreeCAD's GUI binary: run this step with freecad-run.sh --gui")
     out = Path(os.environ["CANDYBAR_OUT"])
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     settings = App.ParamGet("User parameter:BaseApp/Preferences/Document")

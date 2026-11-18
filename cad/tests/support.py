@@ -1,24 +1,34 @@
 from __future__ import annotations
 
-import contextlib
 import csv
 import functools
 import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
-from typing import Iterator
 
-import FreeCAD as App
 import Part
 
-from candybar import build, check, model, params
+from candybar.shell import cavity as shell_cavity
+from candybar.shell import params
+from candybar.shell import solids as shell_solids
+from candybar.shell.dims import Blueprint
 
 CAD = Path(__file__).resolve().parents[1]
 PARAMS = CAD / "params"
-BUILD = CAD / "build.sh"
 FREECAD_RUN = CAD / "candybar" / "freecad-run.sh"
+
+
+def slow(item):
+    """Mark a test class or a test as one of the slow group: it needs a build of the shell, the skin or a study, and
+    it protects something that no build checks. cad/test.sh runs the quick group; cad/test.sh --slow runs these."""
+    item._candybar_slow = True
+    return item
+
+
+def is_slow(test) -> bool:
+    method = getattr(test, getattr(test, "_testMethodName", ""), None)
+    return bool(getattr(method, "_candybar_slow", False) or getattr(type(test), "_candybar_slow", False))
 
 
 _temp_dirs: list[Path] = []
@@ -36,35 +46,106 @@ def remove_temp_dirs() -> None:
         shutil.rmtree(_temp_dirs.pop(), ignore_errors=True)
 
 
+# ---------- the cache of the shell and the cavity on disk ----------
+# support.shell() and support.cavity() take minutes, and each test process made them again. They are kept on disk,
+# as the skin of the split is: binary BREP (which keeps every number as it is), under a key of everything that makes
+# them: the values of Blueprint(), the source of the modules that build them, and the versions of FreeCAD and
+# OpenCascade. CANDYBAR_TEST_CACHE sets the folder (default cad/out/test-cache); CANDYBAR_TEST_CACHE=off makes them
+# in the process, as before. A file is written to a temporary name and then renamed, so that processes that run at the
+# same time never read half a file.
+SHELL_SOURCES = ("dims.py", "profiles.py", "solids.py")
+CAVITY_SOURCES = (*SHELL_SOURCES, "cavity.py")
+
+
+def cache_key(sources: tuple[str, ...]) -> str:
+    import hashlib
+
+    import FreeCAD
+
+    h = hashlib.sha256(repr(Blueprint()).encode())
+    h.update(repr(FreeCAD.Version()).encode())
+    h.update(Part.OCC_VERSION.encode() if hasattr(Part, "OCC_VERSION") else b"")
+    for name in sources:
+        h.update((CAD / "candybar" / "shell" / name).read_bytes())
+    return h.hexdigest()[:16]
+
+
+def cache_dir() -> Path | None:
+    where = os.environ.get("CANDYBAR_TEST_CACHE", "")
+    return None if where == "off" else Path(where or CAD / "out" / "test-cache")
+
+
+def write_atomic(path: Path, write) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    write(temp)
+    os.replace(temp, path)
+
+
+def read_shapes(path: Path) -> list[Part.Shape]:
+    compound = Part.Shape()
+    compound.importBinary(str(path))
+    return list(compound.childShapes())
+
+
+def write_shapes(path: Path, shapes: list[Part.Shape]) -> None:
+    write_atomic(path, lambda temp: Part.makeCompound(shapes).exportBinary(str(temp)))
+
+
 @functools.cache
-def baseline() -> tuple[Path, check.Report]:
-    out = temp_dir()
-    return out, build.run(PARAMS, out, renders=False)
+def shell() -> tuple[Blueprint, dict[str, Part.Shape], tuple[str, ...]]:
+    """The default build of the shell (candybar.shell.solids), made once for all the tests that read it: the
+    dimensions, the parts by name, and the lines of the build's log. Kept on disk (see cache_key)."""
+    import json
 
-
-def shell_build(
-    params_dir: Path, extra_env: dict[str, str] | None = None, out: Path | None = None, renders: bool = False
-) -> tuple[subprocess.CompletedProcess[str], Path]:
-    """Run build.sh into `out` or a fresh directory: (finished process, output directory)."""
-    out = out or temp_dir()
-    env = os.environ | {"CANDYBAR_PARAMS": str(params_dir), "CANDYBAR_OUT": str(out)} | (extra_env or {})
-    command = [str(BUILD)] if renders else [str(BUILD), "--no-render"]
-    return subprocess.run(command, env=env, capture_output=True, text=True), out
+    d = Blueprint()
+    folder = cache_dir()
+    if folder is not None:
+        key = cache_key(SHELL_SOURCES)
+        shapes, meta = folder / f"shell-{key}.bin", folder / f"shell-{key}.json"
+        if shapes.exists() and meta.exists():
+            data = json.loads(meta.read_text(encoding="utf-8"))
+            return d, dict(zip(data["names"], read_shapes(shapes))), tuple(data["log"])
+    log: list[str] = []
+    parts = shell_solids.build(d, log)
+    if folder is not None:
+        write_shapes(shapes, list(parts.values()))
+        write_atomic(meta, lambda temp: temp.write_text(json.dumps({"names": list(parts), "log": log}), encoding="utf-8"))
+    return d, parts, tuple(log)
 
 
 @functools.cache
-def shell_baseline() -> tuple[subprocess.CompletedProcess[str], Path]:
-    return shell_build(PARAMS)
+def cavity() -> shell_cavity.Cavity:
+    """The cavity of the default build (candybar.shell.cavity), made once for all the tests that read it. It takes
+    some minutes to make. Kept on disk (see cache_key): its pieces, its walls, and its slabs as numbers and shapes."""
+    import json
 
+    folder = cache_dir()
+    if folder is not None:
+        key = cache_key(CAVITY_SOURCES)
+        shapes, meta = folder / f"cavity-{key}.bin", folder / f"cavity-{key}.json"
+        if shapes.exists() and meta.exists():
+            data = json.loads(meta.read_text(encoding="utf-8"))
+            found = read_shapes(shapes)
+            take = lambda i: None if i is None else found[i]
+            return shell_cavity.Cavity([found[i] for i in data["pieces"]], [found[i] for i in data["walls"]],
+                                       [(x0, x1, take(a), take(b)) for x0, x1, a, b in data["slabs"]])
+    d, parts, _ = shell()
+    cav = shell_cavity.build(parts, d)
+    if folder is not None:
+        found: list[Part.Shape] = []
 
-@contextlib.contextmanager
-def saved_document() -> Iterator[App.Document]:
-    out, _ = baseline()
-    doc = App.openDocument(str(out / f"{build.DOCUMENT}.FCStd"))
-    try:
-        yield doc
-    finally:
-        App.closeDocument(doc.Name)
+        def put(shape):
+            if shape is None:
+                return None
+            found.append(shape)
+            return len(found) - 1
+
+        data = {"pieces": [put(s) for s in cav.pieces], "walls": [put(s) for s in cav.walls],
+                "slabs": [(x0, x1, put(a), put(b)) for x0, x1, a, b in cav.slabs]}
+        write_shapes(shapes, found)
+        write_atomic(meta, lambda temp: temp.write_text(json.dumps(data), encoding="utf-8"))
+    return cav
 
 
 def params_copy(overrides: dict[str, str]) -> Path:
@@ -84,17 +165,8 @@ def params_copy(overrides: dict[str, str]) -> Path:
     return folder
 
 
-def edit(doc: App.Document, **values: float) -> None:
-    for name, number in values.items():
-        params.edit(doc, name, number)
-    doc.recompute()
-
-
-def solids(doc: App.Document) -> dict[str, model.Placed]:
-    return {solid.name: solid for solid in model.placed(doc)}
-
-
 def hole_centres(shape: Part.Shape, diameter: float) -> list[tuple[float, float]]:
+    """The (x, y) centres of the cylinder faces of the given diameter in a shape: its upright round holes."""
     return sorted(
         {
             (round(face.Surface.Center.x, 6), round(face.Surface.Center.y, 6))
@@ -102,23 +174,3 @@ def hole_centres(shape: Part.Shape, diameter: float) -> list[tuple[float, float]
             if isinstance(face.Surface, Part.Cylinder) and abs(2 * face.Surface.Radius - diameter) < 1e-6
         }
     )
-
-
-def underside_z(shape: Part.Shape) -> float:
-    looking_down = [face for face in shape.Faces if isinstance(face.Surface, Part.Plane) and face.normalAt(0, 0).z < -0.99]
-    return max(looking_down, key=lambda face: face.Area).CenterOfMass.z
-
-
-def width_at(shape: Part.Shape, z: float) -> float:
-    """The extent along x of a horizontal section through the shape."""
-    return Part.makeCompound(shape.slice(App.Vector(0, 0, 1), z)).BoundBox.XLength
-
-
-def width_across(shape: Part.Shape, y: float, z: float) -> float:
-    """The extent along x of the shape on one line across the cabinet, at depth `y` and height `z`."""
-    across = Part.makeLine(App.Vector(-2000, y, z), App.Vector(2000, y, z))
-    return shape.common(across).BoundBox.XLength
-
-
-def fail_rows(report: check.Report, *rules: str) -> set[tuple[str, str]]:
-    return {(row.rule, row.subject) for row in report.rows if row.level == check.FAIL and (not rules or row.rule in rules)}

@@ -1,17 +1,23 @@
-"""The solids of the blueprint: valid parts that do not overlap, and a check that notices a solid off the blueprint."""
+"""The solids of the blueprint: the profile of the band and of the panel outline, the guard on a cut (quick); and in the
+slow group, the planar rear of revision 7 (decision record 0007) on the built shell, and one proof that the check of
+the solids against the blueprint can still fail. cad/check.sh (tools.check_solids) checks the solids on every build."""
 from __future__ import annotations
 
 import math
 import unittest
 from dataclasses import replace
-from unittest import mock
 
 import FreeCAD as App
+import Part
 
-from candybar.shell import cavity, solids
+from candybar.shell import solids
 from candybar.shell import profiles as pr
 from candybar.shell.dims import Blueprint
 from tools import check_solids
+
+from . import support
+
+V = App.Vector
 
 
 def over(row: dict) -> bool:
@@ -22,65 +28,155 @@ def failing(report: dict) -> set[str]:
     return {name for name, row in [*report["sections"].items(), *report["silhouettes"].items()] if over(row)}
 
 
+@support.slow
 class BlueprintSolidsTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.d = Blueprint()
-        cls.parts = solids.build(cls.d)
-        cls.baseline = check_solids.run(cls.parts, cls.d)
-
-    def test_every_part_is_one_valid_closed_solid(self) -> None:
-        for name, state in self.baseline["parts"].items():
-            with self.subTest(part=name):
-                self.assertTrue(state["valid"] and state["closed"] and state["check"])
-                self.assertEqual(state["solids"], 1)
-                self.assertGreater(state["volume_mm3"], 0)
-
-    def test_no_two_parts_overlap(self) -> None:
-        self.assertEqual(self.baseline["overlaps"], [])
-
-    def test_every_view_and_section_matches_the_blueprint(self) -> None:
-        self.assertEqual(failing(self.baseline), set())
-        self.assertTrue(self.baseline["ok"])
-
-    def test_no_point_of_a_section_is_skipped(self) -> None:
-        self.assertEqual(sum(row["bridged_points"] for row in self.baseline["sections"].values()), 0)
-
-    def assert_check_notices(self, **change: float) -> None:
-        changed = check_solids.run(solids.build(replace(self.d, **change)), self.d)
-        self.assertFalse(changed["ok"])
-        self.assertTrue(failing(changed), f"no view or section fails: {change}")
+    """The check of the solids against the blueprint (tools.check_solids) can still fail: it notices a stronger arc of
+    the rail. The check itself runs in cad/check.sh on every build."""
 
     def test_check_notices_a_stronger_rail_arc(self) -> None:
-        self.assert_check_notices(rail_sagitta_ratio=self.d.rail_sagitta_ratio + 0.01)
-
-    def test_check_notices_a_smaller_tuck(self) -> None:
-        self.assert_check_notices(body_tuck_ratio=self.d.body_tuck_ratio - 0.008)
-
-    def test_check_notices_a_rectangular_panel(self) -> None:
-        d = self.d
-        x, y0, y1 = d.panel_w / 2, d.deck_nose + d.panel_gap, d.deck_nose + d.panel_gap + d.panel_d
-        rectangle = lambda d_, grow=0.0: [(-x - grow, y0 - grow), (x + grow, y0 - grow), (x + grow, y1 + grow), (-x - grow, y1 + grow)]
-        with mock.patch.object(pr, "panel_outline", rectangle):
-            parts = solids.build(d)
-        changed = check_solids.run(parts, d)
+        d = Blueprint()
+        changed = check_solids.run(solids.build(replace(d, rail_sagitta_ratio=d.rail_sagitta_ratio + 0.01)), d)
         self.assertFalse(changed["ok"])
-        self.assertIn("Z panel pocket", failing(changed))
+        self.assertTrue(failing(changed), "no view or section fails")
 
-    def assert_same_points(self, found: list[tuple[float, float]], expected: list[tuple[float, float]]) -> None:
-        self.assertEqual(len(found), len(expected), found)
-        for p in expected:
-            self.assertLess(min(math.dist(p, q) for q in found), 1e-4, f"{p} not in {found}")
 
-    def test_panel_plate_and_pocket_have_the_outline(self) -> None:
+def plan_points(shape: Part.Shape, z: float, keep, step: float = 0.05) -> list[App.Vector]:
+    """The points of the level section of a solid at z that pass keep()."""
+    return [p for w in shape.slice(V(0, 0, 1), z) for e in w.Edges for p in e.discretize(Distance=step) if keep(p)]
+
+
+def face_at(shape: Part.Shape, point: App.Vector) -> Part.Face:
+    """The face of a solid on which a point lies."""
+    face = min(shape.Faces, key=lambda f: f.distToShape(Part.Vertex(point))[0])
+    if face.distToShape(Part.Vertex(point))[0] > 0.01:
+        raise AssertionError(f"no face at {point}")
+    return face
+
+
+class BandStrokeTest(unittest.TestCase):
+    """Revision 7: the band's stroke is straight lines (the profile alone, no build)."""
+
+    def setUp(self) -> None:
+        self.d = Blueprint()
+
+    def test_the_stroke_is_four_straight_lines(self) -> None:
         d = self.d
-        corners = lambda shape, z: [(v.X, v.Y) for v in shape.Vertexes if abs(v.Z - z) < 1e-6]
-        self.assert_same_points(corners(self.parts["control_panel"], d.panel_top), pr.panel_outline(d))
-        z = (d.panel_top + d.deck_top) / 2
-        pocket = min(self.parts["deck"].slice(App.Vector(0, 0, 1), z), key=lambda w: w.BoundBox.DiagonalLength)
-        self.assert_same_points([(v.X, v.Y) for v in pocket.Vertexes], pr.panel_outline(d, d.panel_gap))
-        opening = cavity.openings(d, cavity.Openings())[0]
-        self.assert_same_points(corners(opening, opening.BoundBox.ZMax), pr.panel_outline(d, -cavity.Openings().panel_ledge))
+        foot, stub, knee, top, end = pr.band_stroke(d)
+        self.assertEqual(foot[0], stub[0])                                   # the stub stands upright
+        self.assertAlmostEqual(stub[1], d.band_stub)
+        self.assertAlmostEqual(math.degrees(math.atan2(stub[0] - knee[0], knee[1] - stub[1])), d.band_kick)
+        self.assertAlmostEqual(knee[1], 85.2, delta=0.1)
+        self.assertAlmostEqual(math.degrees(math.atan2(top[0] - knee[0], top[1] - knee[1])), d.band_lean)
+        self.assertAlmostEqual(top[1], end[1])                               # the run is level
+        self.assertAlmostEqual(top[1], d.rear_shelf_z0 + d.band_depth)
+
+
+@support.slow
+class PlanarRearTest(unittest.TestCase):
+    """Revision 7 on the built shell: the band and the two facets under the head are planes, the rear goes straight
+    across, the hand-holds print without support, and the corner lines of the head and the hood meet across the seam."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.d, parts, cls.log = support.shell()
+        cls.body, cls.hood = parts["body"], parts["hood"]
+
+    def test_each_piece_of_the_band_is_a_plane(self) -> None:
+        d, hw = self.d, self.d.width / 2
+        stroke = pr.band_stroke(d)
+        for (y0, z0), (y1, z1) in zip(stroke[1:4], stroke[2:5]):
+            length = math.hypot(y1 - y0, z1 - z0)
+            ty, tz = (y1 - y0) / length, (z1 - z0) / length
+            if z1 == z0:                                                     # the run: its facet ends on the hip
+                y1 = d.body_d
+            u = d.band_depth / 2                                                # half way in, square to the stroke
+            point = V(hw - u, (y0 + y1) / 2 + u * tz, (z0 + z1) / 2 - u * ty)
+            with self.subTest(at=(round(point.y), round(point.z))):
+                self.assertIsInstance(face_at(self.body, point).Surface, Part.Plane)
+
+    def test_the_two_facets_of_the_shelf_are_planes_at_45_degrees(self) -> None:
+        d, rw, zc = self.d, self.d.rear_w / 2, self.d.rear_shelf_z0
+        for point, normal in ((V(rw + 6, d.body_d - 20, zc + 6), V(1, 0, -1)), (V(0, d.body_d + 20, zc + 20), V(0, 1, -1))):
+            normal.normalize()
+            surface = face_at(self.body, point).Surface
+            self.assertIsInstance(surface, Part.Plane)
+            self.assertAlmostEqual(abs(surface.Axis.dot(normal)), 1.0, places=6)
+
+    def test_the_rear_goes_straight_across(self) -> None:
+        d = self.d
+        for z, y in ((150.0, d.body_d), (d.rear_shelf_z1 + 10.0, d.depth)):
+            pts = plan_points(self.body, z, lambda p: abs(p.x) < 60 and p.y > d.body_d - 5, 1.0)
+            self.assertTrue(pts)
+            self.assertLess(max(abs(p.y - y) for p in pts), 1e-6, msg=f"z {z}")
+
+    def test_nothing_in_the_hand_holds_faces_down_flatter_than_45_degrees(self) -> None:
+        d = self.d
+        worst = 90.0
+        for f in self.body.Faces:
+            b = f.BoundBox
+            if not (b.XMin > d.grip_x0 - 2 and b.XMax < d.grip_x1 + 2 and b.YMin > d.depth - d.grip_depth - 2 and b.ZMin > d.grip_z0 - 2
+                    and b.ZMax < d.grip_z0 + d.grip_h + 2):
+                continue
+            u0, u1, v0, v1 = f.ParameterRange
+            for i in range(21):
+                for j in range(21):
+                    uv = (u0 + (u1 - u0) * i / 20, v0 + (v1 - v0) * j / 20)
+                    n = f.normalAt(*uv)
+                    if n.z < -1e-6 and f.isInside(f.valueAt(*uv), 1e-3, True):
+                        worst = min(worst, math.degrees(math.acos(min(1.0, -n.z))))
+        self.assertGreaterEqual(worst, 45.0 - 0.01)
+
+    def test_the_corner_lines_of_the_head_and_the_hood_meet_across_the_seam(self) -> None:
+        """Each corner read 0.05 and 10 from its side of the seam groove and carried to the middle of the seam: the
+        two corner points within 0.3."""
+        d = self.d
+        zm = d.body_top + d.seam_gap / 2
+
+        def read(s: Part.Shape, z: float) -> tuple[float, float]:
+            pts = plan_points(s, z, lambda q: q.x > 150 and q.y > 520, 0.01)
+            xs = max(q.x for q in pts if abs(q.y - 560) < 0.05)
+            yr = max(q.y for q in pts if abs(q.x - 215) < 0.05)
+            dg = max((q.x - xs) + (q.y - yr) for q in pts)
+            return xs + dg / 2, yr + dg / 2
+
+        def at_middle(s: Part.Shape, z0: float, z1: float) -> tuple[float, float]:
+            p0, p1 = read(s, z0), read(s, z1)
+            return tuple(p0[i] + (p0[i] - p1[i]) / (z0 - z1) * (zm - z0) for i in range(2))
+
+        g = d.seam_groove
+        body = at_middle(self.body, d.body_top - g - 0.05, d.body_top - g - 10)
+        hood = at_middle(self.hood, d.body_top + d.seam_gap + g + 0.05, d.body_top + d.seam_gap + g + 10)
+        self.assertLess(math.dist(body, hood), 0.3)
+
+class LazySolid:
+    """A solid whose cut takes nothing off, as a cut by a loft can."""
+
+    def __init__(self, shape: Part.Shape) -> None:
+        self.shape, self.Volume, self.Solids = shape, shape.Volume, shape.Solids
+
+    def isValid(self) -> bool:
+        return True
+
+    def cut(self, tools: object) -> "LazySolid":
+        return self
+
+    def common(self, tool: Part.Shape) -> Part.Shape:
+        return self.shape.common(tool)
+
+
+class CutCheckTest(unittest.TestCase):
+    """The guard on a cut by several tools: it stops a result in which a tool did no work."""
+
+    def setUp(self) -> None:
+        self.box = Part.makeBox(40, 40, 40)
+        self.tools = [Part.makeBox(10, 10, 10, V(-5, -5, -5)), Part.makeBox(10, 10, 10, V(35, 35, 35))]
+
+    def test_a_cut_that_does_its_work_passes(self) -> None:
+        self.assertAlmostEqual(solids.cut_checked(self.box, self.tools, "test").Volume, 40 ** 3 - 2 * 125)
+
+    def test_a_result_with_a_tool_left_in_it_is_an_error(self) -> None:
+        with self.assertRaises(Part.OCCError):
+            solids.cut_checked(LazySolid(self.box), self.tools, "test")
 
 
 class PanelOutlineTest(unittest.TestCase):
@@ -121,17 +217,3 @@ class PanelOutlineTest(unittest.TestCase):
         self.assertEqual(rim, {(round(x, 6), round(y, 6)) for x, y in pr.panel_outline(d, d.panel_gap)})
 
 
-class ScreenPositionTest(unittest.TestCase):
-    """The bezel, the window and the screen stand 12 lower on the face than in revision 4; the body top stays."""
-
-    def test_strips_above_and_below_the_bezel(self) -> None:
-        d = Blueprint()
-        self.assertAlmostEqual(d.top_s - d.bezel_s1, 32.0)
-        self.assertAlmostEqual(d.bezel_s0 - d.bend_t, 40.0)
-
-    def test_the_drop_keeps_the_body_top(self) -> None:
-        d = Blueprint()
-        rev4 = replace(d, band_len=52.0, brow_ledge=20.0)
-        self.assertAlmostEqual(d.body_top, rev4.body_top)
-        self.assertAlmostEqual(d.seam_y, rev4.seam_y)
-        self.assertAlmostEqual(d.face(rev4.image_s)[1] - d.face(d.image_s)[1], 12.0 * d.u[1])

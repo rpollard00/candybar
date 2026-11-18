@@ -3,6 +3,9 @@ cad/out/
 
 # Third-party reference CAD. Fetch with cad/tools/fetch_vendor.sh.
 cad/vendor/
+# The same names as links (an agent's checkout links the shared folders): a pattern with a slash does not match a link.
+cad/vendor
+cad/.venv-tools
 
 __pycache__/
 *.FCBak

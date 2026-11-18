@@ -10,9 +10,23 @@
 # Each run gets a fresh FreeCAD user directory inside the output directory and
 # removes it afterwards, so it neither reads nor rewrites ~/.config/FreeCAD,
 # loads no addon, and leaves no settings behind for the next run.
+#
+# One FreeCAD run at a time on this machine: every run takes one lock and waits for it, so that several agents or
+# shells can work at the same time without two heavy processes in memory. A run that this script starts inside
+# another run (a test that builds) does not take the lock again. cad/tools/cad-lock.sh gives the same lock to a
+# direct freecadcmd or blender command. A guard stops freecadcmd when it takes too much memory or the machine has
+# too little left: the whole session ends when the machine runs out of memory.
 set -u
 
+lock=${CANDYBAR_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/candybar-cad.lock}
+if [ -z "${CANDYBAR_LOCK_HELD:-}" ] && command -v flock >/dev/null 2>&1; then
+  export CANDYBAR_LOCK_HELD=1
+  exec flock "$lock" "$0" "$@"
+fi
+
 gui_limit_seconds=300
+rss_limit_mb=${CANDYBAR_RSS_LIMIT_MB:-9500}
+free_min_mb=${CANDYBAR_FREE_MIN_MB:-3000}
 
 runner=(freecadcmd)
 if [ "${1:-}" = --gui ]; then
@@ -28,8 +42,27 @@ state=$out/.freecad
 mkdir -p "$state"
 log=$state/$module.log
 home=$(mktemp -d "$state/home.XXXXXX") || exit 1
-trap 'rm -rf "$home"' EXIT
 status=$home/status
+
+guard() {
+  while sleep 5; do
+    rss=$(ps -o rss= -C freecadcmd | sort -n | tail -1)
+    rss=$(( ${rss:-0} / 1024 ))
+    avail=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
+    if [ "$rss" -gt "$rss_limit_mb" ] || { [ "$rss" -gt 1000 ] && [ "$avail" -lt "$free_min_mb" ]; }; then
+      echo "Memory guard: freecadcmd uses $rss MB and the machine has $avail MB left. $module was stopped." >&2
+      pkill -x freecadcmd
+      return
+    fi
+  done
+}
+guard_pid=
+if [ -z "${CANDYBAR_GUARD_HELD:-}" ]; then
+  export CANDYBAR_GUARD_HELD=1
+  guard &
+  guard_pid=$!
+fi
+trap 'rm -rf "$home"; [ -n "$guard_pid" ] && kill "$guard_pid" 2>/dev/null' EXIT
 
 CANDYBAR_ROOT=$root CANDYBAR_OUT=$out CANDYBAR_MODULE=$module CANDYBAR_STATUS=$status \
   FREECAD_USER_HOME=$home CANDYBAR_THROWAWAY_HOME=$home \

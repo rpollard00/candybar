@@ -10,13 +10,17 @@ The reference is profiles.faces(Blueprint()): the labelled faces as flat polygon
                direction. The parts of each of GROUPS are fused first, as the faces draw them as one skin; the
                forms on the hood band are cut on their own, as the faces draw the band under them.
 
+The faces draw the form. The edge break (a round of 1 mm, the last modelling step) is not in them: at an edge of 90
+degrees it stands 0.4 off the sharp edge, inside the tolerance, and no plane is put where it would cut a break at a
+small angle.
+
 Where the faces leave out a short wall, a point of a solid's cut does not count when it lies in a gap between two
 loose ends of the faces' cut: inside a disc over a gap of at most BRIDGE, or on the straight line over a gap of at
 most CHORD. The report counts these points. The faces MARKS are drawn 0.5 proud as markings and are not compared.
 
 Run headless (exit status 1 when a tolerance is exceeded):
 
-    CANDYBAR_OUT=cad/out/shell-bp cad/candybar/freecad-run.sh tools.check_solids
+    CANDYBAR_OUT=cad/out/shell-rev7 cad/candybar/freecad-run.sh tools.check_solids
 """
 from __future__ import annotations
 
@@ -42,7 +46,12 @@ PX_PER_MM = 6.0
 STEP = 0.2
 MARKS = {"RB6", "MQ2", "SP2", "LG2"}
 VIEWS = {"front": (0, 2), "right side": (1, 2), "top": (0, 1)}
-GROUPS = (("deck", "control_panel", "front_body", "rear_body", "bezel", "screen"), ("hood", "marquee_lip"))
+GROUPS = (("deck", "control_panel", "body", "bezel", "screen"), ("hood",))
+# the parts of the outer form that the blueprint draws. The parts of the hood band (band A) and the front socket plate
+# are designed parts that the blueprint does not draw (the owner's choices of 2026-11-14 and 2026-11-16): they are
+# not compared, and neither are the faces of the blueprint's stand-ins for them (BAND_FACES)
+FORM = ("deck", "control_panel", "body", "bezel", "screen", "hood")
+BAND_FACES = ("SP1", "SP2", "SP3", "LG1", "LG2", "LG3", "HC13")   # the speaker forms, the logo form and the lip
 
 
 def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
@@ -51,9 +60,10 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
     hw = d.width / 2
     return {"X 0": (0, 0.0),
             "X rail land": (0, (d.bezel_w / 2 + d.panel_gap + hw - d.edge_in) / 2),
-            "X side band": (0, hw - 1.0),
+            "X band": (0, hw - d.band_depth / 2),
             "Z deck": (2, d.deck_top - d.deck_lean_h / 2),
             "Z panel pocket": (2, (d.panel_top + d.deck_top) / 2),
+            "Z cut-in": (2, d.cut_in_z0 + d.cut_in_h / 2),
             "Z mid body": (2, (d.deck_top + d.body_top) / 2),
             "Z tuck": (2, (d.tuck_z0 + d.body_top) / 2),
             "Z seam, body": (2, d.body_top - d.seam_groove / 2),
@@ -63,8 +73,12 @@ def planes(d: Blueprint) -> dict[str, tuple[int, float]]:
             "X hood, off centre": (0, h.half_top / 2),
             "X seam corner": (0, d.side_x(d.body_top) - d.edge_in / 2),
             "X speaker": (0, d.logo_w / 2 + d.logo_gap + 40.0),
-            "Y seam corner": (1, h.origin[1] + d.hood_edge_back / 2),
+            # through the seam at the front corners, where it cuts the leaning front of the hood half way up the sill: a
+            # plane that cuts the front where it meets the opening goes through the edge break of the rim at a small
+            # angle, which the faces do not draw
+            "Y seam corner": (1, h.origin[1] + 0.5 * d.hood_sill_h * math.tan(math.radians(d.hood_front_lean_low))),
             "Y rear corner": (1, d.depth - 4.0 / 3.0 * d.seam_groove),
+            "Y rear shelf": (1, d.body_d + d.rear_proud / 2),
             "Y body top": (1, (d.seam_y + d.depth) / 2)}
 
 
@@ -159,8 +173,8 @@ def bridged(points: np.ndarray, ends: np.ndarray) -> np.ndarray:
 
 def skins(parts: dict[str, Part.Shape]) -> list[Part.Shape]:
     """The parts as the faces draw them: each of GROUPS fused, the others alone. The faces of the fuse are not merged
-    (removeSplitter): merging the halves of a face that the front and rear body share can leave an edge with a
-    tolerance of millimetres, and the cuts are the same without it."""
+    (removeSplitter): merging the halves of a face that two parts share can leave an edge with a tolerance of
+    millimetres, and the cuts are the same without it."""
     out = []
     for group in GROUPS:
         shapes = [parts[k] for k in group if k in parts]
@@ -184,12 +198,61 @@ def solid_cut(shapes: list[Part.Shape], axis: int, at: float) -> np.ndarray:
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
 
 
-def compare(solid: np.ndarray, ref: np.ndarray) -> dict:
-    """Largest distance from the solid's cut to the faces' cut and back, with the points that fall in a bridge."""
+def openings(d: Blueprint) -> dict[str, list[tuple[float, float, float, float]]]:
+    """What the build has and the faces of the blueprint do not draw, by plane: boxes in the two other coordinates of
+    the plane. The hole of the latch's button in the deck's front face (Blueprint.latch_button_d): its pocket and its
+    rim, from the front of the deck to 15 into it. The edge break of the rims of the bezel recess at its bottom and
+    its top (2026-11-15): a break of R 1 on an edge of 83 degrees stands about 0.5 off the sharp edge."""
+    out: dict[str, list] = {name: [] for name in planes(d)}
+    if d.latch_button_d > 0:
+        r = d.latch_button_d / 2 + d.edge_break + 0.5
+        out["X 0"].append((-1.0, 15.0, d.latch_button_z - r, d.latch_button_z + r))
+        out["Z deck"].append((-r, r, -1.0, 15.0))
+    # the band wall of the hood with the openings of band A, and the seat of the socket plate in the deck's right side
+    for name, (axis, at) in planes(d).items():
+        for x0, y0, z0, x1, y1, z1 in designed_boxes(d):
+            lo, hi = (x0, y0, z0), (x1, y1, z1)
+            if lo[axis] <= at <= hi[axis]:
+                keep = [i for i in range(3) if i != axis]
+                out[name].append((lo[keep[0]], hi[keep[0]], lo[keep[1]], hi[keep[1]]))
+    return out
+
+
+def designed_boxes(d: Blueprint) -> list[tuple[float, float, float, float, float, float]]:
+    """The boxes (x0, y0, z0, x1, y1, z1), 2 larger than what they hold, where the build has designed parts that the
+    blueprint does not draw: the band of the hood (the cutters of band A, which reach from the stand-in of the lip into
+    the wall) and the seat of the front socket plate with the edge break of its rim."""
+    from candybar.shell import band
+    from candybar.shell import socket_plate as spm
+
+    out = []
+    for c in band.skin_cutters(d) + [spm.cutter(spm.SocketPlate(), d)]:
+        b = c.BoundBox
+        out.append((b.XMin - 2.0, b.YMin - 2.0, b.ZMin - 2.0, b.XMax + 2.0, b.YMax + 2.0, b.ZMax + 2.0))
+    return out
+
+
+def rims(d: Blueprint) -> list[tuple[float, float, float, float]]:
+    """The rims of the bezel recess at its bottom and its top, in (y, z): boxes for every plane of constant x that
+    crosses the recess (the edge break of the bottom rim, 2026-11-15)."""
+    fr = pr.front(d)
+    out = []
+    for s in (d.bezel_s0, d.bezel_s1):
+        y, z = fr.on_rail(d, s, 0.0)
+        out.append((y - 1.5, y + 1.5, z - 1.5, z + 1.5))
+    return out
+
+
+def compare(solid: np.ndarray, ref: np.ndarray, skip: list | None = None) -> dict:
+    """Largest distance from the solid's cut to the faces' cut and back, with the points that fall in a bridge. Points
+    in a box of `skip` (an opening that the faces do not draw) are left out."""
     pts = sample(solid)
+    keep = lambda p: ~np.any([(p[:, 0] > a0) & (p[:, 0] < a1) & (p[:, 1] > b0) & (p[:, 1] < b1) for a0, a1, b0, b1 in skip], axis=0) if skip else np.ones(len(p), bool)
+    pts = pts[keep(pts)]
     dist = distance(pts, ref)
     covered = bridged(pts, loose_ends(ref))
     ref_pts = sample(ref)
+    ref_pts = ref_pts[keep(ref_pts)]
     back = distance(ref_pts, solid)
     far = dist[~covered]
     at = lambda p, k: [round(float(v), 1) for v in p[int(np.argmax(k))]] if len(k) else []
@@ -270,12 +333,14 @@ def solid_state(parts: dict[str, Part.Shape]) -> tuple[dict[str, dict], list[dic
 
 def run(parts: dict[str, Part.Shape], d: Blueprint) -> dict:
     """Every number of the check, and whether all of them are inside the tolerances."""
-    faces = pr.faces(d)
+    faces = {k: f for k, f in pr.faces(d).items() if k not in BAND_FACES}
+    parts = {k: s for k, s in parts.items() if k in FORM}
     state, overlaps = solid_state(parts)
     shapes = skins(parts)
     sections = {}
     for name, (axis, at) in planes(d).items():
-        sections[name] = {"at": round(at, 2), **compare(solid_cut(shapes, axis, at), face_cut(faces, axis, at))}
+        skip = openings(d).get(name, []) + (rims(d) if axis == 0 and abs(at) < d.bezel_w / 2 else [])
+        sections[name] = {"at": round(at, 2), **compare(solid_cut(shapes, axis, at), face_cut(faces, axis, at), skip)}
     sil = silhouettes(parts, faces)
     over = lambda r: max(r["solid_to_blueprint"], r["blueprint_to_solid"]) > TOL
     ok = (all(s["valid"] and s["solids"] == 1 and s["closed"] and s["check"] and s["volume_mm3"] > 0 for s in state.values())
@@ -298,7 +363,7 @@ def table(r: dict) -> str:
 
 
 def main() -> int:
-    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-bp")
+    out = os.environ.get("CANDYBAR_OUT", "cad/out/shell-rev7")
     manifest = json.load(open(os.path.join(out, "manifest.json")))
     parts = {k: Part.read(os.path.join(out, v["brep"])) for k, v in manifest.items()}
     r = run(parts, Blueprint())

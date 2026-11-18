@@ -1,0 +1,139 @@
+"""Sheets of the control panel, with every BREP edge drawn.
+
+The models are the scene directories that candybar.shell.panel_frame writes into cad/out/control-panel/scenes (meshes,
+manifest.json, edges.json and focus.json with the cameras, see render_views.py). Steps:
+
+    cad/.venv-tools/bin/python cad/tools/draw_panel.py [OUT]            render every scene, then make the sheets
+    cad/.venv-tools/bin/python cad/tools/draw_panel.py [OUT] sheets     make the sheets again from the renders
+
+OUT is cad/out/control-panel. The renders go to OUT/renders/<scene>/<view>.png, the sheets to OUT/sheets.
+Blender runs in background mode, one scene at a time. Needs Pillow (cad/.venv-tools); no FreeCAD.
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import textwrap
+
+from PIL import Image, ImageDraw
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from compose_sheet import font  # noqa: E402
+
+ROOT = os.path.dirname(HERE)
+INK, MUTED = (30, 30, 34), (110, 110, 118)
+# scene: its views
+SCENES = {"in-place": ("above", "above-left"), "lifted": ("lifted",), "frame": ("frame", "frame-corner"),
+          "section-lever": ("section", "section-oblique"), "latch-default": ("latch", "latch-oblique"), "latch-screw": ("latch", "latch-oblique"),
+          "latch-magnet": ("latch", "latch-oblique"), "underside": ("underside", "underside-lever"),
+          "blank": ("above-left", "finger-hole"), "blank-underside": ("underside",),
+          "button-front": ("front", "close", "close-oblique"), "button-rim": ("rim", "rim-oblique"),
+          "section-bolt-locked": ("section",), "section-bolt-button-in": ("section",)}
+
+
+def render(out: str) -> None:
+    script = os.path.join(HERE, "render_views.py")
+    for scene, views in SCENES.items():
+        subprocess.run([sys.executable, script, os.path.join(out, "renders", scene), os.path.join(out, "scenes", scene),
+                        "--views", ",".join(views), "--size", "1500", "--samples", "16"], check=True)
+
+
+def picture(out: str, scene: str, view: str, w: int) -> Image.Image:
+    im = Image.open(os.path.join(out, "renders", scene, f"{view}.png")).convert("RGB")
+    return im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
+
+
+def sheet(out: str, name: str, title: str, cells: list[tuple[str, str, str]], notes: list[str], w: int = 900, per_row: int = 2) -> None:
+    """A sheet: the pictures of `cells` (scene, view, label) in rows of per_row, and the notes below them."""
+    gap, top = 14, 84
+    pictures = [(picture(out, scene, view, w), label) for scene, view, label in cells]
+    rows = [pictures[k:k + per_row] for k in range(0, len(pictures), per_row)]
+    width = gap + per_row * (w + gap)
+    lines = [line for note in notes for line in (textwrap.wrap(note, int(width / 11.5)) or [""])]
+    height = top + sum(34 + max(im.height for im, _ in row) + gap for row in rows) + 28 * len(lines) + 30
+    page = Image.new("RGB", (width, height), (255, 255, 255))
+    dr = ImageDraw.Draw(page)
+    dr.text((gap, 22), title, fill=INK, font=font(34, bold=True))
+    y = top
+    for row in rows:
+        for c, (im, label) in enumerate(row):
+            dr.text((gap + c * (w + gap), y), label, fill=MUTED, font=font(20))
+            page.paste(im, (gap + c * (w + gap), y + 34))
+        y += 34 + max(im.height for im, _ in row) + gap
+    for line in lines:
+        dr.text((gap, y), line, fill=INK, font=font(20))
+        y += 28
+    os.makedirs(os.path.join(out, "sheets"), exist_ok=True)
+    path = os.path.join(out, "sheets", name)
+    page.save(path)
+    print("draw_panel:", path)
+
+
+def sheets(out: str) -> None:
+    rep = json.load(open(os.path.join(out, "report.json")))
+    i, a, st = rep["interface"], rep["arcade"], rep["stiffness"]
+    ribs, flat = st["cases"]["with the ribs"], st["cases"]["flat plate of 5, no ribs"]
+    lt = st["latch"]
+    edges = "All BREP edges are drawn."
+    sheet(out, "01-panel-above.png", "Arcade panel in the pocket of the deck",
+          [("in-place", "above", "from above"), ("in-place", "above-left", "from the front left")],
+          [edges, f"The plate is two printed tiles of ABS, 5 thick, with a seam at x {rep['seam_x']:g} between the lever and the buttons. "
+           f"Its top lies 2 below the deck top, as the form has it, and stands {i['seat_gap']:g} inside the wall of its seat. "
+           f"The top edge of its outline has the edge break of R 1.",
+           f"Buttons: {a['buttons']} (Sanwa OBSN-30, screw-in). The plate is 5 thick round each button hole. "
+           "Nothing of the latch shows on the top face: the hooks, the strike and the steel discs are below the plate."])
+    sheet(out, "02-panel-lifted.png", "Panel lifted out; the frame stays in the deck",
+          [("lifted", "lifted", "the panel 95 above its seat"), ("frame", "frame", "the frame and the opening, from above")],
+          [edges, "The frame (blue) is two halves, bonded under the ledge of the opening, on four posts that stand on the floor. They meet at x 20: "
+           "the left half has the tunnel of the push bolt (orange) at the front centre, and both halves have a notch for a rear hook. "
+           f"A pad in each corner of the opening has a magnet of 12 x 2. Two pads at the rear edge have the locating cones "
+           f"(x -{i['cone_x']:g}: round socket in the panel; x +{i['cone_x']:g}: slot). The clip at the rear edge holds the USB cable.",
+           f"The cable has {i['cable_slack']:g} of slack between the clip of the frame and the clip under the panel."])
+    sheet(out, "03-section-lever.png", "Section through the lever (x -75), seen from the right",
+          [("section-lever", "section", "section"), ("section-lever", "section-oblique", "the same cut, turned")],
+          [edges, "The line in the cut plane is the true section of the skin of the deck.",
+           "The plate of the lever bolts under a pad, 9.25 below the top of the panel. The pad lies between the rib beside the encoder and the "
+           "flanges of the seam. The load goes from the ribs to the front and rear ledges, into the bar of the frame and its posts, and to the floor.",
+           f"Hand estimate, {st['load_N']:g} N on the ball: the ball moves {ribs['forward_ball_mm']} forward and {ribs['side_ball_mm']} sideways "
+           f"(a flat plate of 5 with no ribs: {flat['forward_ball_mm']} and {flat['side_ball_mm']})."])
+    h = rep["hold"]
+    pb = i["push"]
+    sheet(out, "04-latch.png", "The latch: the push bolt (the default)",
+          [("button-front", "front", "the front of the deck: the button in its hole"), ("button-front", "close", "the button, close"),
+           ("button-front", "close-oblique", "the button, close, from the front left"),
+           ("section-bolt-locked", "section", "section on the centre line: locked"), ("section-bolt-button-in", "section", f"the button in by {pb['stroke']:g}: the lips are free"),
+           ("button-rim", "rim", "the rim of the hole alone (the bolt left out)")],
+          [edges, f"The button is the outline of its hole moved in by {pb['button_gap']:g}: the gap is {pb['button_gap']:g} all round, at the round, the flats and the "
+           "corners (the hole's corners R 1.5, the button's R 1.2). Both rims have the edge break of R 1.",
+           f"The bolt slides in its tunnel, a part of the left half of the frame. The spring (steel, 4 outside, {pb['bolt_spring_free']:g} free) pushes it forward; "
+           f"the gate holds the spring. The underside of the bolt meets the lips of the strike at {pb['wedge_deg']:g} degrees, so the spring pulls the panel down.",
+           f"ESTIMATED: one latch point (a magnet of 12 x 2 on a steel disc of 12 x 2) holds {h['magnet']['pull_N']:g} N. The hold in the worst load case has the factor "
+           f"{h['hold_factor']:.1f}. With the button held, the panel lifts out at {h['removal']['lever_N']:g} N on the lever, {h['removal']['finger_hole_N']:g} N at the "
+           "finger hole of a blank panel. After the first print, the size of the front magnets is what changes this force."], per_row=3, w=640)
+    sheet(out, "05-latch-options.png", "The latch: the default and the two options on the same four latch points",
+          [("latch-default", "latch-oblique", "The push bolt (the default): magnet in the pad, steel disc in the plate"),
+           ("latch-screw", "latch-oblique", "A. Screws (the fall-back)"), ("latch-magnet", "latch-oblique", "B. Magnets alone")],
+          [edges, "The push bolt: nothing shows on the top face; the button in the front of the deck releases the panel (sheet 04).",
+           f"A. Four flush M4 screws into heat-set inserts: the fall-back. One common tool. Four heads show.",
+           f"B. A magnet of {i['magnet_d']:g} x {i['magnet_h']:g} in each pad and one of {i['magnet_d']:g} x {i['keeper_h']:g} in the plate, and nothing else. "
+           f"ESTIMATED hold: {lt['magnet_edge_N']:g} N on one edge, against {lt['lift_per_edge_N']} N from the lever. A hard input can lift an edge."], per_row=3, w=640)
+    sheet(out, "06-underside.png", "Arcade panel from below",
+          [("underside", "underside", "the two tiles with the hardware"), ("underside", "underside-lever", "the lever, the encoder and the cable clip")],
+          [edges, f"Ribs {i['rib_h']:g} deep: one along the front, one along the rear, one beside the encoder, the flanges of the seam, and one between "
+           "the buttons and the service buttons. Four bosses hold the encoder. The clip holds the cable, which passes the rib through a gate."])
+    sheet(out, "07-blank-panel.png", "The blank panel: made from the interface only",
+          [("blank", "above-left", "in the pocket"), ("blank", "finger-hole", "the finger hole"), ("blank-underside", "underside", "from below")],
+          [edges, "It has the outline, the rest face, the two sockets, the four latch points, the rear hooks, the strike and the cable clip of the interface, "
+           f"and it goes on the same frame. It has nothing to hold, so it has a finger hole of {i['push']['finger_hole'][2]:g} near its front edge."])
+
+
+if __name__ == "__main__":
+    args = [a for a in sys.argv[1:]]
+    only_sheets = "sheets" in args
+    out = next((a for a in args if a != "sheets"), os.path.join(ROOT, "out", "control-panel"))
+    if not only_sheets:
+        render(out)
+    sheets(out)

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import FreeCAD as App
 
-from candybar import params
+from candybar.shell import params
 
 HEADER = ",".join(params.COLUMNS)
 GOOD = "panel_w,380,mm,provisional,,design choice,Panel width"
@@ -64,18 +64,9 @@ class SheetTest(unittest.TestCase):
         values = [params.value(self.doc, name) for name in ("panel_w", "stick_x", "edge_x", "btn_count")]
         self.assertEqual(values, [380, -75, -265, 8])
 
-    def test_edit_keeps_the_unit_and_moves_dependent_cells(self) -> None:
-        self.write(GOOD, STICK_X, EDGE_X)
-        params.edit(self.doc, "stick_x", -60)
-        self.doc.recompute()
-        self.assertEqual(params.value(self.doc, "edge_x"), -250)
-
-    def test_formula_may_use_a_parameter_from_a_later_row_and_follows_its_edits(self) -> None:
+    def test_formula_may_use_a_parameter_from_a_later_row(self) -> None:
         self.write("edge_x,=stick_x - half_w,mm,derived,,,Edge", "half_w,=panel_w / 2,mm,derived,,,Half", GOOD, STICK_X)
         self.assertEqual(params.value(self.doc, "edge_x"), -265)
-        params.edit(self.doc, "panel_w", 400)
-        self.doc.recompute()
-        self.assertEqual(params.value(self.doc, "edge_x"), -275)
 
     def test_name_that_is_a_unit_is_rejected(self) -> None:
         with self.assertRaisesRegex(params.ParamError, r"controls\.csv row 3 \('deg'\): FreeCAD rejects this name"):

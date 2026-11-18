@@ -66,15 +66,16 @@ files; section 3 gives the corrected sizes.
 
 | Item | Value | Status |
 | --- | --- | --- |
-| Body W x H x T | 354 x 230 x 10 | SOURCED (uperfect.com, "Product Size") |
+| Body W x H x T | 354 x 230 x 10 | SOURCED (uperfect.com, "Product Size"). The thickness is measured: see the next row but one. |
 | Body W x H x T, second source | 355.3 x 228.6 x 10.2 (13.99 in x 9 in x 0.4 in) | SOURCED (Amazon "Item Dimensions") |
-| CAD envelope to reserve | 356 x 231 x 11 | ESTIMATED: larger of the two sources, plus 1 |
-| Thickness profile | Uniform slab. No thicker chin or port bump. | ESTIMATED: manufacturer side renders in the product gallery |
+| Body thickness | 10.45 to 10.6, all the way round | MEASURED by the owner with a caliper, 2026-11-14. Thicker than the maker's 10 and the second source's 10.2. The model uses 10.6. |
+| CAD envelope to reserve | 356 x 231 x 11 | ESTIMATED: larger of the two sources, plus 1. The measured thickness is 0.4 inside the 11. |
+| Thickness profile | Uniform slab. No thicker chin or port bump. | MEASURED by the owner, 2026-11-14: 10.45 to 10.6 all the way round |
 | Small protrusions | Two rubber feet on the bottom edge. Power button and scroll wheel stand proud of the right edge by about 1 to 1.5. | ESTIMATED: manufacturer front render |
 | Active area | 344.678 x 215.424 | SOURCED (uperfect.com, "Viewable Area") |
 | Pixel pitch | 0.0898 (344.678 / 3840) | ESTIMATED: calculation. The page rounds it to 0.09. |
-| Side bezels | 4.66 each | ESTIMATED: (354 - 344.678) / 2, assumes symmetry |
-| Top plus bottom bezel | 14.58 total. Split about 5 top and 9.6 bottom. | ESTIMATED: 230 - 215.424. The split is read off a render and is weak. |
+| Side bezels | 4.0 each, from the outer edge of the housing to the lit picture | MEASURED by the owner, 2026-11-14 (the estimate was 4.66) |
+| Top and bottom bezel | Top 3.4, bottom 8.9, from the outer edge of the housing to the lit picture | MEASURED by the owner, 2026-11-14 (the estimates were about 5 and 9.6). The housing is not measured: its width, height and thickness stay the maker's values. |
 | Weight | 0.82 kg (1.8 lb) | SOURCED (uperfect.com, Amazon) |
 | Power | 14 W rated (uperfect.com). Amazon states 30 W. | SOURCED, sources disagree |
 
@@ -96,8 +97,8 @@ Edges are named as seen from the front, screen in landscape.
 | --- | --- | --- | --- |
 | USB-C, full function (video, audio, power) | Left | about 86 | Edge: SOURCED (LinuxLinks photo "Left Hand Side", manufacturer render). Height: ESTIMATED from render, +/-5. |
 | USB-C, full function | Left | about 68 | Same |
-| Mini-HDMI (HDMI Type C) | Left | about 49 | Same |
-| Power button | Right | about 66 | Edge: SOURCED (LinuxLinks photo "Right Hand Side"). Height: ESTIMATED from render, +/-5. |
+| Mini-HDMI (HDMI Type C) | Left | about 49 | Height: same. Direction: the long axis of the socket runs along the edge; the narrow long face is toward the display (the front) and the wide long face toward the back. GIVEN by the owner, 2026-11-14. |
+| Power button | Right | 63.5 (centre) | Edge: SOURCED (LinuxLinks photo "Right Hand Side"). Height: MEASURED by the owner, 2026-11-14, from the bottom edge of the housing (the estimate was about 66). |
 | Status LED | Right | between the button and the wheel | Same |
 | Scroll wheel (OSD) | Right | about 50 | Same |
 | 3.5 mm audio output | Right | about 30 | Same |
@@ -145,15 +146,15 @@ Notes:
 
 ### Must measure on the real unit
 
-1. Body width, height and thickness, including the feet and the button protrusion.
+1. Body width and height, including the feet and the button protrusion. The owner measures them with a rule (about +/-0.5). Until then the model uses the maker's 354 x 230 and keeps the room of 356 x 231 x 11. The thickness is done: 10.45 to 10.6 (the owner, with a caliper, 2026-11-14).
 2. Whether a built-in stand exists (BE16CU or BE16DU Gen 2).
 3. VESA hole centres to the left edge and to the bottom edge. Real thread depth.
 4. Port centre heights on the left edge and their offset from the front face.
-5. Active area position: left, right, top and bottom bezel, measured to the lit pixels.
-6. Button, wheel and jack heights on the right edge.
+5. Active area position: done. The owner measured the bezels on 2026-11-14 (left and right 4.0, top 3.4, bottom 8.9).
+6. Wheel and jack heights on the right edge. The button is done (63.5, the owner, 2026-11-14).
 7. Plug length plus bend of the actual cables that will be used.
 8. Weight.
-9. Behaviour after power loss: does the monitor turn on without a button press.
+9. Behaviour after power loss: done. The monitor turns on by itself when its USB-C socket gets power (the owner's test on the real unit, 2026-11-14). The wake from sleep is not tested yet.
 
 ---
 

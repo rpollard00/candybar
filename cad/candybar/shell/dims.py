@@ -1,4 +1,4 @@
-"""The named dimensions of shell variant D, and the screen-face options.
+"""The named dimensions of the outer form: Dims, and Blueprint, the target of the blueprint; and the seated players.
 
 Lengths are millimetres, angles degrees. Frame: X to the player's right, Y from the deck front edge toward
 the rear, Z up from the desk. The names follow CONTEXT.md; they will move into the parameter sheets later.
@@ -6,7 +6,7 @@ the rear, Z up from the desk. The names follow CONTEXT.md; they will move into t
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 MON_ACTIVE_W = 344.678
 MON_ACTIVE_H = 215.424
@@ -52,9 +52,7 @@ class Dims:
     bend_r: float = 50.0
     body_d: float = 540.0
     rear_w: float = 430.0
-    step_y0: float = 380.0
-    step_lean: float = 28.0
-    rear_facet: float = 14.0
+    band_lean: float = 28.0
     # hood: the cap (an arch of a top bar, two legs and a sill, standing on the body top)
     hood_h_ratio: float = 0.32
     seam_gap: float = 1.5
@@ -66,7 +64,6 @@ class Dims:
     hood_edge_in: float = 16.0
     hood_edge_back: float = 32.0
     hood_rim_r: float = 4.0
-    hood_rear_r: float = 20.0
     hood_wall: float = 4.0
     hood_sill_h: float = 17.0
     hood_sill_corner_r: float = 8.0
@@ -96,17 +93,6 @@ class Dims:
     logo_proud: float = 5.0
     logo_end_gap: float = 4.0
     logo_inset: float = 5.0
-    # rear
-    door_w: float = 368.0
-    door_z0: float = 112.0
-    door_z1: float = 300.0
-    fan_d: float = 118.0
-    pocket_w: float = 100.0
-    pocket_h: float = 42.0
-    pocket_z0: float = 0.0
-    wall_spare: float = 12.0
-    psu_side: float = 14.0
-    controls_forward: float = 15.0
 
     # derived
     @property
@@ -181,69 +167,86 @@ class Dims:
 
 
 @dataclass(frozen=True)
-class HoodStations:
-    """Derived stations of the hood in its own frame: x across, y back from the cap's front plane, z up from its base."""
-    origin: tuple[float, float, float]
-    height: float
-    depth: float
-    half_base: float
-    z_sill: float
-    z_band_top: float
-    z_rail_top: float
-    z_open_top: float
-    y_band_foot: float
-    y_band_top: float
-    y_marquee_bottom: float
-    y_marquee_top: float
-    y_wall: float
-    corner_centre: tuple[float, float]
-
-    def y_band(self, z: float, tilt: float) -> float:
-        return self.y_band_foot + (z - self.z_sill) * math.tan(math.radians(tilt))
-
-    def y_marquee(self, z: float, tilt: float) -> float:
-        return self.y_marquee_bottom - (z - self.z_rail_top) * math.tan(math.radians(tilt))
-
-
-def hood_stations(d: Dims) -> HoodStations:
-    """Where the parts of the hood stand: levels up the arch, depths behind its front plane, the corner centre."""
-    height = d.hood_h - d.seam_gap
-    origin = (0.0, d.seam_y + d.hood_shoulder_front, d.body_top + d.seam_gap)
-    depth = d.body_d - d.hood_shoulder_front - origin[1]
-    half_base = d.width / 2 - d.hood_shoulder
-    z_open_top = height - d.hood_bar
-    tm, tb = math.radians(d.marquee_tilt), math.radians(d.hood_band_tilt)
-    z_rail_top = z_open_top - (d.marquee_margin + d.marquee_h + d.marquee_head) * math.cos(tm)
-    z_band_top = z_rail_top - d.hood_rail_h
-    y_band_top = d.hood_ledge + (z_band_top - d.hood_sill_h) * math.tan(tb)
-    y_marquee_bottom = y_band_top + d.hood_band_t / math.cos(tb) - d.marquee_cover_t / math.cos(tm)
-    y_marquee_top = y_marquee_bottom - (z_open_top - z_rail_top) * math.tan(tm)
-    a = math.radians(d.hood_side_lean)
-    zc = height - d.hood_corner_r
-    xc = half_base - zc * math.tan(a) - d.hood_corner_r / math.cos(a)
-    return HoodStations(origin, height, depth, half_base, d.hood_sill_h, z_band_top, z_rail_top, z_open_top, d.hood_ledge,
-                        y_band_top, y_marquee_bottom, y_marquee_top, depth - d.hood_wall, (xc, zc))
-
-
-@dataclass(frozen=True)
 class Blueprint(Dims):
     """The target of the blueprint (docs/blueprint): the dimensions that differ from the built model, and new ones.
 
     The deck and the bezel window keep the values of Dims; the flat screen stands nearer the bezel, and the control
     panel's front follows the deck's front contour (profiles.panel_outline). The blueprint
-    changes the rail (one edge section from the hood seam to the front of the deck), the rear (the upper rear stands
-    proud) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves of the form
-    as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in front view,
-    the side and top corner of the hood, and the lines that the references draw straight (crown, bow), which are
-    zero. profiles.py turns these into profiles and faces.
+    changes the rail (one edge section from the hood seam to the front of the deck), the rear (planar, revision 7:
+    decision record 0007) and the hood (deeper, near-straight sides with tight top corners). It also holds the curves
+    of the form as named values: the arc of the rail in side view, the tuck of the body sides toward the hood in
+    front view, the side and top corner of the hood, and the lines that the references draw straight (crown, bow),
+    which are zero. profiles.py turns these into profiles and faces.
     """
-    # the side band ends at a shallow step, 0.28 of the width behind the deck at the desk
-    step_y0: float = 345.0
+    # the rear, revision 7: planar. The lower body is rear_w wide behind the band; the head (the body above the rear
+    # shelf) and the hood have the full width back to the rear, and stand rear_proud behind the lower rear wall
     rear_w: float = 470.7
-    # rear: the lower rear wall stays at body_d; the upper rear and the hood stand proud of it
     rear_proud: float = 40.0
-    rear_step_z0: float = 310.0
-    rear_step_z1: float = 350.0
+    # the rear shelf under the head: two flat facets of 45 degrees that meet on the hip. Its inner crease is level at
+    # rear_shelf_z0, on the lower rear wall and on the side of the lower body; the rear facet ends on the upper rear
+    # wall at rear_shelf_z1 (rear_proud higher), the side facet on the side band band_depth higher (band_top_z)
+    rear_shelf_z0: float = 293.0
+    rear_shelf_z1: float = 333.0
+    # the band: the facet of 45 degrees, band_depth deep, on the rear edge of the side band. Its outer edge in side view
+    # (the stroke) is four straight lines: an upright stub of band_stub at the desk (at band_foot_y), a kick that
+    # leans band_kick to the rear of upright on its way down, the lean (band_lean, as on the reference), and the level
+    # run that is the side facet of the rear shelf. The line of the lean passes the desk band_flare in front of the
+    # stub (at band_lean_y0, where the form has no edge), and it would reach the body top at band_seam_y
+    band_seam_y: float = 530.0
+    band_stub: float = 20.0
+    band_flare: float = 80.0
+    band_kick: float = 28.0
+    # the edge finish. No outside edge stays fully sharp, and the form is not rounded off: a convex edge of the rear
+    # design that turns edge_min_turn or more has a round of rear_round_r (the band's outer edge, the hip, the
+    # edges of the head, the rear corners of the head and of the hood; the lower rear corner is the ellipse that this
+    # round makes in plan); every other convex edge that turns more than edge_break_turn gets a break of edge_break
+    # as the last modelling step. Concave creases and blunt mitres stay sharp
+    rear_round_r: float = 3.0
+    edge_min_turn: float = 40.0
+    edge_break: float = 1.0
+    # the hole of the button of the control panel's latch (latch B, the push bolt; the owner, 2026-11-15) in the
+    # leaning band of the deck's front face, on the centre line, along the slide of the bolt (y): its diameter (0: no
+    # hole), the distance between its two upright flats, and the height of its centre
+    latch_button_d: float = 14.6
+    latch_button_flats: float = 12.6
+    latch_button_z: float = 55.3
+    edge_break_turn: float = 45.5
+    # the facet round the foot of the cabinet (deck front and sides, the band's foot, the lower body)
+    base_facet: float = 5.0
+    # the crease between the centre face and each flank of the deck front (it turns deck_flank, 8 degrees) is sharp: a
+    # blunt mitre. The round of 6 that Dims has there is an arc 0.84 long, which stands 0.015 off the sharp crease and
+    # makes faces under 1 mm wide down the front of the deck
+    deck_crease_r: float = 0.0
+    # the opening of the rear door in the lower rear wall. The form sets its sides and its top: a land of door_land
+    # between each side and the ends of the cut-ins, a frame of door_frame between its top and the crease of the rear
+    # shelf (door_w, door_z1). Its sill is door_z0; the fit study checks that the compute module, which stands on
+    # the power supply's fan space, lies inside the opening with its lower edge above the sill
+    door_land: float = 4.0
+    door_frame: float = 12.0
+    door_z0: float = 116.0
+    # the cut-ins at each lower rear corner: cut_in_count level grooves that turn the corner, the lowest lip at
+    # cut_in_z0, cut_in_pitch apart. A ball mills each groove along the true offset of the plan outline, so that the
+    # slot is cut_in_h high and cut_in_depth deep all the way; it runs cut_in_side along the side and cut_in_rear
+    # along the rear, to round ends
+    cut_in_count: int = 4
+    cut_in_z0: float = 126.0
+    cut_in_pitch: float = 22.0
+    cut_in_h: float = 10.0
+    cut_in_depth: float = 1.5
+    cut_in_side: float = 30.0
+    cut_in_rear: float = 20.0
+    # the hand-holds: two recesses in the rear wall of the head, from grip_x0 to grip_x1 each side of the centre
+    # line, grip_h high from grip_z0, grip_depth deep, with ends of grip_end_r in plan. The roof falls 45 degrees
+    # toward the inside (a hook for the fingers that prints without support). The edges inside are rounds of grip_r,
+    # those of the roof grip_roof_r; the rim has the edge break
+    grip_x0: float = 70.0
+    grip_x1: float = 170.0
+    grip_z0: float = 349.05
+    grip_h: float = 62.0
+    grip_depth: float = 26.0
+    grip_end_r: float = 10.0
+    grip_r: float = 8.0
+    grip_roof_r: float = 3.0
     # curves of the body
     rail_sagitta_ratio: float = 0.035
     body_tuck_ratio: float = 0.023
@@ -313,6 +316,75 @@ class Blueprint(Dims):
         return self.body_d + self.rear_proud
 
     @property
+    def band_depth(self) -> float:
+        """How far the side of the lower body stands in from the side band: the depth of the band."""
+        return self.width / 2 - self.rear_w / 2
+
+    @property
+    def band_lean_y0(self) -> float:
+        """Y of the line of the band's lean at the desk. The lean ends at the knee, so the form has no edge here: the
+        band's outer edge at the desk is band_foot_y."""
+        return self.band_seam_y - self.body_top * math.tan(math.radians(self.band_lean))
+
+    @property
+    def band_foot_y(self) -> float:
+        """Y of the band's outer edge at the desk: the upright stub. Behind it (and band_depth farther in) the lower
+        body is rear_w wide."""
+        return self.band_lean_y0 + self.band_flare
+
+    @property
+    def cut_in_z1(self) -> float:
+        """Height of the upper lip of the highest cut-in."""
+        return self.cut_in_z0 + (self.cut_in_count - 1) * self.cut_in_pitch + self.cut_in_h
+
+    @property
+    def cut_in_x(self) -> float:
+        """Half the width of the lower rear wall that the cut-ins leave plain: their slots end here."""
+        return self.rear_w / 2 - self.cut_in_rear
+
+    @property
+    def rear_flat_x(self) -> float:
+        """Half the width of the lower rear wall that is flat: the upright corner (the ellipse that the round of the
+        hip makes in plan) starts here."""
+        return self.rear_w / 2 - self.rear_round_r / math.sqrt(2)
+
+    @property
+    def cut_in_y(self) -> float:
+        """Y where the slots of the cut-ins end on the side of the lower body."""
+        return self.body_d - self.cut_in_side
+
+    @property
+    def door_w(self) -> float:
+        """Width of the rear door opening: door_land inside the ends of the cut-ins on each side."""
+        return 2 * (self.cut_in_x - self.door_land)
+
+    @property
+    def door_z1(self) -> float:
+        """Top of the rear door opening: door_frame below the crease of the rear shelf."""
+        return self.rear_shelf_z0 - self.door_frame
+
+    @property
+    def grip_z1(self) -> float:
+        """Top of the opening of each hand-hold in the rear wall of the head."""
+        return self.grip_z0 + self.grip_h
+
+    def band_lean_y(self, z: float) -> float:
+        """Y of the line of the band's lean at height z (it leans back)."""
+        return self.band_lean_y0 + z * math.tan(math.radians(self.band_lean))
+
+    def rear_y(self, z: float) -> float:
+        """Y of the rear at height z on the centre line: the lower rear wall, the rear facet of the shelf, the upper
+        rear wall."""
+        if z <= self.rear_shelf_z0:
+            return self.body_d
+        return min(self.depth, self.body_d + (z - self.rear_shelf_z0) * (self.depth - self.body_d) / (self.rear_shelf_z1 - self.rear_shelf_z0))
+
+    @property
+    def band_top_z(self) -> float:
+        """Height of the outer edge of the band's level run: the side facet of the rear shelf ends there on the side band."""
+        return self.rear_shelf_z0 + self.band_depth
+
+    @property
     def tuck(self) -> float:
         """How far each body side stands in from the side plane at the seam."""
         return self.body_tuck_ratio * self.width
@@ -351,17 +423,6 @@ class Blueprint(Dims):
         return math.degrees(4 * math.atan(2 * self.rail_sagitta_ratio))
 
 
-OPTIONS: dict[str, dict[str, float]] = {
-    "1-tall-bezel": {"recline": 24.0, "band_len": 0.0, "frame_side": 42.0, "frame_v": -1.0},
-    "2-tall-band": {"recline": 26.0, "band_len": 100.0, "frame_side": 45.0, "frame_v": 45.0},
-    "3-short-band": {"recline": 30.0, "band_len": 60.0, "frame_side": 45.0, "frame_v": 45.0},
-    "4-on-deck": {"recline": 36.0, "band_len": 0.0, "frame_side": 40.0, "frame_v": 40.0},
-}
-# the two eye positions of the earlier form (shell/build.py); the blueprint uses PEOPLE
-EYE = (-60.0, 530.0)
-EYE_LOW = (-60.0, 450.0)
-
-
 @dataclass(frozen=True)
 class Seated:
     """A player at the desk: the eye height above the seat, sitting upright, from published data."""
@@ -385,31 +446,3 @@ PEOPLE = (Seated("child of 8", 578.0, "DINBelg 2005, boys of 8 years, mean sitti
 def eye_of(p: Seated) -> tuple[float, float]:
     """The eye of a seated player in (y, z) of the cabinet: z above the desk top."""
     return EYE_Y, CHAIR_H + p.eye_above_seat - SLUMP - DESK_H
-
-
-def sight(d: Dims, eye: tuple[float, float] = EYE) -> tuple[float, float]:
-    """Sight angle below horizontal and eye distance to the centre of the lit image."""
-    y, z = d.face(d.image_s)
-    su, cu = d.u
-    y, z = y + d.mon_setback * cu, z - d.mon_setback * su
-    dy, dz = y - eye[0], eye[1] - z
-    return math.degrees(math.atan2(dz, dy)), math.hypot(dy, dz)
-
-
-def frame_for_sight(d: Dims, target: float = 25.0) -> float:
-    """The frame height above and below the image that puts the sight angle on target (bisection)."""
-    lo, hi = 0.0, 400.0
-    for _ in range(50):
-        mid = (lo + hi) / 2
-        if sight(replace(d, frame_v=mid))[0] > target:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2
-
-
-def option(name: str, base: Dims | None = None) -> Dims:
-    d = replace(base or Dims(), **{k: v for k, v in OPTIONS[name].items() if v >= 0})
-    if OPTIONS[name]["frame_v"] < 0:
-        d = replace(d, frame_v=round(frame_for_sight(d), 1))
-    return d
