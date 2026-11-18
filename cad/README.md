@@ -55,6 +55,37 @@ The rules of the joints on the whole set (the 30 pieces, the closing gap, the fl
 
 `tests.support.shell()` and `tests.support.cavity()` keep the default shell and its cavity on disk in `cad/out/test-cache`, under a key of the values of `Blueprint()`, the source of the modules that build them, and the versions of FreeCAD and OpenCascade. `CANDYBAR_TEST_CACHE=off` makes them in the process. After the results, `cad/test.sh` prints the twenty slowest tests, each with the time of the set-up of its class.
 
+### The build chain on the server
+
+The server (64 threads, Zen 2) runs the whole chain with the independent steps side by side, each FreeCAD process in the container of `cad/container` (its geometry is near the laptop's, not the same: `cad/container/README.md`):
+
+```sh
+cad/tools/chain.py                  # every step; the log of each step and summary.md go to cad/out/chain
+cad/tools/chain.py pieces mounts    # these steps and the steps that they wait for
+cad/tools/chain.py -j 6             # at most 6 processes at once (default 8); --local: no container
+```
+
+A step starts when the steps that it reads are done:
+
+| Step | Waits for |
+| --- | --- |
+| build (`cad/build.sh`), fit, skin, coupon | nothing |
+| deck, zones (the caches of the skin), split, hood_band, socket_plate | skin (and build) |
+| check_solids, face_check, edge_finish | build |
+| rear, mounts, cradle | fit, and the skin or its zones |
+| structure | fit, split |
+| pieces | build, split, deck, zones |
+| coupons, panel | skin, deck (and zones) |
+| cabinet | build, cradle, panel |
+
+Two steps never write the same file: the caches of the skin (the deck skin, the zones of the mounts) are steps of their own (`tools/build_caches.py`). Each step has its own process table, so the memory guard of `freecad-run.sh` stops only that step; the chain sets its limit to 24 GB (`CANDYBAR_RSS_LIMIT_MB`), because the split takes 12 GB. Exit status: 0 when each step passed, 1 when the check of a step failed, 2 when a step broke.
+
+A full rebuild after a change of the outer form (no cache) took 125.5 minutes of wall time here at `-j 12`, against about 3 hours on the laptop in series. The sum of the step times is 5 hours: one process here is about half as fast as one on the laptop. The critical path is skin (28 min), split (59 min), pieces (38 min); the fit study (70 min) runs beside it. When the outer form did not change, copy the skin (`cad/out/shell-rev7/split/cache/*-<fingerprint>.bin`, the files carry the fingerprint of their source) from another checkout: that saves the 28 minutes.
+
+One chain takes at most about 15 GB of memory (all its FreeCAD processes, sampled every 10 s) and most of the cores while the skin, the fit study and the split run together. Two agents can run a chain at the same time in their own checkouts, each with `-j 6`: an estimate from the use of the cores and the memory, not measured. More than that shares the same cores and makes each chain slower. Each checkout has its own `cad/out` and its own caches. Other services of the owner run on this machine: keep a chain at `-j 12` or less.
+
+Each FreeCAD process already runs its booleans on many threads (64 threads; 8 to 19 cores in use on the skin and the split). There is no supported switch for the parallel mode from FreeCAD's Python: OpenCascade's global switch (`BOPAlgo_Options::SetParallelMode`) reads False inside FreeCAD, and FreeCAD sets the mode for each operation itself.
+
 The default build is the cabinet as the owner chose it: the hood band A (`candybar/shell/band.py`) and the front socket plate `b-knob` (`candybar/shell/socket_plate.py`) are in it since 2026-11-16. `cad/compare.sh` builds the outer form of the baseline commit once into `cad/out/baseline/<commit>` and writes `compare-<commit>/compare.md` beside the build; it fails when a part moved or has no partner. A decided change of the form gets a new baseline: the commit that makes it goes into `cad/BASELINE`.
 
 The whole cabinet, with the printed bezel plate, the monitor and the control panel in, for the owner:
