@@ -44,7 +44,7 @@ The arch build (generic x86-64) and the FreeCAD 1.1.4 AppImage (OpenCascade 7.8.
 
 One kernel gives nearly the same geometry from run to run, but not always the same file. Two builds of 36bc344 in the container: 34 of 35 BREP files are the same byte for byte. In the hood, the volume differs by 0.018 mm3 (2.5e-9 of the volume), the area by 0.0002 mm2 and the box by 2.3e-8 mm. The first pass of `tools/compare_parts.py` has a tolerance of 1e-7 of the volume and the area, and 1e-4 mm on the box.
 
-The cut of the split is not the same from run to run in the container. `test_split.SplitTest.test_each_hand_hold_is_whole_in_one_piece` cut the same skin six times: it passed two times and failed four times, with the left upper rear piece 0.88 mm to 116 mm past the centre line. The split's own measurement of the same commit was symmetric.
+Before b6e13fe, the pieces of the split were not the same from run to run: `test_split.SplitTest.test_each_hand_hold_is_whole_in_one_piece` passed two times in six. The cause was in the model, not in the kernel: the 2D offset of the cavity left edges whose curves on their faces did not follow them, and the mesh of a piece put one node of such a face hundreds of mm off it, at a place that memory addresses decided (`cavity.sound`). Since b6e13fe, six cuts of the body give the same 30 pieces (counts, volume, exact and mesh box, validity), and the test passes six times in six.
 
 ## Pins and disk
 

@@ -25,6 +25,19 @@ The skin is the outer form less the cavity (hollow). Two things make that cut wo
             thicker than wall_t.
   CUT_STEP  One boolean with all the prisms of the cavity (255 on the body) took 12.8 GB of memory and did not end.
             The prisms are cut away CUT_STEP at a time; the result is the same solid.
+
+Two things keep the skin sound:
+  sound     The 2D offset of OpenCascade makes the offset of a spline or an ellipse as an offset curve that is only
+            C0 at the knots of its basis, and whose curve on the plane does not follow it; at a corner where two edges
+            meet nearly tangent it adds a join arc of about 1e-6 mm. The mesh of a piece of the split then put a node
+            of a step face hundreds of mm off it, at a place that changed from run to run. Each offset curve becomes
+            arcs through points of the exact offset (within ARC_TOL), with their corners where the section of the face
+            crosses a fixed family of lines (Grid): a neighbour section cuts the same face and has its corners on the
+            same lines, so two neighbour outlines run side by side piece by piece, and their common has no tiny edges.
+  absorb    Where the form turns across X and takes RIDGE back, two neighbour outlines can run a few 0.0001 mm apart;
+            the step between them is then a strip that the mesh of a part leaves open. A thin part (under THIN) of the
+            difference between two neighbour regions is absorbed into the later one, which takes the outline of the
+            earlier one there.
 """
 from __future__ import annotations
 
@@ -47,8 +60,20 @@ SKIN = ("deck", "body", "hood", "marquee_lip")
 SAME = 1e-3
 # the fuzzy tolerance of a boolean that failed without it, mm
 FUZZY = 1e-3
-# a section whose offset fails is offset again as a polygon that stands at most this far off its edges, mm
+# a section whose offset fails is offset again as a polygon that stands at most this far off its edges; and the
+# shortest radius of a face sets the longest piece between two corners of its offset by this deflection, mm
 POLY_DEFLECTION = 0.02
+# the offset of a section is made sound (sound): its offset curves become arcs with their corners on the grid of
+# their faces, at most ARC_STEP longest pieces apart; an arc stands at most ARC_TOL off the curve; an arc shorter than
+# JOIN_ARC is the join at a corner where two edges meet nearly tangent; an offset curve shorter than SHORT_CURVE is a
+# line; DENSE points of a curve find where it crosses the grid, mm
+ARC_STEP = 4.0
+ARC_TOL = 0.005
+JOIN_ARC = 1e-3
+SHORT_CURVE = 1e-2
+DENSE = 400
+# two neighbour slabs whose outlines run closer than this take one outline (absorb), mm
+THIN = 0.01
 # every second slab of the cavity stands this far inside the offset by wall_t, so that no two neighbour slabs share
 # a part of their outline (see the module text), mm
 RIDGE = 0.05
@@ -117,16 +142,189 @@ def closed_points(wire: Part.Wire) -> list[FreeCAD.Vector]:
     return pts if (pts[0] - pts[-1]).Length < 1e-6 else pts + [pts[0]]
 
 
+class Grid:
+    """The corners of the offset of a section: for each face of the skin parts, a family of lines in the plane of a
+    section (y = k * step, or z = k * step: the one across which the section of the face runs, from its normal at its
+    centre), and the longest piece between two corners (from its smallest radius). A neighbour section cuts the same
+    face, so it has its corners on the same lines: two neighbour outlines run side by side piece by piece."""
+
+    def __init__(self, shapes: list[Part.Shape]) -> None:
+        self.faces = [(f, f.BoundBox) for s in shapes for f in s.Faces if not isinstance(f.Surface, Part.Plane)]
+        self.rules: dict[int, tuple[int, float, float]] = {}
+
+    def face_of(self, edge: Part.Edge) -> Part.Face | None:
+        mid = edge.valueAt(edge.getParameterByLength(edge.Length / 2))
+        best, dist = None, math.inf
+        for f, b in self.faces:
+            if b.XMin - 0.01 <= mid.x <= b.XMax + 0.01 and b.YMin - 0.01 <= mid.y <= b.YMax + 0.01 and b.ZMin - 0.01 <= mid.z <= b.ZMax + 0.01:
+                dd = f.distToShape(Part.Vertex(mid))[0]
+                if dd < dist:
+                    best, dist = f, dd
+        return best if dist < 1e-3 else None
+
+    def rule(self, f: Part.Face) -> tuple[int, float, float]:
+        """(1 for lines y = k * step, 2 for z = k * step; step; the longest piece), fixed for the face."""
+        key = f.hashCode()
+        if key not in self.rules:
+            s = f.Surface
+            u0, u1, v0, v1 = f.ParameterRange
+            n = f.normalAt((u0 + u1) / 2, (v0 + v1) / 2)
+            axis = 1 if abs(n.z) > abs(n.y) else 2
+            rmin = 1e6
+            for i in range(7):
+                for j in range(7):
+                    u, v = u0 + (u1 - u0) * (i + 0.5) / 7, v0 + (v1 - v0) * (j + 0.5) / 7
+                    try:
+                        c = max(abs(s.curvature(u, v, "Max")), abs(s.curvature(u, v, "Min")))
+                    except (Part.OCCError, RuntimeError):
+                        continue
+                    if c > 1e-9:
+                        rmin = min(rmin, 1 / c)
+            piece = ARC_STEP * max(0.1, min(20.0, math.sqrt(8 * POLY_DEFLECTION * rmin)))
+            self.rules[key] = (axis, piece * 0.7, piece)
+        return self.rules[key]
+
+    def params(self, curve, t0: float, t1: float) -> list[float]:
+        """The parameters in (t0, t1) of the corners of a section curve: where it crosses the lines of its face, and
+        more where two of them stand farther apart than the longest piece, evenly by length."""
+        import bisect
+
+        edge = Part.Edge(curve, t0, t1)
+        if edge.Length < SHORT_CURVE:
+            return []
+        f = self.face_of(edge)
+        axis, step, piece = self.rule(f) if f is not None else (2, 1.0, ARC_STEP)
+        ts = [t0 + (t1 - t0) * i / DENSE for i in range(DENSE + 1)]
+        ps = [curve.value(t) for t in ts]
+        vals = [(q.y if axis == 1 else q.z) / step for q in ps]
+        cut = {t0, t1}
+        for i in range(DENSE):
+            g0, g1 = vals[i], vals[i + 1]
+            lo, hi = sorted((g0, g1))
+            if hi - lo > 1e-15:
+                for n in range(math.floor(lo) + 1, math.floor(hi) + 1):
+                    cut.add(ts[i] + (n - g0) / (g1 - g0) * (ts[i + 1] - ts[i]))
+        acc = [0.0]
+        for i in range(DENSE):
+            acc.append(acc[-1] + (ps[i + 1] - ps[i]).Length)
+
+        def length_at(t: float) -> float:
+            x = (t - t0) / (t1 - t0) * DENSE
+            i = min(int(x), DENSE - 1)
+            return acc[i] + (x - i) * (acc[i + 1] - acc[i])
+
+        def param_at(length: float) -> float:
+            i = min(max(bisect.bisect_left(acc, length) - 1, 0), DENSE - 1)
+            span = acc[i + 1] - acc[i]
+            return ts[i] + (0.0 if span <= 0 else (length - acc[i]) / span) * (ts[i + 1] - ts[i])
+
+        out = []
+        cut = sorted(cut)
+        for a, b in zip(cut, cut[1:]):
+            la, lb = length_at(a), length_at(b)
+            m = max(1, math.ceil((lb - la) / piece))
+            out += [param_at(la + (lb - la) * k / m) for k in range(1, m)] + [b]
+        return [t for t in out if t0 < t < t1]
+
+
+def arcs(e: Part.Edge, a: FreeCAD.Vector, b: FreeCAD.Vector, grid: Grid) -> list[Part.Edge]:
+    """An offset curve from a to b as arcs (a line where the curve is that straight) through its corners on the grid
+    and the point of the exact offset halfway between two corners; a piece whose arc stands more than ARC_TOL off
+    the curve at a quarter is cut in two."""
+    base = getattr(e.Curve, "BasisCurve", None) or e.Curve
+    t0, t1 = e.FirstParameter, e.LastParameter
+    params = [t0] + grid.params(base, t0, t1) + [t1]
+    if (e.valueAt(t0) - a).Length > (e.valueAt(t1) - a).Length:
+        params.reverse()
+    out: list[Part.Edge] = []
+
+    def piece(tp: float, tq: float, p: FreeCAD.Vector, q: FreeCAD.Vector, depth: int = 0) -> None:
+        if (q - p).Length < 1e-9:
+            return
+        tm = (tp + tq) / 2
+        m = e.valueAt(tm)
+        quarters = [e.valueAt(tp + (tq - tp) * k) for k in (0.25, 0.75)]
+        if (m - (p + q) * 0.5).Length <= ARC_TOL:
+            line = Part.makeLine(p, q)
+            if depth >= 6 or max(line.distToShape(Part.Vertex(c))[0] for c in quarters) <= ARC_TOL:
+                out.append(line)
+                return
+        else:
+            try:
+                arc = Part.Arc(p, m, q).toShape()
+            except Part.OCCError:
+                arc = None
+            if arc is not None and (depth >= 6 or max(arc.distToShape(Part.Vertex(c))[0] for c in quarters) <= ARC_TOL):
+                out.append(arc)
+                return
+        piece(tp, tm, p, m, depth + 1)
+        piece(tm, tq, m, q, depth + 1)
+
+    pts = [e.valueAt(t) for t in params]
+    pts[0], pts[-1] = a, b
+    for (tp, tq), (p, q) in zip(zip(params, params[1:]), zip(pts, pts[1:])):
+        piece(tp, tq, p, q)
+    return out
+
+
+def sound(face: Part.Face, grid: Grid) -> Part.Face:
+    """An offset face (makeOffset2D) with each offset curve made arcs on the grid (arcs); the lines and the arcs of
+    the offset stay, but a join arc shorter than JOIN_ARC goes and its two neighbours meet at one point.
+
+    The 2D offset of OpenCascade makes the offset of a spline or an ellipse as an offset curve that is only C0 at the
+    knots of its basis, and its curve on the plane does not follow it (BOPAlgo_InvalidCurveOnSurface); at a corner
+    where two edges meet nearly tangent it adds a join arc of about 1e-6 mm (BOPAlgo TooSmallEdge). The skin had step
+    faces with such edges, and the mesh of a piece of the split put a node of such a face hundreds of mm off it, at a
+    place that changed from run to run."""
+    wires = []
+    for wire in face.Wires:
+        edges, vs = wire.OrderedEdges, [v.Point for v in wire.OrderedVertexes]
+        items = []      # [kind, edge, start, end]
+        for i, e in enumerate(edges):
+            a, b = vs[i], vs[(i + 1) % len(vs)]
+            if isinstance(e.Curve, Part.Circle):
+                if e.Length >= JOIN_ARC:
+                    items.append(["arc", e, a, b])
+            elif isinstance(e.Curve, Part.Line) or e.Length < SHORT_CURVE:
+                items.append(["line", e, a, b])
+            else:
+                items.append(["curve", e, a, b])
+        # neighbours meet at one point: the end of an arc, else the end of the edge before
+        for k, cur in enumerate(items):
+            nxt = items[(k + 1) % len(items)]
+            joint = nxt[2] if nxt[0] == "arc" and cur[0] != "arc" else cur[3]
+            cur[3] = joint
+            if nxt[0] != "arc":
+                nxt[2] = joint
+        out = []
+        for kind, e, a, b in items:
+            if kind == "arc":
+                out.append(e)
+            elif kind == "line":
+                if (b - a).Length > 1e-9:
+                    out.append(Part.makeLine(a, b))
+            else:
+                out += arcs(e, a, b, grid)
+        wires.append(Part.Wire(out))
+    return Part.makeFace(wires, "Part::FaceMakerBullseye")
+
+
+# the grid of the parts that build() reads, for inner (a module variable: width_run replaces inner(face, x, w))
+_GRID: Grid | None = None
+
+
 def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
-    """The section offset inward by w, moved into the plane x = 0."""
+    """The section offset inward by w, moved into the plane x = 0, with its edges made sound (sound): the inner face
+    of the wall stands at most ARC_TOL off the exact offset."""
     if face is None:
         return None
     out = []
     for f in face.Faces:
         try:
-            out.append(f.makeOffset2D(-w, 0, False, False, False))
+            off = f.makeOffset2D(-w, 0, False, False, False)
+            out.append(Part.makeCompound([sound(g, _GRID) for g in off.Faces]) if _GRID is not None else off)
             continue
-        except (FreeCAD.Base.CADKernelError, ValueError):
+        except (FreeCAD.Base.CADKernelError, Part.OCCError, ValueError, RuntimeError):
             pass
         # the offset of a section through a lofted surface (the rear corner rounds) can fail on its spline edges:
         # try again on the same outline as a polygon within POLY_DEFLECTION of it; when that fails too, the face is
@@ -134,7 +332,7 @@ def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
         try:
             wires = [Part.makePolygon(closed_points(wi)) for wi in f.Wires]
             out.append(Part.makeFace(wires, "Part::FaceMakerBullseye").makeOffset2D(-w, 0, False, False, False))
-        except (FreeCAD.Base.CADKernelError, ValueError, RuntimeError):
+        except (FreeCAD.Base.CADKernelError, Part.OCCError, ValueError, RuntimeError):
             continue
     out = [s for s in out if s.Faces and s.Area > SAME]
     if not out:
@@ -145,7 +343,8 @@ def inner(face: Part.Shape | None, x: float, w: float) -> Part.Shape | None:
 
 def common(faces: list[Part.Shape | None]) -> Part.Shape | None:
     """The common of the sections. Two sections that share edges can make the boolean fail and return nothing;
-    then it runs again with a fuzzy tolerance of FUZZY."""
+    then it runs again with a fuzzy tolerance of FUZZY. (The fuzzy common is not the first try: on the body at x 233 it
+    returned 12059 mm2 where the plain common gives the 108981 of the offset.)"""
     if any(f is None for f in faces):
         return None
     out = faces[0]
@@ -156,6 +355,30 @@ def common(faces: list[Part.Shape | None]) -> Part.Shape | None:
         if both.isNull() or both.Area < SAME:
             return None
         out = both
+    return out
+
+
+def thin(face: Part.Face) -> bool:
+    return face.Area / max(face.Length / 2, 1e-12) < THIN
+
+
+def absorb(regions: list[Part.Shape | None]) -> list[Part.Shape | None]:
+    """Each region with the thin parts of its difference from the region before it absorbed: where two neighbour
+    outlines run closer than THIN (the form turns across X and takes RIDGE back), the step between them would be a
+    strip of a few 0.0001 mm, which the mesh of a part leaves open; the later region takes the outline of the earlier
+    one there."""
+    out = list(regions)
+    for k in range(1, len(out)):
+        a, b = out[k - 1], out[k]
+        if a is None or b is None:
+            continue
+        add = [f for f in a.cut(b).Faces if thin(f)]
+        take = [f for f in b.cut(a).Faces if thin(f)]
+        if add:
+            b = b.fuse(add).removeSplitter()
+        if take:
+            b = b.cut(take).removeSplitter()
+        out[k] = b
     return out
 
 
@@ -198,8 +421,10 @@ def prisms(region: Part.Shape, x0: float, x1: float) -> list[Part.Shape]:
 
 def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) -> Cavity:
     """The cavity of the skin parts, as slabs symmetric about the centre line plus the two openings."""
+    global _GRID
     w = d.wall_t
     skin = form_parts(parts, d) + [seam_filler(parts, d)]
+    _GRID = Grid(skin)
     half = max(s.BoundBox.XMax for s in skin)
     n = math.ceil(half / SLAB) + 1
     reach = math.ceil(w / SLAB)
@@ -237,7 +462,7 @@ def build(parts: dict[str, Part.Shape], d: Blueprint, o: Openings = Openings()) 
     lost = [x0 for (x0, _, region, _), (_, _, before, _) in zip(stepped, slabs) if region is None and before is not None]
     if lost:
         raise RuntimeError(f"the cavity has no section for the slabs at x = {', '.join(f'{x:g}' for x in lost)}: the offset by wall_t + RIDGE failed there")
-    slabs = stepped
+    slabs = [(x0, x1, region, face) for (x0, x1, _, face), region in zip(stepped, absorb([r for _, _, r, _ in stepped]))]
     cut = openings(d, o, parts)
     pieces = [p for x0, x1, region, _ in slabs if region is not None for p in prisms(region, x0, x1)] + cut
     walls = []
